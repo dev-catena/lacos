@@ -7,6 +7,9 @@ class AppTheme {
     return ThemeData(
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: CustomColor.bottomBarBg
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        border: OutlineInputBorder(),
       )
     );
   }

@@ -2,17 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/utils/custom_colors.dart';
 
-
 class CustomSelectableTile extends StatelessWidget {
   const CustomSelectableTile({
     super.key,
     required this.title,
+    required this.onTap,
+    required this.isActive,
     this.width,
     this.height,
-    this.onTap,
-    this.flexIndex,
-    this.flexFactor = 1,
-    this.isActive,
     this.trailingWidget,
     this.hasGreyBackground = false,
     this.titleColor,
@@ -23,32 +20,25 @@ class CustomSelectableTile extends StatelessWidget {
   final String title;
   final double? width;
   final double? height;
-  final void Function()? onTap;
-  final int? flexIndex;
-  final int flexFactor;
-  final bool? isActive;
+  final void Function() onTap;
+  final bool isActive;
   final bool hasGreyBackground;
   final Color? titleColor;
   final Color? color;
   final Color? borderColor;
   final Widget? trailingWidget;
 
-
   // Casos
   // possui ativo/inativo (portanto, com cor/transparente)
   //
 
   Color getTileColor() {
-    if (isActive != null) {
-      if (isActive!) {
-        return CustomColor.activeBottomBarBgIcon;
-      } else {
-        if (hasGreyBackground) return Colors.grey;
-        return Colors.transparent;
-      }
+    if (isActive) {
+      return CustomColor.activeBottomBarBgIcon;
+    } else {
+      if (hasGreyBackground) return Colors.grey;
+      return Colors.transparent;
     }
-    if (hasGreyBackground) return Colors.grey;
-    return Colors.transparent;
   }
 
   Color? getTextColor() {
@@ -91,7 +81,6 @@ class CustomSelectableTile extends StatelessWidget {
             ),
           ),
           child: Row(
-            // mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               Expanded(
                 child: Text(
@@ -102,12 +91,6 @@ class CustomSelectableTile extends StatelessWidget {
                   ),
                 ),
               ),
-              // ...List.generate(title.length, (index) {
-              //   return Expanded(
-              //     flex: index == flexIndex ? flexFactor : 1,
-              //     child: title[index],
-              //   );
-              // }),
               trailingWidget != null ? trailingWidget! : const SizedBox(),
             ],
           ),

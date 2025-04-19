@@ -3,16 +3,18 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../../core/providers/patient_cubit.dart';
 import '../../../../../common/presentation/widgets/custom_scaffold.dart';
+import '../dialogs/register_new_doctor_dialog.dart';
 
 class DoctorManagementScreen extends StatelessWidget {
   const DoctorManagementScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final bloc = context.read<PatientCubit>();
     return CustomScaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          showDialog(context: context, builder: (context) => const RegisterNewDoctorDialog());
+        },
         child: const Icon(Icons.add),
       ),
       onRefresh: () {},

@@ -5,9 +5,9 @@ import '../features/appointment_schedule/presentation/widgets/screens/appointmen
 import '../features/chat/presentation/widgets/screens/chat_screen.dart';
 import '../features/common/data/data_source/user_datasource.dart';
 import '../features/home/patient_profile/presentation/widgets/screens/doctor_management_screen.dart';
-import '../features/home/patient_profile/data/data_source/doctor_datasource.dart';
 import '../features/home/patient_profile/presentation/widgets/screens/patient_collectable_data_screen.dart';
 import '../features/medicines/data/medication_datasource.dart';
+import '../features/medicines/presentation/widgets/screens/new_medicine_screen.dart';
 import '../features/user_profile/presentation/widgets/screens/group_selection_screen.dart';
 import '../features/home/patient_profile/presentation/widgets/screens/group_management_screen.dart';
 import '../features/home/patient_profile/presentation/widgets/screens/patient_profile_screen.dart';
@@ -41,6 +41,9 @@ class AppRoutes {
   static const patientCollectableDataScreen = 'dados-coletaveis';
   static const groupManagementScreen = 'gerenciar-grupo';
   static const doctorManagementScreen = 'gerenciar-medicos';
+
+  // dentro de [medicinesScreen]
+  static const newMedicineScreen = '/novo-medicamento';
 
   static const userProfileScreen = '/perfil-usuario';
 
@@ -114,7 +117,13 @@ final GoRouter _routes = GoRouter(
                   ),
                 );
               },
-              routes: const [],
+              routes: [
+                GoRoute(
+                  name: AppRoutes.newMedicineScreen,
+                  path: AppRoutes.newMedicineScreen,
+                  builder: (context, state) => const NewMedicineScreen(),
+                ),
+              ],
             )
           ],
         ),

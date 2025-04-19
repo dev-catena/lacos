@@ -38,7 +38,9 @@ class MedicinesScreenState extends State<MedicinesScreen> with SingleTickerProvi
       ),
       isScrollable: false,
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          context.pushNamed(AppRoutes.newMedicineScreen);
+        },
         child: const Icon(Icons.add),
       ),
       child: BlocBuilder<MedicationBloc, MedicationState>(

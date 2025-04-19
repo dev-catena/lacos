@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/routes.dart';
 import '../../../common/presentation/widgets/custom_scaffold.dart';
 import '../../data/medication_datasource.dart';
 import '../../domain/entities/medicine.dart';

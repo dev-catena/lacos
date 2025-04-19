@@ -38,7 +38,7 @@ class LacosApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         RepositoryProvider(create: (_) => UserCubit(UserDataSource())),
-        RepositoryProvider(create: (_) => PatientCubit(context.read<UserCubit>().currentPatient, DoctorDataSource())),
+        RepositoryProvider(create: (_) => PatientCubit(DoctorDataSource())),
 
       ],
       child: MaterialApp.router(

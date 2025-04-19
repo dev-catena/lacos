@@ -64,6 +64,7 @@ class LoginScreen extends StatelessWidget {
                       if ((userData.state as UserReady).defaultPatient == null) {
                         context.goNamed(AppRoutes.groupSelectionScreen);
                       } else {
+                        await doctorData.initialize(userData.currentPatient!);
                         context.goNamed('home');
                       }
                     },
