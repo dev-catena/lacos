@@ -22,10 +22,10 @@ import 'features/home/patient_profile/data/data_source/doctor_datasource.dart';
 // mkdir user_profile\presentation\widgets\screens
 // mkdir user_profile\presentation\widgets\components
 
-void main() {
-  initializeDateFormatting('pt_BR', null).then((_) {
-    runApp(const LacosApp());
-  });
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('pt_BR', null);
+  runApp(const LacosApp());
 }
 
 class LacosApp extends StatelessWidget {
@@ -39,7 +39,6 @@ class LacosApp extends StatelessWidget {
       providers: [
         RepositoryProvider(create: (_) => UserCubit(UserDataSource())),
         RepositoryProvider(create: (_) => PatientCubit(DoctorDataSource())),
-
       ],
       child: MaterialApp.router(
         scaffoldMessengerKey: Globals.scaffoldMessengerKey,

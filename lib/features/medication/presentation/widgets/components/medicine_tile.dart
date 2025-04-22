@@ -3,24 +3,24 @@ import 'package:flutter/material.dart';
 import '../../../../../core/utils/custom_colors.dart';
 import '../../../domain/entities/medicine.dart';
 
-class MedicineTile extends StatelessWidget {
-  const MedicineTile(this.medicine, {super.key});
+class MedicationTile extends StatelessWidget {
+  const MedicationTile(this.medication, {super.key});
 
-  final Medicine medicine;
+  final Medication medication;
 
   @override
   Widget build(BuildContext context) {
     // return Text(medicine.name);
-    final times = medicine.getSuggestedTimes();
+    final times = medication.getSuggestedTimes();
 
     Color getStatusColor(){
       final Color color;
-      if(medicine.hasTaken == null){
+      if(medication.hasTaken == null){
 
         return Colors.transparent;
-      } else if(medicine.hasTaken!) {
+      } else if(medication.hasTaken!) {
         color = Colors.green;
-      } else if(!medicine.hasTaken!){
+      } else if(!medication.hasTaken!){
         color = CustomColor.vividRed;
       } else {
         color = Colors.transparent;
@@ -38,12 +38,12 @@ class MedicineTile extends StatelessWidget {
             decoration: BoxDecoration(
               color: getStatusColor(),
               borderRadius: BorderRadius.circular(50),
-              border: Border.all(color: medicine.hasTaken == null ? Colors.grey : getStatusColor())
+              border: Border.all(color: medication.hasTaken == null ? Colors.grey : getStatusColor())
             ),
-            child: Icon(medicine.type.icon, size: 25),
+            child: Icon(medication.medicine.type.icon, size: 25),
           ),
           const SizedBox(width: 10),
-          Text(medicine.name),
+          Text(medication.medicine.name),
         ],
       ),
     );

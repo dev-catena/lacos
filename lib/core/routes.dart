@@ -6,13 +6,13 @@ import '../features/chat/presentation/widgets/screens/chat_screen.dart';
 import '../features/common/data/data_source/user_datasource.dart';
 import '../features/home/patient_profile/presentation/widgets/screens/doctor_management_screen.dart';
 import '../features/home/patient_profile/presentation/widgets/screens/patient_collectable_data_screen.dart';
-import '../features/medicines/data/medication_datasource.dart';
-import '../features/medicines/presentation/widgets/screens/new_medicine_screen.dart';
+import '../features/medication/data/medication_datasource.dart';
+import '../features/medication/presentation/blocs/medication_bloc.dart';
+import '../features/medication/presentation/widgets/screens/new_medication_screen.dart';
 import '../features/user_profile/presentation/widgets/screens/group_selection_screen.dart';
 import '../features/home/patient_profile/presentation/widgets/screens/group_management_screen.dart';
 import '../features/home/patient_profile/presentation/widgets/screens/patient_profile_screen.dart';
 import '../features/login/presentation/widgets/login_screen.dart';
-import '../features/medicines/presentation/blocs/medication_bloc.dart';
 import '../features/user_profile/presentation/widgets/screens/user_profile_screen.dart';
 import '../splash_screen.dart';
 
@@ -121,7 +121,7 @@ final GoRouter _routes = GoRouter(
                 GoRoute(
                   name: AppRoutes.newMedicineScreen,
                   path: AppRoutes.newMedicineScreen,
-                  builder: (context, state) => const NewMedicineScreen(),
+                  builder: (context, state) => const NewMedicationScreen(),
                 ),
               ],
             )

@@ -8,9 +8,9 @@ final class MedicinesInitial extends MedicationState {}
 final class MedicinesLoadInProgress extends MedicationState {}
 
 final class MedicinesReady extends MedicationState {
-  final List<Medicine> medicines;
+  final List<Medication> medications;
 
-  MedicinesReady({required this.medicines});
+  MedicinesReady({required this.medications});
 }
 
 final class MedicinesError extends MedicationState {

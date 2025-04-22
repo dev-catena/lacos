@@ -21,13 +21,13 @@ class MedicationBloc extends Bloc<MedicationEvent, MedicationState> {
 
   Future<void> _onStarted(event, emit) async {
     emit(MedicinesLoadInProgress());
-    final List<Medicine> medicines = [];
+    final List<Medication> medications = [];
 
     await Future.wait([
-      dataSource.getMedicines().then((value) => medicines.addAll(value)),
+      dataSource.getMedications().then((value) => medications.addAll(value)),
     ]);
 
-    emit(MedicinesReady(medicines: medicines));
+    emit(MedicinesReady(medications: medications));
 
   }
 }

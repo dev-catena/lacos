@@ -43,23 +43,19 @@ class CustomSelectableTile extends StatelessWidget {
 
   Color? getTextColor() {
     if (isActive == true) {
-      return Colors.white;
+      return Colors.black;
     } else {
       return null;
     }
   }
 
   Color getBorderColor() {
-    if (isActive != null) {
-      if (isActive!) {
-        return CustomColor.activeBottomBarBgIcon;
-      } else {
-        if (hasGreyBackground) return Colors.grey;
-        return Colors.grey;
-      }
+    if (isActive) {
+      return CustomColor.activeBottomBarBgIcon;
+    } else {
+      if (hasGreyBackground) return Colors.grey;
+      return Colors.grey;
     }
-    if (hasGreyBackground) return Colors.transparent;
-    return Colors.transparent;
   }
 
   @override

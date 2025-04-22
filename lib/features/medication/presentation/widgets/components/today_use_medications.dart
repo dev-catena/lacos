@@ -6,7 +6,7 @@ import '../../../domain/entities/medicine.dart';
 
 class TodayUseMedications extends StatelessWidget {
   const TodayUseMedications(this.medicines, {super.key});
-  final List<Medicine> medicines;
+  final List<Medication> medicines;
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +38,8 @@ class TodayUseMedications extends StatelessWidget {
     );
   }
 
-  List<Medicine> _groupMedicationsByPeriod(MedicationPeriod period, List<Medicine> medications) {
-    final List<Medicine> result = [];
+  List<Medication> _groupMedicationsByPeriod(MedicationPeriod period, List<Medication> medications) {
+    final List<Medication> result = [];
 
     for (var medicine in medications) {
       final suggestedTimes = medicine.getSuggestedTimes();
@@ -79,7 +79,7 @@ class MedicationPeriodWidget extends StatelessWidget {
   });
 
   final MedicationPeriod period;
-  final List<Medicine> medications;
+  final List<Medication> medications;
 
   @override
   Widget build(BuildContext context) {

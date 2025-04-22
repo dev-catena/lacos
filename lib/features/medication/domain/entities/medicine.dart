@@ -2,7 +2,35 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
 
+import '../../../../core/utils/custom_colors.dart';
 import '../../presentation/widgets/components/medicine_tile.dart';
+
+class Medication {
+  final Medicine medicine;
+  final MedicineFrequency frequency;
+  final List<UsageInstructions>? usageInstructions;
+  final TimeOfDay firstDose;
+  final bool? hasTaken;
+
+
+  /// Retorna os horários sugeridos com base na frequência e primeiro horário do dia
+  List<TimeOfDay> getSuggestedTimes() {
+    return frequency.getSuggestedTimes(firstDose);
+  }
+
+  Medication({
+    required this.medicine,
+    required this.frequency,
+    required this.firstDose,
+    this.usageInstructions,
+    this.hasTaken,
+  });
+
+
+  MedicationTile buildTile() {
+    return MedicationTile(this);
+  }
+}
 
 enum UsageInstructions {
   jejum;
@@ -13,30 +41,13 @@ class Medicine extends Equatable {
   final MedicineType type;
   final String description;
   final double dosage; // mg/ml por dose
-  final MedicineFrequency frequency;
-  final List<UsageInstructions>? usageInstructions;
-  final TimeOfDay firstDose;
-  final bool? hasTaken;
 
   const Medicine({
     required this.name,
     required this.type,
     required this.description,
     required this.dosage,
-    required this.frequency,
-    required this.firstDose,
-    this.usageInstructions,
-    this.hasTaken,
   });
-
-  MedicineTile buildTile() {
-    return MedicineTile(this);
-  }
-
-  /// Retorna os horários sugeridos com base na frequência e primeiro horário do dia
-  List<TimeOfDay> getSuggestedTimes() {
-    return frequency.getSuggestedTimes(firstDose);
-  }
 
   @override
   List<Object?> get props => [
@@ -44,14 +55,11 @@ class Medicine extends Equatable {
         type,
         description,
         dosage,
-        frequency,
-        firstDose,
-        usageInstructions,
       ];
 
   @override
   String toString() {
-    return 'Medicine(name: $name, type: $type, dosage: $dosage mg, frequency: ${frequency.description}, firstDose: ${firstDose.hour}:${firstDose.minute})';
+    return 'Medicine(name: $name, type: $type, dosage: $dosage mg)';
   }
 }
 
@@ -90,6 +98,31 @@ enum MedicineType {
   final IconData icon;
 
   const MedicineType(this.description, this.icon);
+
+  Widget buildIcon(void Function(MedicineType type) onTap, [bool isActive = false]){
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(60),
+            onTap: ()=>onTap(this),
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: isActive ? CustomColor.activeBottomBarBgIcon : null,
+                borderRadius: BorderRadius.circular(60),
+                border: Border.all(color: Colors.grey.shade500)
+              ),
+              child: Icon(icon),
+            ),
+          ),
+        ),
+        Text(description),
+      ],
+    );
+  }
 }
 
 enum MedicineFrequency {

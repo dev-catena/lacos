@@ -7,7 +7,8 @@ import '../../../../../../core/providers/user_cubit.dart';
 import '../../../domain/entities/doctor.dart';
 
 class RegisterNewDoctorDialog extends StatefulWidget {
-  const RegisterNewDoctorDialog({super.key});
+  const RegisterNewDoctorDialog({super.key, this.onRegistered});
+  final void Function(Doctor newDoctor)? onRegistered;
 
   @override
   State<RegisterNewDoctorDialog> createState() => _RegisterNewDoctorDialogState();
@@ -90,6 +91,9 @@ class _RegisterNewDoctorDialogState extends State<RegisterNewDoctorDialog> {
             );
 
             await patientData.registerDoctor(userData.currentPatient!, newDoctor);
+            if(widget.onRegistered != null){
+              widget.onRegistered!(newDoctor);
+            }
             context.pop();
           },
           child: const Text('Cadastrar'),

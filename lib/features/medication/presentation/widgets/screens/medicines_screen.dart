@@ -86,7 +86,7 @@ class _ReadyScreen extends StatelessWidget {
     return TabBarView(
       controller: tabController,
       children: [
-        TodayUseMedications(state.medicines),
+        TodayUseMedications(state.medications),
         const Text('tab2'),
         const Text('tab3'),
       ],
