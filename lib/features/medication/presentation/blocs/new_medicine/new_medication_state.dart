@@ -15,6 +15,7 @@ final class NewMedicationReady extends NewMedicationState {
   final DateTime? startDate;
   final DateTime? endDate;
   final bool isContinuous;
+  final MedicineFrequency? frequencySelected;
   final TimeOfDay? firstDoseTime;
 
   static const _unset = Object();
@@ -27,6 +28,7 @@ final class NewMedicationReady extends NewMedicationState {
     Object? startDate = _unset,
     Object? endDate = _unset,
     Object? isContinuous = _unset,
+    Object? frequencySelected = _unset,
     Object? firstDoseTime = _unset,
   }) {
     return NewMedicationReady(
@@ -38,6 +40,7 @@ final class NewMedicationReady extends NewMedicationState {
       startDate: startDate != _unset ? startDate as DateTime? : this.startDate,
       endDate: endDate != _unset ? endDate as DateTime? : this.endDate,
       isContinuous: isContinuous != _unset ? isContinuous as bool : this.isContinuous,
+      frequencySelected: frequencySelected != _unset ? frequencySelected as MedicineFrequency : this.frequencySelected,
       firstDoseTime: firstDoseTime != _unset ? firstDoseTime as TimeOfDay? : this.firstDoseTime,
     );
   }
@@ -49,6 +52,7 @@ final class NewMedicationReady extends NewMedicationState {
     required this.concentrationSelected,
     required this.startDate,
     required this.endDate,
+    required this.frequencySelected,
     required this.firstDoseTime,
     this.isContinuous = false,
   });

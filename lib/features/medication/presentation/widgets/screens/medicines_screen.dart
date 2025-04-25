@@ -83,10 +83,12 @@ class _ReadyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final userData = context.read<UserCubit>();
     return TabBarView(
       controller: tabController,
       children: [
-        TodayUseMedications(state.medications),
+        // TodayUseMedications(state.medications),
+        TodayUseMedications(userData.currentPatient!.medications),
         const Text('tab2'),
         const Text('tab3'),
       ],

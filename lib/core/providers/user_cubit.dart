@@ -1,8 +1,10 @@
 import 'package:collection/collection.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../features/common/data/data_source/user_datasource.dart';
 import '../../features/common/domain/entities/user.dart';
+import '../../features/medication/domain/entities/medication.dart';
 import '../../features/user_profile/presentation/widgets/screens/group_selection_screen.dart';
 
 part 'user_state.dart';
@@ -12,18 +14,18 @@ class UserCubit extends Cubit<UserState> {
 
   UserCubit(this._userDataSource) : super(UserDataInitial());
 
-  Patient? get currentPatient =>
-      state is UserReady ? (state as UserReady).defaultPatient : null;
+  UserEntity? get user => state is UserReady ? (state as UserReady).userLoggedIn : null;
 
-  Patient? get currentAccessType =>
-      state is UserReady ? (state as UserReady).defaultPatient : null;
+  Patient? get currentPatient => state is UserReady ? (state as UserReady).defaultPatient : null;
 
-  Future<void> initialize(String userName, String pwd) async {
+  Patient? get currentAccessType => state is UserReady ? (state as UserReady).defaultPatient : null;
+
+  Future<void> initialize(GoogleSignInAccount account) async {
     List<Patient> patients = [];
     int? defaultPatientId;
     AccessProfileType? accessType;
 
-    final user = await _userDataSource.login(userName, pwd);
+    final user = await _userDataSource.login(account);
 
     await Future.wait([
       _userDataSource.getPatientsForUser(user.id).then((value) => patients = value),
@@ -31,10 +33,8 @@ class UserCubit extends Cubit<UserState> {
       _userDataSource.getAccessType(user).then((value) => accessType = value),
     ]);
 
-    final defaultPatient = defaultPatientId != null
-        ? patients.firstWhereOrNull((p) => p.self.id == defaultPatientId)
-        : null;
-
+    final defaultPatient =
+        defaultPatientId != null ? patients.firstWhereOrNull((p) => p.self.id == defaultPatientId) : null;
 
     emit(UserReady(user, patients, defaultPatient, accessType!));
   }
@@ -53,6 +53,13 @@ class UserCubit extends Cubit<UserState> {
     if (currentState is UserReady) {
       await _userDataSource.setDefaultAccessType(accessType);
       emit(currentState.copyWith(currentAccessType: accessType));
+    }
+  }
+
+  void addMedication(Medication med) {
+    final currentState = state;
+    if (currentState is UserReady) {
+      emit(currentState.copyWith(defaultPatient: currentPatient!..medications.add(med)));
     }
   }
 

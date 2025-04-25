@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:meta/meta.dart';
 
 import '../../../../home/patient_profile/domain/entities/doctor.dart';
-import '../../../domain/entities/medicine.dart';
+import '../../../domain/entities/medication.dart';
 
 part 'new_medication_event.dart';
 
@@ -20,6 +20,7 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
     on<NewMedicationEndChosen>(_onEndChosen);
     on<NewMedicationContinuousSelected>(_onContinuousSet);
     on<NewMedicationTimeChosen>(_onTimeSet);
+    on<NewMedicationFrequencySelected>(_onFrequencySelected);
   }
 
   Future<void> _onStarted(NewMedicationStarted event, Emitter<NewMedicationState> emit) async {
@@ -36,6 +37,7 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
         endDate: null,
         isContinuous: false,
         firstDoseTime: null,
+        frequencySelected: null,
       ),
     );
   }
@@ -102,6 +104,17 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
       emit(internalState.copyWith(firstDoseTime: null));
     } else {
       emit(internalState.copyWith(firstDoseTime: event.time));
+    }
+
+  }
+
+  void _onFrequencySelected(NewMedicationFrequencySelected event, Emitter<NewMedicationState> emit) {
+    final internalState = state as NewMedicationReady;
+
+    if (event.frequency == internalState.frequencySelected ) {
+      emit(internalState.copyWith(firstDoseTime: null));
+    } else {
+      emit(internalState.copyWith(frequencySelected: event.frequency));
     }
 
   }

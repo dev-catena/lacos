@@ -37,7 +37,7 @@ class _MockData {
   final messages = [
     MessageData(
       id: 1,
-      author: User(
+      author: UserEntity(
         id: 1,
         fullName: 'Juliana Moreira',
         photoPath: 'assets/images/senhora.webp',

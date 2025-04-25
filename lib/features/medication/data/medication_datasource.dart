@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../domain/entities/medicine.dart';
+import '../domain/entities/medication.dart';
 
 class MedicationDataSource {
   Future<List<Medication>> getMedications() async {

@@ -5,7 +5,7 @@ abstract class UserState {}
 class UserDataInitial extends UserState {}
 
 class UserReady extends UserState {
-  final User userLoggedIn;
+  final UserEntity userLoggedIn;
   final List<Patient> patients;
   final Patient? defaultPatient;
   final AccessProfileType currentAccessType;
@@ -18,7 +18,7 @@ class UserReady extends UserState {
   );
 
   UserReady copyWith({
-    User? userLoggedIn,
+    UserEntity? userLoggedIn,
     List<Patient>? patients,
     Patient? defaultPatient,
     AccessProfileType? currentAccessType,

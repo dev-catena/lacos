@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../../core/providers/app_data_cubit.dart';
 import '../../../../../core/providers/patient_cubit.dart';
+import '../../../../../core/providers/user_cubit.dart';
 import '../../../../common/presentation/widgets/components/custom_selectable_tile.dart';
 import '../../../../common/presentation/widgets/custom_scaffold.dart';
 import '../../../../common/presentation/widgets/dialogs/single_select_dialog.dart';
 import '../../../../home/patient_profile/domain/entities/doctor.dart';
 import '../../../../home/patient_profile/presentation/widgets/dialogs/new_medicine_dialog.dart';
 import '../../../../home/patient_profile/presentation/widgets/dialogs/register_new_doctor_dialog.dart';
-import '../../../domain/entities/medicine.dart';
+import '../../../domain/entities/medication.dart';
 import '../../blocs/new_medicine/new_medication_bloc.dart';
 
 class NewMedicationScreen extends StatelessWidget {
@@ -58,6 +61,8 @@ class _ReadyScreen extends StatelessWidget {
     final titleMedium = Theme.of(context).textTheme.titleMedium!;
     final patientData = context.read<PatientCubit>();
     final bloc = context.read<NewMedicationBloc>();
+    final userData = context.read<UserCubit>();
+    final appData = context.read<AppDataCubit>();
 
     return Column(
       children: [
@@ -65,6 +70,7 @@ class _ReadyScreen extends StatelessWidget {
         const SizedBox(height: 12),
         Text('Prescrição médica', style: titleMedium),
         const SizedBox(height: 6),
+
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -99,6 +105,17 @@ class _ReadyScreen extends StatelessWidget {
         const Divider(),
         const SizedBox(height: 10),
         Text('Medicação', style: titleMedium),
+
+        // ListTile(
+        //   title: Text('Remédio 1'),
+        // ),
+        // ListTile(
+        //   title: Text('Remédio 2'),
+        // ),
+        // ListTile(
+        //   title: Text('Remédio 3'),
+        // ),
+        // IconButton(onPressed: (){}, icon: Icon(Icons.add_circle_outline)),
         const SizedBox(height: 6),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -112,7 +129,7 @@ class _ReadyScreen extends StatelessWidget {
                   context: context,
                   builder: (_) => SingleSelectDialog<Medicine>(
                     title: 'Selecione o medicamento',
-                    options: state.medicines,
+                    options: appData.medicines!,
                     getName: (option) => option.name,
                     onChoose: (value) {
                       bloc.add(NewMedicationMedicineSelected(value));
@@ -135,15 +152,18 @@ class _ReadyScreen extends StatelessWidget {
         DropdownMenu<String>(
           width: 200,
           dropdownMenuEntries: const [
-            DropdownMenuEntry(value: '1', label: '1 vez ao dia'),
-            DropdownMenuEntry(value: '12', label: '12 em 12 horas'),
-            DropdownMenuEntry(value: '8', label: '8 em 8 horas'),
-            DropdownMenuEntry(value: '6', label: '6 em 6 horas'),
-            DropdownMenuEntry(value: '4', label: '4 em 4 horas'),
+            DropdownMenuEntry(value: '0', label: '1 vez ao dia'),
             DropdownMenuEntry(value: '2', label: '2 em 2 horas'),
+            DropdownMenuEntry(value: '4', label: '4 em 4 horas'),
+            DropdownMenuEntry(value: '6', label: '6 em 6 horas'),
+            DropdownMenuEntry(value: '8', label: '8 em 8 horas'),
+            DropdownMenuEntry(value: '12', label: '12 em 12 horas'),
             DropdownMenuEntry(value: 'sn', label: 'Sem frequência'),
           ],
-          onSelected: (value) => bloc.add(NewMedicationConcentrationSelected(value!)),
+          initialSelection: state.frequencySelected?.hoursInterval.toString(),
+          onSelected: (value) {
+            bloc.add(NewMedicationFrequencySelected(MedicineFrequency.fromString(value!)));
+          },
         ),
 
         // SegmentedButton<String>(
@@ -251,6 +271,21 @@ class _ReadyScreen extends StatelessWidget {
             );
           },
           isActive: state.firstDoseTime != null,
+        ),
+        const SizedBox(height: 10),
+        FilledButton(
+          onPressed: () {
+            final med = Medication(
+              medicine: state.medicineSelected!,
+              frequency: state.frequencySelected!,
+              firstDose: state.firstDoseTime!,
+              usageInstructions: [],
+              hasTaken: false,
+            );
+            userData.addMedication(med);
+            context.pop();
+          },
+          child: const Text('Cadastrar'),
         ),
         // SegmentedButton<String>(
         //   segments: const [

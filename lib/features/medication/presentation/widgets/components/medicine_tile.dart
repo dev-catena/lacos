@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/utils/custom_colors.dart';
-import '../../../domain/entities/medicine.dart';
+import '../../../domain/entities/medication.dart';
 
 class MedicationTile extends StatelessWidget {
   const MedicationTile(this.medication, {super.key});

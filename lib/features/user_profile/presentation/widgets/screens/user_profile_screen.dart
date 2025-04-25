@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../../../../core/providers/user_cubit.dart';
 import '../../../../../core/routes.dart';
 import '../../../../common/presentation/widgets/custom_scaffold.dart';
 
@@ -9,18 +12,34 @@ class UserProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScaffold(
-      child: Column(
-        children: [
-          ...List.generate(
-            UserProfileOption.values.length,
-                (index) {
-              final option = UserProfileOption.values[index];
+    final userData = context.read<UserCubit>();
 
-              return option.buildTile(context);
-            },
-          ),
-        ],
+    return CustomScaffold(
+      child: BlocBuilder<UserCubit, UserState>(
+        builder: (context, state) {
+          return Column(
+            children: [
+              Text('toekn ${userData.user?.googleAccount?.id}'),
+
+              ...List.generate(
+                UserProfileOption.values.length,
+                    (index) {
+                  final option = UserProfileOption.values[index];
+
+                  void function() {
+                    if (option.description == 'Sair') {
+                      GoogleSignIn().signOut().whenComplete(() => context.goNamed(AppRoutes.loginScreen));
+                    } else {
+                      context.pushNamed(option.route);
+                    }
+                  }
+
+                  return option.buildTile(function);
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -38,13 +57,11 @@ enum UserProfileOption {
 
   const UserProfileOption(this.description, this.route, this.icon);
 
-  Widget buildTile(BuildContext context) {
+  Widget buildTile(VoidCallback onTap) {
     return ListTile(
       title: Text(description),
       leading: Icon(icon),
-      onTap: () {
-        context.pushNamed(route);
-      },
+      onTap: onTap,
     );
   }
 }

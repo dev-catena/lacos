@@ -127,6 +127,7 @@ enum MedicineType {
 
 enum MedicineFrequency {
   singleDose('Dose única', 0),
+  every2Hours('A cada 2 horas', 2),
   every4Hours('A cada 4 horas', 4),
   every6Hours('A cada 6 horas', 6),
   every8Hours('A cada 8 horas', 8),
@@ -157,5 +158,9 @@ enum MedicineFrequency {
   TimeOfDay _addTime(TimeOfDay time, Duration duration) {
     final int newHour = (time.hour + duration.inHours) % 24;
     return TimeOfDay(hour: newHour, minute: time.minute);
+  }
+
+  factory MedicineFrequency.fromString(String value) {
+    return MedicineFrequency.values.firstWhere((element) => element.hoursInterval == int.parse(value));
   }
 }

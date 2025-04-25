@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "54539222544",
+    "project_id": "lacos-be754",
+    "storage_bucket": "lacos-be754.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:54539222544:android:fe21a6fb3540edb07b1495",
+        "android_client_info": {
+          "package_name": "com.example.lacos"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "54539222544-5466hnodbjj850gptbhapfba18nd6dh3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lacos",
+            "certificate_hash": "d491948e24727899e8b35716a576c3e36803488f"
+          }
+        },
+        {
+          "client_id": "54539222544-ntgribpfvc4qi31jvvrt3i11kutarlck.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAC6tcbUU3wVdFsrs1yVFT3o3p-kJhNFqg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "54539222544-ntgribpfvc4qi31jvvrt3i11kutarlck.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "54539222544-1rfjqrsctaica6e7u0jala3pi9sf77gm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.lacos"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

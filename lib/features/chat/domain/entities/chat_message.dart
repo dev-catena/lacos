@@ -6,7 +6,7 @@ import '../../../common/domain/entities/user.dart';
 
 class MessageData {
   final int id;
-  final User author;
+  final UserEntity author;
   final String message;
   final DateTime dateTime;
 

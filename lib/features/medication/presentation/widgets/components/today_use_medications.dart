@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../blocs/medication_bloc.dart';
-import '../../../domain/entities/medicine.dart';
+import '../../../domain/entities/medication.dart';
 
 class TodayUseMedications extends StatelessWidget {
   const TodayUseMedications(this.medicines, {super.key});

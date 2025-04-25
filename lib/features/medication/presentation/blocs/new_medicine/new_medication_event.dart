@@ -23,6 +23,12 @@ class NewMedicationConcentrationSelected extends NewMedicationEvent {
   NewMedicationConcentrationSelected(this.concentrationSelected);
 }
 
+class NewMedicationFrequencySelected extends NewMedicationEvent {
+  final MedicineFrequency frequency;
+
+  NewMedicationFrequencySelected(this.frequency);
+}
+
 class NewMedicationStartChosen extends NewMedicationEvent {
   final DateTime? date;
 
