@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:flutter/material.dart';
-import 'package:meta/meta.dart';
 
-import '../../../../home/patient_profile/domain/entities/doctor.dart';
+import '../../../../common/domain/entities/medicine.dart';
+import '../../../../companion_home/patient_profile/domain/entities/doctor.dart';
 import '../../../domain/entities/medication.dart';
+import '../../../domain/entities/prescription.dart';
 
 part 'new_medication_event.dart';
 
 part 'new_medication_state.dart';
 
 class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
-  NewMedicationBloc() : super(NewMedicationInitial()) {
+  final Prescription prescription;
+
+  NewMedicationBloc(this.prescription) : super(NewMedicationInitial()) {
     on<NewMedicationStarted>(_onStarted);
     on<NewMedicationDoctorSelected>(_onDoctorSelected);
     on<NewMedicationMedicineSelected>(_onMedicineSelected);
@@ -29,6 +32,7 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
 
     emit(
       NewMedicationReady(
+        prescription: prescription,
         doctorSelected: null,
         medicines: meds,
         medicineSelected: null,

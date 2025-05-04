@@ -3,28 +3,34 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../features/appointment_schedule/presentation/widgets/screens/appointment_schedule_screen.dart';
 import '../features/chat/presentation/widgets/screens/chat_screen.dart';
-import '../features/common/data/data_source/user_datasource.dart';
-import '../features/home/patient_profile/presentation/widgets/screens/doctor_management_screen.dart';
-import '../features/home/patient_profile/presentation/widgets/screens/patient_collectable_data_screen.dart';
-import '../features/medication/data/medication_datasource.dart';
+import '../features/common/domain/entities/patient.dart';
+import '../features/companion_home/patient_profile/presentation/widgets/screens/doctor_management_screen.dart';
+import '../features/companion_home/patient_profile/presentation/widgets/screens/group_management_screen.dart';
+import '../features/companion_home/patient_profile/presentation/widgets/screens/patient_collectable_data_screen.dart';
+import '../features/companion_home/patient_profile/presentation/widgets/screens/patient_profile_screen.dart';
+import '../features/companion_home/presentation/widgets/screens/home_screen.dart';
+import '../features/medication/domain/entities/prescription.dart';
 import '../features/medication/presentation/blocs/medication_bloc.dart';
 import '../features/medication/presentation/widgets/screens/new_medication_screen.dart';
+import '../features/medication/presentation/widgets/screens/prescription_medications_screen.dart';
+import '../features/medication/presentation/widgets/screens/prescription_panel_screen.dart';
+import '../features/patient_home/presentation/widgets/screens/patient_home_screen.dart';
 import '../features/user_profile/presentation/widgets/screens/group_selection_screen.dart';
-import '../features/home/patient_profile/presentation/widgets/screens/group_management_screen.dart';
-import '../features/home/patient_profile/presentation/widgets/screens/patient_profile_screen.dart';
 import '../features/login/presentation/widgets/login_screen.dart';
 import '../features/user_profile/presentation/widgets/screens/user_profile_screen.dart';
 import '../splash_screen.dart';
 
-import '../features/home/presentation/widgets/screens/home_screen.dart';
+import 'providers/user_cubit.dart';
 import 'scaffold_with_nested_navigation.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
-final _shellNavigatorAKey = GlobalKey<NavigatorState>(debugLabel: 'shellA');
+final _shellCompanionNavigatorAKey = GlobalKey<NavigatorState>(debugLabel: 'shellA');
 final _shellNavigatorBKey = GlobalKey<NavigatorState>(debugLabel: 'shellB');
 final _shellNavigatorCKey = GlobalKey<NavigatorState>(debugLabel: 'shellC');
 final _shellNavigatorDKey = GlobalKey<NavigatorState>(debugLabel: 'shellD');
 final _shellNavigatorEKey = GlobalKey<NavigatorState>(debugLabel: 'shellE');
+
+final _shellPatientNavigatorAKey = GlobalKey<NavigatorState>(debugLabel: 'shellPatientA');
 
 class AppRoutes {
   static const loginScreen = '/login';
@@ -43,10 +49,15 @@ class AppRoutes {
   static const doctorManagementScreen = 'gerenciar-medicos';
 
   // dentro de [medicinesScreen]
-  static const newMedicineScreen = '/novo-medicamento';
+  static const newMedicineScreen = 'novo-medicamento';
+  static const prescriptionPanelScreen = 'receitas';
+  static const prescriptionMedicationsScreen = 'medicamentos-receita';
 
   static const userProfileScreen = '/perfil-usuario';
 
+
+
+  static const patientHomeScreen = '/paciente';
   GoRouter get routes {
     return _routes;
   }
@@ -62,7 +73,7 @@ final GoRouter _routes = GoRouter(
       },
       branches: [
         StatefulShellBranch(
-          navigatorKey: _shellNavigatorAKey,
+          navigatorKey: _shellCompanionNavigatorAKey,
           initialLocation: AppRoutes.homeScreen,
           routes: [
             GoRoute(
@@ -79,15 +90,6 @@ final GoRouter _routes = GoRouter(
                       path: AppRoutes.patientCollectableDataScreen,
                       name: AppRoutes.patientCollectableDataScreen,
                       builder: (_, __) => const PatientCollectableDataScreen(),
-                    ),
-                    GoRoute(
-                      path: AppRoutes.groupManagementScreen,
-                      name: AppRoutes.groupManagementScreen,
-                      builder: (_, state) {
-                        final patient = state.extra as Patient;
-
-                        return GroupManagementScreen(patient);
-                      },
                     ),
                     GoRoute(
                       path: AppRoutes.doctorManagementScreen,
@@ -112,16 +114,40 @@ final GoRouter _routes = GoRouter(
               pageBuilder: (context, state) {
                 return NoTransitionPage(
                   child: BlocProvider(
-                    create: (context) => MedicationBloc(MedicationDataSource()),
-                    child: const MedicinesScreen(),
+                    create: (context) {
+                      final userData = context.read<UserCubit>();
+                      return MedicationBloc(userData);
+                    },
+                    child: const MedicationsScreen(),
                   ),
                 );
               },
               routes: [
                 GoRoute(
-                  name: AppRoutes.newMedicineScreen,
-                  path: AppRoutes.newMedicineScreen,
-                  builder: (context, state) => const NewMedicationScreen(),
+                  name: AppRoutes.prescriptionPanelScreen,
+                  path: AppRoutes.prescriptionPanelScreen,
+                  builder: (context, state) => const PrescriptionPanelScreen(),
+                  routes: [
+                    GoRoute(
+                      name: AppRoutes.prescriptionMedicationsScreen,
+                      path: AppRoutes.prescriptionMedicationsScreen,
+                      builder: (_, state) {
+                        final pres = state.extra as Prescription;
+
+                        return PrescriptionMedicationsScreen(pres);
+                      },
+                      routes: [
+                        GoRoute(
+                          name: AppRoutes.newMedicineScreen,
+                          path: AppRoutes.newMedicineScreen,
+                          builder: (_, state) {
+                            final pres = state.extra as Prescription;
+                            return NewMedicationScreen(pres);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             )
@@ -157,16 +183,46 @@ final GoRouter _routes = GoRouter(
         // ),
       ],
     ),
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) {
+        return ScaffoldWithNestedNavigation(navigationShell: navigationShell);
+      },
+      branches: [
+        StatefulShellBranch(
+          navigatorKey: _shellPatientNavigatorAKey,
+          routes: [
+            GoRoute(
+              path: AppRoutes.patientHomeScreen,
+              name: 'patient-home',
+              pageBuilder: (_, __) => const NoTransitionPage(child: PatientHomeScreen()),
+              routes: [
+
+              ],
+            ),
+          ],
+        ),
+      ],
+    ),
     GoRoute(
       path: AppRoutes.userProfileScreen,
       name: AppRoutes.userProfileScreen,
       builder: (_, __) => const UserProfileScreen(),
       routes: [
         GoRoute(
-          path: AppRoutes.groupSelectionScreen,
-          name: AppRoutes.groupSelectionScreen,
-          builder: (_, __) => const GroupSelectionScreen(),
-        ),
+            path: AppRoutes.groupSelectionScreen,
+            name: AppRoutes.groupSelectionScreen,
+            builder: (_, __) => const GroupSelectionScreen(),
+            routes: [
+              GoRoute(
+                path: AppRoutes.groupManagementScreen,
+                name: AppRoutes.groupManagementScreen,
+                builder: (_, state) {
+                  final patient = state.extra as Patient;
+
+                  return GroupManagementScreen(patient);
+                },
+              ),
+            ]),
       ],
     ),
     GoRoute(

@@ -3,8 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../../core/providers/app_data_cubit.dart';
-import '../../../../../../core/providers/user_cubit.dart';
-import '../../../../../medication/domain/entities/medication.dart';
+import '../../../../../common/domain/entities/medicine.dart';
 
 class NewMedicineDialog extends StatefulWidget {
   const NewMedicineDialog({super.key});
@@ -110,7 +109,7 @@ class _NewMedicineDialogState extends State<NewMedicineDialog> {
       actions: [
         OutlinedButton(onPressed: ()=> context.pop(), child: const Text('Cancelar')),
         FilledButton(onPressed: () {
-          final med = Medicine(name: nameController.text, type: typeSelected!, description: '', dosage: double.parse(concentrationController.text));
+          final med = Medicine(id: 0, name: nameController.text, type: typeSelected!, description: '', concentration: double.parse(concentrationController.text));
           appData.addMedicine(med);
           context.pop();
         }, child: const Text('Cadastrar')),

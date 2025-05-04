@@ -5,6 +5,16 @@ sealed class LoginEvent {}
 
 class LoginStarted extends LoginEvent {}
 
-class LoginSignWithGooglePressed extends LoginEvent {
+class LoginAccessTypeSelected extends LoginEvent {
+  final AccessProfileType typeSelected;
 
+  LoginAccessTypeSelected(this.typeSelected);
+}
+
+class LoginSignInWithGooglePressed extends LoginEvent {}
+
+class LoginSignInWithCode extends LoginEvent {
+  final String code;
+
+  LoginSignInWithCode(this.code);
 }

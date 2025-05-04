@@ -1,5 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
-
 import '../../../user_profile/presentation/widgets/screens/group_selection_screen.dart';
 import '../../domain/entities/user.dart';
 
@@ -8,17 +6,17 @@ class UserModel extends UserEntity {
       : super(
           id: json['id'],
           fullName: json['nomeCompleto'],
-          isPatient: json['paciente'] == 1 ? true : false,
           photoPath: json['caminhoFoto'],
           accessProfileTypes: AccessProfileType.fromIntList(json['perfisAcesso']),
+    isPatient: json['paciente'] == 1 ? true : false,
         );
 
   UserModel({
     required super.id,
     required super.fullName,
-    required super.isPatient,
     required super.photoPath,
     required super.accessProfileTypes,
+    required super.isPatient,
     super.googleAccount,
   });
 
@@ -26,10 +24,10 @@ class UserModel extends UserEntity {
     return UserEntity(
       id: id,
       fullName: fullName,
-      isPatient: isPatient,
       photoPath: photoPath,
       accessProfileTypes: accessProfileTypes,
       googleAccount: googleAccount,
+        isPatient: isPatient,
     );
   }
 }

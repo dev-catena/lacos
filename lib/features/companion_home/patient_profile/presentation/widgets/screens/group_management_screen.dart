@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../common/domain/entities/patient.dart';
 import '../../../../../../core/utils/custom_colors.dart';
 import '../../../../../common/data/data_source/user_datasource.dart';
 import '../../../../../common/presentation/widgets/custom_scaffold.dart';

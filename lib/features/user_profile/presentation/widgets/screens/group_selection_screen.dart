@@ -70,8 +70,8 @@ String getText(AccessProfileType profile) {
       text = '';
     case AccessProfileType.companion:
       text = 'Acompanhados';
-    case AccessProfileType.caregiver:
-      text = 'Sob cuidados';
+    // case AccessProfileType.caregiver:
+    //   text = 'Sob cuidados';
   }
 
   return text;
@@ -113,25 +113,25 @@ Widget getAccessScreen(BuildContext context, AccessProfileType profile) {
           ),
         ],
       );
-    case AccessProfileType.caregiver:
-      return Column(
-        children: [
-          ...List.generate(
-            userData.patients.length,
-            (index) {
-              final patient = userData.patients[index];
-              return patient.buildGroupCard();
-            },
-          ),
-        ],
-      );
+    // case AccessProfileType.caregiver:
+    //   return Column(
+    //     children: [
+    //       ...List.generate(
+    //         userData.patients.length,
+    //         (index) {
+    //           final patient = userData.patients[index];
+    //           return patient.buildGroupCard();
+    //         },
+    //       ),
+    //     ],
+    //   );
   }
 }
 
 enum AccessProfileType {
-  patient(1, 'Paciente'),
   companion(2, 'Acompanhante'),
-  caregiver(3, 'Cuidador');
+  patient(1, 'Paciente');
+  // caregiver(3, 'Cuidador');
 
   final int code;
   final String description;
@@ -150,8 +150,8 @@ enum AccessProfileType {
         return AccessProfileType.patient;
       case 2:
         return AccessProfileType.companion;
-      case 3:
-        return AccessProfileType.caregiver;
+      // case 3:
+      //   return AccessProfileType.caregiver;
       default:
         return AccessProfileType.companion;
     }

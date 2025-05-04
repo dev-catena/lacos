@@ -1,11 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../home/domain/entities/patient_event.dart';
-import '../../../medication/domain/entities/medication.dart';
 import '../../../user_profile/presentation/widgets/screens/group_selection_screen.dart';
+import '../../domain/entities/patient.dart';
 import '../../domain/entities/user.dart';
 import '../models/user_model.dart';
 
@@ -65,38 +62,6 @@ class UserDataSource {
   }
 }
 
-class Patient {
-  final UserEntity self;
-  final List<UserEntity> usersForPatient;
-  final List<Medication> medications;
-  final String groupCode;
-  final GroupStatus status;
-
-  Patient({
-    required this.self,
-    required this.usersForPatient,
-    required this.medications,
-    required this.groupCode,
-    required this.status,
-  });
-
-  Patient.fromJson(Map<String, dynamic> json)
-      : this(
-          self: UserModel.fromJson(json['paciente']),
-          usersForPatient: (json['cuidadores'] as List? ?? []).map((e) => UserModel.fromJson(e)).toList(),
-          medications: json['medicacoes'],
-          groupCode: json['codigo'],
-          status: GroupStatus.fromCode(json['status']),
-        );
-
-  PatientResumeCard buildResumeCard(List<PatientEvent> events) {
-    return PatientResumeCard(this, events: events);
-  }
-
-  PatientGroupCard buildGroupCard() {
-    return PatientGroupCard(this);
-  }
-}
 
 enum GroupStatus {
   pending(1, 'Pendente'),
@@ -129,7 +94,7 @@ class _MockData {
         'caminhoFoto': 'assets/images/senhora.webp',
         'perfisAcesso': [1],
       },
-      'medicacoes': <Medication>[],
+      'medicacoes': [],
       'cuidadores': [],
       'codigo': 'OPI WGH',
       'status': 1,
@@ -144,67 +109,97 @@ class _MockData {
       },
       'codigo': 'BNJ LCL',
       'status': 2,
-      'medicacoes': <Medication>[
-        Medication(
-          medicine: const Medicine(
-            name: 'Paracetamol',
-            type: MedicineType.pill,
-            description: 'Analgésico e antitérmico',
-            dosage: 500.0,
-          ),
-          frequency: MedicineFrequency.every8Hours,
-          firstDose: const TimeOfDay(hour: 7, minute: 0),
-        ),
-        Medication(
-          medicine: const Medicine(
-            name: 'Xarope para Tosse',
-            type: MedicineType.syrup,
-            description: 'Alivia a tosse e descongestiona',
-            dosage: 10.0,
-          ),
-          frequency: MedicineFrequency.every6Hours,
-          firstDose: const TimeOfDay(hour: 8, minute: 0),
-        ),
-        Medication(
-          medicine: const Medicine(
-            name: 'Xarope',
-            type: MedicineType.syrup,
-            description: 'Alivia a tosse',
-            dosage: 10.0,
-          ),
-          frequency: MedicineFrequency.every6Hours,
-          firstDose: const TimeOfDay(hour: 6, minute: 0),
-        ),
-        Medication(
-          medicine: const Medicine(
-            name: 'Pomada Anti-inflamatória',
-            type: MedicineType.ointment,
-            description: 'Reduz a inflamação e alivia a dor nas articulações',
-            dosage: 2.0,
-          ),
-          frequency: MedicineFrequency.every12Hours,
-          firstDose: const TimeOfDay(hour: 9, minute: 0),
-        ),
-        Medication(
-          medicine: const Medicine(
-            name: 'Vitamina C',
-            type: MedicineType.pill,
-            description: 'Fortalece o sistema imunológico',
-            dosage: 1000.0,
-          ),
-          frequency: MedicineFrequency.singleDose,
-          firstDose: const TimeOfDay(hour: 8, minute: 0),
-        ),
-        Medication(
-          medicine: const Medicine(
-            name: 'Insulina',
-            type: MedicineType.injection,
-            description: 'Controle de níveis de glicose no sangue',
-            dosage: 10.0,
-          ),
-          frequency: MedicineFrequency.every12Hours,
-          firstDose: const TimeOfDay(hour: 7, minute: 0),
-        ),
+      'medicacoes': [
+        {
+          'medicamento': {
+            'id': 1,
+            'nome': 'Paracetamol',
+            'tipo': 1,
+            'descricao': 'Analgésico e antitérmico',
+            'dosagem': '500.0',
+          },
+          'foi_tomado': 0,
+          'primeira_dose': '07:00',
+          'frequencia': 8,
+          'instrucoes': null,
+          'dosagem': 50.0,
+          'status': 1,
+        },
+        {
+          'medicamento': {
+            'id': 2,
+            'nome': 'Xarope para Tosse',
+            'tipo': 3,
+            'descricao': 'Alivia a tosse e descongestiona',
+            'dosagem': '10.0',
+          },
+          'foi_tomado': 0,
+          'primeira_dose': '08:00',
+          'frequencia': 8,
+          'instrucoes': null,
+          'dosagem': 10.0,
+          'status': 1,
+        },
+        {
+          'medicamento': {
+            'id': 3,
+            'nome': 'Xarope',
+            'tipo': 3,
+            'descricao': 'Alivia a tosse',
+            'dosagem': '10.0',
+          },
+          'foi_tomado': 0,
+          'primeira_dose': '06:00',
+          'frequencia': 6,
+          'instrucoes': null,
+          'dosagem': 10.0,
+          'status': 2,
+        },
+        {
+          'medicamento': {
+            'id': 4,
+            'nome': 'Pomada Anti-inflamatória',
+            'tipo': 2,
+            'descricao': 'Reduz a inflamação e alivia a dor nas articulações',
+            'dosagem': '2.0',
+          },
+          'foi_tomado': 0,
+          'primeira_dose': '09:00',
+          'frequencia': 12,
+          'instrucoes': null,
+          'dosagem': 1.0,
+          'status': 3,
+        },
+        {
+          'medicamento': {
+            'id': 5,
+            'nome': 'Vitamina C',
+            'tipo': 1,
+            'descricao': 'Fortalece o sistema imunológico',
+            'dosagem': '1000.0',
+          },
+          'foi_tomado': 0,
+          'primeira_dose': '08:00',
+          'frequencia': 4,
+          'instrucoes': null,
+          'dosagem': 3.0,
+          'status': 1,
+        },
+        {
+          'medicamento': {
+            'id': 6,
+            'nome': 'Insulina',
+            'tipo': 5,
+            'descricao': 'Controle de níveis de glicose no sangue',
+            'dosagem': '10.0',
+          },
+          'foi_tomado': 0,
+          'primeira_dose': '07:00',
+          'frequencia': 8,
+          'instrucoes': null,
+          'dosagem': 5.0,
+          'status': 2,
+        },
       ],
       'cuidadores': [
         {
@@ -212,7 +207,7 @@ class _MockData {
           'nomeCompleto': 'Artur Dias',
           'paciente': 0,
           'caminhoFoto': 'https://thispersondoesnotexist.com',
-          'perfisAcesso': [2, 3],
+          'perfisAcesso': [2],
         },
       ],
     },
@@ -223,6 +218,6 @@ class _MockData {
     'nomeCompleto': 'Artur Dias',
     'paciente': 0,
     'caminhoFoto': 'https://thispersondoesnotexist.com',
-    'perfisAcesso': [2, 3],
+    'perfisAcesso': [2],
   };
 }

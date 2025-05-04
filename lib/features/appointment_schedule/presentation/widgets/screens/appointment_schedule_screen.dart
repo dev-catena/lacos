@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/utils/date_parser.dart';
 import '../../../../common/presentation/widgets/custom_scaffold.dart';
-import '../../../../home/domain/entities/patient_event.dart';
+import '../../../../companion_home/domain/entities/patient_event.dart';
 
 class AppointmentScheduleScreen extends StatelessWidget {
   const AppointmentScheduleScreen({super.key});

@@ -1,63 +1,52 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../../core/providers/app_data_cubit.dart';
 import '../../../../core/providers/patient_cubit.dart';
 import '../../../../core/providers/user_cubit.dart';
 import '../../../../core/routes.dart';
 import '../../../../core/utils/custom_colors.dart';
+import '../../../common/presentation/widgets/components/stateful_segmented_button.dart';
+import '../../../user_profile/presentation/widgets/screens/group_selection_screen.dart';
 import '../blocs/login_bloc.dart';
 
 class LoginScreen extends StatelessWidget {
   LoginScreen({super.key});
 
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-
-  Future<UserCredential> signInWithGoogle() async {
-    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-
-    final GoogleSignInAuthentication? googleAuth = await googleUser?.authentication;
-
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth?.accessToken,
-      idToken: googleAuth?.idToken,
-    );
-
-    return await FirebaseAuth.instance.signInWithCredential(credential);
-  }
+  final TextEditingController controller = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     final userData = context.read<UserCubit>();
-    final doctorData = context.read<PatientCubit>();
     final appData = context.read<AppDataCubit>();
+    final patientData = context.read<PatientCubit>();
 
-    final displaySmall = Theme
-        .of(context)
-        .textTheme
-        .displaySmall!;
+    final displaySmall = Theme.of(context).textTheme.displaySmall!;
+    final titleMedium = Theme.of(context).textTheme.titleMedium!;
 
     return Scaffold(
       body: BlocProvider(
         create: (context) => LoginBloc(userData),
         child: BlocConsumer<LoginBloc, LoginState>(
           listener: (context, state) async {
-            if(state is LoginSuccess){
+            if (state is LoginSuccess) {
+              appData.initialize();
+
               if ((userData.state as UserReady).defaultPatient == null) {
                 context.goNamed(AppRoutes.groupSelectionScreen);
               } else {
-                await doctorData.initialize(userData.currentPatient!);
-                context.goNamed('home');
+                await patientData.initialize(userData.currentPatient!);
+
+                context.goNamed(state.route);
               }
+            } else if (state is LoginFailed) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
             }
           },
           builder: (blocCtx, state) {
             final bloc = blocCtx.read<LoginBloc>();
-            if(state is LoginInitial){
+            if (state is LoginInitial) {
               bloc.add(LoginStarted());
             }
             return Center(
@@ -72,55 +61,61 @@ class LoginScreen extends StatelessWidget {
                       fit: BoxFit.cover,
                     ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: CustomColor.backgroundPrimaryColor),
+                  const SizedBox(height: 60),
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: CustomColor.backgroundPrimaryColor),
+                      ),
+                      padding: const EdgeInsets.only(top: 20, bottom: 20, right: 10, left: 10),
+                      child: Column(
+                        children: [
+                          Text('Entrar como', style: titleMedium),
+                          StatefulSegmentedButton<AccessProfileType>(
+                            options: AccessProfileType.values,
+                            getLabel: (value) => value.description,
+                            getValue: (value) => value,
+                            onChanged: (value) {
+                              bloc.add(LoginAccessTypeSelected(value.first));
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          switch (state.typeSelected) {
+                            AccessProfileType.companion => ElevatedButton(
+                                onPressed: () => bloc.add(LoginSignInWithGooglePressed()),
+                                child: const Text('Login com conta Google'),
+                              ),
+                            AccessProfileType.patient => Column(
+                                children: [
+                                  SizedBox(
+                                    width: 160,
+                                    child: TextField(
+                                      controller: controller,
+                                      decoration: const InputDecoration(
+                                        label: Text('Código'),
+                                      ),
+                                      maxLength: 6,
+                                      onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                                      onSubmitted: (val) {
+                                        FocusScope.of(context).unfocus();
+                                        bloc.add(LoginSignInWithCode(val));
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  FilledButton(
+                                    onPressed: () => bloc.add(LoginSignInWithCode(controller.text)),
+                                    child: const Text('Entrar'),
+                                  ),
+                                ],
+                              ),
+                          }
+                        ],
+                      ),
                     ),
-                    padding: const EdgeInsets.only(left: 40, right: 40),
-                    child: Column(
-                      children: [
-                        ElevatedButton(
-                          onPressed: () => bloc.add(LoginSignWithGooglePressed()),
-                          child: const Text('Login com google'),
-                        ),
-                      ],
-                    ),
-                    // child: Column(
-                    //   mainAxisSize: MainAxisSize.min,
-                    //   children: [
-                    //     const SizedBox(height: 20),
-                    //     getTextField(
-                    //       labelText: 'CPF',
-                    //       hintText: '12345678900',
-                    //       leadingIcon: Icons.person_outlined,
-                    //       controller: emailController,
-                    //     ),
-                    //     const SizedBox(height: 20),
-                    //     getTextField(
-                    //         labelText: 'Senha',
-                    //         hintText: '*****',
-                    //         leadingIcon: Icons.lock_outline,
-                    //         controller: passwordController),
-                    //     const SizedBox(height: 20),
-                    //     FilledButton(
-                    //       onPressed: () async {
-                    //
-                    //         appData.initialize();
-                    //         await userData.initialize('usuario', 'senha');
-                    //         if ((userData.state as UserReady).defaultPatient == null) {
-                    //           context.goNamed(AppRoutes.groupSelectionScreen);
-                    //         } else {
-                    //           await doctorData.initialize(userData.currentPatient!);
-                    //           context.goNamed('home');
-                    //         }
-                    //       },
-                    //       child: const Text('Login'),
-                    //     ),
-                    //     const SizedBox(height: 20),
-                    //   ],
-                    // ),
                   ),
                 ],
               ),

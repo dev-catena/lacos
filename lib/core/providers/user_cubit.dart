@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../features/common/data/data_source/user_datasource.dart';
+import '../../features/common/domain/entities/patient.dart';
 import '../../features/common/domain/entities/user.dart';
 import '../../features/medication/domain/entities/medication.dart';
 import '../../features/user_profile/presentation/widgets/screens/group_selection_screen.dart';
@@ -20,12 +21,13 @@ class UserCubit extends Cubit<UserState> {
 
   Patient? get currentAccessType => state is UserReady ? (state as UserReady).defaultPatient : null;
 
-  Future<void> initialize(GoogleSignInAccount account) async {
+  Future<void> initialize(GoogleSignInAccount account, [bool changeToPatient = false]) async {
     List<Patient> patients = [];
     int? defaultPatientId;
     AccessProfileType? accessType;
 
-    final user = await _userDataSource.login(account);
+    final userD = await _userDataSource.login(account);
+    final user = userD.copyWith(isPatient: changeToPatient);
 
     await Future.wait([
       _userDataSource.getPatientsForUser(user.id).then((value) => patients = value),

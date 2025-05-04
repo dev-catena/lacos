@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/providers/user_cubit.dart';
 import '../../../../core/routes.dart';
-import '../../../home/presentation/widgets/components/icon_emergency_button.dart';
+import '../../../companion_home/presentation/widgets/components/icon_emergency_button.dart';
 
 class CustomScaffold extends StatefulWidget {
   const CustomScaffold({
@@ -117,14 +117,4 @@ class _CustomScaffoldState extends State<CustomScaffold> {
       ),
     );
   }
-}
-
-enum DropdownOptions {
-  changeProfile('Trocar perfil de acesso', AppRoutes.groupSelectionScreen),
-  logout('Logout', AppRoutes.groupSelectionScreen);
-
-  final String description;
-  final String route;
-
-  const DropdownOptions(this.description, this.route);
 }

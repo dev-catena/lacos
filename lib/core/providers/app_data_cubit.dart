@@ -2,7 +2,7 @@ import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
 
 import '../../features/common/data/data_source/medicine_datasource.dart';
-import '../../features/medication/domain/entities/medication.dart';
+import '../../features/common/domain/entities/medicine.dart';
 
 part 'app_data_state.dart';
 

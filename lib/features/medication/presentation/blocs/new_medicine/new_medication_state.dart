@@ -8,6 +8,7 @@ final class NewMedicationInitial extends NewMedicationState {}
 final class NewMedicationLoadInProgress extends NewMedicationState {}
 
 final class NewMedicationReady extends NewMedicationState {
+  final Prescription prescription;
   final Doctor? doctorSelected;
   final List<Medicine> medicines;
   final Medicine? medicineSelected;
@@ -15,7 +16,7 @@ final class NewMedicationReady extends NewMedicationState {
   final DateTime? startDate;
   final DateTime? endDate;
   final bool isContinuous;
-  final MedicineFrequency? frequencySelected;
+  final MedicationFrequency? frequencySelected;
   final TimeOfDay? firstDoseTime;
 
   static const _unset = Object();
@@ -32,6 +33,7 @@ final class NewMedicationReady extends NewMedicationState {
     Object? firstDoseTime = _unset,
   }) {
     return NewMedicationReady(
+      prescription: prescription,
       doctorSelected: doctorSelected != _unset ? doctorSelected as Doctor? : this.doctorSelected,
       medicines: medicines != _unset ? medicines as List<Medicine> : this.medicines,
       medicineSelected: medicineSelected != _unset ? medicineSelected as Medicine? : this.medicineSelected,
@@ -40,12 +42,13 @@ final class NewMedicationReady extends NewMedicationState {
       startDate: startDate != _unset ? startDate as DateTime? : this.startDate,
       endDate: endDate != _unset ? endDate as DateTime? : this.endDate,
       isContinuous: isContinuous != _unset ? isContinuous as bool : this.isContinuous,
-      frequencySelected: frequencySelected != _unset ? frequencySelected as MedicineFrequency : this.frequencySelected,
+      frequencySelected: frequencySelected != _unset ? frequencySelected as MedicationFrequency : this.frequencySelected,
       firstDoseTime: firstDoseTime != _unset ? firstDoseTime as TimeOfDay? : this.firstDoseTime,
     );
   }
 
   NewMedicationReady({
+    required this.prescription,
     required this.doctorSelected,
     required this.medicines,
     required this.medicineSelected,

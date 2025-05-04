@@ -30,6 +30,16 @@ class Doctor extends Equatable {
     );
   }
 
+  Doctor.fromJson(Map<String, dynamic> json): this(
+    id: json['id'],
+    name: json['nome'],
+    speciality: json['especialidade'],
+    crm: json['crm'],
+    address: json['endereco'],
+    email: json['email'],
+    phoneNumber: json['telefone'],
+  );
+
   Map<String, dynamic> toRemote(){
     final data = {
       'nome': name,

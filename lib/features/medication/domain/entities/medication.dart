@@ -1,66 +1,74 @@
-import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
 
-import '../../../../core/utils/custom_colors.dart';
-import '../../presentation/widgets/components/medicine_tile.dart';
+import '../../../common/domain/entities/medicine.dart';
+import '../../presentation/widgets/components/medication_tile.dart';
 
 class Medication {
   final Medicine medicine;
-  final MedicineFrequency frequency;
-  final List<UsageInstructions>? usageInstructions;
+  final MedicationFrequency frequency;
+  final List<String>? usageInstructions;
   final TimeOfDay firstDose;
-  final bool? hasTaken;
-
+  final bool hasTaken;
+  final double? dosage;
+  final TreatmentStatus treatmentStatus;
 
   /// Retorna os horários sugeridos com base na frequência e primeiro horário do dia
   List<TimeOfDay> getSuggestedTimes() {
     return frequency.getSuggestedTimes(firstDose);
   }
 
+  Medication copyWith({
+    Medicine? medicine,
+    MedicationFrequency? frequency,
+    List<String>? usageInstructions,
+    TimeOfDay? firstDose,
+    bool? hasTaken,
+    double? dosage,
+    TreatmentStatus? treatmentStatus,
+  }) {
+    return Medication(
+      medicine: medicine ?? this.medicine,
+      frequency: frequency ?? this.frequency,
+      usageInstructions: usageInstructions ?? this.usageInstructions,
+      firstDose: firstDose ?? this.firstDose,
+      hasTaken: hasTaken ?? this.hasTaken,
+      dosage: dosage ?? this.dosage,
+      treatmentStatus: treatmentStatus ?? this.treatmentStatus,
+    );
+  }
+
   Medication({
     required this.medicine,
     required this.frequency,
     required this.firstDose,
+    required this.dosage,
+    required this.treatmentStatus,
+    required this.hasTaken,
     this.usageInstructions,
-    this.hasTaken,
   });
 
+  Medication.fromJson(Map<String, dynamic> json)
+      : this(
+          medicine: Medicine.fromJson(json['medicamento']),
+          firstDose: TimeOfDay(
+            hour: int.parse((json['primeira_dose'] as String).split(':')[0]),
+            minute: int.parse((json['primeira_dose'] as String).split(':')[1]),
+          ),
+          frequency: MedicationFrequency.fromCode(json['frequencia']),
+          treatmentStatus: TreatmentStatus.fromCode(json['status']),
+          dosage: json['dosagem'] as double,
+          usageInstructions: (json['instrucoes'] as List? ?? []).map((e) => e as String).toList(),
+          hasTaken: json['foi_tomado']== 1 ? true : false,
+        );
 
-  MedicationTile buildTile() {
-    return MedicationTile(this);
+  MedicationTile buildTile({required VoidCallback onTap, Widget? trailing}) {
+    return MedicationTile(this, onTap: onTap, trailing: trailing);
   }
 }
 
 enum UsageInstructions {
   jejum;
-}
-
-class Medicine extends Equatable {
-  final String name;
-  final MedicineType type;
-  final String description;
-  final double dosage; // mg/ml por dose
-
-  const Medicine({
-    required this.name,
-    required this.type,
-    required this.description,
-    required this.dosage,
-  });
-
-  @override
-  List<Object?> get props => [
-        name,
-        type,
-        description,
-        dosage,
-      ];
-
-  @override
-  String toString() {
-    return 'Medicine(name: $name, type: $type, dosage: $dosage mg)';
-  }
 }
 
 enum MedicationPeriod {
@@ -87,45 +95,22 @@ enum MedicationPeriod {
   }
 }
 
-enum MedicineType {
-  pill('Comprimido', Symbols.pill), // Pílula/comprimido
-  ointment('Pomada', Icons.wash), // Pomada
-  syrup('Xarope', Symbols.glass_cup), // Xarope
-  oralDrops('Gotas', Icons.water_drop), // Gotas orais
-  injection('Injeção', Icons.vaccines); // Injeção
+enum TreatmentStatus {
+  active(1, 'Ativo'),
+  treatmentDone(2, 'Finalizado'),
+  discontinued(3, 'Descontinuado');
 
+  final int code;
   final String description;
-  final IconData icon;
 
-  const MedicineType(this.description, this.icon);
+  const TreatmentStatus(this.code, this.description);
 
-  Widget buildIcon(void Function(MedicineType type) onTap, [bool isActive = false]){
-    return Column(
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(60),
-            onTap: ()=>onTap(this),
-            child: Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: isActive ? CustomColor.activeBottomBarBgIcon : null,
-                borderRadius: BorderRadius.circular(60),
-                border: Border.all(color: Colors.grey.shade500)
-              ),
-              child: Icon(icon),
-            ),
-          ),
-        ),
-        Text(description),
-      ],
-    );
+  factory TreatmentStatus.fromCode(int code) {
+    return TreatmentStatus.values.firstWhere((element) => element.code == code);
   }
 }
 
-enum MedicineFrequency {
+enum MedicationFrequency {
   singleDose('Dose única', 0),
   every2Hours('A cada 2 horas', 2),
   every4Hours('A cada 4 horas', 4),
@@ -136,11 +121,11 @@ enum MedicineFrequency {
   final String description;
   final int hoursInterval;
 
-  const MedicineFrequency(this.description, this.hoursInterval);
+  const MedicationFrequency(this.description, this.hoursInterval);
 
   /// Retorna os horários sugeridos com base no primeiro horário do dia
   List<TimeOfDay> getSuggestedTimes(TimeOfDay firstDose) {
-    if (this == MedicineFrequency.singleDose) {
+    if (this == MedicationFrequency.singleDose) {
       return [firstDose];
     }
 
@@ -160,7 +145,11 @@ enum MedicineFrequency {
     return TimeOfDay(hour: newHour, minute: time.minute);
   }
 
-  factory MedicineFrequency.fromString(String value) {
-    return MedicineFrequency.values.firstWhere((element) => element.hoursInterval == int.parse(value));
+  factory MedicationFrequency.fromString(String value) {
+    return MedicationFrequency.values.firstWhere((element) => element.hoursInterval == int.parse(value));
+  }
+
+  factory MedicationFrequency.fromCode(int value) {
+    return MedicationFrequency.values.firstWhere((element) => element.hoursInterval == value);
   }
 }

@@ -3,18 +3,18 @@ part of 'medication_bloc.dart';
 @immutable
 sealed class MedicationState {}
 
-final class MedicinesInitial extends MedicationState {}
+final class MedicationInitial extends MedicationState {}
 
-final class MedicinesLoadInProgress extends MedicationState {}
+final class MedicationLoadInProgress extends MedicationState {}
 
-final class MedicinesReady extends MedicationState {
+final class MedicationReady extends MedicationState {
   final List<Medication> medications;
 
-  MedicinesReady({required this.medications});
+  MedicationReady({required this.medications});
 }
 
-final class MedicinesError extends MedicationState {
+final class MedicationError extends MedicationState {
   final String msg;
 
-  MedicinesError(this.msg);
+  MedicationError(this.msg);
 }

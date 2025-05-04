@@ -1,13 +1,13 @@
 part of '../../blocs/medication_bloc.dart';
 
-class MedicinesScreen extends StatefulWidget {
-  const MedicinesScreen({super.key});
+class MedicationsScreen extends StatefulWidget {
+  const MedicationsScreen({super.key});
 
   @override
-  MedicinesScreenState createState() => MedicinesScreenState();
+  MedicationsScreenState createState() => MedicationsScreenState();
 }
 
-class MedicinesScreenState extends State<MedicinesScreen> with SingleTickerProviderStateMixin {
+class MedicationsScreenState extends State<MedicationsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -39,21 +39,20 @@ class MedicinesScreenState extends State<MedicinesScreen> with SingleTickerProvi
       isScrollable: false,
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          context.pushNamed(AppRoutes.newMedicineScreen);
+          context.pushNamed(AppRoutes.prescriptionPanelScreen);
         },
         child: const Icon(Icons.add),
       ),
       child: BlocBuilder<MedicationBloc, MedicationState>(
         builder: (_, state) {
-
-          Widget getScreen(){
-            if (state is MedicinesInitial) {
+          Widget getScreen() {
+            if (state is MedicationInitial) {
               bloc.add(MedicationStarted());
               return const CircularProgressIndicator();
-            } else if (state is MedicinesLoadInProgress) {
+            } else if (state is MedicationLoadInProgress) {
               bloc.add(MedicationStarted());
               return const CircularProgressIndicator();
-            } else if (state is MedicinesReady) {
+            } else if (state is MedicationReady) {
               return _ReadyScreen(state, _tabController);
             } else {
               return Column(
@@ -78,7 +77,7 @@ class MedicinesScreenState extends State<MedicinesScreen> with SingleTickerProvi
 class _ReadyScreen extends StatelessWidget {
   const _ReadyScreen(this.state, this.tabController);
 
-  final MedicinesReady state;
+  final MedicationReady state;
   final TabController tabController;
 
   @override
@@ -87,8 +86,9 @@ class _ReadyScreen extends StatelessWidget {
     return TabBarView(
       controller: tabController,
       children: [
-        // TodayUseMedications(state.medications),
-        TodayUseMedications(userData.currentPatient!.medications),
+        TodayUseMedications(
+          state.medications.where((element) => element.treatmentStatus == TreatmentStatus.active).toList(),
+        ),
         const Text('tab2'),
         const Text('tab3'),
       ],

@@ -1,37 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../common/presentation/widgets/components/stateful_segmented_button.dart';
 import '../../blocs/medication_bloc.dart';
 import '../../../domain/entities/medication.dart';
 
-class TodayUseMedications extends StatelessWidget {
+class TodayUseMedications extends StatefulWidget {
   const TodayUseMedications(this.medicines, {super.key});
+
   final List<Medication> medicines;
+
+  @override
+  State<TodayUseMedications> createState() => _TodayUseMedicationsState();
+}
+
+class _TodayUseMedicationsState extends State<TodayUseMedications> {
+  List<MedicationsPerPeriodWidget> displayableMeds = [];
+
+  void _filterBy(Set<MedicationPeriod> value) {
+    final ordered = MedicationPeriod.values.where((e) => value.contains(e));
+    displayableMeds = ordered
+        .map((e) => MedicationsPerPeriodWidget(
+      period: e,
+      medications: _groupMedicationsByPeriod(e, widget.medicines),
+    ))
+        .toList();
+    setState(() {});
+  }
+
+  @override
+  void initState() {
+    _filterBy(MedicationPeriod.values.toSet());
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
     final bloc = context.read<MedicationBloc>();
-
-    // Organize os medicamentos por períodos do dia
-    final morningMedications = _groupMedicationsByPeriod(MedicationPeriod.morning, medicines);
-    final afternoonMedications = _groupMedicationsByPeriod(MedicationPeriod.afternoon, medicines);
-    final nightMedications = _groupMedicationsByPeriod(MedicationPeriod.night, medicines);
+    final titleLarge = Theme.of(context).textTheme.titleLarge!;
 
     return RefreshIndicator(
-      onRefresh: () async => bloc.add(MedicationStarted()) ,
-      child: ListView(
+      onRefresh: () async => bloc.add(MedicationStarted()),
+      child: Column(
         children: [
-          MedicationPeriodWidget(
-            period: MedicationPeriod.morning,
-            medications: morningMedications,
+          // Text('Medicações para hoje', style: titleLarge),
+          // const SizedBox(height: 4),
+          StatefulSegmentedButton<MedicationPeriod>(
+            options: MedicationPeriod.values,
+            initialSelection: MedicationPeriod.values.toSet(),
+            multiSelect: true,
+            getLabel: (value) => value.periodName,
+            getValue: (value) => value,
+            onChanged: _filterBy,
           ),
-          MedicationPeriodWidget(
-            period: MedicationPeriod.afternoon,
-            medications: afternoonMedications,
-          ),
-          MedicationPeriodWidget(
-            period: MedicationPeriod.night,
-            medications: nightMedications,
+          const SizedBox(height: 8),
+          Expanded(
+            child: ListView.separated(
+              separatorBuilder: (context, index) => const SizedBox(height: 8),
+              itemCount: displayableMeds.length,
+              itemBuilder: (context, index) {
+                return displayableMeds[index];
+              },
+            ),
           ),
         ],
       ),
@@ -71,8 +101,8 @@ class TodayUseMedications extends StatelessWidget {
   }
 }
 
-class MedicationPeriodWidget extends StatelessWidget {
-  const MedicationPeriodWidget({
+class MedicationsPerPeriodWidget extends StatelessWidget {
+  const MedicationsPerPeriodWidget({
     super.key,
     required this.period,
     required this.medications,
@@ -83,17 +113,18 @@ class MedicationPeriodWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titleMedium = Theme.of(context).textTheme.titleMedium!;
+
     if (medications.isEmpty) {
       return const Text('Nenhum medicamento cadastrado');
     }
 
     return Column(
       children: [
-        period.buildTile(Theme.of(context).textTheme.titleLarge!),
+        period.buildTile(titleMedium),
         const SizedBox(height: 8),
-        ...medications.map((medicine) => medicine.buildTile()),
+        ...medications.map((medicine) => medicine.buildTile(onTap: () {})),
       ],
     );
   }
 }
-

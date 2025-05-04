@@ -5,7 +5,9 @@ class MedicationModel extends Medication {
     required super.medicine,
     required super.frequency,
     required super.firstDose,
-    super.hasTaken,
+    required super.dosage,
+    required super.treatmentStatus,
+    required super.hasTaken,
     super.usageInstructions,
   });
 
@@ -15,7 +17,9 @@ class MedicationModel extends Medication {
       medicine: medicine,
       frequency: frequency,
       firstDose: firstDose,
+      dosage: dosage,
       hasTaken: hasTaken,
+      treatmentStatus: treatmentStatus,
       usageInstructions: usageInstructions,
     );
   }

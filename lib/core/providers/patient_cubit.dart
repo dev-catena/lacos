@@ -1,9 +1,9 @@
 import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
 
-import '../../features/common/data/data_source/user_datasource.dart';
-import '../../features/home/patient_profile/data/data_source/doctor_datasource.dart';
-import '../../features/home/patient_profile/domain/entities/doctor.dart';
+import '../../features/common/domain/entities/patient.dart';
+import '../../features/companion_home/patient_profile/data/data_source/doctor_datasource.dart';
+import '../../features/companion_home/patient_profile/domain/entities/doctor.dart';
 
 part 'patient_state.dart';
 

@@ -12,20 +12,19 @@ import 'core/utils/globals.dart';
 import 'core/providers/user_cubit.dart';
 import 'features/common/data/data_source/medicine_datasource.dart';
 import 'features/common/data/data_source/user_datasource.dart';
-import 'features/home/patient_profile/data/data_source/doctor_datasource.dart';
-import 'features/medication/data/medication_datasource.dart';
+import 'features/companion_home/patient_profile/data/data_source/doctor_datasource.dart';
 import 'firebase_options.dart';
 
-// mkdir user_profile\data\data_source
-// mkdir user_profile\data\models
-// mkdir user_profile\data\repositories
-// mkdir user_profile\domain\entities
-// mkdir user_profile\domain\repositories
-// mkdir user_profile\domain\usecases
-// mkdir user_profile\presentation\blocs
-// mkdir user_profile\presentation\widgets
-// mkdir user_profile\presentation\widgets\screens
-// mkdir user_profile\presentation\widgets\components
+// mkdir patient_home\data\data_source
+// mkdir patient_home\data\models
+// mkdir patient_home\data\repositories
+// mkdir patient_home\domain\entities
+// mkdir patient_home\domain\repositories
+// mkdir patient_home\domain\usecases
+// mkdir patient_home\presentation\blocs
+// mkdir patient_home\presentation\widgets
+// mkdir patient_home\presentation\widgets\screens
+// mkdir patient_home\presentation\widgets\components
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -24,7 +24,7 @@ class NewMedicationConcentrationSelected extends NewMedicationEvent {
 }
 
 class NewMedicationFrequencySelected extends NewMedicationEvent {
-  final MedicineFrequency frequency;
+  final MedicationFrequency frequency;
 
   NewMedicationFrequencySelected(this.frequency);
 }

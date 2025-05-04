@@ -41,8 +41,8 @@ class _MockData {
         id: 1,
         fullName: 'Juliana Moreira',
         photoPath: 'assets/images/senhora.webp',
-        isPatient: false,
         accessProfileTypes: [AccessProfileType.companion],
+        isPatient: false
       ),
       dateTime: DateTime.now(),
       message:
