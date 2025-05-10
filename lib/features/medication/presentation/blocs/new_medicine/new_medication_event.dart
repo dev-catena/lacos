@@ -17,12 +17,6 @@ class NewMedicationMedicineSelected extends NewMedicationEvent {
   NewMedicationMedicineSelected(this.medicineSelected);
 }
 
-class NewMedicationConcentrationSelected extends NewMedicationEvent {
-  final String concentrationSelected;
-
-  NewMedicationConcentrationSelected(this.concentrationSelected);
-}
-
 class NewMedicationFrequencySelected extends NewMedicationEvent {
   final MedicationFrequency frequency;
 
@@ -51,4 +45,10 @@ class NewMedicationTimeChosen extends NewMedicationEvent {
   final TimeOfDay? time;
 
   NewMedicationTimeChosen(this.time);
+}
+
+class NewMedicationInstructionAdded extends NewMedicationEvent {
+  final UsageInstructions instruction;
+
+  NewMedicationInstructionAdded(this.instruction);
 }

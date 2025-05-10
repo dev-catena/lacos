@@ -13,7 +13,7 @@ class PatientGroupCard extends StatelessWidget {
 
     return Container(
       decoration:
-          BoxDecoration(borderRadius: borderRadius, border: Border.all(color: CustomColor.activeBottomBarBgIcon)),
+          BoxDecoration(borderRadius: borderRadius, border: Border.all(color: CustomColor.activeColor)),
       child: InkWell(
         borderRadius: borderRadius,
         onTap: () async {

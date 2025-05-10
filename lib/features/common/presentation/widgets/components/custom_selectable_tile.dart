@@ -34,7 +34,7 @@ class CustomSelectableTile extends StatelessWidget {
 
   Color getTileColor() {
     if (isActive) {
-      return CustomColor.activeBottomBarBgIcon;
+      return CustomColor.darkActiveColor;
     } else {
       if (hasGreyBackground) return Colors.grey;
       return Colors.transparent;
@@ -43,7 +43,7 @@ class CustomSelectableTile extends StatelessWidget {
 
   Color? getTextColor() {
     if (isActive == true) {
-      return Colors.black;
+      return Colors.white;
     } else {
       return null;
     }
@@ -51,7 +51,7 @@ class CustomSelectableTile extends StatelessWidget {
 
   Color getBorderColor() {
     if (isActive) {
-      return CustomColor.activeBottomBarBgIcon;
+      return CustomColor.activeColor;
     } else {
       if (hasGreyBackground) return Colors.grey;
       return Colors.grey;

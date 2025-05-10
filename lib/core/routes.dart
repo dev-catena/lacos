@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../features/appointment_schedule/presentation/widgets/screens/appointment_schedule_screen.dart';
+import '../features/archive/presentation/widgets/screens/archive_screen.dart';
+import '../features/archive/presentation/widgets/screens/prescription_archive_screen.dart';
 import '../features/chat/presentation/widgets/screens/chat_screen.dart';
 import '../features/common/domain/entities/patient.dart';
 import '../features/companion_home/patient_profile/presentation/widgets/screens/doctor_management_screen.dart';
@@ -10,7 +11,7 @@ import '../features/companion_home/patient_profile/presentation/widgets/screens/
 import '../features/companion_home/patient_profile/presentation/widgets/screens/patient_profile_screen.dart';
 import '../features/companion_home/presentation/widgets/screens/home_screen.dart';
 import '../features/medication/domain/entities/prescription.dart';
-import '../features/medication/presentation/blocs/medication_bloc.dart';
+import '../features/medication/presentation/widgets/screens/medications_screen.dart';
 import '../features/medication/presentation/widgets/screens/new_medication_screen.dart';
 import '../features/medication/presentation/widgets/screens/prescription_medications_screen.dart';
 import '../features/medication/presentation/widgets/screens/prescription_panel_screen.dart';
@@ -20,7 +21,6 @@ import '../features/login/presentation/widgets/login_screen.dart';
 import '../features/user_profile/presentation/widgets/screens/user_profile_screen.dart';
 import '../splash_screen.dart';
 
-import 'providers/user_cubit.dart';
 import 'scaffold_with_nested_navigation.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -41,6 +41,7 @@ class AppRoutes {
   static const medicinesScreen = '/medicamentos';
   static const appointmentScheduleScreen = '/agenda';
   static const chatScreen = '/chat';
+  static const archiveScreen = '/arquivo';
 
   // dentro de [homeScreen]
   static const patientProfileScreen = 'perfil-paciente';
@@ -55,9 +56,10 @@ class AppRoutes {
 
   static const userProfileScreen = '/perfil-usuario';
 
-
-
   static const patientHomeScreen = '/paciente';
+
+  static const prescriptionArchive = 'arquivo-receita';
+
   GoRouter get routes {
     return _routes;
   }
@@ -111,17 +113,9 @@ final GoRouter _routes = GoRouter(
             GoRoute(
               path: AppRoutes.medicinesScreen,
               name: AppRoutes.medicinesScreen,
-              pageBuilder: (context, state) {
-                return NoTransitionPage(
-                  child: BlocProvider(
-                    create: (context) {
-                      final userData = context.read<UserCubit>();
-                      return MedicationBloc(userData);
-                    },
-                    child: const MedicationsScreen(),
-                  ),
-                );
-              },
+              pageBuilder: (context, state) => const NoTransitionPage(
+                child: MedicationsScreen(),
+              ),
               routes: [
                 GoRoute(
                   name: AppRoutes.prescriptionPanelScreen,
@@ -177,10 +171,24 @@ final GoRouter _routes = GoRouter(
             ),
           ],
         ),
-        // StatefulShellBranch(
-        //   navigatorKey: _shellNavigatorEKey,
-        //   routes: [],
-        // ),
+        StatefulShellBranch(
+          navigatorKey: _shellNavigatorEKey,
+          initialLocation: AppRoutes.archiveScreen,
+          routes: [
+            GoRoute(
+              path: AppRoutes.archiveScreen,
+              name: AppRoutes.archiveScreen,
+              pageBuilder: (context, state) => const NoTransitionPage(child: ArchiveScreen()),
+              routes: [
+                GoRoute(
+                  path: AppRoutes.prescriptionArchive,
+                  name: AppRoutes.prescriptionArchive,
+                  builder: (context, state) => const PrescriptionArchiveScreen(),
+                )
+              ],
+            ),
+          ],
+        ),
       ],
     ),
     StatefulShellRoute.indexedStack(
@@ -195,9 +203,7 @@ final GoRouter _routes = GoRouter(
               path: AppRoutes.patientHomeScreen,
               name: 'patient-home',
               pageBuilder: (_, __) => const NoTransitionPage(child: PatientHomeScreen()),
-              routes: [
-
-              ],
+              routes: [],
             ),
           ],
         ),

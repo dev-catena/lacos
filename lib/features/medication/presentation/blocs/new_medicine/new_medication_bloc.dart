@@ -18,12 +18,12 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
     on<NewMedicationStarted>(_onStarted);
     on<NewMedicationDoctorSelected>(_onDoctorSelected);
     on<NewMedicationMedicineSelected>(_onMedicineSelected);
-    on<NewMedicationConcentrationSelected>(_onConcentrationSelected);
     on<NewMedicationStartChosen>(_onStartChosen);
     on<NewMedicationEndChosen>(_onEndChosen);
     on<NewMedicationContinuousSelected>(_onContinuousSet);
     on<NewMedicationTimeChosen>(_onTimeSet);
     on<NewMedicationFrequencySelected>(_onFrequencySelected);
+    on<NewMedicationInstructionAdded>(_onInstructionAdded);
   }
 
   Future<void> _onStarted(NewMedicationStarted event, Emitter<NewMedicationState> emit) async {
@@ -36,12 +36,12 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
         doctorSelected: null,
         medicines: meds,
         medicineSelected: null,
-        concentrationSelected: null,
         startDate: null,
         endDate: null,
         isContinuous: false,
         firstDoseTime: null,
         frequencySelected: null,
+        instructions: [],
       ),
     );
   }
@@ -62,16 +62,6 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
       emit(internalState.copyWith(medicineSelected: null));
     } else {
       emit(internalState.copyWith(medicineSelected: event.medicineSelected));
-    }
-  }
-
-  void _onConcentrationSelected(NewMedicationConcentrationSelected event, Emitter<NewMedicationState> emit) {
-    final internalState = state as NewMedicationReady;
-
-    if (event.concentrationSelected == internalState.concentrationSelected) {
-      emit(internalState.copyWith(concentrationSelected: null));
-    } else {
-      emit(internalState.copyWith(concentrationSelected: event.concentrationSelected));
     }
   }
 
@@ -121,5 +111,19 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
       emit(internalState.copyWith(frequencySelected: event.frequency));
     }
 
+  }
+
+  void _onInstructionAdded(NewMedicationInstructionAdded event, Emitter<NewMedicationState> emit) {
+    final internalState = state as NewMedicationReady;
+
+    final instructions = List<UsageInstructions>.of(internalState.instructions);
+
+    if (instructions.contains(event.instruction)) {
+      instructions.remove(event.instruction);
+    } else {
+      instructions.add(event.instruction);
+    }
+
+    emit(internalState.copyWith(instructions: instructions));
   }
 }

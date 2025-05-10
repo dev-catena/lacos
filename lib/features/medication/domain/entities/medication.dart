@@ -7,11 +7,12 @@ import '../../presentation/widgets/components/medication_tile.dart';
 class Medication {
   final Medicine medicine;
   final MedicationFrequency frequency;
-  final List<String>? usageInstructions;
+  final List<UsageInstructions> usageInstructions;
   final TimeOfDay firstDose;
   final bool hasTaken;
   final double? dosage;
   final TreatmentStatus treatmentStatus;
+  final DateTime lastUpdate;
 
   /// Retorna os horários sugeridos com base na frequência e primeiro horário do dia
   List<TimeOfDay> getSuggestedTimes() {
@@ -21,11 +22,12 @@ class Medication {
   Medication copyWith({
     Medicine? medicine,
     MedicationFrequency? frequency,
-    List<String>? usageInstructions,
+    List<UsageInstructions>? usageInstructions,
     TimeOfDay? firstDose,
     bool? hasTaken,
     double? dosage,
     TreatmentStatus? treatmentStatus,
+    DateTime? lastUpdate,
   }) {
     return Medication(
       medicine: medicine ?? this.medicine,
@@ -35,6 +37,7 @@ class Medication {
       hasTaken: hasTaken ?? this.hasTaken,
       dosage: dosage ?? this.dosage,
       treatmentStatus: treatmentStatus ?? this.treatmentStatus,
+      lastUpdate: lastUpdate ?? this.lastUpdate,
     );
   }
 
@@ -45,7 +48,8 @@ class Medication {
     required this.dosage,
     required this.treatmentStatus,
     required this.hasTaken,
-    this.usageInstructions,
+    required this.usageInstructions,
+    required this.lastUpdate,
   });
 
   Medication.fromJson(Map<String, dynamic> json)
@@ -58,8 +62,9 @@ class Medication {
           frequency: MedicationFrequency.fromCode(json['frequencia']),
           treatmentStatus: TreatmentStatus.fromCode(json['status']),
           dosage: json['dosagem'] as double,
-          usageInstructions: (json['instrucoes'] as List? ?? []).map((e) => e as String).toList(),
+          usageInstructions: (json['instrucoes'] as List).map((e) => UsageInstructions.fromCode(e)).toList(),
           hasTaken: json['foi_tomado']== 1 ? true : false,
+          lastUpdate: DateTime.parse(json['updated_at']),
         );
 
   MedicationTile buildTile({required VoidCallback onTap, Widget? trailing}) {
@@ -68,7 +73,20 @@ class Medication {
 }
 
 enum UsageInstructions {
-  jejum;
+  fasted(1, 'Em jejum'),
+  beforeMeal(2, 'Antes da refeição'),
+  afterMeal(3, 'Após refeição'),
+  afterWakeUp(4, 'Ao acordar'),
+  beforeSleep(5, 'Antes de dormir');
+
+  final int code;
+  final String description;
+
+  factory UsageInstructions.fromCode(int value){
+    return UsageInstructions.values.firstWhere((element) => element.code == value);
+  }
+
+  const UsageInstructions(this.code, this.description);
 }
 
 enum MedicationPeriod {

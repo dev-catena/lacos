@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../common/presentation/widgets/components/stateful_segmented_button.dart';
-import '../../blocs/medication_bloc.dart';
 import '../../../domain/entities/medication.dart';
 
 class TodayUseMedications extends StatefulWidget {
@@ -36,11 +34,12 @@ class _TodayUseMedicationsState extends State<TodayUseMedications> {
 
   @override
   Widget build(BuildContext context) {
-    final bloc = context.read<MedicationBloc>();
-    final titleLarge = Theme.of(context).textTheme.titleLarge!;
 
     return RefreshIndicator(
-      onRefresh: () async => bloc.add(MedicationStarted()),
+      onRefresh: () async {
+
+      },
+      // onRefresh: () async => bloc.add(MedicationStarted()),
       child: Column(
         children: [
           // Text('Medicações para hoje', style: titleLarge),
@@ -94,7 +93,7 @@ class _TodayUseMedicationsState extends State<TodayUseMedications> {
       case MedicationPeriod.afternoon:
         return hour >= 12 && hour < 18;
       case MedicationPeriod.night:
-        return hour >= 18 && hour < 24;
+        return hour >= 18 && hour < 24 || hour >= 0 && hour <6;
       default:
         return false;
     }
@@ -116,7 +115,8 @@ class MedicationsPerPeriodWidget extends StatelessWidget {
     final titleMedium = Theme.of(context).textTheme.titleMedium!;
 
     if (medications.isEmpty) {
-      return const Text('Nenhum medicamento cadastrado');
+      // return const Text('Nenhum medicamento cadastrado');
+      return const Text('');
     }
 
     return Column(

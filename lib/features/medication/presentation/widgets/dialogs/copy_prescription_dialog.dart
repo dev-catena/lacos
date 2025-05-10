@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../../core/utils/custom_colors.dart';
+import '../../../../common/presentation/widgets/components/custom_selectable_tile.dart';
 import '../../../domain/entities/prescription.dart';
 
 class CopyPrescriptionDialog extends StatefulWidget {
@@ -16,6 +18,12 @@ class CopyPrescriptionDialog extends StatefulWidget {
 
 class _CopyPrescriptionDialogState extends State<CopyPrescriptionDialog> {
   late final medList = List.of(widget.prescription.medications);
+  DateTime? dateSelected = DateTime.now();
+
+  void setDate(DateTime? date) {
+    dateSelected = date;
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +34,21 @@ class _CopyPrescriptionDialogState extends State<CopyPrescriptionDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('Prescrito por ${widget.prescription.doctorName}'),
+            const SizedBox(height: 8),
+            const Text('Data de emissão'),
+            CustomSelectableTile(
+              title: dateSelected != null ? DateFormat('dd/MM/y').format(dateSelected!) : 'Data',
+              onTap: () => showDialog(
+                context: context,
+                builder: (_) => DatePickerDialog(
+                  firstDate: DateTime.now().subtract(Duration(days: 180)),
+                  lastDate: DateTime.now(),
+                  initialDate: dateSelected,
+                  currentDate: dateSelected,
+                ),
+              ).then((value) => setDate(value)),
+              isActive: dateSelected != null,
+            ),
             const SizedBox(height: 8),
             const Text('Medicações'),
             ...List.generate(
@@ -50,10 +73,10 @@ class _CopyPrescriptionDialogState extends State<CopyPrescriptionDialog> {
       ),
       actionsAlignment: MainAxisAlignment.spaceBetween,
       actions: [
-        OutlinedButton(onPressed: () {}, child: const Text('Cancelar')),
+        OutlinedButton(onPressed: () =>context.pop(), child: const Text('Cancelar')),
         FilledButton(
           onPressed: () {
-            final pres = widget.prescription.copyWith(medications: medList);
+            final pres = widget.prescription.copyWith(medications: medList, createdAt: dateSelected!);
             widget.onCreated(pres);
             context.pop();
           },

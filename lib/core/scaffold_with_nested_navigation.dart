@@ -54,7 +54,7 @@ class _ScaffoldWithNestedNavigationState extends State<ScaffoldWithNestedNavigat
       bottomNavigationBar: NavigationBar(
         backgroundColor: CustomColor.bottomBarBg,
         selectedIndex: widget.navigationShell.currentIndex,
-        indicatorColor: CustomColor.activeBottomBarBgIcon,
+        indicatorColor: CustomColor.activeColor,
         destinations: userData.user!.isPatient ? patientDestination : companionDestination,
         onDestinationSelected: _goBranch,
       ),

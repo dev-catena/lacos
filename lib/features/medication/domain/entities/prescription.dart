@@ -5,34 +5,40 @@ import 'medication.dart';
 
 class Prescription {
   final int id;
-  final String code;
-  final DateTime date;
+  final DateTime createdAt;
   final String doctorName;
+  final String speciality;
   final DateTime? expireDate;
+  final DateTime lastUpdate;
   final List<Medication> medications;
+  final bool isActive;
 
   Prescription copyWith({
     int? id,
-    String? code,
-    DateTime? date,
+    DateTime? createdAt,
     String? doctorName,
+    String? speciality,
     DateTime? expireDate,
+    DateTime? lastUpdate,
     List<Medication>? medications,
+    bool? isActive,
   }) {
     return Prescription(
       id: id ?? this.id,
-      code: code ?? this.code,
-      date: date ?? this.date,
+      createdAt: createdAt ?? this.createdAt,
       doctorName: doctorName ?? this.doctorName,
+      speciality: speciality ?? this.speciality,
       expireDate: expireDate ?? this.expireDate,
+      lastUpdate: lastUpdate ?? this.lastUpdate,
       medications: medications ?? this.medications,
+      isActive: isActive ?? this.isActive,
     );
   }
 
   Widget buildTile({required VoidCallback onTap, Widget? trailing}) {
     return ListTile(
       title: Text(doctorName),
-      subtitle: Text('${DateFormat('dd/MM/yyyy', 'pt_BR').format(date)}\n${medications.length} medicações'),
+      subtitle: Text('$speciality - ${medications.length} medicações\n${DateFormat('dd/MM/yyyy', 'pt_BR').format(createdAt)}'),
       isThreeLine: true,
       contentPadding: const EdgeInsets.only(left: 10),
       trailing: trailing,
@@ -47,8 +53,8 @@ class Prescription {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            Text('Receita\n$code', textAlign: TextAlign.center),
-            Text('Emitida em\n${DateFormat('dd/MM/yyyy', 'pt_BR').format(date)}', textAlign: TextAlign.center),
+            const Text('Receita', textAlign: TextAlign.center),
+            Text('Emitida em\n${DateFormat('dd/MM/yyyy', 'pt_BR').format(createdAt)}', textAlign: TextAlign.center),
           ],
         ),
         Text('Emitido por\n$doctorName', textAlign: TextAlign.center),
@@ -58,19 +64,24 @@ class Prescription {
 
   Prescription.fromJson(Map<String, dynamic> json)
       : this(
-            id: json['id'],
-            code: json['code'],
-            date: DateTime.parse(json['created_at']),
-            doctorName: json['nome_medico'],
-            medications: (json['medicacoes'] as List? ?? []).map((e) => Medication.fromJson(e)).toList(),
-            expireDate: DateTime.tryParse(json['expira_em']));
+          id: json['id'],
+          createdAt: DateTime.parse(json['created_at']),
+          doctorName: json['nome_medico'],
+          speciality: json['especialidade'],
+          medications: (json['medicacoes'] as List? ?? []).map((e) => Medication.fromJson(e)).toList(),
+          isActive: json['ativa'] == 1 ? true : false,
+          expireDate: DateTime.tryParse(json['expira_em']),
+          lastUpdate: DateTime.parse(json['updated_at']),
+        );
 
   Prescription({
     required this.id,
-    required this.code,
-    required this.date,
+    required this.createdAt,
+    required this.lastUpdate,
     required this.doctorName,
+    required this.speciality,
     required this.medications,
+    required this.isActive,
     this.expireDate,
   });
 }

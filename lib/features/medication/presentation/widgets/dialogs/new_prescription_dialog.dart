@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 
+import '../../../../common/presentation/widgets/components/custom_selectable_tile.dart';
 import '../../../../common/presentation/widgets/components/file_preview.dart';
 import '../../../../companion_home/patient_profile/domain/entities/doctor.dart';
 import '../../../domain/entities/prescription.dart';
@@ -19,9 +21,14 @@ class NewPrescriptionDialog extends StatefulWidget {
 }
 
 class _NewPrescriptionDialogState extends State<NewPrescriptionDialog> {
-  final codeController = TextEditingController();
   Doctor? doctor;
   File? selectedFile;
+  DateTime? dateSelected = DateTime.now();
+
+  void setDate(DateTime? date) {
+    dateSelected = date;
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,14 +39,19 @@ class _NewPrescriptionDialogState extends State<NewPrescriptionDialog> {
           children: [
             SelectDoctorComponent(onSelect: (doctorSelected) => doctor = doctorSelected),
             const SizedBox(height: 12),
-            TextField(
-              controller: codeController,
-              onSubmitted: (_) => FocusScope.of(context).unfocus(),
-              onTapOutside: (_) => FocusScope.of(context).unfocus(),
-              onEditingComplete: () => FocusScope.of(context).unfocus(),
-              decoration: const InputDecoration(
-                label: Text('Código da receita'),
-              ),
+            const Text('Data de emissão'),
+            CustomSelectableTile(
+              title: dateSelected != null ? DateFormat('dd/MM/y').format(dateSelected!) : 'Data',
+              onTap: () => showDialog(
+                context: context,
+                builder: (_) => DatePickerDialog(
+                  firstDate: DateTime.now().subtract(const Duration(days: 180)),
+                  lastDate: DateTime.now(),
+                  initialDate: dateSelected,
+                  currentDate: dateSelected,
+                ),
+              ).then((value) => setDate(value)),
+              isActive: dateSelected != null,
             ),
             const SizedBox(height: 12),
             if (selectedFile != null)
@@ -52,7 +64,6 @@ class _NewPrescriptionDialogState extends State<NewPrescriptionDialog> {
                   file: selectedFile!,
                 ),
               ),
-
             IconButton(
               onPressed: () {
                 FilePicker.platform.pickFiles().then(
@@ -78,20 +89,23 @@ class _NewPrescriptionDialogState extends State<NewPrescriptionDialog> {
         ),
         FilledButton(
           onPressed: () {
-            if (doctor == null || codeController.text.isEmpty) {
+            if (doctor == null || dateSelected == null) {
               // Optionally show a warning
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Por favor, preencha todos os campos')),
+                const SnackBar(content: Text('Preencha todos os campos')),
               );
               return;
             }
             final pres = Prescription(
               id: 0,
-              code: codeController.text,
-              date: DateTime.now(),
+              createdAt: dateSelected!,
               doctorName: doctor!.name,
+              speciality: doctor!.speciality,
               medications: [],
+              isActive: true,
+              lastUpdate: DateTime.now(),
             );
+
             widget.onConfirm(pres);
           },
           child: const Text('Cadastrar'),

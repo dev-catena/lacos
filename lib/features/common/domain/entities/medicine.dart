@@ -68,7 +68,7 @@ enum MedicineType {
               width: 60,
               height: 60,
               decoration: BoxDecoration(
-                  color: isActive ? CustomColor.activeBottomBarBgIcon : null,
+                  color: isActive ? CustomColor.activeColor : null,
                   borderRadius: BorderRadius.circular(60),
                   border: Border.all(color: Colors.grey.shade500)),
               child: Icon(icon),

@@ -45,7 +45,7 @@ class ChatMessageWidget extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: const BoxDecoration(
-                    color: CustomColor.activeBottomBarBgIcon,
+                    color: CustomColor.activeColor,
                     borderRadius: BorderRadius.only(
                       topRight: Radius.circular(12),
                       bottomLeft: Radius.circular(12),

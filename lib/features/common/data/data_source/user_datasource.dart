@@ -62,7 +62,6 @@ class UserDataSource {
   }
 }
 
-
 enum GroupStatus {
   pending(1, 'Pendente'),
   accepted(2, 'Aceito');
@@ -85,7 +84,7 @@ enum GroupStatus {
 }
 
 class _MockData {
-  final patientsForUser = [
+  final List<Map<String, dynamic>> patientsForUser = [
     {
       'paciente': {
         'id': 1,
@@ -118,10 +117,11 @@ class _MockData {
             'descricao': 'Analgésico e antitérmico',
             'dosagem': '500.0',
           },
+          'updated_at': '2025-04-20T10:00:00',
+          'instrucoes': <int>[],
           'foi_tomado': 0,
           'primeira_dose': '07:00',
           'frequencia': 8,
-          'instrucoes': null,
           'dosagem': 50.0,
           'status': 1,
         },
@@ -133,10 +133,11 @@ class _MockData {
             'descricao': 'Alivia a tosse e descongestiona',
             'dosagem': '10.0',
           },
+          'updated_at': '2025-04-20T10:00:00',
+          'instrucoes': <int>[1],
           'foi_tomado': 0,
           'primeira_dose': '08:00',
           'frequencia': 8,
-          'instrucoes': null,
           'dosagem': 10.0,
           'status': 1,
         },
@@ -148,10 +149,11 @@ class _MockData {
             'descricao': 'Alivia a tosse',
             'dosagem': '10.0',
           },
+          'updated_at': '2025-04-20T10:00:00',
+          'instrucoes': <int>[2, 3],
           'foi_tomado': 0,
           'primeira_dose': '06:00',
           'frequencia': 6,
-          'instrucoes': null,
           'dosagem': 10.0,
           'status': 2,
         },
@@ -163,10 +165,11 @@ class _MockData {
             'descricao': 'Reduz a inflamação e alivia a dor nas articulações',
             'dosagem': '2.0',
           },
+          'updated_at': '2025-04-20T10:00:00',
+          'instrucoes': <int>[],
           'foi_tomado': 0,
           'primeira_dose': '09:00',
           'frequencia': 12,
-          'instrucoes': null,
           'dosagem': 1.0,
           'status': 3,
         },
@@ -178,10 +181,11 @@ class _MockData {
             'descricao': 'Fortalece o sistema imunológico',
             'dosagem': '1000.0',
           },
+          'updated_at': '2025-04-20T10:00:00',
+          'instrucoes': <int>[],
           'foi_tomado': 0,
           'primeira_dose': '08:00',
           'frequencia': 4,
-          'instrucoes': null,
           'dosagem': 3.0,
           'status': 1,
         },
@@ -193,10 +197,11 @@ class _MockData {
             'descricao': 'Controle de níveis de glicose no sangue',
             'dosagem': '10.0',
           },
+          'updated_at': '2025-04-20T10:00:00',
+          'instrucoes': <int>[2],
           'foi_tomado': 0,
           'primeira_dose': '07:00',
           'frequencia': 8,
-          'instrucoes': null,
           'dosagem': 5.0,
           'status': 2,
         },

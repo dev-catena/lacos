@@ -28,7 +28,7 @@ class PatientResumeCard extends StatelessWidget {
       width: size.width,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: CustomColor.activeBottomBarBgIcon,
+        color: CustomColor.activeColor,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

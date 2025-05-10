@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../../core/providers/app_data_cubit.dart';
 import '../../../../../core/providers/user_cubit.dart';
@@ -13,6 +12,7 @@ import '../../../../companion_home/patient_profile/presentation/widgets/dialogs/
 import '../../../domain/entities/medication.dart';
 import '../../../domain/entities/prescription.dart';
 import '../../blocs/new_medicine/new_medication_bloc.dart';
+import '../components/treatment_duration.dart';
 
 class NewMedicationScreen extends StatelessWidget {
   const NewMedicationScreen(this.prescription, {super.key});
@@ -63,14 +63,17 @@ class _ReadyScreen extends StatelessWidget {
     final bloc = context.read<NewMedicationBloc>();
     final userData = context.read<UserCubit>();
     final appData = context.read<AppDataCubit>();
+    final bool canRegister = state.medicineSelected != null &&
+        state.frequencySelected != null &&
+        state.startDate != null &&
+        state.firstDoseTime != null &&
+        state.firstDoseTime != null;
 
     return Column(
       children: [
-
         Text('Cadastro de nova medicação', style: titleLarge),
         const SizedBox(height: 12),
         state.prescription.buildHeader(),
-
         const SizedBox(height: 10),
         const Divider(),
         const SizedBox(height: 10),
@@ -107,7 +110,10 @@ class _ReadyScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        const Text('Defina a frequência de uso'),
+        const Divider(),
+        const SizedBox(height: 10),
+        Text('Tratamento', style: titleMedium),
+        const SizedBox(height: 10),
         DropdownMenu<String>(
           width: 200,
           dropdownMenuEntries: const [
@@ -119,49 +125,17 @@ class _ReadyScreen extends StatelessWidget {
             DropdownMenuEntry(value: '12', label: '12 em 12 horas'),
             DropdownMenuEntry(value: 'sn', label: 'Sem frequência'),
           ],
+          label: const Text('Frequência de uso', textAlign: TextAlign.center),
           initialSelection: state.frequencySelected?.hoursInterval.toString(),
           onSelected: (value) {
             bloc.add(NewMedicationFrequencySelected(MedicationFrequency.fromString(value!)));
           },
         ),
         const SizedBox(height: 10),
-        const Text('Tratamento contínuo?'),
-        Checkbox(
-          value: state.isContinuous,
-          onChanged: (value) => bloc.add(NewMedicationContinuousSelected(value)),
+        TreatmentDuration(
+          onCheck: (value) => bloc.add(NewMedicationContinuousSelected(value)),
+          onDatePicked: (date) => bloc.add(NewMedicationStartChosen(date)),
         ),
-        const SizedBox(height: 10),
-        const Text('Início do tratamento'),
-        CustomSelectableTile(
-          title: state.startDate != null ? DateFormat('dd/MM/yyyy', 'pt_BR').format(state.startDate!) : 'Início',
-          onTap: () {
-            showDatePicker(
-              context: context,
-              firstDate: DateTime.now(),
-              initialDate: state.startDate,
-              lastDate: DateTime.now().add(const Duration(days: 3650)),
-            ).then((value) => bloc.add(NewMedicationStartChosen(value)));
-          },
-          isActive: state.startDate != null,
-        ),
-        const SizedBox(height: 10),
-        state.isContinuous ? const SizedBox() : const Text('Fim do tratamento'),
-        state.isContinuous
-            ? const SizedBox()
-            : CustomSelectableTile(
-                title: state.endDate != null ? DateFormat('dd/MM/yyyy', 'pt_BR').format(state.endDate!) : 'Fim',
-                onTap: () {
-                  if (state.startDate == null) return;
-
-                  showDatePicker(
-                    context: context,
-                    firstDate: state.startDate!,
-                    initialDate: state.endDate,
-                    lastDate: DateTime.now().add(const Duration(days: 3650)),
-                  ).then((value) => bloc.add(NewMedicationEndChosen(value)));
-                },
-                isActive: state.endDate != null,
-              ),
         const SizedBox(height: 10),
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -216,6 +190,38 @@ class _ReadyScreen extends StatelessWidget {
           isActive: state.firstDoseTime != null,
         ),
         const SizedBox(height: 10),
+        const Divider(),
+        const SizedBox(height: 10),
+        Text('Instruções de uso', style: titleMedium),
+        const SizedBox(height: 10),
+        ...List.generate(
+          state.instructions.length + 1,
+          (index) {
+            if (index ==  state.instructions.length) {
+              return IconButton(
+                  onPressed: () => showDialog(
+                        context: context,
+                        builder: (context) {
+                          final instructions = List<UsageInstructions>.of(UsageInstructions.values);
+                          instructions.removeWhere((element) => state.instructions.contains(element));
+                          return SingleSelectDialog<UsageInstructions>(
+                            title: 'Selecione uma instrução de uso',
+                            options: instructions,
+                            getName: (option) => option.description,
+                            onChoose: (value) {
+                              bloc.add(NewMedicationInstructionAdded(value));
+                            },
+                            optionSelected: null,
+                          );
+                        },
+                      ),
+                  icon: const Icon(Icons.add_circle_outline, size: 30));
+            } else {
+              return Text( state.instructions[index].description);
+            }
+          },
+        ),
+        const SizedBox(height: 10),
         FilledButton(
           onPressed: () {
             final med = Medication(
@@ -223,34 +229,18 @@ class _ReadyScreen extends StatelessWidget {
               frequency: state.frequencySelected!,
               firstDose: state.firstDoseTime!,
               dosage: 30,
-              usageInstructions: [],
+              usageInstructions: state.instructions,
               hasTaken: false,
               treatmentStatus: TreatmentStatus.active,
+              lastUpdate: DateTime.now(),
+
             );
             userData.addMedication(med);
             context.pop();
           },
+          style: ButtonStyle(backgroundColor: canRegister ? null : const WidgetStatePropertyAll(Colors.grey)),
           child: const Text('Cadastrar'),
         ),
-        // SegmentedButton<String>(
-        //   segments: const [
-        //     ButtonSegment(value: 'mg', label: Text('mg')),
-        //     ButtonSegment(value: 'ml', label: Text('ml')),
-        //     ButtonSegment(value: 'gota', label: Text('gota')),
-        //   ],
-        //   selected: {concentrationSelected ?? ''},
-        //   onSelectionChanged: (newSelection) {
-        //     onConcentrationSelected( newSelection.first);
-        //   },
-        // ),
-        // DropdownMenu<String>(
-        //   dropdownMenuEntries: const [
-        //     DropdownMenuEntry(value: 'mg', label: 'mg'),
-        //     DropdownMenuEntry(value: 'ml', label: 'ml'),
-        //     DropdownMenuEntry(value: 'gota', label: 'gota'),
-        //   ],
-        //   onSelected: onConcentrationSelected,
-        // ),
       ],
     );
   }

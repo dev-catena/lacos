@@ -8,7 +8,8 @@ class MedicationModel extends Medication {
     required super.dosage,
     required super.treatmentStatus,
     required super.hasTaken,
-    super.usageInstructions,
+    required super.usageInstructions,
+    required super.lastUpdate,
   });
 
 
@@ -21,6 +22,7 @@ class MedicationModel extends Medication {
       hasTaken: hasTaken,
       treatmentStatus: treatmentStatus,
       usageInstructions: usageInstructions,
+        lastUpdate: lastUpdate,
     );
   }
 }

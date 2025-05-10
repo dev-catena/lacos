@@ -140,7 +140,7 @@ class LoginScreen extends StatelessWidget {
         hintText: hintText,
         focusedBorder: const UnderlineInputBorder(
           borderSide: BorderSide(
-            color: CustomColor.activeBottomBarBgIcon,
+            color: CustomColor.activeColor,
           ),
         ),
         suffixIcon: trailingWidget,

@@ -88,7 +88,7 @@ Widget getAccessScreen(BuildContext context, AccessProfileType profile) {
         width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: CustomColor.activeBottomBarBgIcon),
+          border: Border.all(color: CustomColor.activeColor),
           color: CustomColor.bottomBarBg,
         ),
         child: Center(

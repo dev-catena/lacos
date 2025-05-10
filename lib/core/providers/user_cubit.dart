@@ -10,6 +10,8 @@ import '../../features/user_profile/presentation/widgets/screens/group_selection
 
 part 'user_state.dart';
 
+
+//TODO: implementar os métodos para gerenciar médicos de um paciente aqui dentro e não em um cubit/provider separado
 class UserCubit extends Cubit<UserState> {
   final UserDataSource _userDataSource;
 

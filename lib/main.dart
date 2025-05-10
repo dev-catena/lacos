@@ -10,21 +10,22 @@ import 'core/providers/patient_cubit.dart';
 import 'core/routes.dart';
 import 'core/utils/globals.dart';
 import 'core/providers/user_cubit.dart';
+import 'features/common/data/data_source/medication_data_source.dart';
 import 'features/common/data/data_source/medicine_datasource.dart';
 import 'features/common/data/data_source/user_datasource.dart';
 import 'features/companion_home/patient_profile/data/data_source/doctor_datasource.dart';
 import 'firebase_options.dart';
 
-// mkdir patient_home\data\data_source
-// mkdir patient_home\data\models
-// mkdir patient_home\data\repositories
-// mkdir patient_home\domain\entities
-// mkdir patient_home\domain\repositories
-// mkdir patient_home\domain\usecases
-// mkdir patient_home\presentation\blocs
-// mkdir patient_home\presentation\widgets
-// mkdir patient_home\presentation\widgets\screens
-// mkdir patient_home\presentation\widgets\components
+// mkdir archive\data\data_source
+// mkdir archive\data\models
+// mkdir archive\data\repositories
+// mkdir archive\domain\entities
+// mkdir archive\domain\repositories
+// mkdir archive\domain\usecases
+// mkdir archive\presentation\blocs
+// mkdir archive\presentation\widgets
+// mkdir archive\presentation\widgets\screens
+// mkdir archive\presentation\widgets\components
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +46,7 @@ class LacosApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         RepositoryProvider(create: (_) => UserCubit(UserDataSource())),
-        RepositoryProvider(create: (_) => PatientCubit(DoctorDataSource())),
+        RepositoryProvider(create: (_) => PatientCubit(DoctorDataSource(), MedicationDataSource())),
         RepositoryProvider(create: (_) => AppDataCubit(MedicineDataSource())),
       ],
       child: MaterialApp.router(

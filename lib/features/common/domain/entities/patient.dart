@@ -1,5 +1,6 @@
 
 import '../../../companion_home/domain/entities/patient_event.dart';
+import '../../../companion_home/patient_profile/domain/entities/doctor.dart';
 import '../../../medication/domain/entities/medication.dart';
 import '../../data/data_source/user_datasource.dart';
 import '../../data/models/user_model.dart';
@@ -8,6 +9,7 @@ import 'user.dart';
 class Patient {
   final UserEntity self;
   final List<UserEntity> usersForPatient;
+  final List<Doctor>? doctors;
   final List<Medication> medications;
   final String groupCode;
   final GroupStatus status;
@@ -15,6 +17,7 @@ class Patient {
   Patient({
     required this.self,
     required this.usersForPatient,
+    this.doctors,
     required this.medications,
     required this.groupCode,
     required this.status,
