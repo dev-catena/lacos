@@ -8,6 +8,7 @@ import '../components/emergency_button.dart';
 
 import '../../../domain/entities/patient_event.dart';
 import '../components/patient_last_activity_list.dart';
+import '../dialogs/new_event_dialog.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -16,48 +17,56 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final List<PatientEvent> lastActivities = [
       PatientEvent(
-        eventType: PatientEvents.appointment,
+        id: 1,
+        eventType: PatientEventType.appointment,
         title: 'Fisioterapia',
         description: 'Consulta com Dra. Sabrina Santos',
         dateTime: DateTime.now(),
       ),
       PatientEvent(
-        eventType: PatientEvents.warning,
+        id: 1,
+        eventType: PatientEventType.warning,
         title: 'Ocorrência',
         description: 'Queda no quarto',
         dateTime: DateTime.now(),
       ),
       PatientEvent(
-        eventType: PatientEvents.appointment,
+        id: 1,
+        eventType: PatientEventType.appointment,
         title: 'Oftamologista',
         description: 'Consulta com Dr. Henrique',
         dateTime: DateTime(2025, 03, 08, 16, 45),
       ),
       PatientEvent(
-        eventType: PatientEvents.call,
+        id: 1,
+        eventType: PatientEventType.call,
         title: 'Chamada',
         description: 'Chamada recebida de Beth Guimarães',
         dateTime: DateTime(2025, 03, 08, 10, 11),
       ),
       PatientEvent(
-        eventType: PatientEvents.medicalTest,
+        id: 1,
+        eventType: PatientEventType.medicalTest,
         description: 'Emissão de resultado de teste de urina',
         dateTime: DateTime(2025, 03, 08, 08, 23),
       ),
       PatientEvent(
-        eventType: PatientEvents.appointment,
+        id: 1,
+        eventType: PatientEventType.appointment,
         title: 'Oftamologista',
         description: 'Consulta com Dr. Henrique',
         dateTime: DateTime(2025, 03, 07, 14, 12),
       ),
       PatientEvent(
-        eventType: PatientEvents.call,
+        id: 1,
+        eventType: PatientEventType.call,
         title: 'Chamada',
         description: 'Chamada recebida de Ântonio Beltrão',
         dateTime: DateTime(2025, 03, 07, 12, 56),
       ),
       PatientEvent(
-        eventType: PatientEvents.dataGathered,
+        id: 1,
+        eventType: PatientEventType.dataGathered,
         title: 'Informações coletadas',
         description: 'Pressão, temperatura e glicose',
         dateTime: DateTime(2025, 03, 07, 09, 35),
@@ -66,7 +75,9 @@ class HomeScreen extends StatelessWidget {
 
     return CustomScaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          showDialog(context: context, builder: (context) => const NewEventDialog());
+        },
         child: const Icon(Icons.add),
       ),
       child: BlocBuilder<UserCubit, UserState>(
@@ -91,12 +102,14 @@ class HomeScreen extends StatelessWidget {
                 patient.buildResumeCard(
                   [
                     PatientEvent(
-                      eventType: PatientEvents.goodMood,
+                      id: 1,
+                      eventType: PatientEventType.goodMood,
                       description: 'Muito bom humor',
                       dateTime: DateTime.now(),
                     ),
                     PatientEvent(
-                      eventType: PatientEvents.location,
+                      id: 1,
+                      eventType: PatientEventType.location,
                       description: 'Em casa',
                     ),
                   ],

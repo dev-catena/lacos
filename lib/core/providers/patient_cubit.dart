@@ -1,8 +1,11 @@
 import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
 
+import '../../features/agenda/entities/agenda_appointment.dart';
+import '../../features/common/data/data_source/agenda_data_source.dart';
 import '../../features/common/data/data_source/medication_data_source.dart';
 import '../../features/common/domain/entities/patient.dart';
+import '../../features/companion_home/domain/entities/patient_event.dart';
 import '../../features/companion_home/patient_profile/data/data_source/doctor_datasource.dart';
 import '../../features/companion_home/patient_profile/domain/entities/doctor.dart';
 import '../../features/medication/domain/entities/medication.dart';
@@ -13,22 +16,30 @@ part 'patient_state.dart';
 class PatientCubit extends Cubit<PatientState> {
   final DoctorDataSource doctorsDataSource;
   final MedicationDataSource medicationDataSource;
+  final AgendaDataSource agendaDataSource;
 
-  PatientCubit(this.doctorsDataSource, this.medicationDataSource) : super(PatientInitial());
+  PatientCubit(
+    this.doctorsDataSource,
+    this.medicationDataSource,
+    this.agendaDataSource,
+  ) : super(PatientInitial());
 
   List<Doctor> get doctors => state is PatientReady ? (state as PatientReady).doctors : [];
+
   List<Prescription> get prescriptions => state is PatientReady ? (state as PatientReady).prescription : [];
 
   Future<void> initialize(Patient currentPatient) async {
     final List<Doctor> doctors = [];
     final List<Prescription> prescription = [];
+    final List<AgendaAppointment> appointments = [];
 
     await Future.wait([
       doctorsDataSource.getPatientDoctors(currentPatient).then((value) => doctors.addAll(value)),
       medicationDataSource.getPrescriptionForPatient(currentPatient).then((value) => prescription.addAll(value)),
+      agendaDataSource.getAppointments().then((value) => appointments.addAll(value)),
     ]);
 
-    emit(PatientReady(doctors: doctors, prescription: prescription));
+    emit(PatientReady(doctors: doctors, prescription: prescription, appointments: appointments));
   }
 
   Future<void> registerDoctor(Patient patient, Doctor doctor) async {
@@ -58,7 +69,6 @@ class PatientCubit extends Cubit<PatientState> {
     emit(internalState.copyWith(prescription: [...updatedPrescriptions]));
   }
 
-
   Future<void> deactivateMedication(Patient patient, Prescription pres, Medication med) async {
     final internalState = state as PatientReady;
 
@@ -68,7 +78,6 @@ class PatientCubit extends Cubit<PatientState> {
     presList.removeAt(presIndex);
 
     final updatedPrescription = pres;
-
 
     final index = updatedPrescription.medications.indexOf(med);
 
@@ -92,7 +101,6 @@ class PatientCubit extends Cubit<PatientState> {
 
     final updatedPrescription = pres;
 
-
     final index = updatedPrescription.medications.indexOf(med);
 
     final updatedMedication = await medicationDataSource.reactivateMedication(patient, med);
@@ -103,5 +111,14 @@ class PatientCubit extends Cubit<PatientState> {
     presList.insert(presIndex, updatedPrescription);
 
     emit(internalState.copyWith(prescription: [...presList]));
+  }
+
+  Future<void> registerAppointment(AgendaAppointment event) async {
+    final internalState = state as PatientReady;
+
+    final updatedAgenda = List<AgendaAppointment>.of(internalState.appointments);
+    updatedAgenda.insert(0, event);
+
+    emit(internalState.copyWith(appointments: updatedAgenda));
   }
 }

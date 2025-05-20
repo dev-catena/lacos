@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../../core/providers/patient_cubit.dart';
 import '../../../../common/presentation/widgets/custom_scaffold.dart';
@@ -17,13 +18,21 @@ class PrescriptionArchiveScreen extends StatelessWidget {
         children: [
           ...List.generate(
             inactivePres.length,
-            (index) {
+                (index) {
               final pres = inactivePres[index];
               return pres.buildTile(
-                onTap: () {
-
-                },
-              );
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) {
+                        return SimpleDialog(
+                          children: [
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  trailing: Text('Descontinuado em\n${DateFormat('dd/MM/y').format(pres.lastUpdate)}'));
             },
           ),
         ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../features/appointment_schedule/presentation/widgets/screens/appointment_schedule_screen.dart';
+import '../features/agenda/presentation/widgets/screens/appointment_schedule_screen.dart';
+import '../features/agenda/presentation/widgets/screens/new_schedule_screen.dart';
 import '../features/archive/presentation/widgets/screens/archive_screen.dart';
 import '../features/archive/presentation/widgets/screens/prescription_archive_screen.dart';
 import '../features/chat/presentation/widgets/screens/chat_screen.dart';
@@ -59,6 +60,9 @@ class AppRoutes {
   static const patientHomeScreen = '/paciente';
 
   static const prescriptionArchive = 'arquivo-receita';
+
+
+  static const newAppointmentScreen = 'novo-compromisso';
 
   GoRouter get routes {
     return _routes;
@@ -155,7 +159,13 @@ final GoRouter _routes = GoRouter(
               path: AppRoutes.appointmentScheduleScreen,
               name: AppRoutes.appointmentScheduleScreen,
               pageBuilder: (context, state) => const NoTransitionPage(child: AppointmentScheduleScreen()),
-              routes: const [],
+              routes: [
+                GoRoute(
+                  path: AppRoutes.newAppointmentScreen,
+                  name: AppRoutes.newAppointmentScreen,
+                  builder: (context, state) => const NewScheduleScreen(),
+                ),
+              ],
             ),
           ],
         ),

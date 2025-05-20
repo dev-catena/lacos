@@ -30,7 +30,10 @@ class _PrescriptionPanelScreenState extends State<PrescriptionPanelScreen> {
           showDialog(
               context: context,
               builder: (context) {
-                return NewPrescriptionDialog(onConfirm: (newPrescription) {});
+                return NewPrescriptionDialog(onConfirm: (newPrescription) async {
+                  await patientData.registerPrescription(appData.currentPatient!, newPrescription);
+                  setState(() {});
+                });
               });
         },
         child: const Icon(Icons.add),
@@ -63,6 +66,8 @@ class _PrescriptionPanelScreenState extends State<PrescriptionPanelScreen> {
                           builder: (context) {
                             return CopyPrescriptionDialog(pres, onCreated: (newPrescription) async {
                               await patientData.registerPrescription(appData.currentPatient!, newPrescription);
+
+                              await patientData.deactivatePrescription(appData.currentPatient!, pres);
                               setState(() {});
                             });
                           });

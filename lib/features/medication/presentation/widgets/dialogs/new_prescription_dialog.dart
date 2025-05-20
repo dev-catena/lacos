@@ -94,8 +94,10 @@ class _NewPrescriptionDialogState extends State<NewPrescriptionDialog> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Preencha todos os campos')),
               );
+              debugPrint('aqi');
               return;
             }
+            debugPrint('aqui');
             final pres = Prescription(
               id: 0,
               createdAt: dateSelected!,
@@ -107,6 +109,7 @@ class _NewPrescriptionDialogState extends State<NewPrescriptionDialog> {
             );
 
             widget.onConfirm(pres);
+            context.pop();
           },
           child: const Text('Cadastrar'),
         ),

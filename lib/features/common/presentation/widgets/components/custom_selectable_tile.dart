@@ -10,6 +10,7 @@ class CustomSelectableTile extends StatelessWidget {
     required this.isActive,
     this.width,
     this.height,
+    this.leadingWidget,
     this.trailingWidget,
     this.hasGreyBackground = false,
     this.titleColor,
@@ -26,6 +27,7 @@ class CustomSelectableTile extends StatelessWidget {
   final Color? titleColor;
   final Color? color;
   final Color? borderColor;
+  final Widget? leadingWidget;
   final Widget? trailingWidget;
 
   // Casos
@@ -78,6 +80,7 @@ class CustomSelectableTile extends StatelessWidget {
           ),
           child: Row(
             children: [
+              if(leadingWidget != null) leadingWidget!,
               Expanded(
                 child: Text(
                   title,
@@ -87,7 +90,7 @@ class CustomSelectableTile extends StatelessWidget {
                   ),
                 ),
               ),
-              trailingWidget != null ? trailingWidget! : const SizedBox(),
+              if(trailingWidget != null) trailingWidget!,
             ],
           ),
         ),

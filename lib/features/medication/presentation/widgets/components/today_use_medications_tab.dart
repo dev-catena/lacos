@@ -19,9 +19,9 @@ class _TodayUseMedicationsState extends State<TodayUseMedications> {
     final ordered = MedicationPeriod.values.where((e) => value.contains(e));
     displayableMeds = ordered
         .map((e) => MedicationsPerPeriodWidget(
-      period: e,
-      medications: _groupMedicationsByPeriod(e, widget.medicines),
-    ))
+              period: e,
+              medications: _groupMedicationsByPeriod(e, widget.medicines),
+            ))
         .toList();
     setState(() {});
   }
@@ -34,11 +34,8 @@ class _TodayUseMedicationsState extends State<TodayUseMedications> {
 
   @override
   Widget build(BuildContext context) {
-
     return RefreshIndicator(
-      onRefresh: () async {
-
-      },
+      onRefresh: () async {},
       // onRefresh: () async => bloc.add(MedicationStarted()),
       child: Column(
         children: [
@@ -93,7 +90,7 @@ class _TodayUseMedicationsState extends State<TodayUseMedications> {
       case MedicationPeriod.afternoon:
         return hour >= 12 && hour < 18;
       case MedicationPeriod.night:
-        return hour >= 18 && hour < 24 || hour >= 0 && hour <6;
+        return hour >= 18 && hour < 24 || hour >= 0 && hour < 6;
       default:
         return false;
     }
@@ -123,7 +120,34 @@ class MedicationsPerPeriodWidget extends StatelessWidget {
       children: [
         period.buildTile(titleMedium),
         const SizedBox(height: 8),
-        ...medications.map((medicine) => medicine.buildTile(onTap: () {})),
+        ...medications.map(
+          (medicine) => medicine.buildTile(
+            onTap: () {},
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) async {
+                if (value == 'edit') {
+                  // showDialog(
+                  //     context: context,
+                  //     builder: (context) {
+                  //       // return CopyPrescriptionDialog(pres, onCreated: (newPrescription) async {
+                  //       //   await patientData.registerPrescription(appData.currentPatient!, newPrescription);
+                  //       //   setState(() {});
+                  //       // });
+                  //     });
+                } else if (value == 'delete') {
+                  // await patientData.deactivatePrescription(appData.currentPatient!, pres);
+                  // setState(() {});
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'edit', child: Text('Ver informações')),
+                PopupMenuItem(value: 'delete', child: Text('Descontinuar')),
+              ],
+              // Hide the default icon
+              icon: const Icon(Icons.settings),
+            ),
+          ),
+        ),
       ],
     );
   }

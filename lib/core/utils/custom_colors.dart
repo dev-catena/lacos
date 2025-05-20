@@ -14,4 +14,6 @@ abstract class CustomColor {
 
 
   static const Color background = Color.fromARGB(155, 41, 42, 47);
+
+  static const Color deactivatedButton = Color.fromARGB(255, 145, 155, 132);
 }

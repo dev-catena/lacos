@@ -34,10 +34,6 @@ class MedicationsScreenState extends State<MedicationsScreen> with SingleTickerP
 
   @override
   Widget build(BuildContext context) {
-    final patientData = context.watch<PatientCubit>();
-
-    final medications = patientData.prescriptions.expand((element) => element.medications);
-
     return CustomScaffold(
       tabBar: TabBar(
         controller: _tabController,
@@ -50,24 +46,32 @@ class MedicationsScreenState extends State<MedicationsScreen> with SingleTickerP
       ),
       isScrollable: false,
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          context.pushNamed(AppRoutes.prescriptionPanelScreen);
+        onPressed: () async {
+          await context.pushNamed(AppRoutes.prescriptionPanelScreen);
+          setState(() {});
         },
         child: const Icon(Icons.settings),
       ),
-      child: TabBarView(
-        controller: _tabController,
-        children: [
-          TodayUseMedications(
-            medications.where((element) => element.treatmentStatus == TreatmentStatus.active).toList(),
-          ),
-          MedicationHistoricTab(
-            medications.where((element) => element.treatmentStatus == TreatmentStatus.treatmentDone).toList(),
-          ),
-          DiscontinuedMedicationTab(
-            medications.where((element) => element.treatmentStatus == TreatmentStatus.discontinued).toList(),
-          ),
-        ],
+      child: BlocBuilder<PatientCubit, PatientState>(
+        builder: (context, state) {
+          final prescriptions = (state as PatientReady).prescription;
+          final medications = prescriptions.expand((e) => e.medications).toList();
+
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              TodayUseMedications(
+                medications.where((element) => element.treatmentStatus == TreatmentStatus.active).toList(),
+              ),
+              MedicationHistoricTab(
+                medications.where((element) => element.treatmentStatus == TreatmentStatus.treatmentDone).toList(),
+              ),
+              DiscontinuedMedicationTab(
+                medications.where((element) => element.treatmentStatus == TreatmentStatus.discontinued).toList(),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
