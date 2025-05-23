@@ -48,6 +48,7 @@ dependencies:
   firebase_core: ^3.13.0
   file_picker: ^10.1.2
   pdfx: ^2.9.0
+  calendar_date_picker2: 1.1.9
 
 dev_dependencies:
   flutter_test:

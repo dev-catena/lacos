@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../../core/routes.dart';
+import '../../../../common/presentation/widgets/components/custom_selectable_tile.dart';
 import '../../../domain/entities/medication.dart';
 
 class MedicationTile extends StatefulWidget {
@@ -15,6 +18,7 @@ class MedicationTile extends StatefulWidget {
 
 class _MedicationTileState extends State<MedicationTile> {
   late Medication med = widget.medication;
+  TimeOfDay? timeTaken;
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +62,59 @@ class _MedicationTileState extends State<MedicationTile> {
           borderRadius: borderRadius,
           // onTap: widget.onTap,
           onTap: () {
-            med = med.copyWith(hasTaken: true);
-            setState(() {});
+            showDialog(
+              context: context,
+              builder: (context) {
+                return AlertDialog(
+                  title: const Text(
+                    'Informe o horário de administração do medicamento',
+                    textAlign: TextAlign.center,
+                  ),
+                  contentPadding: EdgeInsets.all(20),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CustomSelectableTile(
+                        title: timeTaken != null
+                            ? '${timeTaken!.hour.toString().padLeft(2, '0')}:${timeTaken!.minute.toString().padLeft(2, '0')}'
+                            : 'Horário',
+                        onTap: () {
+                          showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          ).then((value) {
+                            timeTaken = value;
+
+                            debugPrint('$value');
+                            setState(() {});
+                          });
+                        },
+                        isActive: timeTaken != null,
+                      ),
+                    ],
+                  ),
+                  actionsAlignment: MainAxisAlignment.spaceAround,
+                  actions: [
+                    OutlinedButton(
+                      onPressed: () {
+                        context.pop();
+                      },
+                      child: Text('Cancelar'),
+                    ),
+                    FilledButton(
+                      onPressed: () {
+                        med = med.copyWith(hasTaken: true);
+                        setState(() {});
+                        context.pop();
+                      },
+                      child: Text('Confirmar'),
+                    ),
+                  ],
+                );
+              },
+            );
+            // med = med.copyWith(hasTaken: true);
+            // setState(() {});
           },
           child: Container(
             height: 45,

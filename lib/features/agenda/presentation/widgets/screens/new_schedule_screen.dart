@@ -9,6 +9,7 @@ import '../../../../common/presentation/widgets/components/switch_with_title_row
 import '../../../../common/presentation/widgets/custom_scaffold.dart';
 import '../../../../common/presentation/widgets/dialogs/single_select_dialog.dart';
 import '../../../../companion_home/patient_profile/domain/entities/doctor.dart';
+import '../../../../common/presentation/widgets/components/schedule_component.dart';
 import '../../../entities/agenda_appointment.dart';
 
 class NewScheduleScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class NewScheduleScreen extends StatefulWidget {
 class _NewScheduleScreenState extends State<NewScheduleScreen> {
   final descriptionController = TextEditingController();
   bool isMedical = false;
+  bool isRecurrent = false;
   Doctor? doctorSelected;
   DateTime? dateSelected;
   TimeOfDay? timeSelected;
@@ -124,6 +126,21 @@ class _NewScheduleScreenState extends State<NewScheduleScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                SwitchWithTitleRow(
+                  'Compromisso recorrente?',
+                  onChanged: (value) {
+                    isRecurrent = value;
+                    // if (!value) doctorSelected = null;
+                    setState(() {});
+                  },
+                ),
+                if (isRecurrent)
+                  ScheduleComponent(
+                    currentType: null,
+                    currentValue: null,
+                    onTypeSet: (value) {},
+                    onValueSet: (value) {},
+                  ),
                 SwitchWithTitleRow(
                   'Compromisso médico?',
                   onChanged: (value) {

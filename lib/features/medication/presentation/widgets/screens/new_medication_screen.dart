@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../../core/providers/app_data_cubit.dart';
 import '../../../../../core/providers/user_cubit.dart';
+import '../../../../../core/utils/custom_colors.dart';
 import '../../../../common/domain/entities/medicine.dart';
 import '../../../../common/presentation/widgets/components/custom_selectable_tile.dart';
 import '../../../../common/presentation/widgets/custom_scaffold.dart';
 import '../../../../common/presentation/widgets/dialogs/single_select_dialog.dart';
 import '../../../../companion_home/patient_profile/presentation/widgets/dialogs/new_medicine_dialog.dart';
 import '../../../domain/entities/medication.dart';
+import '../../../domain/entities/medication_schedule.dart';
 import '../../../domain/entities/prescription.dart';
 import '../../blocs/new_medicine/new_medication_bloc.dart';
-import '../components/treatment_duration.dart';
+import '../dialogs/select_dosage_dialog.dart';
+import '../dialogs/select_frequency_schedule_dialog.dart';
+import '../dialogs/set_treatment_duration_dialog.dart';
 
 class NewMedicationScreen extends StatelessWidget {
   const NewMedicationScreen(this.prescription, {super.key});
@@ -55,6 +60,36 @@ class _ReadyScreen extends StatelessWidget {
   const _ReadyScreen(this.state);
 
   final NewMedicationReady state;
+
+  String getScheduleLabel() {
+    switch (state.scheduleType) {
+      case null:
+        return 'Não selecionado';
+      case MedicationScheduleType.interval:
+        return 'A cada ${state.scheduleValue} horas';
+      case MedicationScheduleType.daily:
+        return 'Todo dia às ${state.scheduleValue}';
+      case MedicationScheduleType.weekly:
+        return 'Toda ${state.scheduleValue}';
+      case MedicationScheduleType.cyclicWeekly:
+        return 'Tomar x semanas e x semanas sem tomar';
+      case MedicationScheduleType.monthly:
+        return 'X ao mês nos dias Y e Z';
+    }
+  }
+
+  String getDurationLabel() {
+    if (state.startDate == null) {
+      return 'Selecione a duração';
+    }
+
+    if (state.isContinuous) {
+      return 'Tratamento contínuo a partir de ${DateFormat('dd/MM/yyyy').format(state.startDate!)}';
+    } else {
+      return 'De ${DateFormat('dd/MM/yyyy').format(state.startDate!)} '
+          'até ${DateFormat('dd/MM/yyyy').format(state.endDate!)}';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,65 +144,115 @@ class _ReadyScreen extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 10),
-        const Divider(),
-        const SizedBox(height: 10),
+        const SizedBox(height: 20),
         Text('Tratamento', style: titleMedium),
         const SizedBox(height: 10),
-        DropdownMenu<String>(
-          width: 200,
-          dropdownMenuEntries: const [
-            DropdownMenuEntry(value: '0', label: '1 vez ao dia'),
-            DropdownMenuEntry(value: '2', label: '2 em 2 horas'),
-            DropdownMenuEntry(value: '4', label: '4 em 4 horas'),
-            DropdownMenuEntry(value: '6', label: '6 em 6 horas'),
-            DropdownMenuEntry(value: '8', label: '8 em 8 horas'),
-            DropdownMenuEntry(value: '12', label: '12 em 12 horas'),
-            DropdownMenuEntry(value: 'sn', label: 'Sem frequência'),
-          ],
-          label: const Text('Frequência de uso', textAlign: TextAlign.center),
-          initialSelection: state.frequencySelected?.hoursInterval.toString(),
-          onSelected: (value) {
-            bloc.add(NewMedicationFrequencySelected(MedicationFrequency.fromString(value!)));
+        ListTile(
+          title: const Text('Duração do tratamento'),
+          subtitle: Text(getDurationLabel()),
+          trailing: state.startDate == null
+              ? const Icon(Icons.warning_amber, color: CustomColor.vividRed)
+              : const Icon(Icons.edit_outlined),
+
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (context) {
+                return SetTreatmentDurationDialog(
+                  currentContinuousValue: state.isContinuous,
+                  currentStart: state.startDate,
+                  currentEnd: state.endDate,
+                  onSet: (startDate, endDate, isContinuous) {
+                    bloc.add(NewMedicationDurationSet(startDate, isContinuous, endDate));
+                  },
+                );
+              },
+            );
+          },
+        ),
+        // const Text('Duração do tratamento'),
+        // Row(
+        //   mainAxisAlignment: MainAxisAlignment.center,
+        //   children: [
+        //     const Text('Tratamento contínuo?'),
+        //     Checkbox(
+        //       value: state.isContinuous,
+        //       onChanged: (value) => bloc.add(NewMedicationContinuousSelected(value)),
+        //     ),
+        //   ],
+        // ),
+        // if (state.isContinuous)
+        //   CustomSelectableTile(
+        //     title: state.startDate != null ? DateFormat('dd/MM/y').format(state.startDate!) : 'Data de início',
+        //     onTap: () {
+        //       showDatePicker(
+        //         context: context,
+        //         firstDate: DateTime.now().subtract(const Duration(days: 90)),
+        //         lastDate: DateTime.now().add(const Duration(days: 365)),
+        //       ).then((value) {
+        //         if(value == null) return;
+        //
+        //         bloc.add(NewMedication)
+        //       },);
+        //     },
+        //     isActive: state.startDate != null,
+        //   )
+        // else
+        //   CustomSelectableTile(
+        //     title: 'Intervalo de tratamento',
+        //     onTap: () {
+        //       showDateRangePicker(
+        //         context: context,
+        //         firstDate: DateTime.now().subtract(const Duration(days: 90)),
+        //         lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+        //       );
+        //     },
+        //     isActive: false,
+        //   ),
+        const SizedBox(height: 10),
+        ListTile(
+          title: const Text('Frequencia de uso'),
+          subtitle: Text(getScheduleLabel()),
+          trailing: state.scheduleType == null || state.scheduleValue == null
+              ? const Icon(Icons.warning_amber, color: CustomColor.vividRed)
+              : const Icon(Icons.edit_outlined),
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (context) {
+                return SelectFrequencyScheduleDialog(
+                  currentType: state.scheduleType,
+                  currentValue: state.scheduleValue,
+                  onConfirm: (type, value) {
+                    debugPrint('$runtimeType - type $type, value $value');
+                    bloc.add(NewMedicationIntervalSelected(type, value));
+                  },
+                );
+              },
+            );
           },
         ),
         const SizedBox(height: 10),
-        TreatmentDuration(
-          onCheck: (value) => bloc.add(NewMedicationContinuousSelected(value)),
-          onDatePicked: (date) => bloc.add(NewMedicationStartChosen(date)),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 100,
-              child: TextField(
-                onEditingComplete: () => FocusScope.of(context).unfocus(),
-                onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                onSubmitted: (_) => FocusScope.of(context).unfocus(),
-                decoration: const InputDecoration(
-                  label: Text('Dosagem'),
-                ),
-                keyboardType: TextInputType.number,
+        ListTile(
+          title: const Text('Dosagem'),
+          subtitle: Text(
+            state.dosageType != null ? '${state.dosageQuantity} ${state.dosageType}s' : 'Dosagem não selecionada',
+          ),
+          trailing: state.dosageType == null || state.dosageQuantity == null
+              ? const Icon(Icons.warning_amber, color: CustomColor.vividRed)
+              : const Icon(Icons.edit_outlined),
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (context) => SelectDosageDialog(
+                currentDosageType: state.dosageType,
+                currentDosageQuantity: state.dosageQuantity,
+                onSet: (type, quantity) {
+                  bloc.add(NewMedicationDosageSet(type, quantity));
+                },
               ),
-            ),
-            const SizedBox(width: 10),
-            PopupMenuButton<String>(
-              onSelected: (value) {},
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'Comprimido', child: Text('Comprimido')),
-                const PopupMenuItem(value: 'gota', child: Text('gota')),
-                const PopupMenuItem(value: 'ml', child: Text('ml')),
-              ],
-              child: const Row(
-                children: [
-                  Text('comprimido'),
-                  Icon(Icons.arrow_drop_down),
-                ],
-              ),
-            ),
-          ],
+            );
+          },
         ),
         const SizedBox(height: 10),
         const Text('Horário da primeira dose'),
@@ -197,27 +282,29 @@ class _ReadyScreen extends StatelessWidget {
         ...List.generate(
           state.instructions.length + 1,
           (index) {
-            if (index ==  state.instructions.length) {
+            if (index == state.instructions.length) {
               return IconButton(
-                  onPressed: () => showDialog(
-                        context: context,
-                        builder: (context) {
-                          final instructions = List<UsageInstructions>.of(UsageInstructions.values);
-                          instructions.removeWhere((element) => state.instructions.contains(element));
-                          return SingleSelectDialog<UsageInstructions>(
-                            title: 'Selecione uma instrução de uso',
-                            options: instructions,
-                            getName: (option) => option.description,
-                            onChoose: (value) {
-                              bloc.add(NewMedicationInstructionAdded(value));
-                            },
-                            optionSelected: null,
-                          );
-                        },
-                      ),
-                  icon: const Icon(Icons.add_circle_outline, size: 30));
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (context) {
+                    final instructions = List<UsageInstructions>.of(UsageInstructions.values);
+                    instructions.removeWhere((element) => state.instructions.contains(element));
+                    return SingleSelectDialog<UsageInstructions>(
+                      title: 'Selecione uma instrução de uso',
+                      options: instructions,
+                      getName: (option) => option.description,
+                      onChoose: (value) {
+                        bloc.add(NewMedicationInstructionAdded(value));
+                      },
+                      optionSelected: null,
+                    );
+                  },
+                ),
+                icon: const Icon(Icons.add_circle_outline, size: 30),
+              );
             } else {
-              return Text( state.instructions[index].description);
+              final instruction = state.instructions[index];
+              return instruction.buildTile(() => bloc.add(NewMedicationInstructionRemoved(instruction)));
             }
           },
         ),
@@ -233,7 +320,6 @@ class _ReadyScreen extends StatelessWidget {
               hasTaken: false,
               treatmentStatus: TreatmentStatus.active,
               lastUpdate: DateTime.now(),
-
             );
             userData.addMedication(med);
             context.pop();

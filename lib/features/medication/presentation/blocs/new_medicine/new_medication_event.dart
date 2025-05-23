@@ -52,3 +52,31 @@ class NewMedicationInstructionAdded extends NewMedicationEvent {
 
   NewMedicationInstructionAdded(this.instruction);
 }
+
+class NewMedicationInstructionRemoved extends NewMedicationEvent {
+  final UsageInstructions instruction;
+
+  NewMedicationInstructionRemoved(this.instruction);
+}
+
+class NewMedicationIntervalSelected extends NewMedicationEvent {
+  final MedicationScheduleType type;
+  final dynamic value;
+
+  NewMedicationIntervalSelected(this.type, this.value);
+}
+
+class NewMedicationDosageSet extends NewMedicationEvent {
+  final String type;
+  final int value;
+
+  NewMedicationDosageSet(this.type, this.value);
+}
+
+class NewMedicationDurationSet extends NewMedicationEvent {
+  final DateTime start;
+  final DateTime? end;
+  final bool isContinuous;
+
+  NewMedicationDurationSet(this.start, this.isContinuous, [this.end]);
+}

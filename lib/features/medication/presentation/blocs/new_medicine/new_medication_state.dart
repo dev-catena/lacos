@@ -19,6 +19,12 @@ final class NewMedicationReady extends NewMedicationState {
   final TimeOfDay? firstDoseTime;
   final List<UsageInstructions> instructions;
 
+  final MedicationScheduleType? scheduleType;
+  final dynamic scheduleValue;
+
+  final String? dosageType;
+  final int? dosageQuantity;
+
   static const _unset = Object();
 
   NewMedicationReady copyWith({
@@ -31,6 +37,10 @@ final class NewMedicationReady extends NewMedicationState {
     Object? frequencySelected = _unset,
     Object? firstDoseTime = _unset,
     Object? instructions = _unset,
+    Object? scheduleType = _unset,
+    Object? scheduleValue = _unset,
+    Object? dosageType = _unset,
+    Object? dosageQuantity = _unset,
   }) {
     return NewMedicationReady(
       prescription: prescription,
@@ -43,6 +53,10 @@ final class NewMedicationReady extends NewMedicationState {
       frequencySelected: frequencySelected != _unset ? frequencySelected as MedicationFrequency : this.frequencySelected,
       firstDoseTime: firstDoseTime != _unset ? firstDoseTime as TimeOfDay? : this.firstDoseTime,
       instructions: instructions != _unset ? instructions as List<UsageInstructions> : this.instructions,
+      scheduleType: scheduleType != _unset ? scheduleType as MedicationScheduleType : this.scheduleType,
+      scheduleValue: scheduleValue != _unset ? scheduleValue as dynamic : this.scheduleValue,
+      dosageType: dosageType != _unset ? dosageType as String? : this.dosageType,
+      dosageQuantity: dosageQuantity != _unset ? dosageQuantity as int? : this.dosageQuantity,
     );
   }
 
@@ -56,6 +70,10 @@ final class NewMedicationReady extends NewMedicationState {
     required this.frequencySelected,
     required this.firstDoseTime,
     required this.instructions,
+    required this.scheduleType,
+    required this.scheduleValue,
+    required this.dosageType,
+    required this.dosageQuantity,
     this.isContinuous = false,
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../common/domain/entities/medicine.dart';
 import '../../../../companion_home/patient_profile/domain/entities/doctor.dart';
 import '../../../domain/entities/medication.dart';
+import '../../../domain/entities/medication_schedule.dart';
 import '../../../domain/entities/prescription.dart';
 
 part 'new_medication_event.dart';
@@ -24,6 +25,10 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
     on<NewMedicationTimeChosen>(_onTimeSet);
     on<NewMedicationFrequencySelected>(_onFrequencySelected);
     on<NewMedicationInstructionAdded>(_onInstructionAdded);
+    on<NewMedicationInstructionRemoved>(_onInstructionRemoved);
+    on<NewMedicationIntervalSelected>(_onIntervalSelected);
+    on<NewMedicationDosageSet>(_onDosageSet);
+    on<NewMedicationDurationSet>(_onDurationSet);
   }
 
   Future<void> _onStarted(NewMedicationStarted event, Emitter<NewMedicationState> emit) async {
@@ -42,6 +47,10 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
         firstDoseTime: null,
         frequencySelected: null,
         instructions: [],
+        scheduleType: null,
+        scheduleValue: null,
+        dosageQuantity: null,
+        dosageType: null,
       ),
     );
   }
@@ -99,18 +108,16 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
     } else {
       emit(internalState.copyWith(firstDoseTime: event.time));
     }
-
   }
 
   void _onFrequencySelected(NewMedicationFrequencySelected event, Emitter<NewMedicationState> emit) {
     final internalState = state as NewMedicationReady;
 
-    if (event.frequency == internalState.frequencySelected ) {
+    if (event.frequency == internalState.frequencySelected) {
       emit(internalState.copyWith(firstDoseTime: null));
     } else {
       emit(internalState.copyWith(frequencySelected: event.frequency));
     }
-
   }
 
   void _onInstructionAdded(NewMedicationInstructionAdded event, Emitter<NewMedicationState> emit) {
@@ -118,12 +125,38 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
 
     final instructions = List<UsageInstructions>.of(internalState.instructions);
 
-    if (instructions.contains(event.instruction)) {
-      instructions.remove(event.instruction);
-    } else {
-      instructions.add(event.instruction);
-    }
+    instructions.add(event.instruction);
 
     emit(internalState.copyWith(instructions: instructions));
+  }
+
+  void _onInstructionRemoved(NewMedicationInstructionRemoved event, Emitter<NewMedicationState> emit) {
+    final internalState = state as NewMedicationReady;
+
+    final instructions = List<UsageInstructions>.of(internalState.instructions);
+
+    instructions.remove(event.instruction);
+
+    emit(internalState.copyWith(instructions: instructions));
+  }
+
+  void _onIntervalSelected(NewMedicationIntervalSelected event, Emitter<NewMedicationState> emit) {
+    final internalState = state as NewMedicationReady;
+    final MedicationScheduleType type = event.type;
+    final dynamic value = event.value;
+
+    emit(internalState.copyWith(scheduleType: type, scheduleValue: value));
+  }
+
+  void _onDosageSet(NewMedicationDosageSet event, Emitter<NewMedicationState> emit) {
+    final internState = state as NewMedicationReady;
+
+    emit(internState.copyWith(dosageType: event.type, dosageQuantity: event.value));
+  }
+
+  void _onDurationSet(NewMedicationDurationSet event, Emitter<NewMedicationState> emit) {
+    final internState = state as NewMedicationReady;
+
+    emit(internState.copyWith(startDate: event.start, endDate: event.end, isContinuous: event.isContinuous));
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
 
+import '../../../../core/utils/custom_colors.dart';
 import '../../../common/domain/entities/medicine.dart';
 import '../../presentation/widgets/components/medication_tile.dart';
 
@@ -87,6 +88,19 @@ enum UsageInstructions {
   }
 
   const UsageInstructions(this.code, this.description);
+
+  Widget buildTile(final VoidCallback onPressed){
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(description),
+          IconButton(onPressed: onPressed, icon: Icon(Icons.remove_circle_outline, color: CustomColor.vividRed)),
+        ],
+      ),
+    );
+  }
 }
 
 enum MedicationPeriod {
