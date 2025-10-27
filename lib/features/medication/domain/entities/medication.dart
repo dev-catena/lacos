@@ -96,7 +96,7 @@ enum UsageInstructions {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(description),
-          IconButton(onPressed: onPressed, icon: Icon(Icons.remove_circle_outline, color: CustomColor.vividRed)),
+          IconButton(onPressed: onPressed, icon: const Icon(Icons.remove_circle_outline, color: CustomColor.vividRed)),
         ],
       ),
     );

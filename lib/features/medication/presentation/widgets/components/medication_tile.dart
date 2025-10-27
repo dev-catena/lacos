@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../../core/routes.dart';
 import '../../../../common/presentation/widgets/components/custom_selectable_tile.dart';
 import '../../../domain/entities/medication.dart';
 
@@ -23,7 +22,7 @@ class _MedicationTileState extends State<MedicationTile> {
   @override
   Widget build(BuildContext context) {
     // return Text(medicine.name);
-    final times = med.getSuggestedTimes();
+    // final times = med.getSuggestedTimes();
 
     Color getStatusColor() {
       final Color color;
@@ -70,7 +69,7 @@ class _MedicationTileState extends State<MedicationTile> {
                     'Informe o horário de administração do medicamento',
                     textAlign: TextAlign.center,
                   ),
-                  contentPadding: EdgeInsets.all(20),
+                  contentPadding: const EdgeInsets.all(20),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -99,7 +98,7 @@ class _MedicationTileState extends State<MedicationTile> {
                       onPressed: () {
                         context.pop();
                       },
-                      child: Text('Cancelar'),
+                      child: const Text('Cancelar'),
                     ),
                     FilledButton(
                       onPressed: () {
@@ -107,7 +106,7 @@ class _MedicationTileState extends State<MedicationTile> {
                         setState(() {});
                         context.pop();
                       },
-                      child: Text('Confirmar'),
+                      child: const Text('Confirmar'),
                     ),
                   ],
                 );
@@ -131,23 +130,23 @@ class _MedicationTileState extends State<MedicationTile> {
       trailing: widget.trailing,
     );
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 8),
-      child: Row(
-        children: [
-          Container(
-            height: 40,
-            width: 40,
-            decoration: BoxDecoration(
-                color: getStatusColor(),
-                borderRadius: BorderRadius.circular(50),
-                border: Border.all(color: med.hasTaken == null ? Colors.grey : getStatusColor())),
-            child: Icon(med.medicine.type.icon, size: 25),
-          ),
-          const SizedBox(width: 10),
-          Text(med.medicine.name),
-        ],
-      ),
-    );
+    // return Padding(
+    //   padding: const EdgeInsets.only(top: 8, bottom: 8),
+    //   child: Row(
+    //     children: [
+    //       Container(
+    //         height: 40,
+    //         width: 40,
+    //         decoration: BoxDecoration(
+    //             color: getStatusColor(),
+    //             borderRadius: BorderRadius.circular(50),
+    //             border: Border.all(color: med.hasTaken == null ? Colors.grey : getStatusColor())),
+    //         child: Icon(med.medicine.type.icon, size: 25),
+    //       ),
+    //       const SizedBox(width: 10),
+    //       Text(med.medicine.name),
+    //     ],
+    //   ),
+    // );
   }
 }

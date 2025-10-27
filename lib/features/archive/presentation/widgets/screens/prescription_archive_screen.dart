@@ -25,7 +25,7 @@ class PrescriptionArchiveScreen extends StatelessWidget {
                     showDialog(
                       context: context,
                       builder: (context) {
-                        return SimpleDialog(
+                        return const SimpleDialog(
                           children: [
                           ],
                         );

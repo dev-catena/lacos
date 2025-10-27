@@ -181,6 +181,8 @@ class _NewScheduleScreenState extends State<NewScheduleScreen> {
                     );
 
                     await patientCubit.registerAppointment(event);
+                    // TODO Verificar esse ignore lint
+                    // ignore: use_build_context_synchronously
                     context.pop();
                   },
                   style: ButtonStyle(

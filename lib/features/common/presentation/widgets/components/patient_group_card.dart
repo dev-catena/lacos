@@ -21,6 +21,8 @@ class PatientGroupCard extends StatelessWidget {
             context.pushNamed(AppRoutes.groupManagementScreen, extra: patient);
           } else {
             await userData.setDefaultPatient(patient.self.id);
+            // TODO Verificar esse ignore lint
+            // ignore: use_build_context_synchronously
             context.goNamed('home');
           }
         },

@@ -213,7 +213,7 @@ final GoRouter _routes = GoRouter(
               path: AppRoutes.patientHomeScreen,
               name: 'patient-home',
               pageBuilder: (_, __) => const NoTransitionPage(child: PatientHomeScreen()),
-              routes: [],
+              // routes: [],
             ),
           ],
         ),

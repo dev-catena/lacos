@@ -28,6 +28,8 @@ class UserProfileScreen extends StatelessWidget {
 
                   void function() {
                     if (option.description == 'Sair') {
+                      // TODO Verificar esse ignore lints
+                      // ignore: use_build_context_synchronously
                       GoogleSignIn().signOut().whenComplete(() => context.goNamed(AppRoutes.loginScreen));
                     } else {
                       context.pushNamed(option.route);

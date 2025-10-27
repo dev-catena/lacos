@@ -94,6 +94,8 @@ class _RegisterNewDoctorDialogState extends State<RegisterNewDoctorDialog> {
             if(widget.onRegistered != null){
               widget.onRegistered!(newDoctor);
             }
+            // TODO Verificar esse ignore lint
+            // ignore: use_build_context_synchronously
             context.pop();
           },
           child: const Text('Cadastrar'),

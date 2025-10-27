@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import 'providers/app_data_cubit.dart';
 import 'providers/user_cubit.dart';
 import 'utils/custom_colors.dart';
 

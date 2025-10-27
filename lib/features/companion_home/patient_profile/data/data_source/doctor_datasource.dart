@@ -11,7 +11,7 @@ class DoctorDataSource {
   }
 
   Future<Doctor> registerDoctor(Patient patient, Doctor doctor) async {
-    final Map<String, dynamic> content = {'paciente_id': patient.self.id, 'medico': doctor.toRemote()};
+    // final Map<String, dynamic> content = {'paciente_id': patient.self.id, 'medico': doctor.toRemote()};
 
     final response = doctor.copyWith(id: Random().nextInt(5000) + 100);
 

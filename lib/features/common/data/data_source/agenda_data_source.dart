@@ -11,7 +11,7 @@ class AgendaDataSource {
   }
 
   Future<PatientEvent> addAppointment(final PatientEvent appointment) async {
-    final content = {};
+    // final content = {};
 
     return appointment.copyWith(id: Random().nextInt(5000) + 1000);
   }

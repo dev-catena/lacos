@@ -46,7 +46,7 @@ class NewMedicationBloc extends Bloc<NewMedicationEvent, NewMedicationState> {
         isContinuous: false,
         firstDoseTime: null,
         frequencySelected: null,
-        instructions: [],
+        instructions: const [],
         scheduleType: null,
         scheduleValue: null,
         dosageQuantity: null,

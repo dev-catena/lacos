@@ -5,7 +5,6 @@ import '../../features/agenda/entities/agenda_appointment.dart';
 import '../../features/common/data/data_source/agenda_data_source.dart';
 import '../../features/common/data/data_source/medication_data_source.dart';
 import '../../features/common/domain/entities/patient.dart';
-import '../../features/companion_home/domain/entities/patient_event.dart';
 import '../../features/companion_home/patient_profile/data/data_source/doctor_datasource.dart';
 import '../../features/companion_home/patient_profile/domain/entities/doctor.dart';
 import '../../features/medication/domain/entities/medication.dart';

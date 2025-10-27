@@ -38,6 +38,8 @@ class LoginScreen extends StatelessWidget {
               } else {
                 await patientData.initialize(userData.currentPatient!);
 
+                // TODO Verificar esse ignore lint
+                // ignore: use_build_context_synchronously
                 context.goNamed(state.route);
               }
             } else if (state is LoginFailed) {

@@ -41,7 +41,7 @@ class _CopyPrescriptionDialogState extends State<CopyPrescriptionDialog> {
               onTap: () => showDialog(
                 context: context,
                 builder: (_) => DatePickerDialog(
-                  firstDate: DateTime.now().subtract(Duration(days: 180)),
+                  firstDate: DateTime.now().subtract(const Duration(days: 180)),
                   lastDate: DateTime.now(),
                   initialDate: dateSelected,
                   currentDate: dateSelected,

@@ -34,7 +34,7 @@ class _SelectFrequencyScheduleDialogState extends State<SelectFrequencyScheduleD
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      contentPadding: EdgeInsets.all(20),
+      contentPadding: const EdgeInsets.all(20),
       title: const Text('Frequência de uso', textAlign: TextAlign.center),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -57,7 +57,7 @@ class _SelectFrequencyScheduleDialogState extends State<SelectFrequencyScheduleD
           const SizedBox(height: 20),
         ],
       ),
-      insetPadding: EdgeInsets.all(30),
+      insetPadding: const EdgeInsets.all(30),
       actionsAlignment: MainAxisAlignment.spaceAround,
       actions: [
         OutlinedButton(onPressed: () => context.pop(), child: const Text('Cancelar')),

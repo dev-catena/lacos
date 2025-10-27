@@ -22,7 +22,7 @@ class _FileInspectorState extends State<FileInspector> {
   }
 
   Future<void> _initFile() async {
-    final extension = widget.file.path.split('.').last.toLowerCase();
+    // final extension = widget.file.path.split('.').last.toLowerCase();
 
     // if (extension == 'pdf') {
     //   pdfController = PdfController(
