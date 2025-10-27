@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:pdfx/pdfx.dart';
+// import 'package:pdfx/pdfx.dart';
 
 class FileInspector extends StatefulWidget {
   const FileInspector({super.key, required this.file});
@@ -13,7 +13,7 @@ class FileInspector extends StatefulWidget {
 }
 
 class _FileInspectorState extends State<FileInspector> {
-  PdfController? pdfController;
+  // PdfController? pdfController;
 
   @override
   void initState() {
@@ -24,17 +24,17 @@ class _FileInspectorState extends State<FileInspector> {
   Future<void> _initFile() async {
     final extension = widget.file.path.split('.').last.toLowerCase();
 
-    if (extension == 'pdf') {
-      pdfController = PdfController(
-        document: PdfDocument.openFile(widget.file.path),
-      );
-      setState(() {});
-    }
+    // if (extension == 'pdf') {
+    //   pdfController = PdfController(
+    //     document: PdfDocument.openFile(widget.file.path),
+    //   );
+    //   setState(() {});
+    // }
   }
 
   @override
   void dispose() {
-    pdfController?.dispose();
+    // pdfController?.dispose();
     super.dispose();
   }
 
@@ -43,16 +43,16 @@ class _FileInspectorState extends State<FileInspector> {
     final extension = widget.file.path.split('.').last.toLowerCase();
 
     if (extension == 'pdf') {
-      if (pdfController == null) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      return SizedBox(
+      // if (pdfController == null) {
+      //   return const Center(child: CircularProgressIndicator());
+      // }
+      return const SizedBox(
         height: 200,
-        child: PdfView(
-          controller: pdfController!,
-          pageSnapping: true,
-          scrollDirection: Axis.vertical,
-        ),
+        // child: PdfView(
+        //   controller: pdfController!,
+        //   pageSnapping: true,
+        //   scrollDirection: Axis.vertical,
+        // ),
       );
     } else {
       return Image.file(widget.file);

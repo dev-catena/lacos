@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:pdfx/pdfx.dart';
+// import 'package:pdfx/pdfx.dart';
 
 class FilePreview extends StatefulWidget {
   const FilePreview({super.key, required this.file});
@@ -26,19 +26,19 @@ class _FilePreviewState extends State<FilePreview> {
     final extension = widget.file.path.split('.').last.toLowerCase();
 
     if (extension == 'pdf') {
-      final document = await PdfDocument.openFile(widget.file.path);
-      final page = await document.getPage(1);
-      final pageImage = await page.render(
-        width: page.width,
-        height: page.height,
-        format: PdfPageImageFormat.png,
-      );
-      await page.close();
+      // final document = await PdfDocument.openFile(widget.file.path);
+      // final page = await document.getPage(1);
+      // final pageImage = await page.render(
+      //   width: page.width,
+      //   height: page.height,
+      //   format: PdfPageImageFormat.png,
+      // );
+      // await page.close();
 
-      setState(() {
-        previewImage = MemoryImage(pageImage!.bytes);
-        loading = false;
-      });
+      // setState(() {ss
+      //   previewImage = MemoryImage(pageImage!.bytes);
+      //   loading = false;
+      // });
     } else {
       setState(() {
         previewImage = FileImage(widget.file);
