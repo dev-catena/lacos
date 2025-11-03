@@ -35,6 +35,13 @@ class AppTheme {
             foregroundColor: WidgetStateProperty.all(Colors.white),
           ),
         ),
+        textButtonTheme: TextButtonThemeData(
+          
+          style: ButtonStyle(
+            //backgroundColor: WidgetStateProperty.all(CustomColor.darkActiveColor),
+            foregroundColor: WidgetStateProperty.all(CustomColor.darkActiveColor),
+          ),
+        ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: ButtonStyle(
             foregroundColor: WidgetStateProperty.all(CustomColor.vividRed),
