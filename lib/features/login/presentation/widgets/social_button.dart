@@ -10,7 +10,6 @@ class SocialButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
 
     return InkWell(
       onTap: onTap,
