@@ -31,15 +31,13 @@ class AppTheme {
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.all(CustomColor.darkActiveColor),
+            backgroundColor: WidgetStateProperty.all(const Color.fromARGB(255, 85, 117, 50)),
             foregroundColor: WidgetStateProperty.all(Colors.white),
           ),
         ),
-        textButtonTheme: TextButtonThemeData(
-          
+        textButtonTheme: TextButtonThemeData(          
           style: ButtonStyle(
-            //backgroundColor: WidgetStateProperty.all(CustomColor.darkActiveColor),
-            foregroundColor: WidgetStateProperty.all(CustomColor.darkActiveColor),
+            foregroundColor: WidgetStateProperty.all(const Color.fromARGB(255, 85, 117, 50)),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(

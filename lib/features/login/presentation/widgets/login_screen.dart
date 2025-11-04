@@ -7,18 +7,11 @@ import '../../../../core/providers/app_data_cubit.dart';
 import '../../../../core/providers/patient_cubit.dart';
 import '../../../../core/providers/user_cubit.dart';
 import '../../../../core/routes.dart';
-import '../../../../core/utils/custom_colors.dart';
-import '../../../common/presentation/widgets/components/stateful_segmented_button.dart';
-import '../../../user_profile/presentation/widgets/screens/group_selection_screen.dart';
 import '../blocs/login_bloc.dart';
+import 'social_button.dart';
 
 class LoginScreen extends StatelessWidget {
-  LoginScreen({super.key});
-
-  // final TextEditingController controller = TextEditingController();
-  final userCtrl = TextEditingController();
-  final passCtrl = TextEditingController();
-  bool obscure = true;
+  const LoginScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +19,9 @@ class LoginScreen extends StatelessWidget {
     final appData = context.read<AppDataCubit>();
     final patientData = context.read<PatientCubit>();
 
-    final displaySmall = Theme.of(context).textTheme.displaySmall!;
-    final titleMedium = Theme.of(context).textTheme.titleMedium!;
+    final userCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    const bool obscure = true;
 
     return Scaffold(
       body: BlocProvider(
@@ -128,7 +122,6 @@ class LoginScreen extends StatelessWidget {
             //   ),
             // );
             // final cs = Theme.of(context).colorScheme;
-            const margem = 16.0;
 
             void show(String what) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -137,177 +130,139 @@ class LoginScreen extends StatelessWidget {
             }
 
             void onSignIn() {
-              // Navegação provisória: substitua por sua rota/autenticação real
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Entrando...')),
               );
             }
 
-            return Scaffold(
-              body: SafeArea(
-                child: Column(
+            Expanded fundoDaPagina() {
+              return Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Expanded(
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          SvgPicture.asset(
-                            'assets/images/grafismo.svg',
-                            fit: BoxFit.cover,
-                          ),
-                          Center(
-                            child: SvgPicture.asset(
-                              'assets/images/lacos.svg',
-                              width: 140,
-                              height: 140,
-                            ),
-                          ),
-                        ],
-                      )
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(margem),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _SocialButton(
-                            label: 'Continuar com o Google',
-                            asset: 'assets/images/google-logo.svg',
-                            onTap: () => show('Google'),
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          _SocialButton(
-                            label: 'Continuar com a Apple',
-                            asset: 'assets/images/apple-logo.svg',
-                            onTap: () => show('Apple'),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          TextField(
-                            controller: userCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Usuário',
-                              prefixIcon: Icon(Icons.person_outline),
-                              border: OutlineInputBorder(),
-                            ),
-                            textInputAction: TextInputAction.next,
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          TextField(
-                            controller: passCtrl,
-                            obscureText: obscure,
-                            decoration: InputDecoration(
-                              labelText: 'Senha',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              border: const OutlineInputBorder(),
-                              suffixIcon: IconButton(
-                                tooltip: 'visibilidade da senha', // espelha o title do HTML  :contentReference[oaicite:11]{index=11}
-                                icon: Icon(
-                                  obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                ),
-                                // TODO implementar aqui a ação do botão corretamente
-                                onPressed: () => print('Clicou para mudar visibilidade da senha'),
-                              ),
-                            ),
-                            onSubmitted: (_) => onSignIn(),
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          Row(
-                            children: [
-                              FilledButton( // Raised/primário
-                                onPressed: onSignIn,
-                                child: const Text('Entrar'),
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              TextButton(
-                                onPressed: () => show('Esqueci minha senha'),
-                                child: const Text('Esqueci minha senha'),
-                              ),
-                            ],
-                          )
-                        ],
+                    SvgPicture.asset(
+                      'assets/images/grafismo.svg',
+                      fit: BoxFit.cover,
+                      colorFilter: const ColorFilter.mode(
+                        Color.fromRGBO(168, 196, 136, 1),
+                        BlendMode.srcATop
                       ),
-                    )
+                    ),
+                    Center(
+                      child: SvgPicture.asset(
+                        'assets/images/lacos.svg',
+                        width: 140,
+                        height: 140,
+                      ),
+                    ),
                   ],
+                )
+              );
+            }
+
+            SocialButton logarComGoogle() {
+              return SocialButton(
+                label: 'Continuar com o Google',
+                asset: 'assets/images/google-logo.svg',
+                onTap: () => show('Google'),
+              );
+            }
+
+            SocialButton logarComApple() {
+              return SocialButton(
+                label: 'Continuar com a Apple',
+                asset: 'assets/images/apple-logo.svg',
+                onTap: () => show('Apple'),
+              );
+            }
+
+            TextField campoUsuario() {
+              return TextField(
+                controller: userCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Usuário',
+                  prefixIcon: Icon(Icons.person_outline),
+                  border: OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.next,
+              );
+            }
+
+            TextField campoSenha() {
+              return TextField(
+                controller: passCtrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                   labelText: 'Senha',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    tooltip: 'visibilidade da senha', // espelha o title do HTML  :contentReference[oaicite:11]{index=11}
+                    icon: const Icon(
+                      obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                    ),
+                    // TODO implementar aqui a ação do botão corretamente
+                    onPressed: () => print('Clicou para mudar visibilidade da senha'),
+                  ),
+                ),
+                onSubmitted: (_) => onSignIn(),
+              );
+            }
+
+            Row botoesDeAcao() {
+              return Row(
+                children: [
+                  FilledButton(
+                    onPressed: onSignIn,
+                    child: const Text('Entrar'),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                    TextButton(
+                    onPressed: () => show('Esqueci minha senha'),
+                    child: const Text('Esqueci minha senha'),
+                  ),
+                ],
+              );
+            }
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: Color.fromRGBO(217, 231, 202, 1.0)
+              ),
+              child: Scaffold(
+                backgroundColor: Colors.transparent,
+                body: SafeArea(
+                  child: Column(
+                    children: [
+                      fundoDaPagina(),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            logarComGoogle(),
+                            const SizedBox(height: 8),
+                            logarComApple(),
+                            const SizedBox(height: 16),
+                            
+                            campoUsuario(),
+                            const SizedBox(height: 12),
+                            campoSenha(),
+
+                            const SizedBox(height: 32),
+
+                            botoesDeAcao()
+                          ],
+                        ),
+                      )
+                    ],
+                  ),
                 ),
               ),
             );
           },
-        ),
-      ),
-    );
-  }
-
-  TextField getTextField({
-    required String labelText,
-    required String hintText,
-    required IconData leadingIcon,
-    required TextEditingController controller,
-    Widget? trailingWidget,
-  }) {
-    return TextField(
-      decoration: InputDecoration(
-        prefixIcon: Icon(leadingIcon),
-        labelText: labelText,
-        hintText: hintText,
-        focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(
-            color: CustomColor.activeColor,
-          ),
-        ),
-        suffixIcon: trailingWidget,
-      ),
-      controller: controller,
-    );
-  }
-}
-
-
-// Componente Social Button
-class _SocialButton extends StatelessWidget {
-  final String label;
-  final String asset;
-  final VoidCallback onTap;
-
-  const _SocialButton({
-    required this.label,
-    required this.asset,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), // padding semelhante ao CSS .social a  :contentReference[oaicite:13]{index=13}
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          // box-shadow + outline variant aproximados usando borda
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Row(          
-          children: [
-            SizedBox(width: 20, height: 20, child: SvgPicture.asset(asset)),
-            
-            const SizedBox(width: 16),
-
-            Expanded(
-              child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
-            ),
-          ],
         ),
       ),
     );
