@@ -19,7 +19,7 @@ class SocialButton extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: cs.outlineVariant),
+          border: Border.all(color: const Color.fromARGB(255, 85, 117, 50)),
         ),
         child: Row(          
           children: [

@@ -182,7 +182,9 @@ class LoginScreen extends StatelessWidget {
                 decoration: const InputDecoration(
                   labelText: 'Usuário',
                   prefixIcon: Icon(Icons.person_outline),
-                  border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color.fromARGB(255, 85, 117, 50))
+                  ),
                 ),
                 textInputAction: TextInputAction.next,
               );
@@ -193,9 +195,11 @@ class LoginScreen extends StatelessWidget {
                 controller: passCtrl,
                 obscureText: obscure,
                 decoration: InputDecoration(
-                   labelText: 'Senha',
+                  labelText: 'Senha',
                   prefixIcon: const Icon(Icons.lock_outline),
-                  border: const OutlineInputBorder(),
+                  enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Color.fromARGB(255, 85, 117, 50))
+                  ),
                   suffixIcon: IconButton(
                     tooltip: 'visibilidade da senha', // espelha o title do HTML  :contentReference[oaicite:11]{index=11}
                     icon: const Icon(
@@ -229,7 +233,7 @@ class LoginScreen extends StatelessWidget {
 
             return Container(
               decoration: const BoxDecoration(
-                color: Color.fromRGBO(217, 231, 202, 1.0)
+                color: Color.fromRGBO(240, 252, 203, 1)
               ),
               child: Scaffold(
                 backgroundColor: Colors.transparent,
