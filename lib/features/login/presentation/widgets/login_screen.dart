@@ -135,28 +135,30 @@ class LoginScreen extends StatelessWidget {
               );
             }
 
-            Expanded fundoDaPagina() {
-              return Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    SvgPicture.asset(
-                      'assets/images/grafismo.svg',
-                      fit: BoxFit.cover,
-                      colorFilter: const ColorFilter.mode(
-                        Color.fromRGBO(168, 196, 136, 1),
-                        BlendMode.srcATop
-                      ),
+            Align topoDaPagina() {
+              return Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.585,
+                  width: MediaQuery.of(context).size.width * 1,
+                  child: SvgPicture.asset(
+                    'assets/images/grafismo.svg',
+                    fit: BoxFit.cover,
+                    colorFilter: const ColorFilter.mode(
+                      Color.fromRGBO(168, 196, 136, 1),
+                      BlendMode.srcATop,
                     ),
-                    Center(
-                      child: SvgPicture.asset(
-                        'assets/images/lacos.svg',
-                        width: 140,
-                        height: 140,
-                      ),
-                    ),
-                  ],
-                )
+                  ),
+                ),
+              );
+            }
+
+            Center logoApp() {
+              return Center(
+                child: SvgPicture.asset(
+                  'assets/images/lacos.svg',
+                  height: MediaQuery.of(context).size.width * 0.18,
+                ),
               );
             }
 
@@ -185,6 +187,9 @@ class LoginScreen extends StatelessWidget {
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Color.fromARGB(255, 85, 117, 50))
                   ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color.fromARGB(255, 85, 117, 50))
+                  )
                 ),
                 textInputAction: TextInputAction.next,
               );
@@ -198,6 +203,9 @@ class LoginScreen extends StatelessWidget {
                   labelText: 'Senha',
                   prefixIcon: const Icon(Icons.lock_outline),
                   enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Color.fromARGB(255, 85, 117, 50))
+                  ),
+                  focusedBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: Color.fromARGB(255, 85, 117, 50))
                   ),
                   suffixIcon: IconButton(
@@ -221,9 +229,9 @@ class LoginScreen extends StatelessWidget {
                     child: const Text('Entrar'),
                   ),
 
-                  const SizedBox(height: 16),
+                  SizedBox(width: MediaQuery.of(context).size.width * 0.015),
 
-                    TextButton(
+                  TextButton(
                     onPressed: () => show('Esqueci minha senha'),
                     child: const Text('Esqueci minha senha'),
                   ),
@@ -237,32 +245,54 @@ class LoginScreen extends StatelessWidget {
               ),
               child: Scaffold(
                 backgroundColor: Colors.transparent,
-                body: SafeArea(
-                  child: Column(
-                    children: [
-                      fundoDaPagina(),
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            logarComGoogle(),
-                            const SizedBox(height: 8),
-                            logarComApple(),
-                            const SizedBox(height: 16),
-                            
-                            campoUsuario(),
-                            const SizedBox(height: 12),
-                            campoSenha(),
+                body: Stack(
+                  children: [
+                    topoDaPagina(),
+                    SafeArea(
+                      child: Center(
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.all(
+                            MediaQuery.of(context).size.width * 0.1
+                          ),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.of(context).size.width * 0.8
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                logoApp(),
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.1
+                                ),
 
-                            const SizedBox(height: 32),
+                                logarComGoogle(),
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.01
+                                ),
+                                logarComApple(),
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.03
+                                ),
+                                
+                                campoUsuario(),
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.01
+                                ),
+                                campoSenha(),
 
-                            botoesDeAcao()
-                          ],
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.03
+                                ),                            
+                                botoesDeAcao()
+                              ],
+                            ),
+                          ),
                         ),
-                      )
-                    ],
-                  ),
+                      ),
+                    )
+                  ],
                 ),
               ),
             );
