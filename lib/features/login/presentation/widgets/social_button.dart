@@ -25,7 +25,10 @@ class SocialButton extends StatelessWidget {
             SizedBox(width: 20, height: 20, child: SvgPicture.asset(asset)),            
             const SizedBox(width: 16),
             Expanded(
-              child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodyLarge
+              ),
             ),
           ],
         ),
