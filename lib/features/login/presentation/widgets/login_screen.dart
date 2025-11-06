@@ -157,7 +157,43 @@ class LoginScreen extends StatelessWidget {
               return Center(
                 child: SvgPicture.asset(
                   'assets/images/lacos.svg',
-                  height: MediaQuery.of(context).size.width * 0.18,
+                  height: MediaQuery.of(context).size.width * 0.2,
+                ),
+              );
+            }
+
+            OutlinedButton botaoEntrar() {
+              return OutlinedButton.icon(
+                onPressed: () => show('CLICOU!'),
+                icon: const Icon(Icons.login),
+                label: const Text('Entrar'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF466730),
+                  backgroundColor: const Color.fromRGBO(240, 252, 203, 1),
+                  side: const BorderSide(color: Color.fromARGB(255, 85, 117, 50)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),                    
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                  textStyle: Theme.of(context).textTheme.bodyLarge
+                ),
+              );
+            }
+            
+            OutlinedButton botaoAdicionarUsuario() {
+              return OutlinedButton.icon(
+                onPressed: () => show('CLICOU!'),
+                icon: const Icon(Icons.group_add_outlined),
+                label: const Text('Cadastrar'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF466730),
+                  backgroundColor: const Color.fromRGBO(240, 252, 203, 1),
+                  side: const BorderSide(color: Color.fromARGB(255, 85, 117, 50)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),                    
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                  textStyle: Theme.of(context).textTheme.bodyLarge
                 ),
               );
             }
@@ -166,7 +202,7 @@ class LoginScreen extends StatelessWidget {
               return SocialButton(
                 label: 'Continuar com o Google',
                 asset: 'assets/images/google-logo.svg',
-                onTap: () => show('Google'),
+                onTap: () => bloc.add(LoginSignInWithGooglePressed())
               );
             }
 
@@ -262,11 +298,23 @@ class LoginScreen extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.11
+                                ),
                                 logoApp(),
                                 SizedBox(
-                                  height: MediaQuery.of(context).size.height * 0.1
+                                  height: MediaQuery.of(context).size.height * 0.12
                                 ),
 
+                                botaoEntrar(),
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.01
+                                ),
+                                botaoAdicionarUsuario(),
+
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.04
+                                ),
                                 logarComGoogle(),
                                 SizedBox(
                                   height: MediaQuery.of(context).size.height * 0.01
