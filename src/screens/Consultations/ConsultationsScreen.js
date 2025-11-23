@@ -3,17 +3,16 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
-import { LacosIcon } from '../../components/CustomIcons';
 
 const ConsultationsScreen = ({ route, navigation }) => {
   let { groupId, groupName } = route.params || {};
