@@ -232,7 +232,6 @@ const ConsultationsScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <LacosIcon size={36} />
           <View>
             <Text style={styles.headerTitle}>Consultas</Text>
             <Text style={styles.headerSubtitle}>{groupName}</Text>
