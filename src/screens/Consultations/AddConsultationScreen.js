@@ -56,7 +56,7 @@ const AddConsultationScreen = ({ route, navigation }) => {
 
   const handleTimeChange = (event, time) => {
     setShowTimePicker(false);
-    if (date) {
+    if (time) {
       const newDate = new Date(selectedDate);
       newDate.setHours(time.getHours());
       newDate.setMinutes(time.getMinutes());
