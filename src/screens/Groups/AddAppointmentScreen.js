@@ -116,16 +116,19 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     try {
       // Preparar dados para API
       const appointmentData = {
-        groupId: parseInt(groupId), // Converter para número
+        group_id: parseInt(groupId), // Converter para número
         title: formData.title.trim(),
+        type: formData.type, // ADICIONADO: tipo do compromisso
         description: formData.notes.trim() || null,
-        scheduledAt: formData.date,
-        doctorId: formData.selectedDoctor?.id || null,
+        scheduled_at: formData.date,
+        appointment_date: formData.date, // Backend espera este campo também
+        doctor_id: formData.selectedDoctor?.id || null,
         location: formData.address.trim() || null,
         notes: formData.notes.trim() || null,
       };
 
-      console.log('Salvando compromisso:', appointmentData);
+      console.log('📤 Salvando compromisso:', appointmentData);
+      console.log('📋 Tipo selecionado:', formData.type);
 
       const result = await appointmentService.createAppointment(appointmentData);
 

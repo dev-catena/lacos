@@ -9,34 +9,42 @@ class AppointmentService {
    */
   async createAppointment(appointmentData) {
     try {
-      const data = {
+      // Se os dados já vierem em snake_case (do AddAppointmentScreen novo)
+      const data = appointmentData.group_id ? appointmentData : {
         group_id: appointmentData.groupId,
+        type: appointmentData.type || 'common', // ADICIONADO
         title: appointmentData.title,
         description: appointmentData.description,
         scheduled_at: appointmentData.scheduledAt,
+        appointment_date: appointmentData.scheduledAt, // Backend espera este campo
         doctor_id: appointmentData.doctorId,
         location: appointmentData.location,
         notes: appointmentData.notes,
       };
 
-      console.log('Enviando para API:', data);
+      console.log('🔵 appointmentService.createAppointment - Dados enviados:', data);
 
       const response = await apiService.post('/appointments', data);
+      
+      console.log('✅ appointmentService.createAppointment - Resposta:', response);
+      
       return { success: true, data: response };
     } catch (error) {
-      console.error('Erro ao criar consulta:', error);
+      console.error('❌ Erro ao criar compromisso:', error);
       
       // Capturar mensagens de erro específicas da validação
-      let errorMessage = 'Erro ao criar consulta';
+      let errorMessage = 'Erro ao criar compromisso';
       if (error.errors) {
         errorMessage = Object.values(error.errors).flat().join(', ');
+        console.error('❌ Erros de validação:', error.errors);
       } else if (error.message) {
         errorMessage = error.message;
       }
       
       return { 
         success: false, 
-        error: errorMessage
+        error: errorMessage,
+        errors: error.errors
       };
     }
   }
