@@ -29,38 +29,9 @@ const HomeScreen = ({ navigation }) => {
   const [myGroups, setMyGroups] = useState([]);
   const [participatingGroups, setParticipatingGroups] = useState([]);
   const [selectedTab, setSelectedTab] = useState('myGroups'); // 'myGroups' ou 'participating'
-  const [recentActivities, setRecentActivities] = useState([
-    {
-      id: 1,
-      type: 'medication',
-      title: 'Medicamento adicionado',
-      description: 'Losartana 50mg foi cadastrado',
-      groupName: 'Grupo Pessoal',
-      time: '2 horas atrás',
-      icon: 'medical',
-      color: colors.secondary,
-    },
-    {
-      id: 2,
-      type: 'appointment',
-      title: 'Consulta agendada',
-      description: 'Dr. João Silva - Cardiologia',
-      groupName: 'Grupo Pessoal',
-      time: '5 horas atrás',
-      icon: 'calendar',
-      color: colors.warning,
-    },
-    {
-      id: 3,
-      type: 'exam',
-      title: 'Exame anexado',
-      description: 'Hemograma completo',
-      groupName: 'Cuidados Maria',
-      time: '1 dia atrás',
-      icon: 'document-text',
-      color: colors.info,
-    },
-  ]);
+  // TODO: Buscar atividades reais da API quando endpoints estiverem prontos
+  // Por enquanto, array vazio - mostrará mensagem de "sem atividades"
+  const [recentActivities, setRecentActivities] = useState([]);
 
   // Carregar grupos quando a tela recebe foco
   useFocusEffect(
