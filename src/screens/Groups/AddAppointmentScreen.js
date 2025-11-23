@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   Alert,
   KeyboardAvoidingView,
   Platform,
   Switch,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -408,13 +408,34 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     placeholder="Digite o endereço..."
                     fetchDetails={true}
                     onPress={(data, details = null) => {
-                      updateField('address', data.description);
+                      try {
+                        if (data && data.description) {
+                          updateField('address', data.description);
+                        } else if (details && details.formatted_address) {
+                          updateField('address', details.formatted_address);
+                        } else {
+                          console.warn('Dados do endereço incompletos:', { data, details });
+                        }
+                      } catch (error) {
+                        console.error('Erro ao processar endereço do Google:', error);
+                        Toast.show({
+                          type: 'error',
+                          text1: 'Erro ao selecionar endereço',
+                          text2: 'Tente digitar manualmente',
+                          position: 'bottom',
+                        });
+                      }
+                    }}
+                    onFail={(error) => {
+                      console.error('Erro no Google Places:', error);
                     }}
                     query={{
                       key: GOOGLE_MAPS_CONFIG.API_KEY,
                       language: GOOGLE_MAPS_CONFIG.language,
                       components: 'country:br',
                     }}
+                    enablePoweredByContainer={false}
+                    debounce={400}
                     styles={{
                       container: {
                         flex: 0,
