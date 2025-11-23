@@ -214,6 +214,8 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             {/* Tipo */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Tipo de Compromisso *</Text>
+              
+              {/* Linha 1: Comum e Médico */}
               <View style={styles.typeContainer}>
                 <TouchableOpacity
                   style={[
@@ -256,6 +258,53 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     ]}
                   >
                     Médico
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Linha 2: Fisioterapia e Exames */}
+              <View style={styles.typeContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.typeButton,
+                    formData.type === 'fisioterapia' && styles.typeButtonActive,
+                  ]}
+                  onPress={() => updateField('type', 'fisioterapia')}
+                >
+                  <Ionicons
+                    name="fitness-outline"
+                    size={24}
+                    color={formData.type === 'fisioterapia' ? colors.success : colors.gray400}
+                  />
+                  <Text
+                    style={[
+                      styles.typeButtonText,
+                      formData.type === 'fisioterapia' && styles.typeButtonTextActive,
+                    ]}
+                  >
+                    Fisioterapia
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.typeButton,
+                    formData.type === 'exames' && styles.typeButtonActive,
+                  ]}
+                  onPress={() => updateField('type', 'exames')}
+                >
+                  <Ionicons
+                    name="flask-outline"
+                    size={24}
+                    color={formData.type === 'exames' ? colors.info : colors.gray400}
+                  />
+                  <Text
+                    style={[
+                      styles.typeButtonText,
+                      formData.type === 'exames' && styles.typeButtonTextActive,
+                    ]}
+                  >
+                    Exames
                   </Text>
                 </TouchableOpacity>
               </View>

@@ -12,7 +12,7 @@
 
 const GOOGLE_MAPS_CONFIG = {
   // IMPORTANTE: Substitua pela sua API Key do Google Cloud Console
-  API_KEY: 'SUA_API_KEY_AQUI', // TODO: Substituir pela chave real
+  API_KEY: 'AIzaSyBK7C7316fc5jZAcVFHe_wEdefuZ5fwGqk', // TODO: Substituir pela chave real
   
   // Configurações opcionais
   language: 'pt-BR',

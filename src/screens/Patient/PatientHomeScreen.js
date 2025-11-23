@@ -398,21 +398,18 @@ const PatientHomeScreen = ({ navigation }) => {
           
           {notifications.map((notification) => {
             // Verificar se deve mostrar o microfone
+            // REGRA: Só mostra microfone para consultas do tipo 'medical'
             let showMicrophone = false;
-            if (notification.type === 'appointment' && notification.appointmentTime) {
-              // Não mostrar microfone se for Fisioterapia
-              const isFisioterapia = notification.title?.toLowerCase().includes('fisioterapia') || 
-                                     notification.description?.toLowerCase().includes('fisioterapia');
+            if (notification.type === 'appointment' && 
+                notification.appointmentType === 'medical' && 
+                notification.appointmentTime) {
+              const now = new Date();
+              const appointmentTime = new Date(notification.appointmentTime);
+              const fifteenMinutesBefore = new Date(appointmentTime.getTime() - 15 * 60 * 1000);
+              const threeMinutesAfter = new Date(appointmentTime.getTime() + 3 * 60 * 1000);
               
-              if (!isFisioterapia) {
-                const now = new Date();
-                const appointmentTime = new Date(notification.appointmentTime);
-                const fifteenMinutesBefore = new Date(appointmentTime.getTime() - 15 * 60 * 1000);
-                const threeMinutesAfter = new Date(appointmentTime.getTime() + 3 * 60 * 1000);
-                
-                // Mostrar microfone se estiver entre 15 min antes e 3 min depois
-                showMicrophone = now >= fifteenMinutesBefore && now <= threeMinutesAfter;
-              }
+              // Mostrar microfone se estiver entre 15 min antes e 3 min depois
+              showMicrophone = now >= fifteenMinutesBefore && now <= threeMinutesAfter;
             }
             
             return (

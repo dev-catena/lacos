@@ -46,6 +46,19 @@ const GroupDetailScreen = ({ route, navigation }) => {
       }),
     },
     {
+      id: 'consultations',
+      title: 'Consultas',
+      subtitle: 'Histórico de consultas realizadas',
+      icon: 'document-text',
+      IconComponent: null,
+      color: colors.info,
+      backgroundColor: colors.info + '20',
+      onPress: () => navigation.navigate('Consultations', { 
+        groupId, 
+        groupName 
+      }),
+    },
+    {
       id: 'vitalsigns',
       title: 'Sinais Vitais',
       subtitle: 'Registrar pressão, glicose e peso',

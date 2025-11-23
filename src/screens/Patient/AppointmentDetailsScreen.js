@@ -30,18 +30,17 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Verificar se é Fisioterapia (não tem gravação)
-  const isFisioterapia = appointment?.title?.toLowerCase().includes('fisioterapia') || 
-                         appointment?.description?.toLowerCase().includes('fisioterapia');
+  // REGRA: Só permite gravação para consultas do tipo 'medical'
+  const isMedical = appointment?.type === 'medical';
 
   useEffect(() => {
-    // Só verifica microfone se não for fisioterapia
-    if (!isFisioterapia) {
+    // Só verifica microfone se for consulta médica
+    if (isMedical) {
       checkMicrophoneAvailability();
       const interval = setInterval(checkMicrophoneAvailability, 60000); // Verifica a cada minuto
       return () => clearInterval(interval);
     }
-  }, []);
+  }, [isMedical]);
 
   useEffect(() => {
     if (isMicrophoneBlinking) {
@@ -316,8 +315,8 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Recording Section - Não mostrar para Fisioterapia - APARECE PRIMEIRO */}
-        {!isFisioterapia && showMicrophone && (
+        {/* Recording Section - Só mostra para consultas médicas - APARECE PRIMEIRO */}
+        {isMedical && showMicrophone && (
           <View style={styles.recordingSection}>
             <View style={styles.recordingHeader}>
               <Ionicons name="mic" size={24} color={colors.error} />
@@ -442,8 +441,8 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* Instructions - Não mostrar para Fisioterapia */}
-        {!isFisioterapia && (
+        {/* Instructions - Só mostra para consultas médicas */}
+        {isMedical && (
           <View style={styles.instructionsCard}>
             <Ionicons name="information-circle" size={24} color={colors.info} />
             <View style={styles.instructionsContent}>

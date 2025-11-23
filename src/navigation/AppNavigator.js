@@ -28,6 +28,11 @@ import SelectDoctorScreen from '../screens/Medications/SelectDoctorScreen';
 import AddMedicationScreen from '../screens/Medications/AddMedicationScreen';
 import MedicationDetailsScreen from '../screens/Medications/MedicationDetailsScreen';
 
+// Importa as telas de Consultas
+import ConsultationsScreen from '../screens/Consultations/ConsultationsScreen';
+import AddConsultationScreen from '../screens/Consultations/AddConsultationScreen';
+import ConsultationDetailsScreen from '../screens/Consultations/ConsultationDetailsScreen';
+
 // Importa telas de Debug
 import ShowGroupCodesScreen from '../screens/Debug/ShowGroupCodesScreen';
 
@@ -129,6 +134,27 @@ const HomeStack = () => {
           headerShown: false 
         }}
       />
+      <Stack.Screen 
+        name="Consultations" 
+        component={ConsultationsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddConsultation" 
+        component={AddConsultationScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="ConsultationDetails" 
+        component={ConsultationDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -224,6 +250,27 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="MedicationDetails" 
         component={MedicationDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Consultations" 
+        component={ConsultationsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddConsultation" 
+        component={AddConsultationScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="ConsultationDetails" 
+        component={ConsultationDetailsScreen}
         options={{ 
           headerShown: false 
         }}
