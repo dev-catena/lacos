@@ -107,18 +107,33 @@ npx expo start --clear
 1. No Google Cloud Console → **Credenciais** → Editar sua chave
 2. Em **"Restrições de aplicativo"**, escolha **"Apps Android"**
 3. Clique em **"+ Adicionar um nome do pacote"**
-4. Digite: `com.darley.lacos` (ou o package name do seu app)
+4. Digite: `com.lacos.app` (package name do app Laços)
 5. Para obter o SHA-1:
 ```bash
+# Método 1: Via Expo
+npx expo prebuild
 cd android && ./gradlew signingReport
+
+# Método 2: Via keytool
+keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
 ```
 6. Copie o SHA-1 e cole no Google Cloud Console
 7. Salve
+
+**Veja o guia completo:** `OBTER_SHA1.md`
 
 ### Adicionar domínio web (se for publicar web):
 
 1. Em **"Restrições de aplicativo"**, escolha **"Referenciadores HTTP"**
 2. Adicione: `https://seudominio.com.br/*`
+
+### Restringir por Bundle ID (iOS):
+
+1. No Google Cloud Console → **Credenciais** → Editar sua chave
+2. Em **"Restrições de aplicativo"**, escolha **"Apps iOS"**
+3. Clique em **"+ Adicionar um identificador de pacote"**
+4. Digite: `com.lacos.app` (bundle identifier do app Laços)
+5. Salve
 
 ---
 
