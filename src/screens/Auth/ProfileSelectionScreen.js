@@ -20,7 +20,13 @@ const ProfileSelectionScreen = ({ navigation }) => {
   };
 
   const handleCaretakerAccess = () => {
-    navigation.navigate('Welcome');
+    // Ir direto para registro (criar conta)
+    navigation.navigate('Register');
+  };
+
+  const handleLogin = () => {
+    // Ir para login (já tem conta)
+    navigation.navigate('Login');
   };
 
   return (
@@ -30,7 +36,6 @@ const ProfileSelectionScreen = ({ navigation }) => {
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Laços</Text>
           <View style={styles.logoContainer}>
             <LacosLogoFull width={200} height={62} />
           </View>
@@ -66,11 +71,21 @@ const ProfileSelectionScreen = ({ navigation }) => {
             </View>
             <Text style={styles.buttonTitle}>Sou Acompanhante</Text>
             <Text style={styles.buttonDescription}>
-              Acesso completo para cuidar de quem você ama
+              Criar conta e gerenciar grupos de cuidados
             </Text>
             <Ionicons name="arrow-forward" size={20} color={colors.textWhite} />
           </TouchableOpacity>
         </View>
+
+        {/* Botão Já tenho conta */}
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={handleLogin}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="log-in-outline" size={20} color={colors.textWhite} />
+          <Text style={styles.loginButtonText}>Já tenho conta - Entrar</Text>
+        </TouchableOpacity>
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -96,12 +111,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginTop: 40,
-  },
-  title: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: colors.textWhite,
-    marginBottom: 20,
   },
   logoContainer: {
     marginBottom: 12,
@@ -156,6 +165,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
     marginBottom: 12,
+  },
+  loginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: colors.textWhite,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    marginHorizontal: 20,
+    marginTop: 8,
+    gap: 8,
+  },
+  loginButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textWhite,
   },
   footer: {
     paddingVertical: 20,

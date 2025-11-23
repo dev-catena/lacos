@@ -27,6 +27,40 @@ const GROUPS_STORAGE_KEY = '@lacos_groups';
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [myGroups, setMyGroups] = useState([]);
+  const [participatingGroups, setParticipatingGroups] = useState([]);
+  const [selectedTab, setSelectedTab] = useState('myGroups'); // 'myGroups' ou 'participating'
+  const [recentActivities, setRecentActivities] = useState([
+    {
+      id: 1,
+      type: 'medication',
+      title: 'Medicamento adicionado',
+      description: 'Losartana 50mg foi cadastrado',
+      groupName: 'Grupo Pessoal',
+      time: '2 horas atrás',
+      icon: 'medical',
+      color: colors.secondary,
+    },
+    {
+      id: 2,
+      type: 'appointment',
+      title: 'Consulta agendada',
+      description: 'Dr. João Silva - Cardiologia',
+      groupName: 'Grupo Pessoal',
+      time: '5 horas atrás',
+      icon: 'calendar',
+      color: colors.warning,
+    },
+    {
+      id: 3,
+      type: 'exam',
+      title: 'Exame anexado',
+      description: 'Hemograma completo',
+      groupName: 'Cuidados Maria',
+      time: '1 dia atrás',
+      icon: 'document-text',
+      color: colors.info,
+    },
+  ]);
 
   // Carregar grupos quando a tela recebe foco
   useFocusEffect(
@@ -38,12 +72,36 @@ const HomeScreen = ({ navigation }) => {
   const loadGroups = async () => {
     try {
       const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
+      let groups = [];
+      
       if (groupsJson) {
-        const groups = JSON.parse(groupsJson);
-        setMyGroups(groups);
-      } else {
-        setMyGroups([]);
+        groups = JSON.parse(groupsJson);
       }
+      
+      // TEMPORÁRIO: Adicionar grupo de teste do banco de dados
+      // TODO: Substituir por chamada à API quando groupService estiver integrado
+      const testGroup = {
+        id: 1, // ID real do banco de dados
+        groupName: 'Grupo Pessoal (Teste)',
+        accompaniedName: 'João Silva',
+        accessCode: 'TESTE123',
+        isAdmin: true,
+        memberCount: 1,
+        createdAt: new Date().toISOString(),
+      };
+      
+      // Verificar se o grupo de teste já existe
+      const hasTestGroup = groups.some(g => g.id === 1);
+      if (!hasTestGroup) {
+        groups.unshift(testGroup); // Adiciona no início
+      }
+      
+      // "Meus Grupos" = grupos que EU criei (isAdmin ou criado por mim)
+      // "Participo" = grupos que OUTRO criou e me convidou
+      const myCreatedGroups = groups.filter(g => g.isAdmin !== false);
+      const joinedGroups = groups.filter(g => g.isAdmin === false);
+      setMyGroups(myCreatedGroups);
+      setParticipatingGroups(joinedGroups);
     } catch (error) {
       console.error('Erro ao carregar grupos:', error);
     }
@@ -58,8 +116,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleCreateGroup = () => {
-    navigation.navigate('Groups');
-    // TODO: Abrir modal ou tela de criação de grupo
+    navigation.navigate('CreateGroup');
   };
 
   const handleMedication = () => {
@@ -119,22 +176,43 @@ const HomeScreen = ({ navigation }) => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Grupos que acompanho */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Meus Grupos</Text>
-            <TouchableOpacity onPress={handleGroupPress}>
-              <Text style={styles.seeAllText}>Ver todos</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Tabs de Grupos */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity 
+            style={[styles.tab, selectedTab === 'myGroups' && styles.tabActive]}
+            onPress={() => setSelectedTab('myGroups')}
+          >
+            <Text style={[styles.tabText, selectedTab === 'myGroups' && styles.tabTextActive]}>
+              Meus Grupos
+            </Text>
+            {selectedTab === 'myGroups' && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
           
-          {myGroups.length > 0 ? (
-            <>
-              {myGroups.slice(0, 3).map((group) => (
+          <TouchableOpacity 
+            style={[styles.tab, selectedTab === 'participating' && styles.tabActive]}
+            onPress={() => setSelectedTab('participating')}
+          >
+            <Text style={[styles.tabText, selectedTab === 'participating' && styles.tabTextActive]}>
+              Participo
+            </Text>
+            {selectedTab === 'participating' && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
+        </View>
+
+        {/* Conteúdo das Tabs */}
+        <View style={styles.tabContent}>
+          {selectedTab === 'myGroups' ? (
+            // Meus Grupos
+            myGroups.length > 0 ? (
+              myGroups.map((group) => (
                 <TouchableOpacity 
                   key={group.id}
                   style={styles.groupCard}
-                  onPress={() => navigation.navigate('Groups')}
+                  onPress={() => navigation.navigate('GroupDetail', {
+                    groupId: group.id,
+                    groupName: group.groupName,
+                    accompaniedName: group.accompaniedName,
+                  })}
                   activeOpacity={0.7}
                 >
                   <View style={styles.groupIcon}>
@@ -148,84 +226,94 @@ const HomeScreen = ({ navigation }) => {
                   </View>
                   <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
                 </TouchableOpacity>
-              ))}
-              {myGroups.length > 3 && (
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={48} color={colors.gray300} />
+                <Text style={styles.emptyStateTitle}>Nenhum grupo criado</Text>
+                <Text style={styles.emptyStateText}>
+                  Crie um grupo para acompanhar alguém especial
+                </Text>
                 <TouchableOpacity 
-                  style={styles.viewMoreButton}
-                  onPress={handleGroupPress}
+                  style={styles.createButton}
+                  onPress={handleCreateGroup}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.viewMoreText}>Ver mais {myGroups.length - 3} grupos</Text>
-                  <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+                  <Ionicons name="add" size={20} color={colors.textWhite} />
+                  <Text style={styles.createButtonText}>Criar Grupo</Text>
                 </TouchableOpacity>
-              )}
-            </>
+              </View>
+            )
           ) : (
-          <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color={colors.gray300} />
-            <Text style={styles.emptyStateTitle}>Nenhum grupo ainda</Text>
-            <Text style={styles.emptyStateText}>
-              Crie um grupo para acompanhar alguém especial
-            </Text>
-            <TouchableOpacity 
-              style={styles.createButton}
-              onPress={handleCreateGroup}
-              activeOpacity={0.8}
-            >
-                <Ionicons name="add" size={20} color={colors.textWhite} />
-              <Text style={styles.createButtonText}>Criar Grupo</Text>
-            </TouchableOpacity>
-          </View>
+            // Grupos que Participo
+            participatingGroups.length > 0 ? (
+              participatingGroups.map((group) => (
+                <TouchableOpacity 
+                  key={group.id}
+                  style={styles.groupCard}
+                  onPress={() => navigation.navigate('GroupDetail', {
+                    groupId: group.id,
+                    groupName: group.groupName,
+                    accompaniedName: group.accompaniedName,
+                  })}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.groupIcon}>
+                    <Ionicons name="people" size={32} color={colors.secondary} />
+                  </View>
+                  <View style={styles.groupInfo}>
+                    <Text style={styles.groupName}>{group.groupName}</Text>
+                    <Text style={styles.groupDescription}>
+                      {group.accompaniedName ? `Acompanhando ${group.accompaniedName}` : 'Membro do grupo'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="enter-outline" size={48} color={colors.gray300} />
+                <Text style={styles.emptyStateTitle}>Nenhum grupo ainda</Text>
+                <Text style={styles.emptyStateText}>
+                  Use um código de convite para entrar em um grupo
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.createButton, { backgroundColor: colors.secondary }]}
+                  onPress={() => navigation.navigate('Groups')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="enter" size={20} color={colors.textWhite} />
+                  <Text style={styles.createButtonText}>Entrar em Grupo</Text>
+                </TouchableOpacity>
+              </View>
+            )
           )}
         </View>
 
-        {/* Ações Rápidas */}
+        {/* Últimas Atualizações */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ações Rápidas</Text>
-          <View style={styles.quickActions}>
-            <TouchableOpacity 
-              style={styles.actionCard}
-              onPress={handleMedication}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: colors.primary + '20' }]}>
-                <MedicationIcon size={28} color={colors.primary} />
-              </View>
-              <Text style={styles.actionText}>Registrar Medicação</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.actionCard}
-              onPress={handleVitalSigns}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: colors.secondary + '20' }]}>
-                <VitalSignsIcon size={28} color={colors.secondary} />
-              </View>
-              <Text style={styles.actionText}>Sinais Vitais</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.actionCard}
-              onPress={handleAppointment}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: colors.info + '20' }]}>
-                <AppointmentIcon size={28} color={colors.info} />
-              </View>
-              <Text style={styles.actionText}>Agendar Consulta</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.actionCard}
-              onPress={handleMessages}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: colors.success + '20' }]}>
-                <MessagesIcon size={28} color={colors.success} />
-              </View>
-              <Text style={styles.actionText}>Mensagens</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Últimas Atualizações</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>Ver todas</Text>
             </TouchableOpacity>
           </View>
+
+          {recentActivities.map((activity) => (
+            <View key={activity.id} style={styles.activityCard}>
+              <View style={[styles.activityIcon, { backgroundColor: activity.color + '20' }]}>
+                <Ionicons name={activity.icon} size={24} color={activity.color} />
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>{activity.title}</Text>
+                <Text style={styles.activityDescription}>{activity.description}</Text>
+                <View style={styles.activityMeta}>
+                  <Text style={styles.activityGroup}>{activity.groupName}</Text>
+                  <Text style={styles.activityTime}>• {activity.time}</Text>
+                </View>
+              </View>
+            </View>
+          ))}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -306,6 +394,47 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
+  tabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  tabActive: {
+    // Tab ativo
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.textLight,
+  },
+  tabTextActive: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: colors.primary,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  tabContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    gap: 12,
+  },
   groupCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -314,6 +443,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    marginBottom: 12,
   },
   groupIcon: {
     width: 56,
@@ -408,6 +538,80 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     textAlign: 'center',
+  },
+  actionBigCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  actionBigCardIcon: {
+    marginRight: 16,
+  },
+  actionBigCardContent: {
+    flex: 1,
+  },
+  actionBigCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.textWhite,
+    marginBottom: 4,
+  },
+  actionBigCardDescription: {
+    fontSize: 13,
+    color: colors.textWhite,
+    opacity: 0.9,
+  },
+  activityCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.backgroundLight,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  activityIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  activityDescription: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 6,
+  },
+  activityMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  activityGroup: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '500',
+  },
+  activityTime: {
+    fontSize: 12,
+    color: colors.textLight,
   },
 });
 

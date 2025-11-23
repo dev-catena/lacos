@@ -1,5 +1,4 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +9,7 @@ import colors from '../constants/colors';
 import HomeScreen from '../screens/Home/HomeScreen';
 import GroupsScreen from '../screens/Groups/GroupsScreen';
 import CreateGroupScreen from '../screens/Groups/CreateGroupScreen';
+import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
 import GroupSettingsScreen from '../screens/Groups/GroupSettingsScreen';
 import GroupContactsScreen from '../screens/Groups/GroupContactsScreen';
 import AddVitalSignsScreen from '../screens/Groups/AddVitalSignsScreen';
@@ -17,6 +17,9 @@ import AgendaScreen from '../screens/Groups/AgendaScreen';
 import AddAppointmentScreen from '../screens/Groups/AddAppointmentScreen';
 import NotificationsScreen from '../screens/Notifications/NotificationsScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
+import EditPersonalDataScreen from '../screens/Profile/EditPersonalDataScreen';
+import SecurityScreen from '../screens/Profile/SecurityScreen';
+import NotificationPreferencesScreen from '../screens/Profile/NotificationPreferencesScreen';
 
 // Importa as telas de Medicamentos
 import MedicationsScreen from '../screens/Medications/MedicationsScreen';
@@ -42,6 +45,90 @@ const HomeStack = () => {
           headerShown: false 
         }}
       />
+      <Stack.Screen 
+        name="CreateGroup" 
+        component={CreateGroupScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="GroupDetail" 
+        component={GroupDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="GroupSettings" 
+        component={GroupSettingsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="GroupContacts" 
+        component={GroupContactsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddVitalSigns" 
+        component={AddVitalSignsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Agenda" 
+        component={AgendaScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddAppointment" 
+        component={AddAppointmentScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Medications" 
+        component={MedicationsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddMedicationChoice" 
+        component={AddMedicationChoiceScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="SelectDoctor" 
+        component={SelectDoctorScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddMedication" 
+        component={AddMedicationScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="MedicationDetails" 
+        component={MedicationDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -60,6 +147,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="CreateGroup" 
         component={CreateGroupScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="GroupDetail" 
+        component={GroupDetailScreen}
         options={{ 
           headerShown: false 
         }}
@@ -165,6 +259,27 @@ const ProfileStack = () => {
         }}
       />
       <Stack.Screen 
+        name="EditPersonalData" 
+        component={EditPersonalDataScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Security" 
+        component={SecurityScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="NotificationPreferences" 
+        component={NotificationPreferencesScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="ShowGroupCodes" 
         component={ShowGroupCodesScreen}
         options={{ 
@@ -200,44 +315,29 @@ const AppNavigator = () => {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.gray400,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: '600',
-          marginTop: -2,
-          marginBottom: 4,
         },
         tabBarIconStyle: {
-          marginTop: 4,
+          marginBottom: 0,
         },
         tabBarStyle: {
-          height: 65,
-          paddingBottom: 10,
-          paddingTop: 8,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 5,
           backgroundColor: colors.backgroundLight,
           borderTopWidth: 1,
           borderTopColor: colors.border,
-          elevation: 16,
+          elevation: 8,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.2,
-          shadowRadius: 8,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
         },
         tabBarItemStyle: {
-          paddingVertical: 4,
+          paddingVertical: 0,
+          gap: 2,
         },
-        tabBarButton: (props) => (
-          <TouchableOpacity
-            {...props}
-            activeOpacity={0.7}
-            style={[
-              props.style,
-              {
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }
-            ]}
-          />
-        ),
       })}
       detachInactiveScreens={false}
     >

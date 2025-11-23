@@ -7,18 +7,22 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
-
-const MEDICATIONS_STORAGE_KEY = '@lacos_medications';
+import medicationService from '../../services/medicationService';
 
 const MedicationsScreen = ({ route, navigation }) => {
-  const { groupId, groupName } = route.params || {};
+  let { groupId, groupName } = route.params || {};
+  
+  // TEMPORÁRIO: Se groupId é um timestamp, usar o grupo de teste
+  if (groupId && groupId > 999999999999) {
+    groupId = 1;
+  }
   const [medications, setMedications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('all'); // all, morning, afternoon, night
@@ -33,14 +37,42 @@ const MedicationsScreen = ({ route, navigation }) => {
   const loadMedications = async () => {
     try {
       setLoading(true);
-      const medsJson = await AsyncStorage.getItem(MEDICATIONS_STORAGE_KEY);
-      if (medsJson) {
-        const allMeds = JSON.parse(medsJson);
-        const groupMeds = allMeds.filter(med => 
-          med.groupId === groupId && 
-          (showDiscontinued ? med.active === false : med.active !== false)
+      const result = await medicationService.getMedications(groupId);
+      
+      if (result.success) {
+        const allMeds = result.data || [];
+        // Filtrar por ativos ou descontinuados
+        const filteredMeds = allMeds.filter(med => 
+          showDiscontinued ? !med.is_active : med.is_active
         );
-        setMedications(groupMeds);
+        
+        // Transformar dados da API para o formato esperado pela UI
+        const transformedMeds = filteredMeds.map(med => {
+          const frequencyDetails = typeof med.frequency_details === 'string' 
+            ? JSON.parse(med.frequency_details) 
+            : med.frequency_details;
+          
+          return {
+            id: med.id,
+            groupId: med.group_id,
+            name: med.name,
+            form: med.form,
+            dosage: med.dosage,
+            unit: med.unit,
+            route: med.administration_route,
+            frequency: med.frequency_type === 'advanced' ? 'advanced' : frequencyDetails.interval,
+            schedule: frequencyDetails.schedule || [],
+            advancedFrequency: med.frequency_type === 'advanced' ? frequencyDetails : null,
+            instructions: med.notes,
+            durationType: med.duration_type,
+            durationDays: med.duration_value,
+            active: med.is_active,
+          };
+        });
+        
+        setMedications(transformedMeds);
+      } else {
+        console.error('Erro ao carregar medicamentos:', result.error);
       }
     } catch (error) {
       console.error('Erro ao carregar medicamentos:', error);
@@ -98,13 +130,23 @@ const MedicationsScreen = ({ route, navigation }) => {
       
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <LacosIcon size={36} />
-          <View>
-            <Text style={styles.title}>Remédios</Text>
-            <Text style={styles.subtitle}>{groupName}</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        
+        <View style={styles.headerCenter}>
+          <View style={styles.headerLeft}>
+            <LacosIcon size={36} />
+            <View>
+              <Text style={styles.title}>Remédios</Text>
+              <Text style={styles.subtitle}>{groupName}</Text>
+            </View>
           </View>
         </View>
+        
         <TouchableOpacity
           style={styles.toggleButton}
           onPress={() => setShowDiscontinued(!showDiscontinued)}
@@ -114,9 +156,6 @@ const MedicationsScreen = ({ route, navigation }) => {
             size={24} 
             color={colors.primary} 
           />
-          <Text style={styles.toggleButtonText}>
-            {showDiscontinued ? 'Ativos' : 'Inativos'}
-          </Text>
         </TouchableOpacity>
       </View>
 
@@ -205,7 +244,12 @@ const MedicationsScreen = ({ route, navigation }) => {
       )}
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {medications.length === 0 ? (
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Carregando medicamentos...</Text>
+          </View>
+        ) : medications.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons 
               name={showDiscontinued ? "archive-outline" : "medical-outline"} 
@@ -299,10 +343,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    gap: 12,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.backgroundLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerCenter: {
+    flex: 1,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -310,13 +369,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   toggleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.primary + '20',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   toggleButtonText: {
     fontSize: 12,
@@ -332,6 +390,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textLight,
     marginTop: 2,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 100,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginTop: 12,
   },
   emptyState: {
     flex: 1,

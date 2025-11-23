@@ -302,8 +302,22 @@ const PatientHomeScreen = ({ navigation }) => {
         notification.title,
         notification.description,
         [
-          { text: 'Lembrar depois' },
-          { text: 'Já tomei', style: 'default' },
+          { text: 'Manter alerta' },
+          { 
+            text: 'Já tomei', 
+            style: 'default',
+            onPress: () => {
+              // Remover medicamento da lista quando marcar como "Já tomei"
+              setNotifications(prev => prev.filter(n => n.id !== notification.id));
+              
+              Toast.show({
+                type: 'success',
+                text1: '✅ Medicamento registrado',
+                text2: 'Dose marcada como tomada',
+                position: 'bottom',
+              });
+            }
+          },
         ]
       );
     }
@@ -386,13 +400,19 @@ const PatientHomeScreen = ({ navigation }) => {
             // Verificar se deve mostrar o microfone
             let showMicrophone = false;
             if (notification.type === 'appointment' && notification.appointmentTime) {
-              const now = new Date();
-              const appointmentTime = new Date(notification.appointmentTime);
-              const fifteenMinutesBefore = new Date(appointmentTime.getTime() - 15 * 60 * 1000);
-              const threeMinutesAfter = new Date(appointmentTime.getTime() + 3 * 60 * 1000);
+              // Não mostrar microfone se for Fisioterapia
+              const isFisioterapia = notification.title?.toLowerCase().includes('fisioterapia') || 
+                                     notification.description?.toLowerCase().includes('fisioterapia');
               
-              // Mostrar microfone se estiver entre 15 min antes e 3 min depois
-              showMicrophone = now >= fifteenMinutesBefore && now <= threeMinutesAfter;
+              if (!isFisioterapia) {
+                const now = new Date();
+                const appointmentTime = new Date(notification.appointmentTime);
+                const fifteenMinutesBefore = new Date(appointmentTime.getTime() - 15 * 60 * 1000);
+                const threeMinutesAfter = new Date(appointmentTime.getTime() + 3 * 60 * 1000);
+                
+                // Mostrar microfone se estiver entre 15 min antes e 3 min depois
+                showMicrophone = now >= fifteenMinutesBefore && now <= threeMinutesAfter;
+              }
             }
             
             return (

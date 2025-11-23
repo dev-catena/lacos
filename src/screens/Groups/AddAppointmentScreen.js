@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,16 +11,33 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { AppointmentIcon, LocationIcon } from '../../components/CustomIcons';
+import appointmentService from '../../services/appointmentService';
+import GOOGLE_MAPS_CONFIG from '../../config/maps';
+import { checkGoogleMapsConfig } from '../../utils/checkGoogleMapsConfig';
 
 const AddAppointmentScreen = ({ route, navigation }) => {
-  const { groupId, groupName } = route.params || {};
+  let { groupId, groupName } = route.params || {};
+  
+  // TEMPORÁRIO: Se groupId é um timestamp (> 999999999999), usar o grupo de teste
+  if (groupId && groupId > 999999999999) {
+    console.warn('⚠️ GroupId é um timestamp! Usando grupo de teste (ID=1)');
+    groupId = 1;
+  }
   
   const [loading, setLoading] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const googlePlacesRef = useRef(null);
   
   // Dados do compromisso
   const [formData, setFormData] = useState({
@@ -42,32 +59,91 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleDateChange = (event, date) => {
+    setShowDatePicker(false);
+    if (date) {
+      setSelectedDate(date);
+      updateField('date', date.toISOString());
+    }
+  };
+
+  const handleTimeChange = (event, time) => {
+    setShowTimePicker(false);
+    if (time) {
+      const newDate = new Date(selectedDate);
+      newDate.setHours(time.getHours());
+      newDate.setMinutes(time.getMinutes());
+      setSelectedDate(newDate);
+      updateField('date', newDate.toISOString());
+    }
+  };
+
+  const openGoogleMaps = () => {
+    if (!formData.address) {
+      Alert.alert('Atenção', 'Digite um endereço primeiro');
+      return;
+    }
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.address)}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Erro', 'Não foi possível abrir o Google Maps');
+    });
+  };
+
+  const openWaze = () => {
+    if (!formData.address) {
+      Alert.alert('Atenção', 'Digite um endereço primeiro');
+      return;
+    }
+    const url = `https://waze.com/ul?q=${encodeURIComponent(formData.address)}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Erro', 'Não foi possível abrir o Waze');
+    });
+  };
+
   const handleSave = async () => {
     if (!formData.title.trim()) {
       Alert.alert('Atenção', 'Digite um título para o compromisso');
       return;
     }
 
+    if (!groupId) {
+      Alert.alert('Erro', 'ID do grupo não foi fornecido. Por favor, volte e tente novamente.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // TODO: Implementar chamada à API
-      Alert.alert(
-        '✅ Sucesso',
-        `Compromisso agendado!\n\n` +
-        `Título: ${formData.title}\n` +
-        `Tipo: ${formData.type === 'medical' ? 'Consulta Médica' : 'Comum'}\n` +
-        `Recorrência: ${formData.recurrenceType}\n\n` +
-        `Integração com API em desenvolvimento.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
+      // Preparar dados para API
+      const appointmentData = {
+        groupId: parseInt(groupId), // Converter para número
+        title: formData.title.trim(),
+        description: formData.notes.trim() || null,
+        scheduledAt: formData.date,
+        doctorId: formData.selectedDoctor?.id || null,
+        location: formData.address.trim() || null,
+        notes: formData.notes.trim() || null,
+      };
+
+      console.log('Salvando compromisso:', appointmentData);
+
+      const result = await appointmentService.createAppointment(appointmentData);
+
+      if (result.success) {
+        Toast.show({
+          type: 'success',
+          text1: '✅ Compromisso agendado!',
+          text2: `${formData.title} foi cadastrado com sucesso`,
+          position: 'bottom',
+        });
+        navigation.goBack();
+      } else {
+        console.error('Erro da API:', result.error);
+        Alert.alert('Erro', result.error || 'Não foi possível agendar o compromisso');
+      }
     } catch (error) {
-      Alert.alert('Erro', 'Erro ao agendar compromisso');
+      console.error('Erro ao agendar compromisso:', error);
+      Alert.alert('Erro', error.message || 'Erro ao agendar compromisso');
     } finally {
       setLoading(false);
     }
@@ -188,16 +264,55 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             {/* Data e Hora */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Data e Hora *</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="calendar-outline" size={20} color={colors.gray400} />
-                <Text style={styles.dateText}>
-                  {new Date(formData.date).toLocaleString('pt-BR')}
-                </Text>
-                <TouchableOpacity>
+              
+              <View style={styles.dateTimeRow}>
+                {/* Data */}
+                <TouchableOpacity 
+                  style={[styles.inputWrapper, { flex: 1 }]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color={colors.gray400} />
+                  <Text style={styles.dateText}>
+                    {new Date(formData.date).toLocaleDateString('pt-BR')}
+                  </Text>
+                  <Ionicons name="create-outline" size={20} color={colors.primary} />
+                </TouchableOpacity>
+
+                {/* Hora */}
+                <TouchableOpacity 
+                  style={[styles.inputWrapper, { flex: 1 }]}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={20} color={colors.gray400} />
+                  <Text style={styles.dateText}>
+                    {new Date(formData.date).toLocaleTimeString('pt-BR', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </Text>
                   <Ionicons name="create-outline" size={20} color={colors.primary} />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.hint}>Toque para editar</Text>
+              
+              {showDatePicker && (
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleDateChange}
+                  minimumDate={new Date()}
+                />
+              )}
+              
+              {showTimePicker && (
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleTimeChange}
+                  is24Hour={true}
+                />
+              )}
             </View>
 
             {/* Recorrência */}
@@ -222,29 +337,123 @@ const AddAppointmentScreen = ({ route, navigation }) => {
               ))}
             </View>
 
-            {/* Endereço */}
+            {/* Endereço com Autocomplete */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Endereço (opcional)</Text>
-              <View style={styles.inputWrapper}>
-                <LocationIcon size={20} color={colors.gray400} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Local do compromisso"
-                  value={formData.address}
-                  onChangeText={(value) => updateField('address', value)}
-                  multiline
-                />
+              <View style={styles.labelWithHelp}>
+                <Text style={styles.label}>Endereço (opcional)</Text>
+                {GOOGLE_MAPS_CONFIG.API_KEY === 'SUA_API_KEY_AQUI' && (
+                  <TouchableOpacity 
+                    onPress={checkGoogleMapsConfig}
+                    style={styles.helpButton}
+                  >
+                    <Ionicons name="information-circle" size={20} color={colors.warning} />
+                  </TouchableOpacity>
+                )}
               </View>
-              <View style={styles.mapButtons}>
-                <TouchableOpacity style={styles.mapButton}>
-                  <Ionicons name="navigate-outline" size={16} color={colors.info} />
-                  <Text style={styles.mapButtonText}>Google Maps</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.mapButton}>
-                  <Ionicons name="navigate-outline" size={16} color={colors.info} />
-                  <Text style={styles.mapButtonText}>Waze</Text>
-                </TouchableOpacity>
-              </View>
+              
+              {GOOGLE_MAPS_CONFIG.API_KEY !== 'SUA_API_KEY_AQUI' ? (
+                // Autocomplete do Google (quando configurado)
+                <View style={styles.autocompleteContainer}>
+                  <GooglePlacesAutocomplete
+                    ref={googlePlacesRef}
+                    placeholder="Digite o endereço..."
+                    fetchDetails={true}
+                    onPress={(data, details = null) => {
+                      updateField('address', data.description);
+                    }}
+                    query={{
+                      key: GOOGLE_MAPS_CONFIG.API_KEY,
+                      language: GOOGLE_MAPS_CONFIG.language,
+                      components: 'country:br',
+                    }}
+                    styles={{
+                      container: {
+                        flex: 0,
+                      },
+                      textInputContainer: {
+                        backgroundColor: colors.backgroundLight,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        paddingHorizontal: 8,
+                      },
+                      textInput: {
+                        height: 52,
+                        color: colors.text,
+                        fontSize: 16,
+                        backgroundColor: 'transparent',
+                      },
+                      predefinedPlacesDescription: {
+                        color: colors.primary,
+                      },
+                      listView: {
+                        backgroundColor: colors.backgroundLight,
+                        borderRadius: 12,
+                        marginTop: 8,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                      },
+                      row: {
+                        backgroundColor: colors.backgroundLight,
+                        paddingVertical: 12,
+                        paddingHorizontal: 12,
+                      },
+                      separator: {
+                        height: 1,
+                        backgroundColor: colors.border,
+                      },
+                      description: {
+                        color: colors.text,
+                        fontSize: 14,
+                      },
+                      poweredContainer: {
+                        backgroundColor: colors.backgroundLight,
+                        paddingVertical: 4,
+                      },
+                    }}
+                    textInputProps={{
+                      placeholderTextColor: colors.placeholder,
+                      value: formData.address,
+                      onChangeText: (text) => updateField('address', text),
+                    }}
+                    enablePoweredByContainer={true}
+                    nearbyPlacesAPI="GooglePlacesSearch"
+                    debounce={400}
+                    minLength={3}
+                  />
+                </View>
+              ) : (
+                // Campo manual (fallback quando API Key não configurada)
+                <View style={styles.inputWrapper}>
+                  <LocationIcon size={20} color={colors.gray400} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Digite o endereço manualmente"
+                    value={formData.address}
+                    onChangeText={(value) => updateField('address', value)}
+                    multiline
+                  />
+                </View>
+              )}
+              
+              {formData.address.trim() && (
+                <View style={styles.mapButtons}>
+                  <TouchableOpacity 
+                    style={styles.mapButton}
+                    onPress={openGoogleMaps}
+                  >
+                    <Ionicons name="navigate-outline" size={16} color={colors.info} />
+                    <Text style={styles.mapButtonText}>Google Maps</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.mapButton}
+                    onPress={openWaze}
+                  >
+                    <Ionicons name="navigate-outline" size={16} color={colors.info} />
+                    <Text style={styles.mapButtonText}>Waze</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             {/* Lembretes */}
@@ -393,6 +602,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     marginBottom: 8,
+  },
+  labelWithHelp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  helpButton: {
+    padding: 4,
+  },
+  autocompleteContainer: {
+    flex: 1,
+    zIndex: 1,
+    minHeight: 52,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
   inputWrapper: {
     flexDirection: 'row',

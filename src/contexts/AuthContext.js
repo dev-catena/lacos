@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiService from '../services/apiService';
 
 // Criação do contexto
 export const AuthContext = createContext({});
@@ -22,6 +23,15 @@ export const AuthProvider = ({ children }) => {
 
       if (storedUser && storedToken) {
         setUser(JSON.parse(storedUser));
+        // Validar token com o servidor (opcional)
+        try {
+          const response = await apiService.get('/user');
+          setUser(response);
+        } catch (error) {
+          // Token inválido, limpar dados
+          console.warn('Token inválido, fazendo logout...');
+          await signOut();
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados do storage:', error);
@@ -35,26 +45,24 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      // TODO: Implementar chamada à API real
-      // Por enquanto, apenas simulação
-      const mockUser = {
-        id: '1',
-        name: 'Usuário Teste',
-        email: email,
-        groups: [],
-      };
-      
-      const mockToken = 'mock-token-123';
+      // Chamada à API real
+      const response = await apiService.post('/login', 
+        { email, password },
+        { requiresAuth: false }
+      );
 
       // Salva no AsyncStorage
-      await AsyncStorage.setItem('@lacos:user', JSON.stringify(mockUser));
-      await AsyncStorage.setItem('@lacos:token', mockToken);
+      await AsyncStorage.setItem('@lacos:user', JSON.stringify(response.user));
+      await AsyncStorage.setItem('@lacos:token', response.token);
 
-      setUser(mockUser);
+      setUser(response.user);
       return { success: true };
     } catch (error) {
       console.error('Erro no login:', error);
-      return { success: false, error: error.message };
+      return { 
+        success: false, 
+        error: error.message || 'Erro ao fazer login. Verifique suas credenciais.' 
+      };
     } finally {
       setLoading(false);
     }
@@ -65,30 +73,35 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      // TODO: Implementar chamada à API real
-      // Simulação de criação de conta
-      const newUser = {
-        id: Date.now().toString(),
-        name: userData.name,
-        lastName: userData.lastName,
+      // Preparar dados para API
+      const registerData = {
+        name: `${userData.name} ${userData.lastName || ''}`.trim(),
         email: userData.email,
+        password: userData.password,
+        password_confirmation: userData.password,
         phone: userData.phone,
-        birthDate: userData.birthDate,
+        birth_date: userData.birthDate,
         gender: userData.gender,
-        groups: [],
       };
-      
-      const mockToken = 'mock-token-456';
+
+      // Chamada à API real
+      const response = await apiService.post('/register', 
+        registerData,
+        { requiresAuth: false }
+      );
 
       // Salva no AsyncStorage
-      await AsyncStorage.setItem('@lacos:user', JSON.stringify(newUser));
-      await AsyncStorage.setItem('@lacos:token', mockToken);
+      await AsyncStorage.setItem('@lacos:user', JSON.stringify(response.user));
+      await AsyncStorage.setItem('@lacos:token', response.token);
 
-      setUser(newUser);
+      setUser(response.user);
       return { success: true };
     } catch (error) {
       console.error('Erro no cadastro:', error);
-      return { success: false, error: error.message };
+      return { 
+        success: false, 
+        error: error.message || 'Erro ao criar conta. Tente novamente.' 
+      };
     } finally {
       setLoading(false);
     }
@@ -99,6 +112,14 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
+      // Chamar API de logout (se houver token)
+      try {
+        await apiService.post('/logout');
+      } catch (error) {
+        console.warn('Erro ao fazer logout na API:', error);
+        // Continua o logout local mesmo se falhar na API
+      }
+
       // Remove TODOS os dados do AsyncStorage relacionados à sessão
       await AsyncStorage.removeItem('@lacos:user');
       await AsyncStorage.removeItem('@lacos:token');
@@ -115,6 +136,9 @@ export const AuthProvider = ({ children }) => {
   // Atualiza dados do usuário
   const updateUser = async (updatedData) => {
     try {
+      // Atualizar no servidor (se necessário)
+      // TODO: Implementar endpoint de atualização de perfil
+      
       const updatedUser = { ...user, ...updatedData };
       await AsyncStorage.setItem('@lacos:user', JSON.stringify(updatedUser));
       setUser(updatedUser);

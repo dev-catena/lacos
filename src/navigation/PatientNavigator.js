@@ -23,13 +23,22 @@ const PatientTabNavigator = () => {
         tabBarStyle: {
           backgroundColor: colors.backgroundLight,
           borderTopColor: colors.border,
-          height: 70,
-          paddingBottom: 10,
-          paddingTop: 10,
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 5,
+          elevation: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 14,
+          fontSize: 12,
           fontWeight: '600',
+        },
+        tabBarIconStyle: {
+          marginBottom: 0,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 0,
+          gap: 2,
         },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
@@ -40,7 +49,7 @@ const PatientTabNavigator = () => {
             iconName = focused ? 'person' : 'person-outline';
           }
 
-          return <Ionicons name={iconName} size={28} color={color} />;
+          return <Ionicons name={iconName} size={24} color={color} />;
         },
       })}
     >

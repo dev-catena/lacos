@@ -91,18 +91,21 @@ const ProfileScreen = ({ navigation }) => {
               title="Dados Pessoais"
               subtitle="Nome, e-mail, telefone"
               color={colors.primary}
+              onPress={() => navigation.navigate('EditPersonalData')}
             />
             <MenuItem
               icon="lock-closed-outline"
               title="Segurança"
               subtitle="Senha e autenticação"
               color={colors.warning}
+              onPress={() => navigation.navigate('Security')}
             />
             <MenuItem
               icon="notifications-outline"
               title="Notificações"
               subtitle="Preferências de notificações"
               color={colors.info}
+              onPress={() => navigation.navigate('NotificationPreferences')}
             />
           </View>
         </View>

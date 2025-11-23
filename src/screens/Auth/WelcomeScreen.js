@@ -27,17 +27,8 @@ const WelcomeScreen = ({ navigation }) => {
           </Text>
         </View>
 
-        {/* Ilustração ou imagem */}
-        <View style={styles.illustrationContainer}>
-          <Text style={styles.illustration}>👨‍👩‍👧‍👦</Text>
-          <Text style={styles.description}>
-            Crie grupos de cuidados e compartilhe informações médicas com familiares e profissionais
-          </Text>
-        </View>
-
         {/* Botões de ação */}
         <View style={styles.buttonsContainer}>
-          <Text style={styles.choiceTitle}>Como você quer entrar?</Text>
           
           {/* Botão Cuidador */}
           <TouchableOpacity
@@ -98,42 +89,23 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     paddingBottom: 40,
   },
   header: {
     alignItems: 'center',
     marginTop: 60,
-    marginBottom: 20,
+    marginBottom: 60,
   },
   subtitle: {
     fontSize: 16,
     color: colors.primaryLight,
     textAlign: 'center',
-  },
-  illustrationContainer: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  illustration: {
-    fontSize: 100,
-    marginBottom: 24,
-  },
-  description: {
-    fontSize: 16,
-    color: colors.primaryLight,
-    textAlign: 'center',
-    lineHeight: 24,
+    marginTop: 12,
   },
   buttonsContainer: {
     gap: 16,
-  },
-  choiceTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.backgroundLight,
-    textAlign: 'center',
-    marginBottom: 8,
+    marginTop: 40,
   },
   roleButton: {
     backgroundColor: colors.backgroundLight,
@@ -148,7 +120,7 @@ const styles = StyleSheet.create({
   roleButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
     gap: 16,
   },
   roleIconContainer: {
@@ -175,12 +147,12 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     backgroundColor: 'transparent',
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: colors.backgroundLight,
-    marginTop: 8,
+    marginTop: 16,
   },
   loginButtonText: {
     color: colors.backgroundLight,

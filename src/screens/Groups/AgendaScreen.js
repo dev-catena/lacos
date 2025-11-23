@@ -7,9 +7,11 @@ import {
   SafeAreaView,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { 
   AppointmentIcon,
@@ -23,38 +25,43 @@ import {
   AddIcon,
   ArrowBackIcon,
 } from '../../components/CustomIcons';
+import appointmentService from '../../services/appointmentService';
 
 const AgendaScreen = ({ route, navigation }) => {
-  const { groupId, groupName } = route.params || {};
+  let { groupId, groupName } = route.params || {};
+  
+  // TEMPORÁRIO: Se groupId é um timestamp, usar o grupo de teste
+  if (groupId && groupId > 999999999999) {
+    groupId = 1;
+  }
 
-  // Mock de compromissos
-  const [appointments] = useState([
-    {
-      id: 1,
-      title: 'Consulta com Dr. João Silva',
-      type: 'medical',
-      date: '2025-11-25',
-      time: '14:30',
-      location: 'Clínica São Lucas',
-      doctor: 'Dr. João Silva - Cardiologista',
-    },
-    {
-      id: 2,
-      title: 'Fisioterapia',
-      type: 'common',
-      date: '2025-11-26',
-      time: '10:00',
-      location: 'Centro de Reabilitação',
-    },
-    {
-      id: 3,
-      title: 'Exames de Rotina',
-      type: 'medical',
-      date: '2025-11-28',
-      time: '08:00',
-      location: 'Laboratório Vida',
-    },
-  ]);
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Carregar compromissos da API
+  const loadAppointments = async () => {
+    try {
+      setLoading(true);
+      const result = await appointmentService.getAppointments(groupId);
+      
+      if (result.success) {
+        setAppointments(result.data || []);
+      } else {
+        console.error('Erro ao carregar compromissos:', result.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar compromissos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Recarregar quando a tela ganhar foco
+  useFocusEffect(
+    React.useCallback(() => {
+      loadAppointments();
+    }, [groupId])
+  );
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
@@ -64,8 +71,16 @@ const AgendaScreen = ({ route, navigation }) => {
     return { day, month, weekDay };
   };
 
+  const formatTime = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
+
   const renderAppointmentCard = ({ item }) => {
-    const { day, month, weekDay } = formatDate(item.date);
+    // Backend retorna appointment_date, mas adicionamos scheduled_at para compatibilidade
+    const dateStr = item.appointment_date || item.scheduled_at || item.date;
+    const { day, month, weekDay } = formatDate(dateStr);
+    const time = formatTime(dateStr);
     const isMedical = item.type === 'medical';
 
     return (
@@ -98,13 +113,13 @@ const AgendaScreen = ({ route, navigation }) => {
           {item.doctor && (
             <View style={styles.infoRow}>
               <PersonIcon size={14} color={colors.textLight} />
-              <Text style={styles.infoText}>{item.doctor}</Text>
+              <Text style={styles.infoText}>{item.doctor.name || item.doctor}</Text>
             </View>
           )}
 
           <View style={styles.infoRow}>
             <TimeIcon size={14} color={colors.textLight} />
-            <Text style={styles.infoText}>{item.time}</Text>
+            <Text style={styles.infoText}>{time}</Text>
           </View>
 
           {item.location && (
@@ -163,7 +178,12 @@ const AgendaScreen = ({ route, navigation }) => {
       </View>
 
       {/* Lista de Compromissos */}
-      {appointments.length > 0 ? (
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Carregando compromissos...</Text>
+        </View>
+      ) : appointments.length > 0 ? (
         <FlatList
           data={appointments}
           renderItem={renderAppointmentCard}
@@ -360,6 +380,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginTop: 12,
   },
   emptyState: {
     flex: 1,

@@ -30,10 +30,17 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Verificar se é Fisioterapia (não tem gravação)
+  const isFisioterapia = appointment?.title?.toLowerCase().includes('fisioterapia') || 
+                         appointment?.description?.toLowerCase().includes('fisioterapia');
+
   useEffect(() => {
-    checkMicrophoneAvailability();
-    const interval = setInterval(checkMicrophoneAvailability, 60000); // Verifica a cada minuto
-    return () => clearInterval(interval);
+    // Só verifica microfone se não for fisioterapia
+    if (!isFisioterapia) {
+      checkMicrophoneAvailability();
+      const interval = setInterval(checkMicrophoneAvailability, 60000); // Verifica a cada minuto
+      return () => clearInterval(interval);
+    }
   }, []);
 
   useEffect(() => {
@@ -309,7 +316,56 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Audio Player Section - Mostrar se houver gravação */}
+        {/* Recording Section - Não mostrar para Fisioterapia - APARECE PRIMEIRO */}
+        {!isFisioterapia && showMicrophone && (
+          <View style={styles.recordingSection}>
+            <View style={styles.recordingHeader}>
+              <Ionicons name="mic" size={24} color={colors.error} />
+              <Text style={styles.recordingTitle}>Gravação de Áudio</Text>
+            </View>
+
+            <Text style={styles.recordingDescription}>
+              Grave anotações sobre esta consulta. Seus cuidadores receberão o áudio.
+            </Text>
+
+            <Animated.View style={{ opacity: blinkAnim }}>
+              <TouchableOpacity
+                style={[
+                  styles.recordButton,
+                  isMicrophoneBlinking && styles.recordButtonBlinking
+                ]}
+                onPress={handleStartRecording}
+              >
+                <View style={styles.recordButtonIcon}>
+                  <Ionicons name="mic" size={32} color={colors.textWhite} />
+                </View>
+                <View style={styles.recordButtonContent}>
+                  <Text style={styles.recordButtonTitle}>
+                    {isMicrophoneBlinking ? 'Gravar Agora!' : 'Iniciar Gravação'}
+                  </Text>
+                  <Text style={styles.recordButtonSubtitle}>
+                    {isMicrophoneBlinking 
+                      ? 'Consulta em andamento - Toque para gravar'
+                      : 'Grave suas anotações sobre a consulta'
+                    }
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color={colors.textWhite} />
+              </TouchableOpacity>
+            </Animated.View>
+
+            {isMicrophoneBlinking && (
+              <View style={styles.urgentBadge}>
+                <Ionicons name="alert-circle" size={16} color={colors.error} />
+                <Text style={styles.urgentText}>
+                  Disponível por mais alguns minutos!
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Audio Player Section - Mostrar se houver gravação - APARECE DEPOIS */}
         {recordingData && (
           <View style={styles.audioPlayerSection}>
             <View style={styles.audioPlayerHeader}>
@@ -386,68 +442,21 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* Recording Section */}
-        {showMicrophone && (
-          <View style={styles.recordingSection}>
-            <View style={styles.recordingHeader}>
-              <Ionicons name="mic" size={24} color={colors.error} />
-              <Text style={styles.recordingTitle}>Gravação de Áudio</Text>
+        {/* Instructions - Não mostrar para Fisioterapia */}
+        {!isFisioterapia && (
+          <View style={styles.instructionsCard}>
+            <Ionicons name="information-circle" size={24} color={colors.info} />
+            <View style={styles.instructionsContent}>
+              <Text style={styles.instructionsTitle}>Como funciona?</Text>
+              <Text style={styles.instructionsText}>
+                • O botão de gravação aparece 15 minutos antes da consulta{'\n'}
+                • Durante a consulta, o botão pisca para lembrar você{'\n'}
+                • Você tem até 30 minutos após o início para gravar{'\n'}
+                • Seus cuidadores serão notificados da gravação
+              </Text>
             </View>
-
-            <Text style={styles.recordingDescription}>
-              Grave anotações sobre esta consulta. Seus cuidadores receberão o áudio.
-            </Text>
-
-            <Animated.View style={{ opacity: blinkAnim }}>
-              <TouchableOpacity
-                style={[
-                  styles.recordButton,
-                  isMicrophoneBlinking && styles.recordButtonBlinking
-                ]}
-                onPress={handleStartRecording}
-              >
-                <View style={styles.recordButtonIcon}>
-                  <Ionicons name="mic" size={32} color={colors.textWhite} />
-                </View>
-                <View style={styles.recordButtonContent}>
-                  <Text style={styles.recordButtonTitle}>
-                    {isMicrophoneBlinking ? 'Gravar Agora!' : 'Iniciar Gravação'}
-                  </Text>
-                  <Text style={styles.recordButtonSubtitle}>
-                    {isMicrophoneBlinking 
-                      ? 'Consulta em andamento - Toque para gravar'
-                      : 'Grave suas anotações sobre a consulta'
-                    }
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={24} color={colors.textWhite} />
-              </TouchableOpacity>
-            </Animated.View>
-
-            {isMicrophoneBlinking && (
-              <View style={styles.urgentBadge}>
-                <Ionicons name="alert-circle" size={16} color={colors.error} />
-                <Text style={styles.urgentText}>
-                  Disponível por mais alguns minutos!
-                </Text>
-              </View>
-            )}
           </View>
         )}
-
-        {/* Instructions */}
-        <View style={styles.instructionsCard}>
-          <Ionicons name="information-circle" size={24} color={colors.info} />
-          <View style={styles.instructionsContent}>
-            <Text style={styles.instructionsTitle}>Como funciona?</Text>
-            <Text style={styles.instructionsText}>
-              • O botão de gravação aparece 15 minutos antes da consulta{'\n'}
-              • Durante a consulta, o botão pisca para lembrar você{'\n'}
-              • Você tem até 30 minutos após o início para gravar{'\n'}
-              • Seus cuidadores serão notificados da gravação
-            </Text>
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );

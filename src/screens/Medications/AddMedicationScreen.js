@@ -11,13 +11,11 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import AdvancedFrequencyModal from './AdvancedFrequencyModal';
 import { scheduleMedicationNotifications } from '../../services/notificationService';
-
-const MEDICATIONS_STORAGE_KEY = '@lacos_medications';
+import medicationService from '../../services/medicationService';
 
 // Dados de autocomplete
 const COMMON_MEDICATIONS = [
@@ -43,7 +41,12 @@ const FREQUENCIES = [
 ];
 
 const AddMedicationScreen = ({ route, navigation }) => {
-  const { groupId, groupName, prescriptionId } = route.params;
+  let { groupId, groupName, prescriptionId } = route.params;
+  
+  // TEMPORÁRIO: Se groupId é um timestamp, usar o grupo de teste
+  if (groupId && groupId > 999999999999) {
+    groupId = 1;
+  }
 
   const [name, setName] = useState('');
   const [form, setForm] = useState('');
@@ -118,48 +121,55 @@ const AddMedicationScreen = ({ route, navigation }) => {
       // Gerar horários baseado na frequência
       const schedule = generateSchedule(firstDoseTime, frequency);
 
-      const medication = {
-        id: Date.now().toString(),
-        groupId,
-        prescriptionId,
+      // Preparar dados para API
+      const medicationData = {
+        groupId: groupId,
         name: name.trim(),
         form: form.trim(),
         dosage: dosage.trim(),
-        unit,
-        route: administrationRoute,
-        frequency,
-        schedule,
-        advancedFrequency: frequency === 'advanced' ? advancedFrequency : null,
-        instructions: instructions.trim(),
-        durationType,
-        durationDays: durationType === 'temporario' ? parseInt(durationDays) : null,
-        startDate: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        active: true,
+        unit: unit,
+        administrationRoute: administrationRoute,
+        frequencyType: frequency === 'advanced' ? 'advanced' : 'simple',
+        frequencyDetails: frequency === 'advanced' 
+          ? JSON.stringify(advancedFrequency) 
+          : JSON.stringify({ interval: frequency, schedule }),
+        firstDoseAt: `${new Date().toISOString().split('T')[0]} ${firstDoseTime}:00`,
+        durationType: durationType,
+        durationValue: durationType === 'temporario' ? parseInt(durationDays) : null,
+        notes: instructions.trim() || null,
+        isActive: true,
       };
 
-      // Salvar no AsyncStorage
-      const medsJson = await AsyncStorage.getItem(MEDICATIONS_STORAGE_KEY);
-      const medications = medsJson ? JSON.parse(medsJson) : [];
-      medications.push(medication);
-      await AsyncStorage.setItem(MEDICATIONS_STORAGE_KEY, JSON.stringify(medications));
+      const result = await medicationService.createMedication(medicationData);
 
-      // Agendar notificações
-      try {
-        await scheduleMedicationNotifications(medication);
-      } catch (notifError) {
-        console.error('Erro ao agendar notificações:', notifError);
-        // Não bloqueia o salvamento
+      if (result.success) {
+        // Agendar notificações locais
+        try {
+          const medication = {
+            id: result.data.id,
+            name: name.trim(),
+            frequency,
+            schedule,
+            advancedFrequency: frequency === 'advanced' ? advancedFrequency : null,
+          };
+          await scheduleMedicationNotifications(medication);
+        } catch (notifError) {
+          console.error('Erro ao agendar notificações:', notifError);
+          // Não bloqueia o salvamento
+        }
+
+        Toast.show({
+          type: 'success',
+          text1: 'Medicamento cadastrado',
+          text2: `${name} foi adicionado com sucesso`,
+          position: 'bottom',
+        });
+
+        navigation.goBack();
+        navigation.goBack(); // Voltar para a tela de medicamentos
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível salvar o medicamento');
       }
-
-      Toast.show({
-        type: 'success',
-        text1: 'Medicamento cadastrado',
-        text2: `${name} foi adicionado com sucesso`,
-      });
-
-      navigation.goBack();
-      navigation.goBack(); // Voltar para a tela de medicamentos
     } catch (error) {
       console.error('Erro ao salvar medicamento:', error);
       Alert.alert('Erro', 'Não foi possível salvar o medicamento');
@@ -354,9 +364,12 @@ const AddMedicationScreen = ({ route, navigation }) => {
               placeholder="08:00"
               value={firstDoseTime}
               onChangeText={setFirstDoseTime}
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+              editable={true}
             />
             <Text style={styles.hint}>
-              Os próximos horários serão calculados automaticamente
+              Formato: HH:MM (ex: 08:00, 14:30)
             </Text>
           </View>
 

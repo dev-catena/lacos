@@ -41,10 +41,29 @@ const GroupsScreen = ({ navigation }) => {
     try {
       setLoading(true);
       const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
+      let groups = [];
+      
       if (groupsJson) {
-        const groups = JSON.parse(groupsJson);
-        setMyGroups(groups);
+        groups = JSON.parse(groupsJson);
       }
+      
+      // TEMPORÁRIO: Adicionar grupo de teste do banco de dados
+      const testGroup = {
+        id: 1,
+        groupName: 'Grupo Pessoal (Teste)',
+        accompaniedName: 'João Silva',
+        accessCode: 'TESTE123',
+        isAdmin: true,
+        memberCount: 1,
+        createdAt: new Date().toISOString(),
+      };
+      
+      const hasTestGroup = groups.some(g => g.id === 1);
+      if (!hasTestGroup) {
+        groups.unshift(testGroup);
+      }
+      
+      setMyGroups(groups);
     } catch (error) {
       console.error('Erro ao carregar grupos:', error);
     } finally {
@@ -97,9 +116,10 @@ const GroupsScreen = ({ navigation }) => {
               <TouchableOpacity 
                 key={group.id} 
                 style={styles.groupCard}
-                onPress={() => navigation.navigate('GroupSettings', {
+                onPress={() => navigation.navigate('GroupDetail', {
                   groupId: group.id,
-                  groupName: group.groupName
+                  groupName: group.groupName,
+                  accompaniedName: group.accompaniedName,
                 })}
                 activeOpacity={0.7}
               >

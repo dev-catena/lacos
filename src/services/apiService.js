@@ -68,19 +68,52 @@ class ApiService {
 
       clearTimeout(timeoutId);
 
-      // Parse response
-      const data = await response.json();
-
-      // Check for errors
+      // Check for errors first
       if (!response.ok) {
+        let errorData = {};
+        const contentType = response.headers.get('content-type');
+        
+        // Tentar fazer parse do JSON de erro se houver conteúdo
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            errorData = await response.json();
+          } catch (e) {
+            // Se falhar, usar mensagem genérica
+            errorData = { message: `Erro HTTP ${response.status}` };
+          }
+        }
+        
         throw {
           status: response.status,
-          message: data.message || 'Erro na requisição',
-          errors: data.errors || {},
+          message: errorData.message || `Erro na requisição: ${response.status}`,
+          errors: errorData.errors || {},
         };
       }
 
-      return data;
+      // Parse response JSON - verificar se há conteúdo
+      const contentType = response.headers.get('content-type');
+      
+      // Se não houver content-type ou não for JSON, retornar resposta vazia
+      if (!contentType || !contentType.includes('application/json')) {
+        return {};
+      }
+
+      // Verificar se há conteúdo no body
+      const text = await response.text();
+      if (!text || text.trim() === '') {
+        return {};
+      }
+
+      // Tentar fazer parse do JSON
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error('Erro ao fazer parse do JSON:', text);
+        throw {
+          status: 500,
+          message: 'Resposta inválida do servidor',
+        };
+      }
     } catch (error) {
       if (error.name === 'AbortError') {
         throw {
