@@ -291,30 +291,59 @@ const HomeScreen = ({ navigation }) => {
         </View>
 
         {/* Últimas Atualizações */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Últimas Atualizações</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>Ver todas</Text>
-            </TouchableOpacity>
-          </View>
+        {(() => {
+          const currentGroups = selectedTab === 'myGroups' ? myGroups : participatingGroups;
+          const hasGroups = currentGroups.length > 0;
+          
+          // Filtrar atividades apenas dos grupos da aba atual
+          const filteredActivities = recentActivities.filter(activity => {
+            return currentGroups.some(group => group.groupName === activity.groupName);
+          });
 
-          {recentActivities.map((activity) => (
-            <View key={activity.id} style={styles.activityCard}>
-              <View style={[styles.activityIcon, { backgroundColor: activity.color + '20' }]}>
-                <Ionicons name={activity.icon} size={24} color={activity.color} />
+          if (!hasGroups) {
+            return null; // Não mostrar seção se não há grupos
+          }
+
+          return (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Últimas Atualizações</Text>
+                {filteredActivities.length > 0 && (
+                  <TouchableOpacity>
+                    <Text style={styles.seeAllText}>Ver todas</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>{activity.title}</Text>
-                <Text style={styles.activityDescription}>{activity.description}</Text>
-                <View style={styles.activityMeta}>
-                  <Text style={styles.activityGroup}>{activity.groupName}</Text>
-                  <Text style={styles.activityTime}>• {activity.time}</Text>
+
+              {filteredActivities.length > 0 ? (
+                filteredActivities.map((activity) => (
+                  <View key={activity.id} style={styles.activityCard}>
+                    <View style={[styles.activityIcon, { backgroundColor: activity.color + '20' }]}>
+                      <Ionicons name={activity.icon} size={24} color={activity.color} />
+                    </View>
+                    <View style={styles.activityContent}>
+                      <Text style={styles.activityTitle}>{activity.title}</Text>
+                      <Text style={styles.activityDescription}>{activity.description}</Text>
+                      <View style={styles.activityMeta}>
+                        <Text style={styles.activityGroup}>{activity.groupName}</Text>
+                        <Text style={styles.activityTime}>• {activity.time}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyActivities}>
+                  <Ionicons name="time-outline" size={48} color={colors.gray300} />
+                  <Text style={styles.emptyActivitiesText}>
+                    {selectedTab === 'myGroups' 
+                      ? 'Nenhuma atividade recente nos seus grupos'
+                      : 'Nenhuma atividade recente nos grupos que você participa'}
+                  </Text>
                 </View>
-              </View>
+              )}
             </View>
-          ))}
-        </View>
+          );
+        })()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -612,6 +641,20 @@ const styles = StyleSheet.create({
   activityTime: {
     fontSize: 12,
     color: colors.textLight,
+  },
+  emptyActivities: {
+    backgroundColor: colors.backgroundLight,
+    padding: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  emptyActivitiesText: {
+    fontSize: 14,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginTop: 12,
   },
 });
 
