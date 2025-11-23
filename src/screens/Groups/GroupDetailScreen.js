@@ -59,6 +59,19 @@ const GroupDetailScreen = ({ route, navigation }) => {
       }),
     },
     {
+      id: 'doctors',
+      title: 'Médicos',
+      subtitle: 'Gerenciar médicos vinculados',
+      icon: 'medkit',
+      IconComponent: null,
+      color: '#FF6B6B',
+      backgroundColor: '#FF6B6B20',
+      onPress: () => navigation.navigate('Doctors', { 
+        groupId, 
+        groupName 
+      }),
+    },
+    {
       id: 'vitalsigns',
       title: 'Sinais Vitais',
       subtitle: 'Registrar pressão, glicose e peso',

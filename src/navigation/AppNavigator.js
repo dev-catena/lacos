@@ -33,6 +33,10 @@ import ConsultationsScreen from '../screens/Consultations/ConsultationsScreen';
 import AddConsultationScreen from '../screens/Consultations/AddConsultationScreen';
 import ConsultationDetailsScreen from '../screens/Consultations/ConsultationDetailsScreen';
 
+// Importa as telas de Médicos
+import DoctorsScreen from '../screens/Doctors/DoctorsScreen';
+import AddDoctorScreen from '../screens/Doctors/AddDoctorScreen';
+
 // Importa telas de Debug
 import ShowGroupCodesScreen from '../screens/Debug/ShowGroupCodesScreen';
 
@@ -155,6 +159,20 @@ const HomeStack = () => {
           headerShown: false 
         }}
       />
+      <Stack.Screen 
+        name="Doctors" 
+        component={DoctorsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddDoctor" 
+        component={AddDoctorScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -271,6 +289,20 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="ConsultationDetails" 
         component={ConsultationDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Doctors" 
+        component={DoctorsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddDoctor" 
+        component={AddDoctorScreen}
         options={{ 
           headerShown: false 
         }}

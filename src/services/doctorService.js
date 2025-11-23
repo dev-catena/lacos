@@ -1,106 +1,70 @@
 import apiService from './apiService';
 
-/**
- * Serviço para gerenciar médicos
- */
-class DoctorService {
+const doctorService = {
   /**
-   * Criar novo médico
+   * Busca todos os médicos de um grupo
    */
-  async createDoctor(doctorData) {
+  async getDoctors(groupId) {
     try {
-      const data = {
-        name: doctorData.name,
-        specialty: doctorData.specialty,
-        phone: doctorData.phone,
-        email: doctorData.email,
-      };
-
-      const response = await apiService.post('/doctors', data);
-      return { success: true, data: response };
-    } catch (error) {
-      console.error('Erro ao criar médico:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Erro ao criar médico' 
-      };
-    }
-  }
-
-  /**
-   * Listar todos os médicos do usuário
-   */
-  async getDoctors() {
-    try {
-      const response = await apiService.get('/doctors');
-      return { success: true, data: response };
+      const response = await apiService.get(`/doctors?group_id=${groupId}`);
+      return response;
     } catch (error) {
       console.error('Erro ao buscar médicos:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Erro ao buscar médicos' 
-      };
+      throw error;
     }
-  }
+  },
 
   /**
-   * Obter detalhes de um médico específico
+   * Busca um médico específico
    */
   async getDoctor(doctorId) {
     try {
-      const endpoint = apiService.replaceParams('/doctors/:id', { id: doctorId });
-      const response = await apiService.get(endpoint);
-      return { success: true, data: response };
+      const response = await apiService.get(`/doctors/${doctorId}`);
+      return response;
     } catch (error) {
       console.error('Erro ao buscar médico:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Erro ao buscar médico' 
-      };
+      throw error;
     }
-  }
+  },
 
   /**
-   * Atualizar médico
+   * Cria um novo médico
+   */
+  async createDoctor(doctorData) {
+    try {
+      const response = await apiService.post('/doctors', doctorData);
+      return response;
+    } catch (error) {
+      console.error('Erro ao criar médico:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Atualiza um médico existente
    */
   async updateDoctor(doctorId, doctorData) {
     try {
-      const endpoint = apiService.replaceParams('/doctors/:id', { id: doctorId });
-      const data = {
-        name: doctorData.name,
-        specialty: doctorData.specialty,
-        phone: doctorData.phone,
-        email: doctorData.email,
-      };
-
-      const response = await apiService.put(endpoint, data);
-      return { success: true, data: response };
+      const response = await apiService.put(`/doctors/${doctorId}`, doctorData);
+      return response;
     } catch (error) {
       console.error('Erro ao atualizar médico:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Erro ao atualizar médico' 
-      };
+      throw error;
     }
-  }
+  },
 
   /**
-   * Deletar médico
+   * Remove um médico
    */
   async deleteDoctor(doctorId) {
     try {
-      const endpoint = apiService.replaceParams('/doctors/:id', { id: doctorId });
-      await apiService.delete(endpoint);
-      return { success: true };
+      const response = await apiService.delete(`/doctors/${doctorId}`);
+      return response;
     } catch (error) {
       console.error('Erro ao deletar médico:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Erro ao deletar médico' 
-      };
+      throw error;
     }
-  }
-}
+  },
+};
 
-export default new DoctorService();
-
+export default doctorService;
