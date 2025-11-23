@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Platform,
   Switch,
   Linking,
+  FlatList,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +23,7 @@ import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { AppointmentIcon, LocationIcon } from '../../components/CustomIcons';
 import appointmentService from '../../services/appointmentService';
+import medicalSpecialtyService from '../../services/medicalSpecialtyService';
 import GOOGLE_MAPS_CONFIG from '../../config/maps';
 import { checkGoogleMapsConfig } from '../../utils/checkGoogleMapsConfig';
 
@@ -39,21 +42,65 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const googlePlacesRef = useRef(null);
   
+  // Estados para especialidades médicas
+  const [specialties, setSpecialties] = useState([]);
+  const [filteredSpecialties, setFilteredSpecialties] = useState([]);
+  const [showSpecialtyModal, setShowSpecialtyModal] = useState(false);
+  const [specialtySearch, setSpecialtySearch] = useState('');
+  const [selectedSpecialty, setSelectedSpecialty] = useState(null);
+  
   // Dados do compromisso
   const [formData, setFormData] = useState({
     title: '',
-    type: 'common', // common ou medical
+    type: 'common', // common, medical, fisioterapia, exames
     date: new Date().toISOString(),
     duration: '60',
     address: '',
     notes: '',
     selectedDoctor: null,
+    medicalSpecialtyId: null,
     recurrenceType: 'none', // none, daily, weekdays, custom
     recurrenceDays: [], // [0,1,2,3,4,5,6]
     recurrenceStart: new Date().toISOString(),
     recurrenceEnd: '',
     reminderOption: '3', // Opções pré-definidas
   });
+
+  // Carregar especialidades ao montar o componente
+  useEffect(() => {
+    loadSpecialties();
+  }, []);
+
+  const loadSpecialties = async () => {
+    try {
+      const response = await medicalSpecialtyService.getSpecialties();
+      if (response.success && response.data) {
+        setSpecialties(response.data);
+        setFilteredSpecialties(response.data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar especialidades:', error);
+    }
+  };
+
+  const handleSpecialtySearch = (text) => {
+    setSpecialtySearch(text);
+    if (text.trim() === '') {
+      setFilteredSpecialties(specialties);
+    } else {
+      const filtered = specialties.filter(specialty =>
+        specialty.name.toLowerCase().includes(text.toLowerCase())
+      );
+      setFilteredSpecialties(filtered);
+    }
+  };
+
+  const selectSpecialty = (specialty) => {
+    setSelectedSpecialty(specialty);
+    setSpecialtySearch(specialty.name);
+    setFormData(prev => ({ ...prev, medicalSpecialtyId: specialty.id }));
+    setShowSpecialtyModal(false);
+  };
 
   const updateField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -123,6 +170,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
         scheduled_at: formData.date,
         appointment_date: formData.date, // Backend espera este campo também
         doctor_id: formData.selectedDoctor?.id || null,
+        medical_specialty_id: formData.medicalSpecialtyId || null, // Especialidade médica
         location: formData.address.trim() || null,
         notes: formData.notes.trim() || null,
       };
@@ -312,6 +360,23 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Especialidade Médica - apenas para compromissos médicos */}
+            {formData.type === 'medical' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Especialidade Médica</Text>
+                <TouchableOpacity
+                  style={styles.specialtyInput}
+                  onPress={() => setShowSpecialtyModal(true)}
+                >
+                  <Ionicons name="medical-outline" size={20} color={colors.gray400} />
+                  <Text style={[styles.specialtyInputText, selectedSpecialty && styles.specialtyInputTextSelected]}>
+                    {selectedSpecialty ? selectedSpecialty.name : 'Selecione a especialidade...'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color={colors.gray400} />
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Data e Hora */}
             <View style={styles.inputContainer}>
@@ -597,6 +662,76 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Modal de Seleção de Especialidade */}
+      <Modal
+        visible={showSpecialtyModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSpecialtyModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Header do Modal */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Selecione a Especialidade</Text>
+              <TouchableOpacity
+                onPress={() => setShowSpecialtyModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Campo de Busca */}
+            <View style={styles.modalSearchContainer}>
+              <Ionicons name="search-outline" size={20} color={colors.gray400} />
+              <TextInput
+                style={styles.modalSearchInput}
+                placeholder="Buscar especialidade..."
+                value={specialtySearch}
+                onChangeText={handleSpecialtySearch}
+                autoFocus={true}
+              />
+            </View>
+
+            {/* Lista de Especialidades */}
+            <FlatList
+              data={filteredSpecialties}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.specialtyItem,
+                    selectedSpecialty?.id === item.id && styles.specialtyItemSelected
+                  ]}
+                  onPress={() => selectSpecialty(item)}
+                >
+                  <Ionicons
+                    name={selectedSpecialty?.id === item.id ? 'checkmark-circle' : 'medical-outline'}
+                    size={24}
+                    color={selectedSpecialty?.id === item.id ? colors.primary : colors.gray400}
+                  />
+                  <Text style={[
+                    styles.specialtyItemText,
+                    selectedSpecialty?.id === item.id && styles.specialtyItemTextSelected
+                  ]}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.emptyList}>
+                  <Text style={styles.emptyListText}>
+                    Nenhuma especialidade encontrada
+                  </Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -842,6 +977,96 @@ const styles = StyleSheet.create({
     color: colors.textWhite,
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // Estilos para Especialidade
+  specialtyInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  specialtyInputText: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.gray400,
+  },
+  specialtyInputTextSelected: {
+    color: colors.text,
+  },
+  // Estilos para Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.gray100,
+    borderRadius: 12,
+    padding: 12,
+    margin: 16,
+    gap: 8,
+  },
+  modalSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text,
+  },
+  specialtyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  specialtyItemSelected: {
+    backgroundColor: colors.primary + '10',
+  },
+  specialtyItemText: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text,
+  },
+  specialtyItemTextSelected: {
+    color: colors.primary,
+    fontWeight: '500',
+  },
+  emptyList: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyListText: {
+    fontSize: 16,
+    color: colors.gray400,
   },
 });
 
