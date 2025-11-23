@@ -52,7 +52,9 @@ class ConsultationService {
    */
   async createConsultation(consultationData) {
     try {
+      console.log('🔵 consultationService.createConsultation - Dados enviados:', consultationData);
       const response = await apiService.post('/consultations', consultationData);
+      console.log('✅ consultationService.createConsultation - Resposta:', response);
       return { success: true, data: response };
     } catch (error) {
       let errorMessage = 'Erro na requisição';
@@ -61,8 +63,9 @@ class ConsultationService {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      console.error('Erro no consultationService:', errorMessage, error);
-      return { success: false, error: errorMessage };
+      console.error('❌ Erro no consultationService:', errorMessage);
+      console.error('❌ Erro completo:', JSON.stringify(error, null, 2));
+      return { success: false, error: errorMessage, errors: error.errors };
     }
   }
 

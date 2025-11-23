@@ -126,10 +126,18 @@ const AddConsultationScreen = ({ route, navigation }) => {
       return;
     }
 
+    if (!formData.type) {
+      Alert.alert('Atenção', 'Selecione o tipo de consulta');
+      return;
+    }
+
     if (!groupId) {
       Alert.alert('Erro', 'ID do grupo não foi fornecido');
       return;
     }
+
+    console.log('📋 Dados do formulário antes de salvar:', formData);
+    console.log('🏥 Group ID:', groupId);
 
     setLoading(true);
 
@@ -137,24 +145,35 @@ const AddConsultationScreen = ({ route, navigation }) => {
       const consultationData = {
         group_id: groupId,
         type: formData.type,
-        medical_specialty_id: formData.medicalSpecialtyId,
         title: formData.title,
-        doctor_name: formData.doctorName,
         consultation_date: formData.date,
-        location: formData.location,
-        summary: formData.summary,
-        diagnosis: formData.diagnosis,
-        treatment: formData.treatment,
-        notes: formData.notes,
         is_urgent: formData.type === 'urgency',
       };
 
-      // Remover campos nulos
-      Object.keys(consultationData).forEach(key => {
-        if (consultationData[key] === null || consultationData[key] === '') {
-          delete consultationData[key];
-        }
-      });
+      // Adicionar campos opcionais apenas se tiverem valor
+      if (formData.medicalSpecialtyId) {
+        consultationData.medical_specialty_id = formData.medicalSpecialtyId;
+      }
+      if (formData.doctorName && formData.doctorName.trim()) {
+        consultationData.doctor_name = formData.doctorName;
+      }
+      if (formData.location && formData.location.trim()) {
+        consultationData.location = formData.location;
+      }
+      if (formData.summary && formData.summary.trim()) {
+        consultationData.summary = formData.summary;
+      }
+      if (formData.diagnosis && formData.diagnosis.trim()) {
+        consultationData.diagnosis = formData.diagnosis;
+      }
+      if (formData.treatment && formData.treatment.trim()) {
+        consultationData.treatment = formData.treatment;
+      }
+      if (formData.notes && formData.notes.trim()) {
+        consultationData.notes = formData.notes;
+      }
+
+      console.log('📤 Enviando consulta:', consultationData);
 
       const result = await consultationService.createConsultation(consultationData);
 
@@ -168,10 +187,25 @@ const AddConsultationScreen = ({ route, navigation }) => {
 
         navigation.goBack();
       } else {
-        Alert.alert('Erro', result.error || 'Não foi possível salvar a consulta');
+        console.error('❌ Erro da API:', result.error);
+        if (result.errors) {
+          console.error('❌ Detalhes dos erros:', JSON.stringify(result.errors, null, 2));
+        }
+        
+        let errorMessage = result.error || 'Não foi possível salvar a consulta';
+        
+        // Exibir erros detalhados se disponíveis
+        if (result.errors) {
+          const errorDetails = Object.entries(result.errors)
+            .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+            .join('\n');
+          errorMessage = `${errorMessage}\n\nDetalhes:\n${errorDetails}`;
+        }
+        
+        Alert.alert('Erro ao salvar', errorMessage);
       }
     } catch (error) {
-      console.error('Erro ao salvar consulta:', error);
+      console.error('❌ Erro ao salvar consulta (catch):', error);
       Alert.alert('Erro', 'Não foi possível salvar a consulta');
     } finally {
       setLoading(false);
