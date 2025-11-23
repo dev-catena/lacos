@@ -17,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
+import PanicButton from '../../components/PanicButton';
 
 const PATIENT_SESSION_KEY = '@lacos_patient_session';
 const GROUPS_STORAGE_KEY = '@lacos_groups';
@@ -25,6 +26,7 @@ const PatientHomeScreen = ({ navigation }) => {
   const [patientSession, setPatientSession] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [sosContacts, setSosContacts] = useState([]);
+  const [groupId, setGroupId] = useState(null);
 
   // Mock de notificações - Criar consulta AGORA para testar o microfone
   const [notifications, setNotifications] = useState(() => {
@@ -89,6 +91,9 @@ const PatientHomeScreen = ({ navigation }) => {
           const currentGroup = groups.find(g => g.id === session.groupId);
 
           if (currentGroup) {
+            // Definir groupId para o botão de pânico
+            setGroupId(session.groupId);
+            
             // Carregar contatos rápidos com cores padrão
             const colorOptions = [colors.primary, colors.secondary, colors.info];
             const quickContacts = (currentGroup.quickContacts || []).map((contact, index) => ({
@@ -445,8 +450,20 @@ const PatientHomeScreen = ({ navigation }) => {
           })}
         </View>
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Botão de Pânico Flutuante */}
+      {groupId && (
+        <View style={styles.panicButtonContainer}>
+          <PanicButton 
+            groupId={groupId}
+            onPanicTriggered={(data) => {
+              console.log('Pânico acionado:', data);
+            }}
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -611,6 +628,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textLight,
     textAlign: 'center',
+  },
+  panicButtonContainer: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    zIndex: 1000,
   },
 });
 
