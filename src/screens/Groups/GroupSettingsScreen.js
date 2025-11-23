@@ -297,6 +297,24 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           </View>
         )}
 
+        {/* Botão de Pânico */}
+        <TouchableOpacity
+          style={styles.panicCard}
+          onPress={() => navigation.navigate('PanicSettings', { groupId, groupName })}
+          activeOpacity={0.7}
+        >
+          <View style={styles.panicIconContainer}>
+            <Ionicons name="warning" size={28} color={colors.white} />
+          </View>
+          <View style={styles.panicInfo}>
+            <Text style={styles.panicTitle}>Botão de Pânico</Text>
+            <Text style={styles.panicDescription}>
+              Configure emergências e contatos prioritários
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
+        </TouchableOpacity>
+
         {/* Botão de Gerenciar Contatos */}
         <View style={styles.quickActionSection}>
           <TouchableOpacity
@@ -871,6 +889,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text,
     lineHeight: 16,
+  },
+  // Estilos do Botão de Pânico
+  panicCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    padding: 16,
+    marginHorizontal: 20,
+    marginVertical: 12,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.error + '30',
+    shadowColor: colors.error,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  panicIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  panicInfo: {
+    flex: 1,
+  },
+  panicTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  panicDescription: {
+    fontSize: 14,
+    color: colors.gray400,
   },
 });
 
