@@ -9,12 +9,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  FlatList,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
@@ -34,12 +33,8 @@ const AddConsultationScreen = ({ route, navigation }) => {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // Estados para autocomplete de especialidades
+  // Estados para especialidades
   const [specialties, setSpecialties] = useState([]);
-  const [filteredSpecialties, setFilteredSpecialties] = useState([]);
-  const [showSpecialtyModal, setShowSpecialtyModal] = useState(false);
-  const [specialtySearch, setSpecialtySearch] = useState('');
-  const [selectedSpecialty, setSelectedSpecialty] = useState(null);
 
   const [formData, setFormData] = useState({
     type: 'urgency', // urgency, medical, fisioterapia, exames
@@ -64,30 +59,10 @@ const AddConsultationScreen = ({ route, navigation }) => {
       const response = await medicalSpecialtyService.getSpecialties();
       if (response.success && response.data) {
         setSpecialties(response.data);
-        setFilteredSpecialties(response.data);
       }
     } catch (error) {
       console.error('Erro ao carregar especialidades:', error);
     }
-  };
-
-  const handleSpecialtySearch = (text) => {
-    setSpecialtySearch(text);
-    if (text.trim() === '') {
-      setFilteredSpecialties(specialties);
-    } else {
-      const filtered = specialties.filter(specialty =>
-        specialty.name.toLowerCase().includes(text.toLowerCase())
-      );
-      setFilteredSpecialties(filtered);
-    }
-  };
-
-  const selectSpecialty = (specialty) => {
-    setSelectedSpecialty(specialty);
-    setSpecialtySearch(specialty.name);
-    setFormData(prev => ({ ...prev, medicalSpecialtyId: specialty.id }));
-    setShowSpecialtyModal(false);
   };
 
   const updateField = (field, value) => {
@@ -281,16 +256,23 @@ const AddConsultationScreen = ({ route, navigation }) => {
           {formData.type === 'medical' && (
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Especialidade Médica</Text>
-              <TouchableOpacity
-                style={styles.specialtyInput}
-                onPress={() => setShowSpecialtyModal(true)}
-              >
-                <Ionicons name="medical-outline" size={20} color={colors.gray400} />
-                <Text style={[styles.specialtyInputText, selectedSpecialty && styles.specialtyInputTextSelected]}>
-                  {selectedSpecialty ? selectedSpecialty.name : 'Selecione a especialidade...'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color={colors.gray400} />
-              </TouchableOpacity>
+              <View style={styles.pickerContainer}>
+                <Ionicons name="medical-outline" size={20} color={colors.gray400} style={styles.pickerIcon} />
+                <Picker
+                  selectedValue={formData.medicalSpecialtyId}
+                  onValueChange={(itemValue) => updateField('medicalSpecialtyId', itemValue)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Selecione a especialidade..." value={null} />
+                  {specialties.map((specialty) => (
+                    <Picker.Item 
+                      key={specialty.id} 
+                      label={specialty.name} 
+                      value={specialty.id} 
+                    />
+                  ))}
+                </Picker>
+              </View>
             </View>
           )}
 
@@ -460,76 +442,6 @@ const AddConsultationScreen = ({ route, navigation }) => {
           <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Modal de Seleção de Especialidade */}
-      <Modal
-        visible={showSpecialtyModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowSpecialtyModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Header do Modal */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Selecione a Especialidade</Text>
-              <TouchableOpacity
-                onPress={() => setShowSpecialtyModal(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Campo de Busca */}
-            <View style={styles.modalSearchContainer}>
-              <Ionicons name="search-outline" size={20} color={colors.gray400} />
-              <TextInput
-                style={styles.modalSearchInput}
-                placeholder="Buscar especialidade..."
-                value={specialtySearch}
-                onChangeText={handleSpecialtySearch}
-                autoFocus={true}
-              />
-            </View>
-
-            {/* Lista de Especialidades */}
-            <FlatList
-              data={filteredSpecialties}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.specialtyItem,
-                    selectedSpecialty?.id === item.id && styles.specialtyItemSelected
-                  ]}
-                  onPress={() => selectSpecialty(item)}
-                >
-                  <Ionicons
-                    name={selectedSpecialty?.id === item.id ? 'checkmark-circle' : 'medical-outline'}
-                    size={24}
-                    color={selectedSpecialty?.id === item.id ? colors.primary : colors.gray400}
-                  />
-                  <Text style={[
-                    styles.specialtyItemText,
-                    selectedSpecialty?.id === item.id && styles.specialtyItemTextSelected
-                  ]}>
-                    {item.name}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                <View style={styles.emptyList}>
-                  <Text style={styles.emptyListText}>
-                    Nenhuma especialidade encontrada
-                  </Text>
-                </View>
-              }
-            />
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -670,95 +582,22 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 20,
   },
-  // Estilos para Especialidade
-  specialtyInput: {
+  // Estilos para Picker de Especialidade
+  pickerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
     borderRadius: 12,
-    padding: 16,
-    gap: 12,
     borderWidth: 1,
     borderColor: colors.gray200,
+    paddingLeft: 12,
   },
-  specialtyInputText: {
+  pickerIcon: {
+    marginRight: 8,
+  },
+  picker: {
     flex: 1,
-    fontSize: 16,
-    color: colors.gray400,
-  },
-  specialtyInputTextSelected: {
-    color: colors.text,
-  },
-  // Estilos para Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '80%',
-    paddingBottom: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modalSearchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.gray100,
-    borderRadius: 12,
-    padding: 12,
-    margin: 16,
-    gap: 8,
-  },
-  modalSearchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text,
-  },
-  specialtyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
-  },
-  specialtyItemSelected: {
-    backgroundColor: colors.primary + '10',
-  },
-  specialtyItemText: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text,
-  },
-  specialtyItemTextSelected: {
-    color: colors.primary,
-    fontWeight: '500',
-  },
-  emptyList: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyListText: {
-    fontSize: 16,
-    color: colors.gray400,
+    height: 50,
   },
 });
 
