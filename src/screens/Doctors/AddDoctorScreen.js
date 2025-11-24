@@ -193,7 +193,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
           </View>
 
           {/* Especialidade */}
-          <View style={[styles.inputContainer, { zIndex: 10 }]}>
+          <View style={styles.inputContainer}>
             <Text style={styles.label}>
               Especialidade Médica {specialties.length > 0 && `(${specialties.length} disponíveis)`}
             </Text>
@@ -207,10 +207,9 @@ const AddDoctorScreen = ({ route, navigation }) => {
                 }}
                 style={styles.picker}
                 enabled={specialties.length > 0}
-                mode="dropdown"
-                dropdownIconColor={colors.gray400}
+                itemStyle={styles.pickerItem}
               >
-                <Picker.Item label="Selecione a especialidade..." value={null} color={colors.gray400} />
+                <Picker.Item label="Selecione a especialidade..." value={null} />
                 {specialties.map((specialty) => (
                   <Picker.Item 
                     key={specialty.id} 
@@ -228,7 +227,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
           </View>
 
           {/* CRM */}
-          <View style={[styles.inputContainer, { zIndex: 1 }]}>
+          <View style={styles.inputContainer}>
             <Text style={styles.label}>CRM</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="card-outline" size={20} color={colors.gray400} />
@@ -447,7 +446,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   inputContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   label: {
     fontSize: 14,
@@ -491,10 +490,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray200,
     paddingLeft: 12,
-    paddingRight: 4,
-    paddingVertical: 2,
-    minHeight: 56,
-    marginBottom: 8,
+    paddingRight: 8,
+    height: 56,
   },
   pickerIcon: {
     marginRight: 8,
@@ -503,7 +500,12 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 56,
     color: colors.text,
-    marginRight: -12,
+    backgroundColor: colors.white,
+  },
+  pickerItem: {
+    fontSize: 16,
+    height: 56,
+    color: colors.text,
   },
   textAreaWrapper: {
     alignItems: 'flex-start',
