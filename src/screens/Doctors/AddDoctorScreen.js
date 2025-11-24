@@ -193,7 +193,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
           </View>
 
           {/* Especialidade */}
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, { zIndex: 10 }]}>
             <Text style={styles.label}>
               Especialidade Médica {specialties.length > 0 && `(${specialties.length} disponíveis)`}
             </Text>
@@ -208,6 +208,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
                 style={styles.picker}
                 enabled={specialties.length > 0}
                 mode="dropdown"
+                dropdownIconColor={colors.gray400}
               >
                 <Picker.Item label="Selecione a especialidade..." value={null} color={colors.gray400} />
                 {specialties.map((specialty) => (
@@ -227,7 +228,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
           </View>
 
           {/* CRM */}
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, { zIndex: 1 }]}>
             <Text style={styles.label}>CRM</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="card-outline" size={20} color={colors.gray400} />
@@ -446,7 +447,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   label: {
     fontSize: 14,
@@ -490,14 +491,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray200,
     paddingLeft: 12,
+    paddingRight: 4,
+    paddingVertical: 2,
+    minHeight: 56,
+    marginBottom: 8,
   },
   pickerIcon: {
     marginRight: 8,
   },
   picker: {
     flex: 1,
-    height: 50,
+    height: 56,
     color: colors.text,
+    marginRight: -12,
   },
   textAreaWrapper: {
     alignItems: 'flex-start',
