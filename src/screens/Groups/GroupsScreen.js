@@ -232,40 +232,6 @@ const GroupsScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Convites Pendentes */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Convites Pendentes</Text>
-          
-          {/* Convite exemplo (comentado - placeholder) */}
-          {/* <View style={styles.inviteCard}>
-            <View style={styles.inviteHeader}>
-              <View style={styles.groupIconContainer}>
-                <Ionicons name="mail" size={28} color={colors.secondary} />
-              </View>
-              <View style={styles.inviteContent}>
-                <Text style={styles.inviteName}>Grupo da Maria Silva</Text>
-                <Text style={styles.inviteFrom}>Convidado por João Silva</Text>
-              </View>
-            </View>
-            <View style={styles.inviteActions}>
-              <TouchableOpacity style={styles.rejectButton}>
-                <Text style={styles.rejectButtonText}>Recusar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.acceptButton}>
-                <Text style={styles.acceptButtonText}>Aceitar</Text>
-              </TouchableOpacity>
-            </View>
-          </View> */}
-          
-          <View style={styles.emptyCard}>
-            <Ionicons name="mail-outline" size={40} color={colors.gray300} />
-            <Text style={styles.emptyTitle}>Nenhum convite</Text>
-            <Text style={styles.emptyText}>
-              Você não tem convites pendentes no momento
-            </Text>
-          </View>
-        </View>
-
         {/* Botões de ação */}
         <View style={styles.section}>
           <TouchableOpacity 
