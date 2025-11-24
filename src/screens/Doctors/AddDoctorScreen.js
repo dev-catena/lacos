@@ -197,27 +197,28 @@ const AddDoctorScreen = ({ route, navigation }) => {
             <Text style={styles.label}>
               Especialidade Médica {specialties.length > 0 && `(${specialties.length} disponíveis)`}
             </Text>
-            <View style={styles.pickerContainer}>
+            <View style={styles.pickerWrapper}>
               <Ionicons name="medical-outline" size={20} color={colors.gray400} style={styles.pickerIcon} />
-              <Picker
-                selectedValue={formData.medicalSpecialtyId}
-                onValueChange={(itemValue) => {
-                  console.log('Especialidade selecionada:', itemValue);
-                  updateField('medicalSpecialtyId', itemValue);
-                }}
-                style={styles.picker}
-                enabled={specialties.length > 0}
-                itemStyle={styles.pickerItem}
-              >
-                <Picker.Item label="Selecione a especialidade..." value={null} />
-                {specialties.map((specialty) => (
-                  <Picker.Item 
-                    key={specialty.id} 
-                    label={specialty.name} 
-                    value={specialty.id} 
-                  />
-                ))}
-              </Picker>
+              <View style={styles.pickerInnerWrapper}>
+                <Picker
+                  selectedValue={formData.medicalSpecialtyId}
+                  onValueChange={(itemValue) => {
+                    console.log('Especialidade selecionada:', itemValue);
+                    updateField('medicalSpecialtyId', itemValue);
+                  }}
+                  style={styles.picker}
+                  enabled={true}
+                >
+                  <Picker.Item label="Selecione a especialidade..." value={null} />
+                  {specialties.map((specialty) => (
+                    <Picker.Item 
+                      key={specialty.id} 
+                      label={specialty.name} 
+                      value={specialty.id} 
+                    />
+                  ))}
+                </Picker>
+              </View>
             </View>
             {specialties.length === 0 && (
               <Text style={styles.hint}>
@@ -482,7 +483,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: 'italic',
   },
-  pickerContainer: {
+  pickerWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
@@ -490,22 +491,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray200,
     paddingLeft: 12,
-    paddingRight: 8,
     height: 56,
   },
   pickerIcon: {
     marginRight: 8,
   },
-  picker: {
+  pickerInnerWrapper: {
     flex: 1,
-    height: 56,
-    color: colors.text,
-    backgroundColor: colors.white,
   },
-  pickerItem: {
-    fontSize: 16,
+  picker: {
+    width: '100%',
     height: 56,
-    color: colors.text,
   },
   textAreaWrapper: {
     alignItems: 'flex-start',
