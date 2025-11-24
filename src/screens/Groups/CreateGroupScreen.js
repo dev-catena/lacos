@@ -107,54 +107,65 @@ const CreateGroupScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // Gerar código único
-      const mockCode = Math.random().toString(36).substring(2, 10).toUpperCase();
-      setGeneratedCode(mockCode);
-
-      // Criar objeto do grupo
-      const newGroup = {
-        id: Date.now().toString(), // ID único baseado em timestamp
+      console.log('📝 Criando grupo via API...');
+      
+      // Dados para enviar ao backend (formato esperado pelo groupService)
+      const groupPayload = {
         groupName: groupData.groupName,
-        description: groupData.description,
-        code: mockCode,
+        description: groupData.description || '',
         accompaniedName: `${accompaniedData.name}${accompaniedData.lastName ? ' ' + accompaniedData.lastName : ''}`,
-        accompaniedData: accompaniedData,
-        photo: groupPhoto, // URI da foto local
-        createdAt: new Date().toISOString(),
-        members: 1,
-        medications: 0,
-        appointments: 0,
+        accompaniedAge: accompaniedData.age || null,
+        accompaniedGender: accompaniedData.gender || null,
+        accessCode: null, // Será gerado pelo backend
+        healthInfo: accompaniedData.observations ? { observations: accompaniedData.observations } : null,
       };
 
-      // Carregar grupos existentes
-      const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
-      const existingGroups = groupsJson ? JSON.parse(groupsJson) : [];
+      console.log('📤 Payload:', groupPayload);
 
-      // Adicionar novo grupo
-      const updatedGroups = [...existingGroups, newGroup];
+      // Criar grupo via API
+      const result = await groupService.createGroup(groupPayload);
 
-      // Salvar no AsyncStorage
-      await AsyncStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(updatedGroups));
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao criar grupo');
+      }
 
-      console.log('Grupo criado:', newGroup);
-      console.log('Código gerado:', mockCode);
-      console.log('Todos os grupos salvos:', updatedGroups);
+      const createdGroup = result.data;
+      console.log('✅ Grupo criado com sucesso:', createdGroup);
+
+      // Se tem foto, fazer upload
+      if (groupPhoto) {
+        console.log('📤 Fazendo upload da foto...');
+        const uploadResult = await groupService.uploadGroupPhoto(createdGroup.id, groupPhoto);
+        if (uploadResult.success) {
+          console.log('✅ Foto enviada com sucesso');
+        }
+      }
+
+      // Gerar código de convite (mock por enquanto, ou usar o do backend)
+      const inviteCode = createdGroup.invite_code || Math.random().toString(36).substring(2, 10).toUpperCase();
+      setGeneratedCode(inviteCode);
 
       Alert.alert(
         'Sucesso! 🎉',
         `Grupo "${groupData.groupName}" criado com sucesso!\n\n` +
         `Acompanhado: ${accompaniedData.name}\n` +
-        `Código de pareamento: ${mockCode}\n\n` +
-        `Use este código para o paciente acessar o aplicativo.\n` +
-        `Vá em Configurações do grupo para ver o código novamente.`,
+        `Código de convite: ${inviteCode}\n\n` +
+        `Use este código para convidar membros.\n` +
+        `Você pode ver o código novamente nas Configurações do grupo.`,
         [
           {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
+            text: 'Ir para Meus Grupos',
+            onPress: () => {
+              console.log('✅ Navegando para Home após criar grupo');
+              // Voltar para o topo do stack (HomeMain)
+              // HomeScreen vai recarregar os grupos automaticamente (useFocusEffect)
+              navigation.popToTop();
+            },
           },
         ]
       );
     } catch (error) {
+      console.error('❌ Erro ao criar grupo:', error);
       Alert.alert('Erro', error.message || 'Erro ao criar grupo');
     } finally {
       setLoading(false);

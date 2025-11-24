@@ -89,6 +89,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const loadGroups = async () => {
+    console.log('🔄 HomeScreen - Carregando grupos...');
     setLoading(true);
     try {
       // Buscar grupos da API
@@ -96,9 +97,11 @@ const HomeScreen = ({ navigation }) => {
       
       if (result.success && result.data) {
         const groups = result.data;
+        console.log(`✅ HomeScreen - ${groups.length} grupo(s) encontrado(s)`);
         
         // Se não tem grupos, navegar para NoGroupsScreen
         if (groups.length === 0) {
+          console.log('ℹ️ HomeScreen - Nenhum grupo, navegando para NoGroupsScreen');
           setLoading(false);
           navigation.replace('NoGroups');
           return;
@@ -109,14 +112,17 @@ const HomeScreen = ({ navigation }) => {
         const myCreatedGroups = groups.filter(g => g.is_admin || g.isAdmin);
         const joinedGroups = groups.filter(g => !g.is_admin && !g.isAdmin);
         
+        console.log(`✅ HomeScreen - Meus Grupos: ${myCreatedGroups.length}, Participo: ${joinedGroups.length}`);
+        
         setMyGroups(myCreatedGroups);
         setParticipatingGroups(joinedGroups);
       } else {
+        console.warn('⚠️ HomeScreen - Erro ao buscar grupos, navegando para NoGroupsScreen');
         // Se erro ao buscar grupos, mostrar NoGroupsScreen
         navigation.replace('NoGroups');
       }
     } catch (error) {
-      console.error('Erro ao carregar grupos:', error);
+      console.error('❌ HomeScreen - Erro ao carregar grupos:', error);
       // Em caso de erro, mostrar NoGroupsScreen
       navigation.replace('NoGroups');
     } finally {
