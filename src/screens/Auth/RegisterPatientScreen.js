@@ -52,11 +52,31 @@ const RegisterPatientScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
+      // Converter gênero de português para inglês (quando API for implementada)
+      const genderMap = {
+        'masculino': 'male',
+        'feminino': 'female',
+        'outro': 'other'
+      };
+      const genderInEnglish = genderMap[formData.gender] || null;
+      
       // TODO: Chamar API real
+      // const registerData = {
+      //   name: formData.name,
+      //   birth_date: formData.birthDate,
+      //   gender: genderInEnglish, // ← Usar gênero convertido
+      //   phone: formData.phone,
+      //   email: formData.email,
+      //   password: formData.password,
+      //   pairing_code: formData.pairingCode,
+      // };
+      // await apiService.post('/register-patient', registerData);
+      
       Alert.alert(
         'Em Desenvolvimento',
         'Integração com API em desenvolvimento.\n\nDados enviados:\n' +
         `Nome: ${formData.name}\n` +
+        `Gênero: ${formData.gender} → ${genderInEnglish}\n` +
         `Código: ${formData.pairingCode}`,
         [
           {
