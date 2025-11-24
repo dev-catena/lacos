@@ -3,15 +3,16 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  Image,
   SafeAreaView,
+  TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import { LacosLogoFull } from '../../components/LacosLogo';
-import { CaregiverIcon, ElderlyIcon } from '../../components/CustomIcons';
+
+const { width } = Dimensions.get('window');
 
 const WelcomeScreen = ({ navigation }) => {
   return (
@@ -19,62 +20,53 @@ const WelcomeScreen = ({ navigation }) => {
       <StatusBar style="light" />
       
       <View style={styles.content}>
-        {/* Logo e Título */}
+        {/* Header */}
         <View style={styles.header}>
-          <LacosLogoFull width={200} height={62} />
+          <View style={styles.logoContainer}>
+            <LacosLogoFull width={220} height={68} />
+          </View>
           <Text style={styles.subtitle}>
-            Cuidando de quem amamos, juntos
+            Cuidado e conexão para quem você ama
+          </Text>
+          <Text style={styles.description}>
+            Gerencie medicamentos, consultas e cuidados de saúde de forma simples e organizada
           </Text>
         </View>
 
-        {/* Botões de ação */}
+        {/* Ilustração */}
+        <View style={styles.illustrationContainer}>
+          <View style={styles.iconCircle}>
+            <Ionicons name="heart-circle" size={120} color={colors.textWhite} />
+          </View>
+        </View>
+
+        {/* Buttons */}
         <View style={styles.buttonsContainer}>
-          
-          {/* Botão Cuidador */}
           <TouchableOpacity
-            style={styles.roleButton}
+            style={[styles.button, styles.primaryButton]}
             onPress={() => navigation.navigate('Register')}
+            activeOpacity={0.8}
           >
-            <View style={styles.roleButtonContent}>
-              <View style={styles.roleIconContainer}>
-                <CaregiverIcon size={32} color={colors.primary} />
-              </View>
-              <View style={styles.roleTextContainer}>
-                <Text style={styles.roleButtonTitle}>Entrar como Cuidador</Text>
-                <Text style={styles.roleButtonSubtitle}>
-                  Criar conta e gerenciar grupos de cuidados
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color={colors.primary} />
-            </View>
+            <Text style={styles.primaryButtonText}>Criar Conta</Text>
+            <Ionicons name="arrow-forward" size={20} color={colors.primary} />
           </TouchableOpacity>
 
-          {/* Botão Paciente */}
           <TouchableOpacity
-            style={styles.roleButton}
-            onPress={() => navigation.navigate('RegisterPatient')}
-          >
-            <View style={styles.roleButtonContent}>
-              <View style={styles.roleIconContainer}>
-                <ElderlyIcon size={32} color={colors.secondary} />
-              </View>
-              <View style={styles.roleTextContainer}>
-                <Text style={styles.roleButtonTitle}>Entrar como Paciente</Text>
-                <Text style={styles.roleButtonSubtitle}>
-                  Usar código do cuidador para conectar ao grupo
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color={colors.secondary} />
-            </View>
-          </TouchableOpacity>
-
-          {/* Link para Login */}
-          <TouchableOpacity
-            style={styles.loginButton}
+            style={[styles.button, styles.secondaryButton]}
             onPress={() => navigation.navigate('Login')}
+            activeOpacity={0.8}
           >
-            <Text style={styles.loginButtonText}>Já tenho conta - Entrar</Text>
+            <Text style={styles.secondaryButtonText}>Já tenho conta</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            • Gerenciar grupos de cuidados{'\n'}
+            • Acompanhar medicamentos e consultas{'\n'}
+            • Compartilhar informações com familiares
+          </Text>
         </View>
       </View>
     </SafeAreaView>
@@ -89,77 +81,86 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    justifyContent: 'flex-start',
-    paddingBottom: 40,
+    justifyContent: 'space-between',
   },
   header: {
     alignItems: 'center',
-    marginTop: 60,
-    marginBottom: 60,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.primaryLight,
-    textAlign: 'center',
-    marginTop: 12,
-  },
-  buttonsContainer: {
-    gap: 16,
     marginTop: 40,
   },
-  roleButton: {
-    backgroundColor: colors.backgroundLight,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  logoContainer: {
+    marginBottom: 16,
   },
-  roleButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 24,
-    gap: 16,
+  subtitle: {
+    fontSize: 18,
+    color: colors.textWhite,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 8,
   },
-  roleIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primaryLight + '30',
+  description: {
+    fontSize: 14,
+    color: colors.textWhite,
+    textAlign: 'center',
+    opacity: 0.85,
+    lineHeight: 20,
+    paddingHorizontal: 20,
+  },
+  illustrationContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    marginVertical: 20,
   },
-  roleTextContainer: {
-    flex: 1,
+  iconCircle: {
+    opacity: 0.3,
   },
-  roleButtonTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 4,
+  buttonsContainer: {
+    gap: 12,
+    marginBottom: 16,
   },
-  roleButtonSubtitle: {
-    fontSize: 13,
-    color: colors.textLight,
-    lineHeight: 18,
-  },
-  loginButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 18,
-    borderRadius: 12,
+  button: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.backgroundLight,
-    marginTop: 16,
+    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    gap: 8,
   },
-  loginButtonText: {
-    color: colors.backgroundLight,
+  primaryButton: {
+    backgroundColor: colors.textWhite,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  primaryButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: colors.textWhite,
+  },
+  secondaryButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: colors.textWhite,
+  },
+  footer: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 12,
+    color: colors.textWhite,
+    opacity: 0.8,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
 
 export default WelcomeScreen;
-

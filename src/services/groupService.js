@@ -139,6 +139,13 @@ class GroupService {
   }
 
   /**
+   * Entrar em grupo usando código (alias para joinGroup)
+   */
+  async joinWithCode(code) {
+    return this.joinGroup(code);
+  }
+
+  /**
    * Upload de foto do grupo
    */
   async uploadGroupPhoto(groupId, imageUri) {
