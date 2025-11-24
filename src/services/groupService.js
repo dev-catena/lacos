@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import apiService from './apiService';
 
 /**
@@ -158,11 +159,16 @@ class GroupService {
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
       
-      formData.append('photo', {
-        uri: imageUri,
-        name: filename,
-        type,
-      });
+      // React Native precisa de um objeto com propriedades específicas
+      const file = {
+        uri: Platform.OS === 'android' ? imageUri : imageUri.replace('file://', ''),
+        name: filename || `photo_${Date.now()}.jpg`,
+        type: type,
+      };
+      
+      formData.append('photo', file);
+
+      console.log('📤 Enviando foto:', { groupId, filename, type });
 
       const response = await apiService.post(`/groups/${groupId}/photo`, formData, {
         headers: {
