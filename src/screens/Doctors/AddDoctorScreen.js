@@ -243,6 +243,8 @@ const AddDoctorScreen = ({ route, navigation }) => {
                 <FlatList
                   data={specialties}
                   keyExtractor={(item) => item.id.toString()}
+                  style={styles.flatList}
+                  contentContainerStyle={styles.flatListContent}
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       style={[
@@ -552,10 +554,18 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -565,6 +575,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
+    backgroundColor: '#FFFFFF',
   },
   modalTitle: {
     fontSize: 18,
@@ -574,15 +585,22 @@ const styles = StyleSheet.create({
   modalCloseButton: {
     padding: 4,
   },
+  flatList: {
+    backgroundColor: '#FFFFFF',
+  },
+  flatListContent: {
+    backgroundColor: '#FFFFFF',
+  },
   specialtyItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
   },
   specialtyItemSelected: {
-    backgroundColor: colors.primary + '10',
+    backgroundColor: '#E3F2FD',
   },
   specialtyItemText: {
     fontSize: 16,
@@ -594,7 +612,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: colors.gray200,
+    backgroundColor: '#E0E0E0',
   },
   textAreaWrapper: {
     alignItems: 'flex-start',
