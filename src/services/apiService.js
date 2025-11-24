@@ -54,7 +54,15 @@ class ApiService {
 
       // Adicionar body se necessário
       if (body && method !== 'GET') {
-        config.body = JSON.stringify(body);
+        // Se for FormData, enviar diretamente (não fazer stringify)
+        if (body instanceof FormData) {
+          config.body = body;
+          // Remover Content-Type para deixar o browser/RN definir com boundary
+          delete config.headers['Content-Type'];
+        } else {
+          // Para JSON normal, fazer stringify
+          config.body = JSON.stringify(body);
+        }
       }
 
       // Fazer requisição com timeout
