@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -186,9 +187,13 @@ const HomeScreen = ({ navigation }) => {
                   })}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.groupIcon}>
-                    <Ionicons name="people" size={32} color={colors.primary} />
-                  </View>
+                  {group.photo ? (
+                    <Image source={{ uri: group.photo }} style={styles.groupPhoto} />
+                  ) : (
+                    <View style={styles.groupIcon}>
+                      <Ionicons name="people" size={32} color={colors.primary} />
+                    </View>
+                  )}
                   <View style={styles.groupInfo}>
                     <Text style={styles.groupName}>{group.groupName}</Text>
                     <Text style={styles.groupDescription}>
@@ -229,9 +234,13 @@ const HomeScreen = ({ navigation }) => {
                   })}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.groupIcon}>
-                    <Ionicons name="people" size={32} color={colors.secondary} />
-                  </View>
+                  {group.photo ? (
+                    <Image source={{ uri: group.photo }} style={styles.groupPhoto} />
+                  ) : (
+                    <View style={styles.groupIcon}>
+                      <Ionicons name="people" size={32} color={colors.secondary} />
+                    </View>
+                  )}
                   <View style={styles.groupInfo}>
                     <Text style={styles.groupName}>{group.groupName}</Text>
                     <Text style={styles.groupDescription}>
@@ -452,6 +461,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary + '20',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
+  },
+  groupPhoto: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     marginRight: 12,
   },
   groupInfo: {

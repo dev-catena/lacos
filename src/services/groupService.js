@@ -137,6 +137,41 @@ class GroupService {
       };
     }
   }
+
+  /**
+   * Upload de foto do grupo
+   */
+  async uploadGroupPhoto(groupId, imageUri) {
+    try {
+      // Criar FormData
+      const formData = new FormData();
+      
+      // Extrair nome e tipo do arquivo
+      const filename = imageUri.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      formData.append('photo', {
+        uri: imageUri,
+        name: filename,
+        type,
+      });
+
+      const response = await apiService.post(`/groups/${groupId}/photo`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Erro ao fazer upload da foto:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Erro ao fazer upload da foto' 
+      };
+    }
+  }
 }
 
 export default new GroupService();

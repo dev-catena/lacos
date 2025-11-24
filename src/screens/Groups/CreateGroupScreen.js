@@ -10,12 +10,16 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { ElderlyIcon, InviteCodeIcon } from '../../components/CustomIcons';
+import groupService from '../../services/groupService';
 
 const GROUPS_STORAGE_KEY = '@lacos_groups';
 
@@ -42,6 +46,7 @@ const CreateGroupScreen = ({ navigation }) => {
   });
 
   const [generatedCode, setGeneratedCode] = useState('');
+  const [groupPhoto, setGroupPhoto] = useState(null);
 
   const handleNext = () => {
     // Validações do Step 1
@@ -59,6 +64,37 @@ const CreateGroupScreen = ({ navigation }) => {
       setStep(1);
     } else {
       navigation.goBack();
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permissão Necessária',
+          'Precisamos de permissão para acessar suas fotos.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setGroupPhoto(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar imagem:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro ao selecionar foto',
+      });
     }
   };
 
@@ -83,6 +119,7 @@ const CreateGroupScreen = ({ navigation }) => {
         code: mockCode,
         accompaniedName: `${accompaniedData.name}${accompaniedData.lastName ? ' ' + accompaniedData.lastName : ''}`,
         accompaniedData: accompaniedData,
+        photo: groupPhoto, // URI da foto local
         createdAt: new Date().toISOString(),
         members: 1,
         medications: 0,
@@ -355,6 +392,36 @@ const CreateGroupScreen = ({ navigation }) => {
                     onChangeText={(value) => updateGroupField('groupName', value)}
                   />
                 </View>
+              </View>
+
+              {/* Foto do Grupo */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Foto do Grupo (opcional)</Text>
+                <TouchableOpacity
+                  style={styles.photoSelector}
+                  onPress={pickImage}
+                  activeOpacity={0.7}
+                >
+                  {groupPhoto ? (
+                    <Image source={{ uri: groupPhoto }} style={styles.groupPhoto} />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <Ionicons name="image-outline" size={48} color={colors.gray300} />
+                      <Text style={styles.photoPlaceholderText}>
+                        Toque para adicionar foto
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                {groupPhoto && (
+                  <TouchableOpacity
+                    style={styles.changePhotoButton}
+                    onPress={pickImage}
+                  >
+                    <Ionicons name="camera-outline" size={16} color={colors.primary} />
+                    <Text style={styles.changePhotoText}>Alterar foto</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Descrição */}
@@ -712,6 +779,45 @@ const styles = StyleSheet.create({
     color: colors.textWhite,
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // Estilos de Foto do Grupo
+  photoSelector: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: colors.gray200,
+    borderStyle: 'dashed',
+  },
+  groupPhoto: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  photoPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.gray100,
+  },
+  photoPlaceholderText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: colors.gray400,
+  },
+  changePhotoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  changePhotoText: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '500',
   },
 });
 
