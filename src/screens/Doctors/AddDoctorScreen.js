@@ -50,11 +50,18 @@ const AddDoctorScreen = ({ route, navigation }) => {
   const loadSpecialties = async () => {
     try {
       const response = await medicalSpecialtyService.getSpecialties();
+      console.log('Resposta de especialidades:', response);
       if (response.success && response.data) {
+        console.log('Especialidades carregadas:', response.data.length);
         setSpecialties(response.data);
       }
     } catch (error) {
       console.error('Erro ao carregar especialidades:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro ao carregar especialidades',
+        text2: 'Verifique sua conexão',
+      });
     }
   };
 
@@ -192,19 +199,32 @@ const AddDoctorScreen = ({ route, navigation }) => {
               <Ionicons name="medical-outline" size={20} color={colors.gray400} style={styles.pickerIcon} />
               <Picker
                 selectedValue={formData.medicalSpecialtyId}
-                onValueChange={(itemValue) => updateField('medicalSpecialtyId', itemValue)}
+                onValueChange={(itemValue) => {
+                  console.log('Especialidade selecionada:', itemValue);
+                  updateField('medicalSpecialtyId', itemValue);
+                }}
                 style={styles.picker}
+                enabled={true}
               >
                 <Picker.Item label="Selecione a especialidade..." value={null} />
-                {specialties.map((specialty) => (
-                  <Picker.Item 
-                    key={specialty.id} 
-                    label={specialty.name} 
-                    value={specialty.id} 
-                  />
-                ))}
+                {specialties.length > 0 ? (
+                  specialties.map((specialty) => (
+                    <Picker.Item 
+                      key={specialty.id} 
+                      label={specialty.name} 
+                      value={specialty.id} 
+                    />
+                  ))
+                ) : (
+                  <Picker.Item label="Carregando..." value={null} />
+                )}
               </Picker>
             </View>
+            {specialties.length === 0 && (
+              <Text style={styles.hint}>
+                Carregando especialidades...
+              </Text>
+            )}
           </View>
 
           {/* CRM */}

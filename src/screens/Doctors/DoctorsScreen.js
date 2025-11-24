@@ -200,7 +200,7 @@ const DoctorsScreen = ({ route, navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
       {/* Header */}
