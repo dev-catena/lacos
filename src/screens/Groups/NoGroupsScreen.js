@@ -8,6 +8,9 @@ import {
   TextInput,
   Alert,
   Modal,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -82,64 +85,74 @@ const NoGroupsScreen = ({ navigation, onGroupJoined }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       
-      <View style={styles.content}>
-        {/* Ilustração */}
-        <View style={styles.illustrationContainer}>
-          <View style={styles.iconCircle}>
-            <Ionicons name="people-outline" size={80} color={colors.primary} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Ilustração */}
+          <View style={styles.illustrationContainer}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="people-outline" size={80} color={colors.primary} />
+            </View>
+            <Text style={styles.title}>Bem-vindo ao Laços!</Text>
+            <Text style={styles.description}>
+              Você ainda não faz parte de nenhum grupo de cuidados.{'\n'}
+              Crie seu primeiro grupo ou entre em um usando um código de convite.
+            </Text>
           </View>
-          <Text style={styles.title}>Bem-vindo ao Laços!</Text>
-          <Text style={styles.description}>
-            Você ainda não faz parte de nenhum grupo de cuidados.{'\n'}
-            Crie seu primeiro grupo ou entre em um usando um código de convite.
-          </Text>
-        </View>
 
-        {/* Botões de Ação */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionCard, styles.createCard]}
-            onPress={handleCreateGroup}
-            activeOpacity={0.7}
-          >
-            <View style={styles.actionIconContainer}>
-              <Ionicons name="add-circle" size={40} color={colors.primary} />
+          {/* Botões de Ação */}
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity
+              style={[styles.actionCard, styles.createCard]}
+              onPress={handleCreateGroup}
+              activeOpacity={0.7}
+            >
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="add-circle" size={40} color={colors.primary} />
+              </View>
+              <Text style={styles.actionTitle}>Criar Novo Grupo</Text>
+              <Text style={styles.actionDescription}>
+                Crie um grupo para gerenciar os cuidados de um familiar ou amigo
+              </Text>
+              <View style={styles.actionArrow}>
+                <Ionicons name="arrow-forward" size={20} color={colors.primary} />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionCard, styles.joinCard]}
+              onPress={() => setInviteModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="qr-code" size={40} color={colors.success} />
+              </View>
+              <Text style={styles.actionTitle}>Entrar com Código</Text>
+              <Text style={styles.actionDescription}>
+                Use um código de convite para entrar em um grupo existente
+              </Text>
+              <View style={styles.actionArrow}>
+                <Ionicons name="arrow-forward" size={20} color={colors.success} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Info Box */}
+          <View style={styles.infoBox}>
+            <View style={styles.infoIcon}>
+              <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
             </View>
-            <Text style={styles.actionTitle}>Criar Novo Grupo</Text>
-            <Text style={styles.actionDescription}>
-              Crie um grupo para gerenciar os cuidados de um familiar ou amigo
+            <Text style={styles.infoText}>
+              Você pode fazer parte de vários grupos ao mesmo tempo e ter diferentes papéis em cada um.
             </Text>
-            <View style={styles.actionArrow}>
-              <Ionicons name="arrow-forward" size={20} color={colors.primary} />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionCard, styles.joinCard]}
-            onPress={() => setInviteModalVisible(true)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.actionIconContainer}>
-              <Ionicons name="qr-code" size={40} color={colors.success} />
-            </View>
-            <Text style={styles.actionTitle}>Entrar com Código</Text>
-            <Text style={styles.actionDescription}>
-              Use um código de convite para entrar em um grupo existente
-            </Text>
-            <View style={styles.actionArrow}>
-              <Ionicons name="arrow-forward" size={20} color={colors.success} />
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
-          <Text style={styles.infoText}>
-            Você pode fazer parte de vários grupos ao mesmo tempo e ter diferentes papéis em cada um.
-          </Text>
-        </View>
-      </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Modal de Código de Convite */}
       <Modal
@@ -200,15 +213,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  content: {
+  keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 40,
-    justifyContent: 'space-between',
+    paddingBottom: 40,
   },
   illustrationContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   iconCircle: {
     width: 140,
@@ -234,7 +250,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   actionsContainer: {
-    flex: 1,
     gap: 16,
     marginBottom: 24,
   },
@@ -276,12 +291,15 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: colors.primary + '10',
     borderRadius: 12,
     padding: 16,
     gap: 12,
-    marginBottom: 24,
+    marginTop: 8,
+  },
+  infoIcon: {
+    marginTop: 2,
   },
   infoText: {
     flex: 1,
