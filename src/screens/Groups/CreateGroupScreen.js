@@ -109,13 +109,23 @@ const CreateGroupScreen = ({ navigation }) => {
     try {
       console.log('📝 Criando grupo via API...');
       
+      // Converter gênero de português para inglês
+      const genderMap = {
+        'masculino': 'male',
+        'feminino': 'female',
+        'outro': 'other'
+      };
+      
+      const genderInEnglish = genderMap[accompaniedData.gender] || null;
+      console.log('🔄 Convertendo gênero:', accompaniedData.gender, '→', genderInEnglish);
+      
       // Dados para enviar ao backend (formato esperado pelo groupService)
       const groupPayload = {
         groupName: groupData.groupName,
         description: groupData.description || '',
         accompaniedName: `${accompaniedData.name}${accompaniedData.lastName ? ' ' + accompaniedData.lastName : ''}`,
         accompaniedAge: accompaniedData.age || null,
-        accompaniedGender: accompaniedData.gender || null,
+        accompaniedGender: genderInEnglish,
         accessCode: null, // Será gerado pelo backend
         healthInfo: accompaniedData.observations ? { observations: accompaniedData.observations } : null,
       };
