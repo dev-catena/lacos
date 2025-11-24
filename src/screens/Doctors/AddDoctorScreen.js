@@ -138,7 +138,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
       {/* Header */}
@@ -471,6 +471,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray200,
     paddingLeft: 12,
+    overflow: 'hidden',
   },
   pickerIcon: {
     marginRight: 8,
