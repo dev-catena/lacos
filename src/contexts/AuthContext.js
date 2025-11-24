@@ -22,27 +22,37 @@ export const AuthProvider = ({ children }) => {
       const storedUser = await AsyncStorage.getItem('@lacos:user');
       const storedToken = await AsyncStorage.getItem('@lacos:token');
 
+      console.log('🔑 AuthContext - storedUser:', storedUser ? 'EXISTE' : 'NULL');
+      console.log('🔑 AuthContext - storedToken:', storedToken ? 'EXISTE' : 'NULL');
+
       if (storedUser && storedToken) {
-        console.log('🔑 AuthContext - Token encontrado, validando...');
-        setUser(JSON.parse(storedUser));
-        // Validar token com o servidor (opcional)
+        console.log('🔑 AuthContext - Token encontrado, validando com servidor...');
+        const parsedUser = JSON.parse(storedUser);
+        console.log('🔑 AuthContext - User do storage:', parsedUser.name);
+        
+        // Validar token com o servidor
         try {
           const response = await apiService.get('/user');
-          console.log('🔑 AuthContext - Token válido, usuário:', response.name);
+          console.log('✅ AuthContext - Token VÁLIDO, usuário:', response.name);
           setUser(response);
         } catch (error) {
           // Token inválido, limpar dados
-          console.warn('🔑 AuthContext - Token inválido, fazendo logout...');
-          await signOut();
+          console.error('❌ AuthContext - Token INVÁLIDO, limpando dados...');
+          await AsyncStorage.removeItem('@lacos:user');
+          await AsyncStorage.removeItem('@lacos:token');
+          await AsyncStorage.removeItem('@lacos_patient_session');
+          setUser(null);
         }
       } else {
-        console.log('🔑 AuthContext - Nenhum token armazenado');
+        console.log('✅ AuthContext - Nenhum token armazenado (primeira vez ou logout)');
+        setUser(null);
       }
     } catch (error) {
-      console.error('🔑 AuthContext - Erro ao carregar dados do storage:', error);
+      console.error('❌ AuthContext - Erro ao carregar dados do storage:', error);
+      setUser(null);
     } finally {
       setLoading(false);
-      console.log('🔑 AuthContext - Loading finalizado');
+      console.log('🔑 AuthContext - Loading finalizado, signed:', !!user);
     }
   };
 
@@ -124,26 +134,53 @@ export const AuthProvider = ({ children }) => {
   // Função de logout
   const signOut = async () => {
     try {
+      console.log('🔑 AuthContext - Iniciando logout...');
       setLoading(true);
       
       // Chamar API de logout (se houver token)
       try {
         await apiService.post('/logout');
+        console.log('🔑 AuthContext - Logout na API bem-sucedido');
       } catch (error) {
-        console.warn('Erro ao fazer logout na API:', error);
+        console.warn('⚠️ AuthContext - Erro ao fazer logout na API:', error);
         // Continua o logout local mesmo se falhar na API
       }
 
       // Remove TODOS os dados do AsyncStorage relacionados à sessão
       await AsyncStorage.removeItem('@lacos:user');
       await AsyncStorage.removeItem('@lacos:token');
-      await AsyncStorage.removeItem('@lacos_patient_session'); // Remove sessão do paciente também
+      await AsyncStorage.removeItem('@lacos_patient_session');
+      await AsyncStorage.removeItem('@lacos:current_profile');
+      console.log('🔑 AuthContext - AsyncStorage limpo');
 
       setUser(null);
+      console.log('🔑 AuthContext - User removido, signed agora é false');
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
+      console.error('❌ AuthContext - Erro ao fazer logout:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Função para forçar limpeza completa (debug)
+  const forceLogout = async () => {
+    try {
+      console.log('🧹 AuthContext - FORÇANDO limpeza completa...');
+      
+      // Limpar TUDO do AsyncStorage
+      const keys = await AsyncStorage.getAllKeys();
+      console.log('🧹 Chaves encontradas:', keys);
+      await AsyncStorage.multiRemove(keys);
+      console.log('🧹 AsyncStorage COMPLETAMENTE limpo');
+      
+      setUser(null);
+      setLoading(false);
+      console.log('🧹 Estado resetado para inicial');
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Erro ao forçar limpeza:', error);
+      return { success: false, error: error.message };
     }
   };
 
@@ -173,6 +210,7 @@ export const AuthProvider = ({ children }) => {
         signUp,
         signOut,
         updateUser,
+        forceLogout,
       }}
     >
       {children}

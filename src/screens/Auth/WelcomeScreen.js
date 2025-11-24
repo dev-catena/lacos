@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,51 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import { LacosLogoFull } from '../../components/LacosLogo';
+import { useAuth } from '../../contexts/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
 const WelcomeScreen = ({ navigation }) => {
+  const { forceLogout } = useAuth();
+  const [debugTaps, setDebugTaps] = useState(0);
+
+  const handleDebugTap = () => {
+    const newTaps = debugTaps + 1;
+    setDebugTaps(newTaps);
+    
+    // 5 toques rápidos ativa o botão de limpeza
+    if (newTaps >= 5) {
+      Alert.alert(
+        '🧹 Limpar Dados',
+        'Deseja limpar TODOS os dados do AsyncStorage?\n\nIsso vai forçar logout e remover todas as sessões salvas.',
+        [
+          { text: 'Cancelar', style: 'cancel', onPress: () => setDebugTaps(0) },
+          {
+            text: 'Limpar Tudo',
+            style: 'destructive',
+            onPress: async () => {
+              const result = await forceLogout();
+              if (result.success) {
+                Alert.alert('✅ Sucesso', 'Dados limpos! Reinicie o app.');
+              } else {
+                Alert.alert('❌ Erro', result.error || 'Não foi possível limpar');
+              }
+              setDebugTaps(0);
+            },
+          },
+        ]
+      );
+    }
+    
+    // Reset após 3 segundos
+    setTimeout(() => setDebugTaps(0), 3000);
+  };
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
@@ -34,9 +70,13 @@ const WelcomeScreen = ({ navigation }) => {
           <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoContainer}>
+          <TouchableOpacity 
+            style={styles.logoContainer}
+            onPress={handleDebugTap}
+            activeOpacity={0.9}
+          >
             <LacosLogoFull width={220} height={68} />
-          </View>
+          </TouchableOpacity>
           <Text style={styles.subtitle}>
             Cuidado e conexão para quem você ama
           </Text>
@@ -79,6 +119,11 @@ const WelcomeScreen = ({ navigation }) => {
             • Acompanhar medicamentos e consultas{'\n'}
             • Compartilhar informações com familiares
           </Text>
+          {debugTaps > 0 && (
+            <Text style={styles.debugText}>
+              🧹 Debug: {debugTaps}/5 toques (toque no logo 5x para limpar dados)
+            </Text>
+          )}
         </View>
       </View>
         </ScrollView>
@@ -182,6 +227,13 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  debugText: {
+    fontSize: 10,
+    color: '#FFD700',
+    marginTop: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
 
