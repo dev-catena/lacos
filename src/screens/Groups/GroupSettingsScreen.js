@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
+import groupService from '../../services/groupService';
 import {
   VitalSignsIcon,
   PermissionsIcon,
@@ -65,16 +66,19 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   const loadGroupData = async () => {
     setLoading(true);
     try {
-      const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
-      if (groupsJson) {
-        const groups = JSON.parse(groupsJson);
-        const group = groups.find(g => g.id === groupId);
-        if (group) {
-          setGroupData(group);
-        }
+      console.log('🔄 GroupSettings - Carregando grupo da API:', groupId);
+      const result = await groupService.getGroup(groupId);
+      
+      if (result.success && result.data) {
+        console.log('✅ GroupSettings - Grupo carregado:', result.data);
+        setGroupData(result.data);
+      } else {
+        console.error('❌ GroupSettings - Erro ao carregar grupo:', result.error);
+        Alert.alert('Erro', 'Não foi possível carregar os dados do grupo');
       }
     } catch (error) {
-      console.error('Erro ao carregar dados do grupo:', error);
+      console.error('❌ GroupSettings - Erro ao carregar dados do grupo:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os dados do grupo');
     } finally {
       setLoading(false);
     }
