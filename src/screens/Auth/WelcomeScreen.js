@@ -6,20 +6,32 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Dimensions,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import { LacosLogoFull } from '../../components/LacosLogo';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const WelcomeScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       
-      <View style={styles.content}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
@@ -69,6 +81,8 @@ const WelcomeScreen = ({ navigation }) => {
           </Text>
         </View>
       </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -78,10 +92,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.primary,
   },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    minHeight: height,
+  },
   content: {
     flex: 1,
     paddingHorizontal: 24,
     justifyContent: 'space-between',
+    paddingBottom: 20,
   },
   header: {
     alignItems: 'center',
