@@ -28,15 +28,44 @@ const NoGroupsScreen = ({ navigation, onGroupJoined }) => {
   // Verificar autenticação
   useEffect(() => {
     if (!signed || !user) {
-      console.warn('⚠️ NoGroupsScreen - Usuário não autenticado, não deveria estar aqui!');
+      console.error('❌ NoGroupsScreen - ACESSO NEGADO: Usuário não autenticado!');
+      console.error('❌ Este é um BUG DE SEGURANÇA - bloqueando acesso');
+      // Redirecionar imediatamente para login
+      Alert.alert(
+        'Acesso Negado',
+        'Você precisa estar logado para acessar esta tela.',
+        [{ text: 'OK' }]
+      );
+      return;
     }
   }, [signed, user]);
 
   const handleCreateGroup = () => {
+    // GUARD: Verificar autenticação antes de qualquer ação
+    if (!signed || !user) {
+      console.error('❌ Tentativa de criar grupo sem autenticação bloqueada');
+      Alert.alert(
+        'Acesso Negado',
+        'Você precisa estar logado para criar um grupo.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     navigation.navigate('CreateGroup');
   };
 
   const handleJoinWithCode = async () => {
+    // GUARD: Verificar autenticação
+    if (!signed || !user) {
+      console.error('❌ Tentativa de entrar em grupo sem autenticação bloqueada');
+      Alert.alert(
+        'Acesso Negado',
+        'Você precisa estar logado para entrar em um grupo.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     if (!inviteCode.trim()) {
       Toast.show({
         type: 'error',
@@ -80,6 +109,25 @@ const NoGroupsScreen = ({ navigation, onGroupJoined }) => {
     }
     setLoading(false);
   };
+
+  // GUARD: Se não estiver autenticado, mostrar mensagem de erro
+  if (!signed || !user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" />
+        <View style={styles.errorContainer}>
+          <Ionicons name="lock-closed-outline" size={80} color={colors.error} />
+          <Text style={styles.errorTitle}>Acesso Negado</Text>
+          <Text style={styles.errorText}>
+            Você precisa estar logado para acessar esta tela.
+          </Text>
+          <Text style={styles.errorSubtext}>
+            Este é um erro de navegação. Por favor, reinicie o aplicativo.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -212,6 +260,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.error,
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: colors.gray600,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   keyboardView: {
     flex: 1,

@@ -17,6 +17,11 @@ const RootNavigator = () => {
       hasUser: !!user,
       userName: user?.name,
     });
+    
+    // ALERTA: Se signed=true mas não tem user, algo está errado
+    if (signed && !user) {
+      console.error('❌ ERRO CRÍTICO: signed=true mas user é null!');
+    }
   }, [signed, loading, user]);
 
   // Exibe tela de loading enquanto verifica autenticação
@@ -36,10 +41,19 @@ const RootNavigator = () => {
     );
   }
 
-  // Renderiza AuthNavigator se não estiver autenticado
-  // Renderiza AppNavigator se estiver autenticado
-  console.log(`🔐 RootNavigator - Renderizando: ${signed ? 'AppNavigator (Autenticado)' : 'AuthNavigator (Não autenticado)'}`);
-  return signed ? <AppNavigator /> : <AuthNavigator />;
+  // GUARD: FORÇAR autenticação
+  // Só renderiza AppNavigator se signed=true E user existe
+  const isAuthenticated = signed && user !== null;
+  
+  console.log(`🔐 RootNavigator - isAuthenticated: ${isAuthenticated}`);
+  console.log(`🔐 RootNavigator - Renderizando: ${isAuthenticated ? 'AppNavigator (Autenticado)' : 'AuthNavigator (Não autenticado)'}`);
+  
+  // PROTEÇÃO: Mesmo que signed seja true, se não tem user, mostrar login
+  if (!isAuthenticated) {
+    return <AuthNavigator />;
+  }
+  
+  return <AppNavigator />;
 };
 
 export default RootNavigator;

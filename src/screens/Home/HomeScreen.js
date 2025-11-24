@@ -40,9 +40,8 @@ const HomeScreen = ({ navigation }) => {
   // Verificar autenticação
   useEffect(() => {
     if (!signed || !user) {
-      console.warn('⚠️ Acesso negado - Usuário não autenticado');
-      // Usuário não está autenticado, não deveria estar aqui
-      // O RootNavigator já deveria ter bloqueado
+      console.error('❌ HomeScreen - ACESSO NEGADO: Usuário não autenticado!');
+      console.error('❌ Este é um BUG DE SEGURANÇA - bloqueando acesso');
     }
   }, [signed, user]);
 
@@ -168,6 +167,25 @@ const HomeScreen = ({ navigation }) => {
       [{ text: 'OK' }]
     );
   };
+
+  // GUARD: Se não estiver autenticado, mostrar mensagem de erro
+  if (!signed || !user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" />
+        <View style={styles.errorContainer}>
+          <Ionicons name="lock-closed-outline" size={80} color={colors.error} />
+          <Text style={styles.errorTitle}>Acesso Negado</Text>
+          <Text style={styles.errorText}>
+            Você precisa estar logado para acessar esta tela.
+          </Text>
+          <Text style={styles.errorSubtext}>
+            Este é um erro de navegação. Por favor, reinicie o aplicativo.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Loading state
   if (loading) {
@@ -399,6 +417,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.error,
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: colors.gray600,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   loadingContainer: {
     flex: 1,
