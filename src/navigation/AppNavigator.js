@@ -7,6 +7,7 @@ import colors from '../constants/colors';
 
 // Importa as telas principais
 import HomeScreen from '../screens/Home/HomeScreen';
+import NoGroupsScreen from '../screens/Groups/NoGroupsScreen';
 import GroupsScreen from '../screens/Groups/GroupsScreen';
 import CreateGroupScreen from '../screens/Groups/CreateGroupScreen';
 import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
@@ -51,6 +52,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="HomeMain" 
         component={HomeScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="NoGroups" 
+        component={NoGroupsScreen}
         options={{ 
           headerShown: false 
         }}

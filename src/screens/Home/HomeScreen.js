@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import { LacosIcon, LacosLogoFull } from '../../components/LacosLogo';
+import ProfileSwitcher from '../../components/ProfileSwitcher';
+import groupService from '../../services/groupService';
 import {
   MedicationIcon,
   VitalSignsIcon,
@@ -23,16 +26,21 @@ import {
   MessagesIcon,
 } from '../../components/CustomIcons';
 
-const GROUPS_STORAGE_KEY = '@lacos_groups';
+const CURRENT_PROFILE_KEY = '@lacos_current_profile';
 
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [myGroups, setMyGroups] = useState([]);
   const [participatingGroups, setParticipatingGroups] = useState([]);
-  const [selectedTab, setSelectedTab] = useState('myGroups'); // 'myGroups' ou 'participating'
-  // TODO: Buscar atividades reais da API quando endpoints estiverem prontos
-  // Por enquanto, array vazio - mostrará mensagem de "sem atividades"
+  const [selectedTab, setSelectedTab] = useState('myGroups');
   const [recentActivities, setRecentActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentProfile, setCurrentProfile] = useState('caregiver');
+
+  // Carregar perfil salvo
+  useEffect(() => {
+    loadCurrentProfile();
+  }, []);
 
   // Carregar grupos quando a tela recebe foco
   useFocusEffect(
@@ -41,41 +49,68 @@ const HomeScreen = ({ navigation }) => {
     }, [])
   );
 
-  const loadGroups = async () => {
+  const loadCurrentProfile = async () => {
     try {
-      const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
-      let groups = [];
-      
-      if (groupsJson) {
-        groups = JSON.parse(groupsJson);
+      const savedProfile = await AsyncStorage.getItem(CURRENT_PROFILE_KEY);
+      if (savedProfile) {
+        setCurrentProfile(savedProfile);
       }
+    } catch (error) {
+      console.error('Erro ao carregar perfil:', error);
+    }
+  };
+
+  const handleProfileChange = async (newProfile) => {
+    setCurrentProfile(newProfile);
+    try {
+      await AsyncStorage.setItem(CURRENT_PROFILE_KEY, newProfile);
       
-      // TEMPORÁRIO: Adicionar grupo de teste do banco de dados
-      // TODO: Substituir por chamada à API quando groupService estiver integrado
-      const testGroup = {
-        id: 1, // ID real do banco de dados
-        groupName: 'Grupo Pessoal (Teste)',
-        accompaniedName: 'João Silva',
-        accessCode: 'TESTE123',
-        isAdmin: true,
-        memberCount: 1,
-        createdAt: new Date().toISOString(),
-      };
-      
-      // Verificar se o grupo de teste já existe
-      const hasTestGroup = groups.some(g => g.id === 1);
-      if (!hasTestGroup) {
-        groups.unshift(testGroup); // Adiciona no início
+      // Se mudar para paciente, navegar para PatientApp
+      if (newProfile === 'patient') {
+        // TODO: Implementar navegação para interface do paciente
+        Alert.alert(
+          'Modo Paciente',
+          'Navegação para interface simplificada em desenvolvimento'
+        );
       }
+    } catch (error) {
+      console.error('Erro ao salvar perfil:', error);
+    }
+  };
+
+  const loadGroups = async () => {
+    setLoading(true);
+    try {
+      // Buscar grupos da API
+      const result = await groupService.getMyGroups();
       
-      // "Meus Grupos" = grupos que EU criei (isAdmin ou criado por mim)
-      // "Participo" = grupos que OUTRO criou e me convidou
-      const myCreatedGroups = groups.filter(g => g.isAdmin !== false);
-      const joinedGroups = groups.filter(g => g.isAdmin === false);
-      setMyGroups(myCreatedGroups);
-      setParticipatingGroups(joinedGroups);
+      if (result.success && result.data) {
+        const groups = result.data;
+        
+        // Se não tem grupos, navegar para NoGroupsScreen
+        if (groups.length === 0) {
+          setLoading(false);
+          navigation.replace('NoGroups');
+          return;
+        }
+        
+        // "Meus Grupos" = grupos onde sou admin
+        // "Participo" = grupos onde não sou admin
+        const myCreatedGroups = groups.filter(g => g.is_admin || g.isAdmin);
+        const joinedGroups = groups.filter(g => !g.is_admin && !g.isAdmin);
+        
+        setMyGroups(myCreatedGroups);
+        setParticipatingGroups(joinedGroups);
+      } else {
+        // Se erro ao buscar grupos, mostrar NoGroupsScreen
+        navigation.replace('NoGroups');
+      }
     } catch (error) {
       console.error('Erro ao carregar grupos:', error);
+      // Em caso de erro, mostrar NoGroupsScreen
+      navigation.replace('NoGroups');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -123,6 +158,19 @@ const HomeScreen = ({ navigation }) => {
     );
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Carregando grupos...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
@@ -136,15 +184,22 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.userName}>{user?.name || 'Usuário'}</Text>
           </View>
         </View>
-        <TouchableOpacity 
-          style={styles.notificationButton}
-          onPress={handleNotifications}
-        >
-          <Ionicons name="notifications-outline" size={24} color={colors.text} />
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>3</Text>
-          </View>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <ProfileSwitcher 
+            currentProfile={currentProfile}
+            onProfileChange={handleProfileChange}
+            style={{ marginRight: 12 }}
+          />
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={handleNotifications}
+          >
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>3</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -334,6 +389,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.gray600,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -345,6 +410,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   greetingContainer: {
     flexDirection: 'column',
