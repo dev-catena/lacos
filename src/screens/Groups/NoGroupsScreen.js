@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,13 +12,22 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
+import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import Toast from 'react-native-toast-message';
 
 const NoGroupsScreen = ({ navigation, onGroupJoined }) => {
+  const { user, signed } = useAuth();
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Verificar autenticação
+  useEffect(() => {
+    if (!signed || !user) {
+      console.warn('⚠️ NoGroupsScreen - Usuário não autenticado, não deveria estar aqui!');
+    }
+  }, [signed, user]);
 
   const handleCreateGroup = () => {
     navigation.navigate('CreateGroup');

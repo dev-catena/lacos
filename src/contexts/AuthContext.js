@@ -18,31 +18,38 @@ export const AuthProvider = ({ children }) => {
   // Carrega dados do AsyncStorage
   const loadStorageData = async () => {
     try {
+      console.log('🔑 AuthContext - Carregando dados do storage...');
       const storedUser = await AsyncStorage.getItem('@lacos:user');
       const storedToken = await AsyncStorage.getItem('@lacos:token');
 
       if (storedUser && storedToken) {
+        console.log('🔑 AuthContext - Token encontrado, validando...');
         setUser(JSON.parse(storedUser));
         // Validar token com o servidor (opcional)
         try {
           const response = await apiService.get('/user');
+          console.log('🔑 AuthContext - Token válido, usuário:', response.name);
           setUser(response);
         } catch (error) {
           // Token inválido, limpar dados
-          console.warn('Token inválido, fazendo logout...');
+          console.warn('🔑 AuthContext - Token inválido, fazendo logout...');
           await signOut();
         }
+      } else {
+        console.log('🔑 AuthContext - Nenhum token armazenado');
       }
     } catch (error) {
-      console.error('Erro ao carregar dados do storage:', error);
+      console.error('🔑 AuthContext - Erro ao carregar dados do storage:', error);
     } finally {
       setLoading(false);
+      console.log('🔑 AuthContext - Loading finalizado');
     }
   };
 
   // Função de login
   const signIn = async (email, password) => {
     try {
+      console.log('🔑 AuthContext - Iniciando login...');
       setLoading(true);
       
       // Chamada à API real
@@ -51,14 +58,17 @@ export const AuthProvider = ({ children }) => {
         { requiresAuth: false }
       );
 
+      console.log('🔑 AuthContext - Login bem-sucedido:', response.user.name);
+
       // Salva no AsyncStorage
       await AsyncStorage.setItem('@lacos:user', JSON.stringify(response.user));
       await AsyncStorage.setItem('@lacos:token', response.token);
 
       setUser(response.user);
+      console.log('🔑 AuthContext - User setado, signed agora é true');
       return { success: true };
     } catch (error) {
-      console.error('Erro no login:', error);
+      console.error('🔑 AuthContext - Erro no login:', error);
       return { 
         success: false, 
         error: error.message || 'Erro ao fazer login. Verifique suas credenciais.' 
@@ -71,6 +81,7 @@ export const AuthProvider = ({ children }) => {
   // Função de cadastro
   const signUp = async (userData) => {
     try {
+      console.log('🔑 AuthContext - Iniciando cadastro...');
       setLoading(true);
       
       // Preparar dados para API
@@ -90,14 +101,17 @@ export const AuthProvider = ({ children }) => {
         { requiresAuth: false }
       );
 
+      console.log('🔑 AuthContext - Cadastro bem-sucedido:', response.user.name);
+
       // Salva no AsyncStorage
       await AsyncStorage.setItem('@lacos:user', JSON.stringify(response.user));
       await AsyncStorage.setItem('@lacos:token', response.token);
 
       setUser(response.user);
+      console.log('🔑 AuthContext - User setado após cadastro, signed agora é true');
       return { success: true };
     } catch (error) {
-      console.error('Erro no cadastro:', error);
+      console.error('🔑 AuthContext - Erro no cadastro:', error);
       return { 
         success: false, 
         error: error.message || 'Erro ao criar conta. Tente novamente.' 

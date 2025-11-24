@@ -29,13 +29,22 @@ import {
 const CURRENT_PROFILE_KEY = '@lacos_current_profile';
 
 const HomeScreen = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, signed } = useAuth();
   const [myGroups, setMyGroups] = useState([]);
   const [participatingGroups, setParticipatingGroups] = useState([]);
   const [selectedTab, setSelectedTab] = useState('myGroups');
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentProfile, setCurrentProfile] = useState('caregiver');
+
+  // Verificar autenticação
+  useEffect(() => {
+    if (!signed || !user) {
+      console.warn('⚠️ Acesso negado - Usuário não autenticado');
+      // Usuário não está autenticado, não deveria estar aqui
+      // O RootNavigator já deveria ter bloqueado
+    }
+  }, [signed, user]);
 
   // Carregar perfil salvo
   useEffect(() => {
@@ -45,8 +54,10 @@ const HomeScreen = ({ navigation }) => {
   // Carregar grupos quando a tela recebe foco
   useFocusEffect(
     React.useCallback(() => {
-      loadGroups();
-    }, [])
+      if (signed && user) {
+        loadGroups();
+      }
+    }, [signed, user])
   );
 
   const loadCurrentProfile = async () => {
