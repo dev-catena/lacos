@@ -272,22 +272,22 @@ const HomeScreen = ({ navigation }) => {
                   style={styles.groupCard}
                   onPress={() => navigation.navigate('GroupDetail', {
                     groupId: group.id,
-                    groupName: group.groupName,
-                    accompaniedName: group.accompaniedName,
+                    groupName: group.name,
+                    accompaniedName: group.accompanied_name,
                   })}
                   activeOpacity={0.7}
                 >
-                  {group.photo ? (
-                    <Image source={{ uri: group.photo }} style={styles.groupPhoto} />
+                  {group.photo_url ? (
+                    <Image source={{ uri: group.photo_url }} style={styles.groupPhoto} />
                   ) : (
                     <View style={styles.groupIcon}>
                       <Ionicons name="people" size={32} color={colors.primary} />
                     </View>
                   )}
                   <View style={styles.groupInfo}>
-                    <Text style={styles.groupName}>{group.groupName}</Text>
+                    <Text style={styles.groupName}>{group.name}</Text>
                     <Text style={styles.groupDescription}>
-                      {group.accompaniedName ? `Acompanhando ${group.accompaniedName}` : 'Grupo de cuidados'}
+                      {group.accompanied_name ? `Acompanhando ${group.accompanied_name}` : 'Grupo de cuidados'}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
@@ -319,22 +319,22 @@ const HomeScreen = ({ navigation }) => {
                   style={styles.groupCard}
                   onPress={() => navigation.navigate('GroupDetail', {
                     groupId: group.id,
-                    groupName: group.groupName,
-                    accompaniedName: group.accompaniedName,
+                    groupName: group.name,
+                    accompaniedName: group.accompanied_name,
                   })}
                   activeOpacity={0.7}
                 >
-                  {group.photo ? (
-                    <Image source={{ uri: group.photo }} style={styles.groupPhoto} />
+                  {group.photo_url ? (
+                    <Image source={{ uri: group.photo_url }} style={styles.groupPhoto} />
                   ) : (
                     <View style={styles.groupIcon}>
                       <Ionicons name="people" size={32} color={colors.secondary} />
                     </View>
                   )}
                   <View style={styles.groupInfo}>
-                    <Text style={styles.groupName}>{group.groupName}</Text>
+                    <Text style={styles.groupName}>{group.name}</Text>
                     <Text style={styles.groupDescription}>
-                      {group.accompaniedName ? `Acompanhando ${group.accompaniedName}` : 'Membro do grupo'}
+                      {group.accompanied_name ? `Acompanhando ${group.accompanied_name}` : 'Membro do grupo'}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
