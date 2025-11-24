@@ -194,7 +194,9 @@ const AddDoctorScreen = ({ route, navigation }) => {
 
           {/* Especialidade */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Especialidade Médica</Text>
+            <Text style={styles.label}>
+              Especialidade Médica {specialties.length > 0 && `(${specialties.length} disponíveis)`}
+            </Text>
             <View style={styles.pickerContainer}>
               <Ionicons name="medical-outline" size={20} color={colors.gray400} style={styles.pickerIcon} />
               <Picker
@@ -204,20 +206,17 @@ const AddDoctorScreen = ({ route, navigation }) => {
                   updateField('medicalSpecialtyId', itemValue);
                 }}
                 style={styles.picker}
-                enabled={true}
+                enabled={specialties.length > 0}
+                mode="dropdown"
               >
-                <Picker.Item label="Selecione a especialidade..." value={null} />
-                {specialties.length > 0 ? (
-                  specialties.map((specialty) => (
-                    <Picker.Item 
-                      key={specialty.id} 
-                      label={specialty.name} 
-                      value={specialty.id} 
-                    />
-                  ))
-                ) : (
-                  <Picker.Item label="Carregando..." value={null} />
-                )}
+                <Picker.Item label="Selecione a especialidade..." value={null} color={colors.gray400} />
+                {specialties.map((specialty) => (
+                  <Picker.Item 
+                    key={specialty.id} 
+                    label={specialty.name} 
+                    value={specialty.id} 
+                  />
+                ))}
               </Picker>
             </View>
             {specialties.length === 0 && (
@@ -491,7 +490,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray200,
     paddingLeft: 12,
-    overflow: 'hidden',
   },
   pickerIcon: {
     marginRight: 8,
@@ -499,6 +497,7 @@ const styles = StyleSheet.create({
   picker: {
     flex: 1,
     height: 50,
+    color: colors.text,
   },
   textAreaWrapper: {
     alignItems: 'flex-start',
