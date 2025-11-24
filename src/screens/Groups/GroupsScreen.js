@@ -266,7 +266,7 @@ const GroupsScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Botão criar novo grupo */}
+        {/* Botões de ação */}
         <View style={styles.section}>
           <TouchableOpacity 
             style={styles.createGroupButton}
@@ -274,6 +274,14 @@ const GroupsScreen = ({ navigation }) => {
           >
             <Ionicons name="add-circle" size={24} color={colors.primary} />
             <Text style={styles.createGroupText}>Criar Novo Grupo</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.joinGroupButton}
+            onPress={() => navigation.navigate('NoGroups')}
+          >
+            <Ionicons name="key" size={24} color={colors.secondary} />
+            <Text style={styles.joinGroupText}>Entrar com Código</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -481,11 +489,26 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     borderStyle: 'dashed',
     gap: 8,
+    marginBottom: 12,
   },
   createGroupText: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.primary,
+  },
+  joinGroupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.secondary,
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  joinGroupText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
   },
 });
 
