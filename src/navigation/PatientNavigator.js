@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../constants/colors';
+import groupService from '../services/groupService';
 
 import PatientHomeScreen from '../screens/Patient/PatientHomeScreen';
 import AppointmentDetailsScreen from '../screens/Patient/AppointmentDetailsScreen';
 import RecordingScreen from '../screens/Patient/RecordingScreen';
 import PatientProfileScreen from '../screens/Patient/PatientProfileScreen';
+import PatientJoinGroupScreen from '../screens/Patient/PatientJoinGroupScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -67,13 +70,74 @@ const PatientTabNavigator = () => {
   );
 };
 
-// Stack Navigator principal
+// Stack Navigator principal com verificação de grupo
 const PatientNavigator = () => {
+  const [loading, setLoading] = useState(true);
+  const [hasGroup, setHasGroup] = useState(false);
+
+  useEffect(() => {
+    checkPatientGroup();
+  }, []);
+
+  const checkPatientGroup = async () => {
+    try {
+      console.log('🔍 PatientNavigator - Verificando se paciente tem grupo...');
+      
+      const groups = await groupService.getGroups();
+      
+      console.log('🔍 PatientNavigator - Grupos encontrados:', groups.length);
+      
+      // Paciente deve estar em pelo menos 1 grupo
+      if (groups && groups.length > 0) {
+        console.log('✅ PatientNavigator - Paciente tem grupo:', groups[0].name);
+        setHasGroup(true);
+      } else {
+        console.log('⚠️ PatientNavigator - Paciente SEM grupo, precisa entrar com código');
+        setHasGroup(false);
+      }
+    } catch (error) {
+      console.error('❌ PatientNavigator - Erro ao verificar grupos:', error);
+      setHasGroup(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mostrar loading enquanto verifica
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="PatientTabs" component={PatientTabNavigator} />
-      <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} />
-      <Stack.Screen name="RecordingScreen" component={RecordingScreen} />
+    <Stack.Navigator 
+      screenOptions={{ headerShown: false }}
+      initialRouteName={hasGroup ? 'PatientTabs' : 'PatientJoinGroup'}
+    >
+      {/* Tela de entrada com código (se não tiver grupo) */}
+      <Stack.Screen 
+        name="PatientJoinGroup" 
+        component={PatientJoinGroupScreen}
+      />
+      
+      {/* Tabs principais (se já tiver grupo) */}
+      <Stack.Screen 
+        name="PatientTabs" 
+        component={PatientTabNavigator} 
+      />
+      
+      {/* Outras telas */}
+      <Stack.Screen 
+        name="AppointmentDetails" 
+        component={AppointmentDetailsScreen} 
+      />
+      <Stack.Screen 
+        name="RecordingScreen" 
+        component={RecordingScreen} 
+      />
     </Stack.Navigator>
   );
 };
