@@ -13,6 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
+import documentService from '../../services/documentService';
 
 const DocumentsScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params || {};
@@ -38,46 +39,38 @@ const DocumentsScreen = ({ route, navigation }) => {
   const loadDocuments = async () => {
     setLoading(true);
     try {
-      // TODO: Implementar chamada à API
-      // const result = await documentService.getDocumentsByGroup(groupId);
+      console.log('📂 DocumentsScreen - Carregando documentos do grupo:', groupId);
       
-      // Mock de dados
-      const mockDocs = [
-        {
-          id: 1,
-          type: 'exam_lab',
-          title: 'Hemograma Completo',
-          date: '2025-11-20',
-          consultation_id: 1,
-          doctor_name: 'Dr. João Silva',
-          file_url: 'https://example.com/doc1.pdf',
-          file_type: 'pdf',
-        },
-        {
-          id: 2,
-          type: 'exam_image',
-          title: 'Raio-X Tórax',
-          date: '2025-11-18',
-          consultation_id: 2,
-          doctor_name: 'Dra. Maria Santos',
-          file_url: 'https://example.com/doc2.jpg',
-          file_type: 'image',
-        },
-        {
-          id: 3,
-          type: 'prescription',
-          title: 'Receita - Losartana',
-          date: '2025-11-15',
-          consultation_id: 1,
-          doctor_name: 'Dr. João Silva',
-          file_url: 'https://example.com/doc3.pdf',
-          file_type: 'pdf',
-        },
-      ];
+      if (!groupId) {
+        console.error('❌ DocumentsScreen - groupId não fornecido');
+        setDocuments([]);
+        return;
+      }
 
-      setDocuments(mockDocs);
+      // Chamar API real
+      const result = await documentService.getDocumentsByGroup(groupId);
+      
+      console.log('✅ DocumentsScreen - Documentos carregados:', result.length);
+      
+      // Mapear para formato esperado (ajustar campos se necessário)
+      const mappedDocs = result.map(doc => ({
+        id: doc.id,
+        type: doc.type,
+        title: doc.title,
+        date: doc.document_date,
+        consultation_id: doc.consultation_id,
+        doctor_name: doc.doctor_name || 'Não especificado',
+        file_url: doc.file_url,
+        file_type: doc.file_type,
+        notes: doc.notes,
+        user_name: doc.user_name,
+        group_name: doc.group_name,
+      }));
+
+      setDocuments(mappedDocs);
     } catch (error) {
-      console.error('Erro ao carregar documentos:', error);
+      console.error('❌ DocumentsScreen - Erro ao carregar documentos:', error);
+      setDocuments([]);
     } finally {
       setLoading(false);
     }

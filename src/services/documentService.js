@@ -19,10 +19,17 @@ const documentService = {
   // Listar documentos de um grupo
   async getDocumentsByGroup(groupId) {
     try {
+      console.log('📡 documentService - Buscando documentos do grupo:', groupId);
       const response = await apiService.get(`/documents?group_id=${groupId}`);
-      return response;
+      console.log('📡 documentService - Resposta raw:', response);
+      
+      // O backend pode retornar {success: true, data: [...]} ou apenas [...]
+      const documents = response.data || response;
+      console.log('📡 documentService - Documentos extraídos:', documents.length);
+      
+      return documents;
     } catch (error) {
-      console.error('Erro ao buscar documentos:', error.response?.data || error);
+      console.error('❌ documentService - Erro ao buscar documentos:', error.response?.data || error);
       throw error;
     }
   },
