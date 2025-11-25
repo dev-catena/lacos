@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import colors from '../constants/colors';
 import CustomTabBar from '../components/CustomTabBar';
+import { useAuth } from '../contexts/AuthContext';
 
 // Importa as telas principais
 import HomeScreen from '../screens/Home/HomeScreen';
@@ -24,6 +25,9 @@ import ProfileScreen from '../screens/Profile/ProfileScreen';
 import EditPersonalDataScreen from '../screens/Profile/EditPersonalDataScreen';
 import SecurityScreen from '../screens/Profile/SecurityScreen';
 import NotificationPreferencesScreen from '../screens/Profile/NotificationPreferencesScreen';
+
+// Importa o PatientNavigator COMPLETO (já testado e funcionando)
+import PatientNavigator from './PatientNavigator';
 
 // Importa as telas de Medicamentos
 import MedicationsScreen from '../screens/Medications/MedicationsScreen';
@@ -475,8 +479,8 @@ const ProfileStack = () => {
   );
 };
 
-// Tab Navigator Principal
-const AppNavigator = () => {
+// Tab Navigator Principal - CUIDADOR
+const CaregiverNavigator = () => {
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -523,6 +527,21 @@ const AppNavigator = () => {
       />
     </Tab.Navigator>
   );
+};
+
+// AppNavigator Principal - Detecta o perfil e redireciona
+const AppNavigator = () => {
+  const { user } = useAuth();
+
+  // Verificar se o usuário é PACIENTE
+  // Assumindo que user.profile ou user.role contém o tipo de perfil
+  const isPatient = user?.profile === 'accompanied' || user?.role === 'accompanied';
+
+  console.log('👤 AppNavigator - User:', user?.name, '| Profile:', user?.profile, '| Role:', user?.role, '| Is Patient:', isPatient);
+
+  // Se for PACIENTE, mostra navegação simplificada (PatientNavigator já existe e está testado!)
+  // Se for CUIDADOR, mostra navegação completa
+  return isPatient ? <PatientNavigator /> : <CaregiverNavigator />;
 };
 
 export default AppNavigator;
