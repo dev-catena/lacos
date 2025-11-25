@@ -7,6 +7,10 @@ import {
   SafeAreaView,
   TouchableOpacity,
   TextInput,
+  Modal,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +26,8 @@ import {
   AddIcon,
   CloseIcon 
 } from '../../components/CustomIcons';
+import groupService from '../../services/groupService';
+import Toast from 'react-native-toast-message';
 
 const GROUPS_STORAGE_KEY = '@lacos_groups';
 
@@ -29,6 +35,9 @@ const GroupsScreen = ({ navigation }) => {
   const [searchText, setSearchText] = useState('');
   const [myGroups, setMyGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [joiningGroup, setJoiningGroup] = useState(false);
 
   // Carregar grupos quando a tela recebe foco
   useFocusEffect(
@@ -69,6 +78,49 @@ const GroupsScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleJoinWithCode = async () => {
+    if (!inviteCode.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Código obrigatório',
+        text2: 'Digite o código de convite',
+      });
+      return;
+    }
+
+    setJoiningGroup(true);
+    try {
+      const result = await groupService.joinWithCode(inviteCode.trim());
+      
+      if (result.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Sucesso!',
+          text2: `Você entrou no grupo ${result.data.group.name}`,
+        });
+        setInviteModalVisible(false);
+        setInviteCode('');
+        
+        // Recarregar grupos
+        loadGroups();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Erro',
+          text2: result.error || 'Código inválido',
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao entrar no grupo:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro',
+        text2: 'Não foi possível entrar no grupo',
+      });
+    }
+    setJoiningGroup(false);
   };
 
   return (
@@ -244,13 +296,67 @@ const GroupsScreen = ({ navigation }) => {
 
           <TouchableOpacity 
             style={styles.joinGroupButton}
-            onPress={() => navigation.navigate('NoGroups', { openModal: true })}
+            onPress={() => setInviteModalVisible(true)}
           >
             <Ionicons name="key" size={24} color={colors.secondary} />
             <Text style={styles.joinGroupText}>Entrar com Código</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Modal de Código de Convite */}
+      <Modal
+        visible={inviteModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setInviteModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Entrar no Grupo</Text>
+              <TouchableOpacity
+                onPress={() => setInviteModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.modalLabel}>
+                Digite o código de convite que você recebeu:
+              </Text>
+              
+              <View style={styles.codeInputContainer}>
+                <Ionicons name="key-outline" size={20} color={colors.gray400} />
+                <TextInput
+                  style={styles.codeInput}
+                  placeholder="Ex: ABC123XYZ"
+                  placeholderTextColor={colors.gray400}
+                  value={inviteCode}
+                  onChangeText={setInviteCode}
+                  autoCapitalize="characters"
+                  maxLength={20}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.joinButton, joiningGroup && styles.joinButtonDisabled]}
+                onPress={handleJoinWithCode}
+                disabled={joiningGroup}
+              >
+                <Text style={styles.joinButtonText}>
+                  {joiningGroup ? 'Entrando...' : 'Entrar no Grupo'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -475,6 +581,79 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.white,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalBody: {
+    padding: 20,
+  },
+  modalLabel: {
+    fontSize: 16,
+    color: colors.text,
+    marginBottom: 16,
+  },
+  codeInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  codeInput: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    color: colors.text,
+  },
+  joinButton: {
+    backgroundColor: colors.secondary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  joinButtonDisabled: {
+    opacity: 0.6,
+  },
+  joinButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
