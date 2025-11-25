@@ -144,16 +144,17 @@ const AddOccurrenceScreen = ({ route, navigation }) => {
 
     setLoading(true);
     try {
-      // TODO: Implementar chamada à API
-      // const result = await occurrenceService.createOccurrence({
-      //   group_id: groupId,
-      //   type: formData.type === 'outro' ? formData.customType : formData.typeLabel,
-      //   type_code: formData.type,
-      //   occurred_at: formData.date,
-      //   description: formData.description,
-      //   responsible: formData.responsible,
-      //   notes: formData.notes,
-      // });
+      const occurrenceService = require('../../services/occurrenceService').default;
+      
+      await occurrenceService.createOccurrence({
+        group_id: groupId,
+        type: formData.type === 'outro' ? formData.customType : formData.typeLabel,
+        type_code: formData.type,
+        occurred_at: formData.date,
+        description: formData.description,
+        responsible: formData.responsible,
+        notes: formData.notes,
+      });
 
       Toast.show({
         type: 'success',
@@ -167,10 +168,11 @@ const AddOccurrenceScreen = ({ route, navigation }) => {
       }, 1000);
     } catch (error) {
       console.error('Erro ao registrar ocorrência:', error);
+      const errorMessage = error.response?.data?.message || 'Não foi possível registrar a ocorrência';
       Toast.show({
         type: 'error',
         text1: 'Erro ao salvar',
-        text2: 'Não foi possível registrar a ocorrência',
+        text2: errorMessage,
       });
     } finally {
       setLoading(false);
