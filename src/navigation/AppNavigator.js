@@ -40,6 +40,9 @@ import ConsultationDetailsScreen from '../screens/Consultations/ConsultationDeta
 // Importa as telas de Histórico
 import HistoryScreen from '../screens/History/HistoryScreen';
 
+// Importa as telas de Ocorrências
+import AddOccurrenceScreen from '../screens/Occurrences/AddOccurrenceScreen';
+
 // Importa as telas de Médicos
 import DoctorsScreen from '../screens/Doctors/DoctorsScreen';
 import AddDoctorScreen from '../screens/Doctors/AddDoctorScreen';
@@ -201,6 +204,13 @@ const HomeStack = () => {
           headerShown: false 
         }}
       />
+      <Stack.Screen 
+        name="AddOccurrence" 
+        component={AddOccurrenceScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -345,6 +355,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="History" 
         component={HistoryScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddOccurrence" 
+        component={AddOccurrenceScreen}
         options={{ 
           headerShown: false 
         }}

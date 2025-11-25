@@ -228,9 +228,21 @@ const HistoryScreen = ({ route, navigation }) => {
             </View>
           ))}
 
-          <View style={{ height: 40 }} />
+          <View style={{ height: 80 }} />
         </ScrollView>
       )}
+
+      {/* Botão Flutuante para Adicionar Ocorrência */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('AddOccurrence', {
+          groupId,
+          groupName,
+          accompaniedName
+        })}
+      >
+        <Ionicons name="add" size={28} color={colors.white} />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -382,6 +394,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.gray600,
     lineHeight: 20,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.warning,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
 
