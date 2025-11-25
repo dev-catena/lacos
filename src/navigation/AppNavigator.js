@@ -537,11 +537,25 @@ const AppNavigator = () => {
   // Assumindo que user.profile ou user.role contém o tipo de perfil
   const isPatient = user?.profile === 'accompanied' || user?.role === 'accompanied';
 
-  console.log('👤 AppNavigator - User:', user?.name, '| Profile:', user?.profile, '| Role:', user?.role, '| Is Patient:', isPatient);
+  console.log('===========================================');
+  console.log('👤 AppNavigator - DETECÇÃO DE PERFIL:');
+  console.log('   User Name:', user?.name);
+  console.log('   User Email:', user?.email);
+  console.log('   User Profile:', user?.profile);
+  console.log('   User Role:', user?.role);
+  console.log('   Is Patient?:', isPatient);
+  console.log('   User Object:', JSON.stringify(user, null, 2));
+  console.log('===========================================');
 
   // Se for PACIENTE, mostra navegação simplificada (PatientNavigator já existe e está testado!)
   // Se for CUIDADOR, mostra navegação completa
-  return isPatient ? <PatientNavigator /> : <CaregiverNavigator />;
+  if (isPatient) {
+    console.log('✅ AppNavigator - Redirecionando para PatientNavigator');
+    return <PatientNavigator />;
+  } else {
+    console.log('✅ AppNavigator - Redirecionando para CaregiverNavigator');
+    return <CaregiverNavigator />;
+  }
 };
 
 export default AppNavigator;
