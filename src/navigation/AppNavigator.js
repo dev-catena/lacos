@@ -47,6 +47,11 @@ import AddOccurrenceScreen from '../screens/Occurrences/AddOccurrenceScreen';
 import DoctorsScreen from '../screens/Doctors/DoctorsScreen';
 import AddDoctorScreen from '../screens/Doctors/AddDoctorScreen';
 
+// Importa as telas de Documentos
+import DocumentsScreen from '../screens/Documents/DocumentsScreen';
+import AddDocumentScreen from '../screens/Documents/AddDocumentScreen';
+import DocumentDetailsScreen from '../screens/Documents/DocumentDetailsScreen';
+
 // Importa telas de Debug
 import ShowGroupCodesScreen from '../screens/Debug/ShowGroupCodesScreen';
 
@@ -211,6 +216,27 @@ const HomeStack = () => {
           headerShown: false 
         }}
       />
+      <Stack.Screen 
+        name="Documents" 
+        component={DocumentsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddDocument" 
+        component={AddDocumentScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="DocumentDetails" 
+        component={DocumentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -362,6 +388,27 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="AddOccurrence" 
         component={AddOccurrenceScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Documents" 
+        component={DocumentsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddDocument" 
+        component={AddDocumentScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="DocumentDetails" 
+        component={DocumentDetailsScreen}
         options={{ 
           headerShown: false 
         }}

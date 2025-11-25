@@ -73,6 +73,19 @@ const GroupDetailScreen = ({ route, navigation }) => {
       }),
     },
     {
+      id: 'documents',
+      title: 'Arquivos',
+      subtitle: 'Exames, receitas e laudos',
+      icon: 'folder-open',
+      IconComponent: null,
+      color: '#9C27B0',
+      backgroundColor: '#9C27B020',
+      onPress: () => navigation.navigate('Documents', { 
+        groupId, 
+        groupName 
+      }),
+    },
+    {
       id: 'vitalsigns',
       title: 'Sinais Vitais',
       subtitle: 'Registrar pressão, glicose e peso',
