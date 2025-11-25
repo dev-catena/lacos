@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import colors from '../constants/colors';
+import CustomTabBar from '../components/CustomTabBar';
 
 // Importa as telas principais
 import HomeScreen from '../screens/Home/HomeScreen';
@@ -397,62 +398,13 @@ const ProfileStack = () => {
 const AppNavigator = () => {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-
-          if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Groups') {
-            iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Notifications') {
-            iconName = focused ? 'notifications' : 'notifications-outline';
-          } else if (route.name === 'Profile') {
-            iconName = focused ? 'person' : 'person-outline';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{
         headerShown: false,
         lazy: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.gray400,
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        },
-        tabBarIconStyle: {
-          marginBottom: 0,
-        },
-        tabBarStyle: {
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 5,
-          backgroundColor: colors.backgroundLight,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-        },
-        tabBarItemStyle: {
-          paddingVertical: 0,
-          gap: 2,
-        },
-        // FIX para Samsung A15 e outros dispositivos Android
-        tabBarHideOnKeyboard: true,
         unmountOnBlur: false,
         freezeOnBlur: false,
-        ...(Platform.OS === 'android' && {
-          // Configurações específicas para Android
-          tabBarButton: undefined, // Remove customização que pode causar bugs
-          tabBarPressColor: 'rgba(0, 0, 0, 0.1)', // Visual feedback
-          tabBarPressOpacity: 0.8,
-        }),
-      })}
-      detachInactiveScreens={false}
+      }}
       backBehavior="history"
       sceneContainerStyle={{ backgroundColor: colors.background }}
     >
