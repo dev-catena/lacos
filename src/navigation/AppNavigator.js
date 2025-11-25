@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -440,28 +441,52 @@ const AppNavigator = () => {
           paddingVertical: 0,
           gap: 2,
         },
+        // FIX para Samsung A15 e outros dispositivos Android
+        tabBarHideOnKeyboard: true,
+        unmountOnBlur: false,
+        freezeOnBlur: false,
+        ...(Platform.OS === 'android' && {
+          // Configurações específicas para Android
+          tabBarButton: undefined, // Remove customização que pode causar bugs
+          tabBarPressColor: 'rgba(0, 0, 0, 0.1)', // Visual feedback
+          tabBarPressOpacity: 0.8,
+        }),
       })}
       detachInactiveScreens={false}
+      backBehavior="history"
+      sceneContainerStyle={{ backgroundColor: colors.background }}
     >
       <Tab.Screen 
         name="Home" 
         component={HomeStack}
-        options={{ tabBarLabel: 'Início' }}
+        options={{ 
+          tabBarLabel: 'Início',
+          tabBarTestID: 'tab-home',
+        }}
       />
       <Tab.Screen 
         name="Groups" 
         component={GroupsStack}
-        options={{ tabBarLabel: 'Grupos' }}
+        options={{ 
+          tabBarLabel: 'Grupos',
+          tabBarTestID: 'tab-groups',
+        }}
       />
       <Tab.Screen 
         name="Notifications" 
         component={NotificationsStack}
-        options={{ tabBarLabel: 'Notificações' }}
+        options={{ 
+          tabBarLabel: 'Notificações',
+          tabBarTestID: 'tab-notifications',
+        }}
       />
       <Tab.Screen 
         name="Profile" 
         component={ProfileStack}
-        options={{ tabBarLabel: 'Perfil' }}
+        options={{ 
+          tabBarLabel: 'Perfil',
+          tabBarTestID: 'tab-profile',
+        }}
       />
     </Tab.Navigator>
   );
