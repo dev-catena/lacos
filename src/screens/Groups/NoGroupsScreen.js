@@ -25,6 +25,10 @@ const NoGroupsScreen = ({ navigation, route, onGroupJoined }) => {
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Verificar se é paciente
+  const isPatient = user?.profile === 'accompanied' || user?.role === 'accompanied';
+  console.log('👤 NoGroupsScreen - User:', user?.name, '| Profile:', user?.profile, '| Is Patient:', isPatient);
+
   // Verificar autenticação
   useEffect(() => {
     if (!signed || !user) {
@@ -155,30 +159,35 @@ const NoGroupsScreen = ({ navigation, route, onGroupJoined }) => {
             </View>
             <Text style={styles.title}>Bem-vindo ao Laços!</Text>
             <Text style={styles.description}>
-              Você ainda não faz parte de nenhum grupo de cuidados.{'\n'}
-              Crie seu primeiro grupo ou entre em um usando um código de convite.
+              {isPatient
+                ? 'Você ainda não faz parte de nenhum grupo de cuidados.\nPeça ao seu cuidador para te enviar um código de convite.'
+                : 'Você ainda não faz parte de nenhum grupo de cuidados.\nCrie seu primeiro grupo ou entre em um usando um código de convite.'}
             </Text>
           </View>
 
           {/* Botões de Ação */}
           <View style={styles.actionsContainer}>
-            <TouchableOpacity
-              style={[styles.actionCard, styles.createCard]}
-              onPress={handleCreateGroup}
-              activeOpacity={0.7}
-            >
-              <View style={styles.actionIconContainer}>
-                <Ionicons name="add-circle" size={40} color={colors.primary} />
-              </View>
-              <Text style={styles.actionTitle}>Criar Novo Grupo</Text>
-              <Text style={styles.actionDescription}>
-                Crie um grupo para gerenciar os cuidados de um familiar ou amigo
-              </Text>
-              <View style={styles.actionArrow}>
-                <Ionicons name="arrow-forward" size={20} color={colors.primary} />
-              </View>
-            </TouchableOpacity>
+            {/* Botão "Criar Grupo" - SOMENTE para Cuidadores */}
+            {!isPatient && (
+              <TouchableOpacity
+                style={[styles.actionCard, styles.createCard]}
+                onPress={handleCreateGroup}
+                activeOpacity={0.7}
+              >
+                <View style={styles.actionIconContainer}>
+                  <Ionicons name="add-circle" size={40} color={colors.primary} />
+                </View>
+                <Text style={styles.actionTitle}>Criar Novo Grupo</Text>
+                <Text style={styles.actionDescription}>
+                  Crie um grupo para gerenciar os cuidados de um familiar ou amigo
+                </Text>
+                <View style={styles.actionArrow}>
+                  <Ionicons name="arrow-forward" size={20} color={colors.primary} />
+                </View>
+              </TouchableOpacity>
+            )}
 
+            {/* Botão "Entrar com Código" - Para TODOS */}
             <TouchableOpacity
               style={[styles.actionCard, styles.joinCard]}
               onPress={() => setInviteModalVisible(true)}
@@ -203,7 +212,9 @@ const NoGroupsScreen = ({ navigation, route, onGroupJoined }) => {
               <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
             </View>
             <Text style={styles.infoText}>
-              Você pode fazer parte de vários grupos ao mesmo tempo e ter diferentes papéis em cada um.
+              {isPatient
+                ? 'Peça ao seu cuidador para criar um grupo e compartilhar o código de convite com você.'
+                : 'Você pode fazer parte de vários grupos ao mesmo tempo e ter diferentes papéis em cada um.'}
             </Text>
           </View>
         </ScrollView>

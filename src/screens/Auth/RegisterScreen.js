@@ -26,6 +26,7 @@ const RegisterScreen = ({ navigation }) => {
     phone: '',
     password: '',
     confirmPassword: '',
+    profile: 'caregiver', // Padrão: Cuidador
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -139,6 +140,74 @@ const RegisterScreen = ({ navigation }) => {
                 onChangeText={(value) => updateFormData('phone', value)}
                 keyboardType="phone-pad"
               />
+            </View>
+
+            {/* Seletor de Perfil */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Qual é o seu perfil? *</Text>
+              <View style={styles.profileSelector}>
+                <TouchableOpacity
+                  style={[
+                    styles.profileOption,
+                    formData.profile === 'caregiver' && styles.profileOptionActive
+                  ]}
+                  onPress={() => updateFormData('profile', 'caregiver')}
+                >
+                  <View style={[
+                    styles.profileIconContainer,
+                    formData.profile === 'caregiver' && styles.profileIconContainerActive
+                  ]}>
+                    <Ionicons
+                      name="heart"
+                      size={28}
+                      color={formData.profile === 'caregiver' ? colors.white : colors.primary}
+                    />
+                  </View>
+                  <Text style={[
+                    styles.profileOptionTitle,
+                    formData.profile === 'caregiver' && styles.profileOptionTitleActive
+                  ]}>
+                    Sou Cuidador
+                  </Text>
+                  <Text style={[
+                    styles.profileOptionDescription,
+                    formData.profile === 'caregiver' && styles.profileOptionDescriptionActive
+                  ]}>
+                    Vou cuidar de alguém
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.profileOption,
+                    formData.profile === 'accompanied' && styles.profileOptionActive
+                  ]}
+                  onPress={() => updateFormData('profile', 'accompanied')}
+                >
+                  <View style={[
+                    styles.profileIconContainer,
+                    formData.profile === 'accompanied' && styles.profileIconContainerActive
+                  ]}>
+                    <Ionicons
+                      name="person"
+                      size={28}
+                      color={formData.profile === 'accompanied' ? colors.white : colors.secondary}
+                    />
+                  </View>
+                  <Text style={[
+                    styles.profileOptionTitle,
+                    formData.profile === 'accompanied' && styles.profileOptionTitleActive
+                  ]}>
+                    Sou Paciente
+                  </Text>
+                  <Text style={[
+                    styles.profileOptionDescription,
+                    formData.profile === 'accompanied' && styles.profileOptionDescriptionActive
+                  ]}>
+                    Vou ser acompanhado
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
@@ -303,6 +372,53 @@ const styles = StyleSheet.create({
   },
   eyeButton: {
     padding: 12,
+  },
+  profileSelector: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  profileOption: {
+    flex: 1,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+  },
+  profileOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '10',
+  },
+  profileIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  profileIconContainerActive: {
+    backgroundColor: colors.primary,
+  },
+  profileOptionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  profileOptionTitleActive: {
+    color: colors.primary,
+  },
+  profileOptionDescription: {
+    fontSize: 13,
+    color: colors.textLight,
+    textAlign: 'center',
+  },
+  profileOptionDescriptionActive: {
+    color: colors.primary,
   },
   registerButton: {
     backgroundColor: colors.primary,

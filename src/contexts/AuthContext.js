@@ -103,7 +103,10 @@ export const AuthProvider = ({ children }) => {
         phone: userData.phone,
         birth_date: userData.birthDate,
         gender: userData.gender,
+        profile: userData.profile || 'caregiver', // Novo: Perfil do usuário
       };
+
+      console.log('🔑 AuthContext - Dados de registro:', { ...registerData, password: '***' });
 
       // Chamada à API real
       const response = await apiService.post('/register', 
