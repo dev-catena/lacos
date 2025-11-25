@@ -19,7 +19,6 @@ import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import { LacosIcon, LacosLogoFull } from '../../components/LacosLogo';
 import ProfileSwitcher from '../../components/ProfileSwitcher';
-import DrawerToggleButton from '../../components/DrawerToggleButton';
 import groupService from '../../services/groupService';
 import {
   MedicationIcon,
@@ -215,7 +214,6 @@ const HomeScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <DrawerToggleButton />
           <LacosIcon size={40} />
           <View style={styles.greetingContainer}>
             <Text style={styles.greeting}>Olá,</Text>
