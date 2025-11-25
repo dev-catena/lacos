@@ -100,11 +100,13 @@ const HomeScreen = ({ navigation }) => {
         const groups = result.data;
         console.log(`✅ HomeScreen - ${groups.length} grupo(s) encontrado(s)`);
         
-        // Se não tem grupos, navegar para NoGroupsScreen
+        // Se não tem grupos, apenas setar estado vazio
+        // HomeScreen vai renderizar NoGroupsScreen condicionalmente
         if (groups.length === 0) {
-          console.log('ℹ️ HomeScreen - Nenhum grupo, navegando para NoGroupsScreen');
+          console.log('ℹ️ HomeScreen - Nenhum grupo encontrado');
+          setMyGroups([]);
+          setParticipatingGroups([]);
           setLoading(false);
-          navigation.replace('NoGroups');
           return;
         }
         
@@ -118,14 +120,16 @@ const HomeScreen = ({ navigation }) => {
         setMyGroups(myCreatedGroups);
         setParticipatingGroups(joinedGroups);
       } else {
-        console.warn('⚠️ HomeScreen - Erro ao buscar grupos, navegando para NoGroupsScreen');
-        // Se erro ao buscar grupos, mostrar NoGroupsScreen
-        navigation.replace('NoGroups');
+        console.warn('⚠️ HomeScreen - Erro ao buscar grupos');
+        // Em caso de erro, setar estado vazio
+        setMyGroups([]);
+        setParticipatingGroups([]);
       }
     } catch (error) {
       console.error('❌ HomeScreen - Erro ao carregar grupos:', error);
-      // Em caso de erro, mostrar NoGroupsScreen
-      navigation.replace('NoGroups');
+      // Em caso de erro, setar estado vazio
+      setMyGroups([]);
+      setParticipatingGroups([]);
     } finally {
       setLoading(false);
     }

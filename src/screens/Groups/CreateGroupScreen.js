@@ -155,25 +155,16 @@ const CreateGroupScreen = ({ navigation }) => {
       const inviteCode = createdGroup.invite_code || Math.random().toString(36).substring(2, 10).toUpperCase();
       setGeneratedCode(inviteCode);
 
-      Alert.alert(
-        'Sucesso! 🎉',
-        `Grupo "${groupData.groupName}" criado com sucesso!\n\n` +
-        `Acompanhado: ${accompaniedData.name}\n` +
-        `Código de convite: ${inviteCode}\n\n` +
-        `Use este código para convidar membros.\n` +
-        `Você pode ver o código novamente nas Configurações do grupo.`,
-        [
-          {
-            text: 'Ir para Meus Grupos',
-            onPress: () => {
-              console.log('✅ Navegando para Home após criar grupo');
-              // Voltar para o topo do stack (HomeMain)
-              // HomeScreen vai recarregar os grupos automaticamente (useFocusEffect)
-              navigation.popToTop();
-            },
-          },
-        ]
-      );
+      Toast.show({
+        type: 'success',
+        text1: 'Grupo criado! 🎉',
+        text2: `Código de convite: ${inviteCode}`,
+        visibilityTime: 4000,
+      });
+
+      console.log('✅ Navegando para Home após criar grupo');
+      // Navegar para Home, que vai recarregar os grupos automaticamente
+      navigation.navigate('Home');
     } catch (error) {
       console.error('❌ Erro ao criar grupo:', error);
       Alert.alert('Erro', error.message || 'Erro ao criar grupo');
