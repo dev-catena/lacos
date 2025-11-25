@@ -83,13 +83,10 @@ const PatientNavigator = () => {
     try {
       console.log('🔍 PatientNavigator - Verificando se paciente tem grupo...');
       
-      const groups = await groupService.getGroups();
+      const result = await groupService.getMyGroups();
       
-      console.log('🔍 PatientNavigator - Grupos encontrados:', groups.length);
-      
-      // Paciente deve estar em pelo menos 1 grupo
-      if (groups && groups.length > 0) {
-        console.log('✅ PatientNavigator - Paciente tem grupo:', groups[0].name);
+      if (result.success && result.data && result.data.length > 0) {
+        console.log('✅ PatientNavigator - Paciente tem grupo:', result.data[0].name);
         setHasGroup(true);
       } else {
         console.log('⚠️ PatientNavigator - Paciente SEM grupo, precisa entrar com código');
