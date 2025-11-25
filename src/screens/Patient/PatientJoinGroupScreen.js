@@ -17,10 +17,40 @@ import colors from '../../constants/colors';
 import { LacosLogoFull } from '../../components/LacosLogo';
 import groupService from '../../services/groupService';
 import Toast from 'react-native-toast-message';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PatientJoinGroupScreen = ({ navigation }) => {
+  const { signOut } = useAuth();
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sair',
+      'Você ainda não entrou em um grupo. Deseja sair e fazer login novamente?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🚪 PatientJoinGroupScreen - Fazendo logout...');
+              await signOut();
+              console.log('✅ PatientJoinGroupScreen - Logout concluído');
+            } catch (error) {
+              console.error('❌ PatientJoinGroupScreen - Erro ao fazer logout:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Erro',
+                text2: 'Não foi possível sair. Tente novamente.',
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleJoinGroup = async () => {
     if (!inviteCode.trim()) {
@@ -78,6 +108,18 @@ const PatientJoinGroupScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar style="dark" />
+      
+      {/* Botão Sair no topo */}
+      <View style={styles.topBar}>
+        <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={handleLogout}
+          disabled={loading}
+        >
+          <Ionicons name="log-out-outline" size={22} color={colors.danger} />
+          <Text style={styles.logoutButtonText}>Sair</Text>
+        </TouchableOpacity>
+      </View>
       
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -155,6 +197,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: colors.danger + '10',
+  },
+  logoutButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.danger,
   },
   keyboardView: {
     flex: 1,
