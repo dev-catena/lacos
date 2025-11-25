@@ -584,13 +584,13 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalContent: {
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     width: '100%',
     maxWidth: 400,
@@ -599,6 +599,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -607,6 +608,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray100,
+    backgroundColor: '#FFFFFF',
   },
   modalTitle: {
     fontSize: 20,
@@ -618,6 +620,7 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 20,
+    backgroundColor: '#FFFFFF',
   },
   modalLabel: {
     fontSize: 16,
