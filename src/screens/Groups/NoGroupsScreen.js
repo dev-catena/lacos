@@ -19,7 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import Toast from 'react-native-toast-message';
 
-const NoGroupsScreen = ({ navigation, onGroupJoined }) => {
+const NoGroupsScreen = ({ navigation, route, onGroupJoined }) => {
   const { user, signed } = useAuth();
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
@@ -39,6 +39,13 @@ const NoGroupsScreen = ({ navigation, onGroupJoined }) => {
       return;
     }
   }, [signed, user]);
+
+  // Abrir modal automaticamente se veio de "Entrar com Código"
+  useEffect(() => {
+    if (route?.params?.openModal) {
+      setInviteModalVisible(true);
+    }
+  }, [route?.params?.openModal]);
 
   const handleCreateGroup = () => {
     // GUARD: Verificar autenticação antes de qualquer ação

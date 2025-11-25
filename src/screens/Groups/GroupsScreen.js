@@ -244,7 +244,7 @@ const GroupsScreen = ({ navigation }) => {
 
           <TouchableOpacity 
             style={styles.joinGroupButton}
-            onPress={() => navigation.navigate('NoGroups')}
+            onPress={() => navigation.navigate('NoGroups', { openModal: true })}
           >
             <Ionicons name="key" size={24} color={colors.secondary} />
             <Text style={styles.joinGroupText}>Entrar com Código</Text>
