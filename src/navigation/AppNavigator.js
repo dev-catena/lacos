@@ -1,11 +1,13 @@
 import React from 'react';
 import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import colors from '../constants/colors';
 import CustomTabBar from '../components/CustomTabBar';
+import CustomDrawerContent from '../components/CustomDrawerContent';
 
 // Importa as telas principais
 import HomeScreen from '../screens/Home/HomeScreen';
@@ -45,6 +47,7 @@ import AddDoctorScreen from '../screens/Doctors/AddDoctorScreen';
 import ShowGroupCodesScreen from '../screens/Debug/ShowGroupCodesScreen';
 
 const Tab = createBottomTabNavigator();
+const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
 
 // Stack Navigator para Home
@@ -394,8 +397,8 @@ const ProfileStack = () => {
   );
 };
 
-// Tab Navigator principal
-const AppNavigator = () => {
+// Tab Navigator (para iOS)
+const TabNavigatorApp = () => {
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -443,6 +446,53 @@ const AppNavigator = () => {
     </Tab.Navigator>
   );
 };
+
+// Drawer Navigator (para Android - FIX Samsung A15)
+const DrawerNavigatorApp = () => {
+  return (
+    <Drawer.Navigator
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      screenOptions={{
+        headerShown: false,
+        drawerType: 'front',
+        drawerStyle: {
+          width: 280,
+        },
+        overlayColor: 'rgba(0, 0, 0, 0.5)',
+        swipeEnabled: true,
+        swipeEdgeWidth: 50,
+      }}
+    >
+      <Drawer.Screen 
+        name="Home" 
+        component={HomeStack}
+        options={{ title: 'Início' }}
+      />
+      <Drawer.Screen 
+        name="Groups" 
+        component={GroupsStack}
+        options={{ title: 'Grupos' }}
+      />
+      <Drawer.Screen 
+        name="Notifications" 
+        component={NotificationsStack}
+        options={{ title: 'Notificações' }}
+      />
+      <Drawer.Screen 
+        name="Profile" 
+        component={ProfileStack}
+        options={{ title: 'Perfil' }}
+      />
+    </Drawer.Navigator>
+  );
+};
+
+// Exporta o navegador correto baseado na plataforma
+const AppNavigator = Platform.select({
+  ios: TabNavigatorApp,
+  android: DrawerNavigatorApp,
+  default: DrawerNavigatorApp,
+});
 
 export default AppNavigator;
 
