@@ -21,6 +21,20 @@ const GroupDetailScreen = ({ route, navigation }) => {
 
   const menuItems = [
     {
+      id: 'history',
+      title: 'Histórico',
+      subtitle: 'Timeline completa de eventos',
+      icon: 'time',
+      IconComponent: null,
+      color: colors.info,
+      backgroundColor: colors.info + '20',
+      onPress: () => navigation.navigate('History', { 
+        groupId, 
+        groupName,
+        accompaniedName
+      }),
+    },
+    {
       id: 'medications',
       title: 'Remédios',
       subtitle: 'Gerenciar medicamentos e horários',
@@ -43,20 +57,6 @@ const GroupDetailScreen = ({ route, navigation }) => {
       onPress: () => navigation.navigate('Agenda', { 
         groupId, 
         groupName 
-      }),
-    },
-    {
-      id: 'history',
-      title: 'Histórico',
-      subtitle: 'Timeline completa de eventos',
-      icon: 'time',
-      IconComponent: null,
-      color: colors.info,
-      backgroundColor: colors.info + '20',
-      onPress: () => navigation.navigate('History', { 
-        groupId, 
-        groupName,
-        accompaniedName
       }),
     },
     {
