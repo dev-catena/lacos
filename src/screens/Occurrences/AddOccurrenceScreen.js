@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
+import occurrenceService from '../../services/occurrenceService';
 
 const AddOccurrenceScreen = ({ route, navigation }) => {
   const { groupId, groupName, accompaniedName } = route.params || {};
@@ -144,8 +145,6 @@ const AddOccurrenceScreen = ({ route, navigation }) => {
 
     setLoading(true);
     try {
-      const occurrenceService = require('../../services/occurrenceService').default;
-      
       await occurrenceService.createOccurrence({
         group_id: groupId,
         type: formData.type === 'outro' ? formData.customType : formData.typeLabel,

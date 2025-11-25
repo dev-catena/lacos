@@ -1,11 +1,11 @@
-import api from './api';
+import apiService from './apiService';
 
 const occurrenceService = {
   // Criar nova ocorrência
   async createOccurrence(data) {
     try {
-      const response = await api.post('/occurrences', data);
-      return response.data;
+      const response = await apiService.post('/occurrences', data);
+      return response;
     } catch (error) {
       console.error('Erro ao criar ocorrência:', error.response?.data || error);
       throw error;
@@ -15,8 +15,8 @@ const occurrenceService = {
   // Listar ocorrências de um grupo
   async getOccurrencesByGroup(groupId) {
     try {
-      const response = await api.get(`/occurrences?group_id=${groupId}`);
-      return response.data;
+      const response = await apiService.get(`/occurrences?group_id=${groupId}`);
+      return response;
     } catch (error) {
       console.error('Erro ao buscar ocorrências:', error.response?.data || error);
       throw error;
@@ -26,8 +26,8 @@ const occurrenceService = {
   // Buscar detalhes de uma ocorrência
   async getOccurrenceById(occurrenceId) {
     try {
-      const response = await api.get(`/occurrences/${occurrenceId}`);
-      return response.data;
+      const response = await apiService.get(`/occurrences/${occurrenceId}`);
+      return response;
     } catch (error) {
       console.error('Erro ao buscar detalhes da ocorrência:', error.response?.data || error);
       throw error;
@@ -37,8 +37,8 @@ const occurrenceService = {
   // Atualizar ocorrência
   async updateOccurrence(occurrenceId, data) {
     try {
-      const response = await api.put(`/occurrences/${occurrenceId}`, data);
-      return response.data;
+      const response = await apiService.put(`/occurrences/${occurrenceId}`, data);
+      return response;
     } catch (error) {
       console.error('Erro ao atualizar ocorrência:', error.response?.data || error);
       throw error;
@@ -48,8 +48,8 @@ const occurrenceService = {
   // Deletar ocorrência
   async deleteOccurrence(occurrenceId) {
     try {
-      const response = await api.delete(`/occurrences/${occurrenceId}`);
-      return response.data;
+      const response = await apiService.delete(`/occurrences/${occurrenceId}`);
+      return response;
     } catch (error) {
       console.error('Erro ao deletar ocorrência:', error.response?.data || error);
       throw error;
