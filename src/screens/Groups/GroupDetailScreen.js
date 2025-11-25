@@ -46,16 +46,17 @@ const GroupDetailScreen = ({ route, navigation }) => {
       }),
     },
     {
-      id: 'consultations',
-      title: 'Consultas',
-      subtitle: 'Histórico de consultas realizadas',
-      icon: 'document-text',
+      id: 'history',
+      title: 'Histórico',
+      subtitle: 'Timeline completa de eventos',
+      icon: 'time',
       IconComponent: null,
       color: colors.info,
       backgroundColor: colors.info + '20',
-      onPress: () => navigation.navigate('Consultations', { 
+      onPress: () => navigation.navigate('History', { 
         groupId, 
-        groupName 
+        groupName,
+        accompaniedName
       }),
     },
     {

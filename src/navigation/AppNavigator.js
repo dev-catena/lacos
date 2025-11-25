@@ -37,6 +37,9 @@ import ConsultationsScreen from '../screens/Consultations/ConsultationsScreen';
 import AddConsultationScreen from '../screens/Consultations/AddConsultationScreen';
 import ConsultationDetailsScreen from '../screens/Consultations/ConsultationDetailsScreen';
 
+// Importa as telas de Histórico
+import HistoryScreen from '../screens/History/HistoryScreen';
+
 // Importa as telas de Médicos
 import DoctorsScreen from '../screens/Doctors/DoctorsScreen';
 import AddDoctorScreen from '../screens/Doctors/AddDoctorScreen';
@@ -191,6 +194,13 @@ const HomeStack = () => {
           headerShown: false 
         }}
       />
+      <Stack.Screen 
+        name="History" 
+        component={HistoryScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -328,6 +338,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="AddDoctor" 
         component={AddDoctorScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="History" 
+        component={HistoryScreen}
         options={{ 
           headerShown: false 
         }}
