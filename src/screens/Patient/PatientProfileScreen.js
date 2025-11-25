@@ -13,10 +13,12 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PATIENT_SESSION_KEY = '@lacos_patient_session';
 
 const PatientProfileScreen = ({ navigation }) => {
+  const { user, signOut } = useAuth();
   const [patientSession, setPatientSession] = useState(null);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ const PatientProfileScreen = ({ navigation }) => {
   const handleLogout = () => {
     Alert.alert(
       'Sair do Aplicativo',
-      'Deseja sair? Você precisará digitar o código novamente para entrar.',
+      'Deseja sair? Você precisará fazer login novamente.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -45,16 +47,18 @@ const PatientProfileScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Remove a sessão do paciente
+              console.log('🚪 PatientProfileScreen - Fazendo logout...');
+              
+              // Remove a sessão antiga do paciente (compatibilidade)
               await AsyncStorage.removeItem(PATIENT_SESSION_KEY);
               
-              // Navega de volta para a tela de seleção
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'ProfileSelection' }],
-              });
+              // Faz logout pelo AuthContext (remove token, user, etc)
+              await signOut();
+              
+              console.log('✅ PatientProfileScreen - Logout concluído, RootNavigator vai redirecionar');
+              // RootNavigator automaticamente redireciona para Login quando signed = false
             } catch (error) {
-              console.error('Erro ao fazer logout:', error);
+              console.error('❌ PatientProfileScreen - Erro ao fazer logout:', error);
               Alert.alert('Erro', 'Não foi possível sair. Tente novamente.');
             }
           },
@@ -94,7 +98,7 @@ const PatientProfileScreen = ({ navigation }) => {
             <Ionicons name="person" size={48} color={colors.textWhite} />
           </View>
           <Text style={styles.userName}>
-            {patientSession?.accompaniedName || 'Paciente'}
+            {user?.name || patientSession?.accompaniedName || 'Paciente'}
           </Text>
           <View style={styles.groupBadge}>
             <Ionicons name="people" size={14} color={colors.primary} />
@@ -102,6 +106,13 @@ const PatientProfileScreen = ({ navigation }) => {
               {patientSession?.groupName || 'Grupo de Cuidados'}
             </Text>
           </View>
+          {user?.profile && (
+            <View style={[styles.profileBadge, { backgroundColor: colors.secondary + '20' }]}>
+              <Text style={[styles.profileBadgeText, { color: colors.secondary }]}>
+                Paciente
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Info Section */}
@@ -239,6 +250,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.primary,
+  },
+  profileBadge: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  profileBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   section: {
     paddingHorizontal: 20,
