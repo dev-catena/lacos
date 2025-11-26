@@ -120,7 +120,8 @@ const PatientHomeScreen = ({ navigation }) => {
       if (appointmentsResult.success && appointmentsResult.data) {
         const appointments = Array.isArray(appointmentsResult.data) ? appointmentsResult.data : [];
         appointments.forEach(appointment => {
-          const appointmentDate = new Date(appointment.scheduled_at || appointment.appointment_date);
+          // Backend usa 'appointment_date' não 'scheduled_at'
+          const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at);
           const hours = appointmentDate.getHours().toString().padStart(2, '0');
           const minutes = appointmentDate.getMinutes().toString().padStart(2, '0');
           const dateLabel = isToday(appointmentDate) ? 'Hoje' : isTomorrow(appointmentDate) ? 'Amanhã' : formatDate(appointmentDate);
@@ -199,8 +200,32 @@ const PatientHomeScreen = ({ navigation }) => {
   };
 
   const calculateNextDoses = (medication) => {
-    // Se não tem schedule, retornar vazio
-    if (!medication.schedule || !Array.isArray(medication.schedule)) {
+    // Backend usa 'times' (JSON) não 'schedule' (array)
+    let timesArray = [];
+    
+    // Tentar extrair horários do campo 'times'
+    if (medication.times) {
+      if (Array.isArray(medication.times)) {
+        timesArray = medication.times;
+      } else if (typeof medication.times === 'object') {
+        // Se for objeto, tentar extrair array de valores
+        timesArray = Object.values(medication.times);
+      } else if (typeof medication.times === 'string') {
+        try {
+          const parsed = JSON.parse(medication.times);
+          timesArray = Array.isArray(parsed) ? parsed : Object.values(parsed);
+        } catch (e) {
+          console.warn('Erro ao parsear times:', e);
+        }
+      }
+    }
+    
+    // Fallback: tentar 'schedule' se existir
+    if (timesArray.length === 0 && medication.schedule) {
+      timesArray = Array.isArray(medication.schedule) ? medication.schedule : [];
+    }
+    
+    if (timesArray.length === 0) {
       return [];
     }
     
@@ -208,8 +233,13 @@ const PatientHomeScreen = ({ navigation }) => {
     const nextDoses = [];
     
     // Pegar até 3 próximas doses
-    medication.schedule.slice(0, 3).forEach(time => {
-      const [hours, minutes] = time.split(':');
+    timesArray.slice(0, 3).forEach(time => {
+      // Garantir que time é string
+      const timeStr = typeof time === 'string' ? time : String(time);
+      const [hours, minutes] = timeStr.split(':');
+      
+      if (!hours || !minutes) return;
+      
       const doseDate = new Date(today);
       doseDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
       
@@ -219,7 +249,7 @@ const PatientHomeScreen = ({ navigation }) => {
       }
       
       nextDoses.push({
-        time: time,
+        time: timeStr,
         date: isToday(doseDate) ? 'Hoje' : isTomorrow(doseDate) ? 'Amanhã' : formatDate(doseDate),
       });
     });
