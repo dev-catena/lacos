@@ -55,6 +55,14 @@ const CreateGroupScreen = ({ navigation }) => {
         Alert.alert('Erro', 'Preencha os campos obrigatórios');
         return;
       }
+      
+      // Usar o nome do paciente como nome do grupo automaticamente
+      const patientFullName = `${accompaniedData.name}${accompaniedData.lastName ? ' ' + accompaniedData.lastName : ''}`.trim();
+      setGroupData(prev => ({
+        ...prev,
+        groupName: patientFullName,
+      }));
+      
       setStep(2);
     }
   };
@@ -395,11 +403,14 @@ const CreateGroupScreen = ({ navigation }) => {
                 <Text style={styles.label}>
                   Nome do Grupo <Text style={styles.required}>*</Text>
                 </Text>
+                <Text style={styles.helperText}>
+                  Preenchido automaticamente com o nome do paciente. Você pode editar se preferir.
+                </Text>
                 <View style={styles.inputWrapper}>
                   <Ionicons name="people-outline" size={20} color={colors.gray400} />
                   <TextInput
                     style={styles.input}
-                    placeholder={`Grupo de ${accompaniedData.name || 'Cuidados'}`}
+                    placeholder={`Ex: ${accompaniedData.name || 'Grupo de Cuidados'}`}
                     value={groupData.groupName}
                     onChangeText={(value) => updateGroupField('groupName', value)}
                   />
@@ -624,6 +635,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     marginBottom: 8,
+  },
+  helperText: {
+    fontSize: 12,
+    color: colors.gray500,
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   required: {
     color: colors.error,
