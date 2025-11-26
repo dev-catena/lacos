@@ -274,8 +274,16 @@ const GroupMembersScreen = ({ route, navigation }) => {
   };
 
   const renderMemberActions = (member) => {
-    if (!isAdmin) return null;
-    if (member.user_id === user?.id) return null; // Não mostrar ações para si mesmo
+    if (!isAdmin) {
+      console.log('⚠️ Usuário não é admin, não mostrará botões');
+      return null;
+    }
+    if (member.user_id === user?.id) {
+      console.log('⚠️ É o próprio usuário, não mostrará botões');
+      return null;
+    }
+
+    console.log(`🔍 Renderizando ações para ${member.user?.name} (role: ${member.role})`);
 
     return (
       <View style={styles.memberActions}>
@@ -291,7 +299,7 @@ const GroupMembersScreen = ({ route, navigation }) => {
               Rebaixar
             </Text>
           </TouchableOpacity>
-        ) : member.role === 'caregiver' && (
+        ) : member.role === 'caregiver' ? (
           <TouchableOpacity
             style={[styles.actionButton, styles.promoteButton]}
             onPress={() => handlePromoteToAdmin(member)}
@@ -302,7 +310,7 @@ const GroupMembersScreen = ({ route, navigation }) => {
               Promover
             </Text>
           </TouchableOpacity>
-        )}
+        ) : null}
 
         {/* Trocar Paciente */}
         {member.role !== 'patient' && (
