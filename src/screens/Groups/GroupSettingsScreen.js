@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import groupService from '../../services/groupService';
+import groupMemberService from '../../services/groupMemberService';
 import {
   VitalSignsIcon,
   PermissionsIcon,
@@ -36,6 +37,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [groupData, setGroupData] = useState(null);
+  const [members, setMembers] = useState([]);
 
   // Sinais Vitais
   const [vitalSigns, setVitalSigns] = useState({
@@ -75,6 +77,17 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       } else {
         console.error('❌ GroupSettings - Erro ao carregar grupo:', result.error);
         Alert.alert('Erro', 'Não foi possível carregar os dados do grupo');
+      }
+
+      // Carregar membros do grupo
+      console.log('👥 GroupSettings - Carregando membros do grupo:', groupId);
+      const membersResult = await groupMemberService.getGroupMembers(groupId);
+      if (membersResult.success && membersResult.data) {
+        console.log('✅ GroupSettings - Membros carregados:', membersResult.data.length);
+        setMembers(membersResult.data);
+      } else {
+        console.warn('⚠️ GroupSettings - Erro ao carregar membros:', membersResult.error);
+        setMembers([]);
       }
     } catch (error) {
       console.error('❌ GroupSettings - Erro ao carregar dados do grupo:', error);
@@ -349,66 +362,91 @@ const GroupSettingsScreen = ({ route, navigation }) => {
               Pessoas que fazem parte deste grupo de cuidados
             </Text>
 
-            {/* Administrador / Cuidador */}
-            <View style={styles.memberCard}>
-              <View style={styles.memberAvatar}>
-                <Ionicons name="person" size={32} color={colors.primary} />
-              </View>
-              <View style={styles.memberInfo}>
-                <View style={styles.memberHeader}>
-                  <Text style={styles.memberName}>Você</Text>
-                  <View style={styles.adminBadge}>
-                    <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
-                    <Text style={styles.adminBadgeText}>Administrador</Text>
-                  </View>
-                </View>
-                <Text style={styles.memberRole}>Cuidador Principal</Text>
-                <View style={styles.memberDetail}>
-                  <Ionicons name="calendar-outline" size={14} color={colors.textLight} />
-                  <Text style={styles.memberDetailText}>
-                    Criado em: {new Date(groupData.createdAt).toLocaleDateString('pt-BR')}
-                  </Text>
-                </View>
-              </View>
-            </View>
+            {/* Lista de Membros Real */}
+            {members.length > 0 ? (
+              <>
+                {members.map((member) => {
+                  const isAdmin = member.role === 'admin';
+                  const isPatient = member.role === 'patient';
+                  const isCaregiver = member.role === 'caregiver';
 
-            {/* Paciente / Pessoa Acompanhada */}
-            <View style={[styles.memberCard, styles.patientCard]}>
-              <View style={[styles.memberAvatar, styles.patientAvatar]}>
-                <Ionicons name="heart" size={32} color={colors.secondary} />
+                  return (
+                    <View 
+                      key={member.id} 
+                      style={[
+                        styles.memberCard,
+                        isPatient && styles.patientCard
+                      ]}
+                    >
+                      <View style={[
+                        styles.memberAvatar,
+                        isPatient && styles.patientAvatar
+                      ]}>
+                        <Ionicons 
+                          name={isPatient ? 'heart' : 'person'} 
+                          size={32} 
+                          color={isPatient ? colors.secondary : colors.primary} 
+                        />
+                      </View>
+                      <View style={styles.memberInfo}>
+                        <View style={styles.memberHeader}>
+                          <Text style={styles.memberName}>
+                            {member.user?.name || 'Membro'}
+                          </Text>
+                          {isAdmin && (
+                            <View style={styles.adminBadge}>
+                              <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
+                              <Text style={styles.adminBadgeText}>Administrador</Text>
+                            </View>
+                          )}
+                          {isPatient && (
+                            <View style={styles.patientBadge}>
+                              <Ionicons name="medkit" size={14} color={colors.secondary} />
+                              <Text style={styles.patientBadgeText}>Paciente</Text>
+                            </View>
+                          )}
+                          {isCaregiver && !isAdmin && (
+                            <View style={styles.caregiverBadge}>
+                              <Ionicons name="heart" size={14} color={colors.info} />
+                              <Text style={styles.caregiverBadgeText}>Cuidador</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.memberRole}>
+                          {isAdmin ? 'Cuidador Principal' : isPatient ? 'Pessoa Acompanhada' : 'Cuidador'}
+                        </Text>
+                        {member.joined_at && (
+                          <View style={styles.memberDetail}>
+                            <Ionicons name="calendar-outline" size={14} color={colors.textLight} />
+                            <Text style={styles.memberDetailText}>
+                              Entrou em: {new Date(member.joined_at).toLocaleDateString('pt-BR')}
+                            </Text>
+                          </View>
+                        )}
+                        {member.user?.email && (
+                          <View style={styles.memberDetail}>
+                            <Ionicons name="mail-outline" size={14} color={colors.textLight} />
+                            <Text style={styles.memberDetailText}>
+                              {member.user.email}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            ) : (
+              <View style={styles.emptyMembersCard}>
+                <Ionicons name="people-outline" size={48} color={colors.gray300} />
+                <Text style={styles.emptyMembersText}>Nenhum membro no grupo</Text>
               </View>
-              <View style={styles.memberInfo}>
-                <View style={styles.memberHeader}>
-                  <Text style={styles.memberName}>{groupData.accompaniedName || 'Paciente'}</Text>
-                  <View style={styles.patientBadge}>
-                    <Ionicons name="medkit" size={14} color={colors.secondary} />
-                    <Text style={styles.patientBadgeText}>Paciente</Text>
-                  </View>
-                </View>
-                <Text style={styles.memberRole}>Pessoa Acompanhada</Text>
-                {groupData.accompaniedBirthDate && (
-                  <View style={styles.memberDetail}>
-                    <Ionicons name="calendar-outline" size={14} color={colors.textLight} />
-                    <Text style={styles.memberDetailText}>
-                      Nascimento: {new Date(groupData.accompaniedBirthDate).toLocaleDateString('pt-BR')}
-                    </Text>
-                  </View>
-                )}
-                {groupData.accompaniedRelationship && (
-                  <View style={styles.memberDetail}>
-                    <Ionicons name="link-outline" size={14} color={colors.textLight} />
-                    <Text style={styles.memberDetailText}>
-                      Relação: {groupData.accompaniedRelationship}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
+            )}
 
             <View style={styles.membersInfoCard}>
               <Ionicons name="information-circle" size={20} color={colors.info} />
               <Text style={styles.membersInfoText}>
-                Atualmente este grupo tem 2 membros: você como cuidador e {groupData.accompaniedName || 'o paciente'}.
+                Atualmente este grupo tem {members.length} membro{members.length !== 1 ? 's' : ''}.
               </Text>
             </View>
           </View>
@@ -859,6 +897,30 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
+  },
+  caregiverBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.info + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  caregiverBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.info,
+  },
+  emptyMembersCard: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    gap: 10,
+  },
+  emptyMembersText: {
+    fontSize: 16,
+    color: colors.gray600,
+    fontWeight: '600',
   },
   patientBadgeText: {
     fontSize: 11,
