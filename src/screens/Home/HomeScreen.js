@@ -20,6 +20,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { LacosIcon, LacosLogoFull } from '../../components/LacosLogo';
 import ProfileSwitcher from '../../components/ProfileSwitcher';
 import groupService from '../../services/groupService';
+import activityService from '../../services/activityService';
+import moment from 'moment';
 import {
   MedicationIcon,
   VitalSignsIcon,
@@ -119,6 +121,9 @@ const HomeScreen = ({ navigation }) => {
         
         setMyGroups(myCreatedGroups);
         setParticipatingGroups(joinedGroups);
+        
+        // Carregar atividades recentes
+        loadActivities();
       } else {
         console.warn('⚠️ HomeScreen - Erro ao buscar grupos');
         // Em caso de erro, setar estado vazio
@@ -132,6 +137,34 @@ const HomeScreen = ({ navigation }) => {
       setParticipatingGroups([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadActivities = async () => {
+    try {
+      console.log('📊 HomeScreen - Carregando atividades recentes...');
+      const result = await activityService.getRecentActivities(10);
+      
+      if (result.success && result.data) {
+        const formattedActivities = result.data.map(activity => ({
+          id: activity.id,
+          title: activityService.getActivityTypeLabel(activity.action_type),
+          description: activity.description,
+          groupName: activity.group?.name || 'Grupo',
+          icon: activityService.getActivityIcon(activity.action_type),
+          color: activityService.getActivityColor(activity.action_type),
+          time: moment(activity.created_at).fromNow(),
+        }));
+        
+        setRecentActivities(formattedActivities);
+        console.log(`✅ HomeScreen - ${formattedActivities.length} atividade(s) carregada(s)`);
+      } else {
+        console.warn('⚠️ HomeScreen - Nenhuma atividade encontrada');
+        setRecentActivities([]);
+      }
+    } catch (error) {
+      console.error('❌ HomeScreen - Erro ao carregar atividades:', error);
+      setRecentActivities([]);
     }
   };
 
