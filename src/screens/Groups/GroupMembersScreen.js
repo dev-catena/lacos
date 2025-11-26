@@ -286,7 +286,7 @@ const GroupMembersScreen = ({ route, navigation }) => {
             onPress={() => handleDemoteAdmin(member)}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-down-circle" size={16} color={colors.warning} />
+            <Ionicons name="arrow-down-circle-outline" size={20} color={colors.warning} />
             <Text style={[styles.actionButtonText, { color: colors.warning }]}>
               Rebaixar
             </Text>
@@ -297,7 +297,7 @@ const GroupMembersScreen = ({ route, navigation }) => {
             onPress={() => handlePromoteToAdmin(member)}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-up-circle" size={16} color={colors.success} />
+            <Ionicons name="arrow-up-circle-outline" size={20} color={colors.success} />
             <Text style={[styles.actionButtonText, { color: colors.success }]}>
               Promover
             </Text>
@@ -311,7 +311,7 @@ const GroupMembersScreen = ({ route, navigation }) => {
             onPress={() => handleChangePatient(member)}
             activeOpacity={0.7}
           >
-            <Ionicons name="swap-horizontal" size={16} color={colors.info} />
+            <Ionicons name="swap-horizontal-outline" size={20} color={colors.info} />
             <Text style={[styles.actionButtonText, { color: colors.info }]}>
               Tornar Paciente
             </Text>
@@ -324,7 +324,7 @@ const GroupMembersScreen = ({ route, navigation }) => {
           onPress={() => handleRemoveMember(member)}
           activeOpacity={0.7}
         >
-          <Ionicons name="trash" size={16} color={colors.error} />
+          <Ionicons name="trash-outline" size={20} color={colors.error} />
           <Text style={[styles.actionButtonText, { color: colors.error }]}>
             Remover
           </Text>
@@ -691,11 +691,11 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 8,
-    borderWidth: 1,
-    gap: 6,
+    borderWidth: 1.5,
+    gap: 8,
   },
   promoteButton: {
     backgroundColor: colors.success + '10',
@@ -714,7 +714,7 @@ const styles = StyleSheet.create({
     borderColor: colors.error + '30',
   },
   actionButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   emptyState: {
