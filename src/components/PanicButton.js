@@ -60,7 +60,7 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
       Animated.timing(holdProgress, {
         toValue: 1,
         duration: HOLD_DURATION,
-        useNativeDriver: false,
+        useNativeDriver: true,
       }),
       Animated.timing(scaleAnim, {
         toValue: 10, // Expande 10x para cobrir a tela
@@ -83,7 +83,7 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
         Animated.timing(holdProgress, {
           toValue: 0,
           duration: 300,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
         Animated.timing(scaleAnim, {
           toValue: 1,
@@ -286,10 +286,14 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
                   style={[
                     styles.progressFill,
                     {
-                      width: holdProgress.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%'],
-                      }),
+                      transform: [
+                        { scaleX: holdProgress },
+                        { translateX: holdProgress.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-60, 0], // -50% de 120 (width da barra)
+                          })
+                        }
+                      ],
                     },
                   ]}
                 />
@@ -371,8 +375,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   progressFill: {
+    width: '100%',
     height: '100%',
     backgroundColor: colors.white,
+    borderRadius: 2,
   },
   hint: {
     marginTop: 12,
