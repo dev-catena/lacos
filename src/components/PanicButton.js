@@ -9,6 +9,7 @@ import {
   Linking,
   Platform,
   Alert,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -223,34 +224,41 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
 
   if (isCallActive) {
     return (
-      <View style={styles.callActiveContainer}>
-        <Animated.View
-          style={[
-            styles.callActiveContent,
-            {
-              transform: [{ scale: pulseAnim }],
-            },
-          ]}
-        >
-          <View style={styles.sosIconContainer}>
-            <Text style={styles.sosText}>SOS</Text>
-          </View>
-          <Text style={styles.callActiveTitle}>Chamada de Emergência Ativa</Text>
-          <Text style={styles.callActiveSubtitle}>
-            {emergencyContacts.length > 0
-              ? `Conectado: ${emergencyContacts[0].user?.name || 'Contato de emergência'}`
-              : 'Conectando...'}
-          </Text>
-          <TouchableOpacity
-            style={styles.endCallButton}
-            onPress={endCall}
-            activeOpacity={0.8}
+      <Modal
+        visible={true}
+        transparent={false}
+        animationType="none"
+        statusBarTranslucent={true}
+      >
+        <View style={styles.callActiveContainer}>
+          <Animated.View
+            style={[
+              styles.callActiveContent,
+              {
+                transform: [{ scale: pulseAnim }],
+              },
+            ]}
           >
-            <Ionicons name="call" size={24} color={colors.white} style={{ transform: [{ rotate: '135deg' }] }} />
-            <Text style={styles.endCallText}>Desligar</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
+            <View style={styles.sosIconContainer}>
+              <Text style={styles.sosText}>SOS</Text>
+            </View>
+            <Text style={styles.callActiveTitle}>Chamada de Emergência Ativa</Text>
+            <Text style={styles.callActiveSubtitle}>
+              {emergencyContacts.length > 0
+                ? `Conectado: ${emergencyContacts[0].user?.name || 'Contato de emergência'}`
+                : 'Conectando...'}
+            </Text>
+            <TouchableOpacity
+              style={styles.endCallButton}
+              onPress={endCall}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="call" size={24} color={colors.white} style={{ transform: [{ rotate: '135deg' }] }} />
+              <Text style={styles.endCallText}>Desligar</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
     );
   }
 
@@ -414,11 +422,7 @@ const styles = StyleSheet.create({
   },
   // Estilos para chamada ativa
   callActiveContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: '#FF3B30',
     alignItems: 'center',
     justifyContent: 'center',
