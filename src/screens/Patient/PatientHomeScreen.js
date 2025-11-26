@@ -18,11 +18,13 @@ import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
 import PanicButton from '../../components/PanicButton';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PATIENT_SESSION_KEY = '@lacos_patient_session';
 const GROUPS_STORAGE_KEY = '@lacos_groups';
 
 const PatientHomeScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [patientSession, setPatientSession] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [sosContacts, setSosContacts] = useState([]);
@@ -339,10 +341,8 @@ const PatientHomeScreen = ({ navigation }) => {
         <View style={styles.headerLeft}>
           <LacosIcon size={36} />
           <View>
-            <Text style={styles.greeting}>Olá!</Text>
-            {patientSession && (
-              <Text style={styles.userName}>{patientSession.accompaniedName}</Text>
-            )}
+            <Text style={styles.greeting}>Olá,</Text>
+            <Text style={styles.userName}>{user?.name || 'Paciente'}</Text>
           </View>
         </View>
       </View>
