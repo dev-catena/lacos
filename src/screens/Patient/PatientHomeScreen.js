@@ -9,6 +9,7 @@ import {
   Linking,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,9 @@ import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
 import PanicButton from '../../components/PanicButton';
 import { useAuth } from '../../contexts/AuthContext';
+import groupService from '../../services/groupService';
+import appointmentService from '../../services/appointmentService';
+import medicationService from '../../services/medicationService';
 
 const PATIENT_SESSION_KEY = '@lacos_patient_session';
 const GROUPS_STORAGE_KEY = '@lacos_groups';
@@ -29,74 +33,45 @@ const PatientHomeScreen = ({ navigation }) => {
   const [contacts, setContacts] = useState([]);
   const [sosContacts, setSosContacts] = useState([]);
   const [groupId, setGroupId] = useState(null);
-
-  // Mock de notificações - Criar consulta AGORA para testar o microfone
-  const [notifications, setNotifications] = useState(() => {
-    const now = new Date();
-    const appointmentTime = new Date(now.getTime() + 2 * 60 * 1000); // 2 minutos no futuro
-    const hours = appointmentTime.getHours().toString().padStart(2, '0');
-    const minutes = appointmentTime.getMinutes().toString().padStart(2, '0');
-    
-    return [
-      {
-        id: 1,
-        type: 'appointment',
-        title: 'Consulta com Dr. Silva',
-        description: 'Cardiologia - AGORA',
-        time: `${hours}:${minutes}`,
-        date: 'Hoje',
-        icon: 'calendar',
-        color: colors.warning,
-        appointmentTime: appointmentTime.toISOString(), // Adiciona o horário ISO
-      },
-      {
-        id: 2,
-        type: 'medication',
-        title: 'Hora do Remédio',
-        description: 'Losartana 50mg',
-        time: '15:00',
-        date: 'Hoje',
-        icon: 'medical',
-        color: colors.secondary,
-      },
-      {
-        id: 3,
-        type: 'appointment',
-        title: 'Fisioterapia',
-        description: 'Centro de Reabilitação',
-        time: '10:00',
-        date: 'Amanhã',
-        icon: 'calendar',
-        color: colors.warning,
-        appointmentTime: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(), // Amanhã
-      },
-    ];
-  });
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useFocusEffect(
     React.useCallback(() => {
-      loadPatientSession();
+      loadPatientData();
     }, [])
   );
 
-  const loadPatientSession = async () => {
+  const loadPatientData = async () => {
+    setLoading(true);
     try {
-      const sessionJson = await AsyncStorage.getItem(PATIENT_SESSION_KEY);
-      if (sessionJson) {
-        const session = JSON.parse(sessionJson);
-        setPatientSession(session);
-
-        // Carregar contatos do grupo
+      // 1. Buscar grupos do usuário
+      const groupsResult = await groupService.getMyGroups();
+      
+      if (groupsResult.success && groupsResult.data && groupsResult.data.length > 0) {
+        const patientGroup = groupsResult.data[0]; // Paciente deve ter apenas 1 grupo
+        const currentGroupId = patientGroup.id;
+        
+        console.log('📋 PatientHomeScreen - Grupo encontrado:', patientGroup.name);
+        setGroupId(currentGroupId);
+        
+        // 2. Carregar eventos (appointments + medications)
+        await loadUpcomingEvents(currentGroupId);
+        
+        // 3. Carregar contatos do AsyncStorage (temporário até migrar para API)
+        const sessionJson = await AsyncStorage.getItem(PATIENT_SESSION_KEY);
+        if (sessionJson) {
+          const session = JSON.parse(sessionJson);
+          setPatientSession(session);
+        }
+        
+        // Carregar contatos do grupo (AsyncStorage temporário)
         const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
         if (groupsJson) {
           const groups = JSON.parse(groupsJson);
-          const currentGroup = groups.find(g => g.id === session.groupId);
-
+          const currentGroup = groups.find(g => g.id === currentGroupId);
+          
           if (currentGroup) {
-            // Definir groupId para o botão de pânico
-            setGroupId(session.groupId);
-            
-            // Carregar contatos rápidos com cores padrão
             const colorOptions = [colors.primary, colors.secondary, colors.info];
             const quickContacts = (currentGroup.quickContacts || []).map((contact, index) => ({
               ...contact,
@@ -105,20 +80,151 @@ const PatientHomeScreen = ({ navigation }) => {
             
             setContacts(quickContacts);
             setSosContacts(currentGroup.sosContacts || []);
-            
-            console.log('Contatos carregados:', quickContacts);
-            console.log('Contatos SOS:', currentGroup.sosContacts);
           }
         }
+      } else {
+        console.warn('⚠️ PatientHomeScreen - Nenhum grupo encontrado para o paciente');
       }
     } catch (error) {
-      console.error('Erro ao carregar sessão:', error);
+      console.error('❌ PatientHomeScreen - Erro ao carregar dados:', error);
       Toast.show({
         type: 'error',
         text1: 'Erro',
         text2: 'Não foi possível carregar os dados',
       });
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const loadUpcomingEvents = async (currentGroupId) => {
+    try {
+      const today = new Date();
+      const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      console.log('📅 PatientHomeScreen - Carregando eventos do grupo:', currentGroupId);
+      
+      // Buscar appointments
+      const appointmentsResult = await appointmentService.getAppointments(
+        currentGroupId,
+        today.toISOString().split('T')[0],
+        nextWeek.toISOString().split('T')[0]
+      );
+      
+      // Buscar medications
+      const medicationsResult = await medicationService.getMedications(currentGroupId);
+      
+      const upcomingEvents = [];
+      
+      // Processar appointments
+      if (appointmentsResult.success && appointmentsResult.data) {
+        const appointments = Array.isArray(appointmentsResult.data) ? appointmentsResult.data : [];
+        appointments.forEach(appointment => {
+          const appointmentDate = new Date(appointment.scheduled_at || appointment.appointment_date);
+          const hours = appointmentDate.getHours().toString().padStart(2, '0');
+          const minutes = appointmentDate.getMinutes().toString().padStart(2, '0');
+          const dateLabel = isToday(appointmentDate) ? 'Hoje' : isTomorrow(appointmentDate) ? 'Amanhã' : formatDate(appointmentDate);
+          
+          upcomingEvents.push({
+            id: `appointment-${appointment.id}`,
+            type: 'appointment',
+            title: appointment.title || 'Consulta',
+            description: appointment.description || appointment.type || '',
+            time: `${hours}:${minutes}`,
+            date: dateLabel,
+            icon: 'calendar',
+            color: colors.warning,
+            appointmentTime: appointmentDate.toISOString(),
+            data: appointment,
+          });
+        });
+      }
+      
+      // Processar medications (próximas doses)
+      if (medicationsResult.success && medicationsResult.data) {
+        const medications = Array.isArray(medicationsResult.data) ? medicationsResult.data : [];
+        medications.forEach(medication => {
+          // Calcular próximas doses baseado no schedule
+          const nextDoses = calculateNextDoses(medication);
+          nextDoses.forEach(dose => {
+            upcomingEvents.push({
+              id: `medication-${medication.id}-${dose.time}`,
+              type: 'medication',
+              title: 'Hora do Remédio',
+              description: `${medication.name} ${medication.dosage || ''}`,
+              time: dose.time,
+              date: dose.date,
+              icon: 'medical',
+              color: colors.secondary,
+              data: medication,
+            });
+          });
+        });
+      }
+      
+      // Ordenar por data/hora
+      upcomingEvents.sort((a, b) => {
+        const dateA = a.appointmentTime ? new Date(a.appointmentTime) : new Date(`${a.date} ${a.time}`);
+        const dateB = b.appointmentTime ? new Date(b.appointmentTime) : new Date(`${b.date} ${b.time}`);
+        return dateA - dateB;
+      });
+      
+      console.log(`✅ PatientHomeScreen - ${upcomingEvents.length} evento(s) próximo(s) carregado(s)`);
+      setNotifications(upcomingEvents);
+    } catch (error) {
+      console.error('❌ PatientHomeScreen - Erro ao carregar eventos:', error);
+      setNotifications([]);
+    }
+  };
+
+  const isToday = (date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  };
+
+  const isTomorrow = (date) => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return date.getDate() === tomorrow.getDate() &&
+      date.getMonth() === tomorrow.getMonth() &&
+      date.getFullYear() === tomorrow.getFullYear();
+  };
+
+  const formatDate = (date) => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    return `${day}/${month}`;
+  };
+
+  const calculateNextDoses = (medication) => {
+    // Se não tem schedule, retornar vazio
+    if (!medication.schedule || !Array.isArray(medication.schedule)) {
+      return [];
+    }
+    
+    const today = new Date();
+    const nextDoses = [];
+    
+    // Pegar até 3 próximas doses
+    medication.schedule.slice(0, 3).forEach(time => {
+      const [hours, minutes] = time.split(':');
+      const doseDate = new Date(today);
+      doseDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      
+      // Se o horário já passou hoje, pegar para amanhã
+      if (doseDate < today) {
+        doseDate.setDate(doseDate.getDate() + 1);
+      }
+      
+      nextDoses.push({
+        time: time,
+        date: isToday(doseDate) ? 'Hoje' : isTomorrow(doseDate) ? 'Amanhã' : formatDate(doseDate),
+      });
+    });
+    
+    return nextDoses;
   };
 
 
@@ -331,6 +437,19 @@ const PatientHomeScreen = ({ navigation }) => {
   };
 
 
+
+  // Loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Carregando...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -634,6 +753,17 @@ const styles = StyleSheet.create({
     bottom: 24,
     right: 24,
     zIndex: 1000,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.text,
   },
 });
 
