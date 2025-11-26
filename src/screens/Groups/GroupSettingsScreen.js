@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
+import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import groupMemberService from '../../services/groupMemberService';
 import {
@@ -34,10 +35,12 @@ const GROUPS_STORAGE_KEY = '@lacos_groups';
 const GroupSettingsScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params || {};
   
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [groupData, setGroupData] = useState(null);
   const [members, setMembers] = useState([]);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Sinais Vitais
   const [vitalSigns, setVitalSigns] = useState({
@@ -85,6 +88,26 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       if (membersResult.success && membersResult.data) {
         console.log('✅ GroupSettings - Membros carregados:', membersResult.data.length);
         setMembers(membersResult.data);
+        
+        // Verificar se o usuário logado é admin
+        const currentUserMember = membersResult.data.find(m => m.user_id === user?.id);
+        const userIsAdmin = currentUserMember?.role === 'admin';
+        setIsAdmin(userIsAdmin);
+        console.log(`👤 Usuário é admin: ${userIsAdmin}`);
+        
+        // Se não for admin, bloquear acesso
+        if (!userIsAdmin) {
+          Alert.alert(
+            'Acesso Negado',
+            'Apenas administradores podem acessar as configurações do grupo.',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.goBack(),
+              },
+            ]
+          );
+        }
       } else {
         console.warn('⚠️ GroupSettings - Erro ao carregar membros:', membersResult.error);
         setMembers([]);
@@ -449,6 +472,19 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                 Atualmente este grupo tem {members.length} membro{members.length !== 1 ? 's' : ''}.
               </Text>
             </View>
+
+            {/* Botão Gerenciar Membros */}
+            <TouchableOpacity
+              style={styles.manageMembersButton}
+              onPress={() => navigation.navigate('GroupMembers', { groupId, groupName })}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="settings-outline" size={20} color={colors.primary} />
+              <Text style={styles.manageMembersButtonText}>
+                Gerenciar Membros
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -921,6 +957,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.gray600,
     fontWeight: '600',
+  },
+  manageMembersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.primary + '10',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  manageMembersButtonText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+    marginLeft: 8,
   },
   patientBadgeText: {
     fontSize: 11,

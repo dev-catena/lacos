@@ -15,6 +15,7 @@ import GroupsScreen from '../screens/Groups/GroupsScreen';
 import CreateGroupScreen from '../screens/Groups/CreateGroupScreen';
 import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
 import GroupSettingsScreen from '../screens/Groups/GroupSettingsScreen';
+import GroupMembersScreen from '../screens/Groups/GroupMembersScreen';
 import GroupContactsScreen from '../screens/Groups/GroupContactsScreen';
 import PanicSettingsScreen from '../screens/Groups/PanicSettingsScreen';
 import AddVitalSignsScreen from '../screens/Groups/AddVitalSignsScreen';
@@ -97,6 +98,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="GroupSettings" 
         component={GroupSettingsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="GroupMembers" 
+        component={GroupMembersScreen}
         options={{ 
           headerShown: false 
         }}
@@ -273,6 +281,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="GroupSettings" 
         component={GroupSettingsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="GroupMembers" 
+        component={GroupMembersScreen}
         options={{ 
           headerShown: false 
         }}
