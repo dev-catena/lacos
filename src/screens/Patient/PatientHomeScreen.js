@@ -23,6 +23,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import appointmentService from '../../services/appointmentService';
 import medicationService from '../../services/medicationService';
+import emergencyContactService from '../../services/emergencyContactService';
 
 const PATIENT_SESSION_KEY = '@lacos_patient_session';
 const GROUPS_STORAGE_KEY = '@lacos_groups';
@@ -58,29 +59,14 @@ const PatientHomeScreen = ({ navigation }) => {
         // 2. Carregar eventos (appointments + medications)
         await loadUpcomingEvents(currentGroupId);
         
-        // 3. Carregar contatos do AsyncStorage (temporário até migrar para API)
+        // 3. Carregar contatos de emergência da API
+        await loadEmergencyContacts(currentGroupId);
+        
+        // 4. Manter sessão no AsyncStorage (temporário)
         const sessionJson = await AsyncStorage.getItem(PATIENT_SESSION_KEY);
         if (sessionJson) {
           const session = JSON.parse(sessionJson);
           setPatientSession(session);
-        }
-        
-        // Carregar contatos do grupo (AsyncStorage temporário)
-        const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
-        if (groupsJson) {
-          const groups = JSON.parse(groupsJson);
-          const currentGroup = groups.find(g => g.id === currentGroupId);
-          
-          if (currentGroup) {
-            const colorOptions = [colors.primary, colors.secondary, colors.info];
-            const quickContacts = (currentGroup.quickContacts || []).map((contact, index) => ({
-              ...contact,
-              color: colorOptions[index % colorOptions.length],
-            }));
-            
-            setContacts(quickContacts);
-            setSosContacts(currentGroup.sosContacts || []);
-          }
         }
       } else {
         console.warn('⚠️ PatientHomeScreen - Nenhum grupo encontrado para o paciente');
@@ -175,6 +161,66 @@ const PatientHomeScreen = ({ navigation }) => {
     } catch (error) {
       console.error('❌ PatientHomeScreen - Erro ao carregar eventos:', error);
       setNotifications([]);
+    }
+  };
+
+  const loadEmergencyContacts = async (currentGroupId) => {
+    try {
+      console.log('📞 PatientHomeScreen - Carregando contatos de emergência do grupo:', currentGroupId);
+      
+      // Buscar contatos de emergência da API
+      const contactsResult = await emergencyContactService.getEmergencyContacts(currentGroupId);
+      
+      // Buscar membros do grupo que são contatos de emergência
+      const membersResult = await groupService.getGroupMembers(currentGroupId);
+      
+      const allContacts = [];
+      const colorOptions = [colors.primary, colors.secondary, colors.info];
+      
+      // Adicionar contatos de emergência (tabela emergency_contacts)
+      if (contactsResult.success && contactsResult.data) {
+        const emergencyContacts = Array.isArray(contactsResult.data) ? contactsResult.data : [];
+        emergencyContacts.forEach((contact, index) => {
+          allContacts.push({
+            id: `emergency-${contact.id}`,
+            name: contact.name,
+            phone: contact.phone,
+            relationship: contact.relationship || 'Contato de Emergência',
+            color: colorOptions[index % colorOptions.length],
+            type: 'emergency',
+          });
+        });
+      }
+      
+      // Adicionar membros que são contatos de emergência (group_members com is_emergency_contact=true)
+      if (membersResult.success && membersResult.data) {
+        const members = Array.isArray(membersResult.data) ? membersResult.data : [];
+        const emergencyMembers = members.filter(m => m.is_emergency_contact);
+        
+        emergencyMembers.forEach((member, index) => {
+          allContacts.push({
+            id: `member-${member.user_id || member.id}`,
+            name: member.user?.name || member.name || 'Membro do Grupo',
+            phone: member.user?.phone || member.phone || '',
+            relationship: member.role === 'admin' ? 'Cuidador Principal' : 'Cuidador',
+            color: colorOptions[(allContacts.length + index) % colorOptions.length],
+            type: 'member',
+          });
+        });
+      }
+      
+      // Limitar a 3 contatos (os 3 primeiros)
+      const quickContacts = allContacts.slice(0, 3);
+      
+      console.log(`✅ PatientHomeScreen - ${quickContacts.length} contato(s) rápido(s) carregado(s)`);
+      setContacts(quickContacts);
+      
+      // SOS contacts = todos os contatos (para o botão de pânico)
+      setSosContacts(allContacts);
+    } catch (error) {
+      console.error('❌ PatientHomeScreen - Erro ao carregar contatos:', error);
+      setContacts([]);
+      setSosContacts([]);
     }
   };
 

@@ -185,6 +185,22 @@ class GroupService {
       };
     }
   }
+
+  /**
+   * Buscar membros de um grupo
+   */
+  async getGroupMembers(groupId) {
+    try {
+      const response = await apiService.get(`/groups/${groupId}/members`);
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Erro ao buscar membros do grupo:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Erro ao buscar membros' 
+      };
+    }
+  }
 }
 
 export default new GroupService();

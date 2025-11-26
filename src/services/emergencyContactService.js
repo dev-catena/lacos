@@ -9,26 +9,27 @@ class EmergencyContactService {
    */
   async createEmergencyContact(contactData) {
     try {
-      const data = {
-        group_id: contactData.groupId,
-        name: contactData.name,
-        phone: contactData.phone,
-        relationship: contactData.relationship,
-      };
-
-      const response = await apiService.post('/emergency-contacts', data);
+      const response = await apiService.post('/emergency-contacts', contactData);
       return { success: true, data: response };
     } catch (error) {
       console.error('Erro ao criar contato de emergência:', error);
+      
+      let errorMessage = 'Erro ao criar contato';
+      if (error.errors) {
+        errorMessage = Object.values(error.errors).flat().join(', ');
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return { 
         success: false, 
-        error: error.message || 'Erro ao criar contato de emergência' 
+        error: errorMessage
       };
     }
   }
 
   /**
-   * Listar contatos de emergência de um grupo
+   * Listar contatos de emergência
    */
   async getEmergencyContacts(groupId = null) {
     try {
@@ -43,68 +44,90 @@ class EmergencyContactService {
       console.error('Erro ao buscar contatos de emergência:', error);
       return { 
         success: false, 
-        error: error.message || 'Erro ao buscar contatos de emergência' 
+        error: error.message || 'Erro ao buscar contatos' 
       };
     }
   }
 
   /**
-   * Obter detalhes de um contato de emergência específico
+   * Buscar contato específico
    */
   async getEmergencyContact(contactId) {
     try {
-      const endpoint = apiService.replaceParams('/emergency-contacts/:id', { id: contactId });
-      const response = await apiService.get(endpoint);
+      const response = await apiService.get(`/emergency-contacts/${contactId}`);
       return { success: true, data: response };
     } catch (error) {
-      console.error('Erro ao buscar contato de emergência:', error);
+      console.error('Erro ao buscar contato:', error);
       return { 
         success: false, 
-        error: error.message || 'Erro ao buscar contato de emergência' 
+        error: error.message || 'Erro ao buscar contato' 
       };
     }
   }
 
   /**
-   * Atualizar contato de emergência
+   * Atualizar contato
    */
   async updateEmergencyContact(contactId, contactData) {
     try {
-      const endpoint = apiService.replaceParams('/emergency-contacts/:id', { id: contactId });
-      const data = {
-        name: contactData.name,
-        phone: contactData.phone,
-        relationship: contactData.relationship,
-      };
-
-      const response = await apiService.put(endpoint, data);
+      const response = await apiService.put(`/emergency-contacts/${contactId}`, contactData);
       return { success: true, data: response };
     } catch (error) {
-      console.error('Erro ao atualizar contato de emergência:', error);
+      console.error('Erro ao atualizar contato:', error);
+      
+      let errorMessage = 'Erro ao atualizar contato';
+      if (error.errors) {
+        errorMessage = Object.values(error.errors).flat().join(', ');
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return { 
         success: false, 
-        error: error.message || 'Erro ao atualizar contato de emergência' 
+        error: errorMessage
       };
     }
   }
 
   /**
-   * Deletar contato de emergência
+   * Deletar contato
    */
   async deleteEmergencyContact(contactId) {
     try {
-      const endpoint = apiService.replaceParams('/emergency-contacts/:id', { id: contactId });
-      await apiService.delete(endpoint);
+      await apiService.delete(`/emergency-contacts/${contactId}`);
       return { success: true };
     } catch (error) {
-      console.error('Erro ao deletar contato de emergência:', error);
+      console.error('Erro ao deletar contato:', error);
       return { 
         success: false, 
-        error: error.message || 'Erro ao deletar contato de emergência' 
+        error: error.message || 'Erro ao deletar contato' 
+      };
+    }
+  }
+
+  /**
+   * Buscar membros do grupo que são contatos de emergência
+   */
+  async getGroupMembersAsEmergencyContacts(groupId) {
+    try {
+      // Buscar membros do grupo
+      const response = await apiService.get(`/groups/${groupId}/members`);
+      
+      if (response && Array.isArray(response)) {
+        // Filtrar apenas os que são contatos de emergência
+        const emergencyMembers = response.filter(member => member.is_emergency_contact);
+        return { success: true, data: emergencyMembers };
+      }
+      
+      return { success: true, data: [] };
+    } catch (error) {
+      console.error('Erro ao buscar membros como contatos de emergência:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Erro ao buscar membros' 
       };
     }
   }
 }
 
 export default new EmergencyContactService();
-
