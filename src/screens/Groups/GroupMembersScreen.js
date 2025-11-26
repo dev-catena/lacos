@@ -36,16 +36,30 @@ const GroupMembersScreen = ({ route, navigation }) => {
   const loadMembers = async () => {
     try {
       console.log('👥 Carregando membros do grupo:', groupId);
+      console.log('👤 Usuário logado ID:', user?.id);
+      console.log('👤 Usuário logado Nome:', user?.name);
+      
       const result = await groupMemberService.getGroupMembers(groupId);
       
       if (result.success && result.data) {
+        console.log('📋 Membros retornados pela API:', JSON.stringify(result.data, null, 2));
         setMembers(result.data);
         
         // Verificar se o usuário logado é admin
         const currentUserMember = result.data.find(m => m.user_id === user?.id);
-        setIsAdmin(currentUserMember?.role === 'admin');
+        console.log('🔍 Membro atual encontrado:', currentUserMember);
+        console.log('🔍 Role do membro atual:', currentUserMember?.role);
         
+        const userIsAdmin = currentUserMember?.role === 'admin';
+        setIsAdmin(userIsAdmin);
+        
+        console.log(`👑 É ADMIN? ${userIsAdmin ? 'SIM ✅' : 'NÃO ❌'}`);
         console.log(`✅ ${result.data.length} membro(s) carregado(s)`);
+        
+        // Log de cada membro
+        result.data.forEach(m => {
+          console.log(`  - ${m.user?.name} (ID: ${m.user_id}, Role: ${m.role})`);
+        });
       } else {
         Toast.show({
           type: 'error',
@@ -274,16 +288,28 @@ const GroupMembersScreen = ({ route, navigation }) => {
   };
 
   const renderMemberActions = (member) => {
+    console.log('─────────────────────────────────────');
+    console.log(`🎯 renderMemberActions chamado para: ${member.user?.name}`);
+    console.log(`   - Member ID: ${member.id}`);
+    console.log(`   - User ID: ${member.user_id}`);
+    console.log(`   - Role: ${member.role}`);
+    console.log(`   - isAdmin global: ${isAdmin}`);
+    console.log(`   - user?.id (logado): ${user?.id}`);
+    
     if (!isAdmin) {
-      console.log('⚠️ Usuário não é admin, não mostrará botões');
+      console.log('❌ BLOQUEADO: Usuário não é admin');
       return null;
     }
     if (member.user_id === user?.id) {
-      console.log('⚠️ É o próprio usuário, não mostrará botões');
+      console.log('❌ BLOQUEADO: É o próprio usuário');
       return null;
     }
 
-    console.log(`🔍 Renderizando ações para ${member.user?.name} (role: ${member.role})`);
+    console.log('✅ PASSOU nas validações! Renderizando botões...');
+    console.log(`   - Role: ${member.role}`);
+    console.log(`   - É admin? ${member.role === 'admin'}`);
+    console.log(`   - É cuidador? ${member.role === 'caregiver'}`);
+    console.log(`   - É paciente? ${member.role === 'patient'}`);
 
     return (
       <View style={styles.memberActions}>
