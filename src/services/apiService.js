@@ -44,6 +44,17 @@ class ApiService {
         if (token) {
           requestHeaders['Authorization'] = `Bearer ${token}`;
         }
+        
+        // LOG: Identificar usuário
+        try {
+          const userDataStr = await AsyncStorage.getItem('@lacos:user');
+          if (userDataStr) {
+            const userData = JSON.parse(userDataStr);
+            console.log(`📱 REQUEST [${method}] ${endpoint} - Usuário: ${userData.name} | Telefone: ${userData.phone || 'N/A'}`);
+          }
+        } catch (e) {
+          // Ignore se não conseguir pegar dados do usuário
+        }
       }
 
       // Preparar configuração da requisição

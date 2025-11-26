@@ -87,11 +87,32 @@ const PatientJoinGroupScreen = ({ navigation }) => {
         }, 1500);
       } else {
         console.error('❌ PatientJoinGroupScreen - Erro:', result.error);
+        
+        // Tratar erro específico de paciente duplicado
+        const errorMessage = result.error || 'Código não encontrado ou expirado';
+        const isPatientLimitError = errorMessage.includes('já possui um paciente');
+        
         Toast.show({
           type: 'error',
-          text1: 'Código inválido',
-          text2: result.error || 'Código não encontrado ou expirado',
+          text1: isPatientLimitError ? 'Grupo Completo' : 'Código inválido',
+          text2: errorMessage,
+          visibilityTime: isPatientLimitError ? 6000 : 3000, // Mais tempo para ler mensagem importante
         });
+        
+        // Se for erro de limite, sugerir alternativas
+        if (isPatientLimitError) {
+          setTimeout(() => {
+            Alert.alert(
+              'O que fazer?',
+              'Este grupo já tem um paciente cadastrado.\n\n' +
+              'Opções:\n' +
+              '• Verifique se você recebeu o código correto\n' +
+              '• Peça ao administrador para criar um novo grupo\n' +
+              '• Ou cadastre-se como cuidador se for esse o seu papel',
+              [{ text: 'Entendi' }]
+            );
+          }, 500);
+        }
       }
     } catch (error) {
       console.error('❌ PatientJoinGroupScreen - Erro ao entrar no grupo:', error);

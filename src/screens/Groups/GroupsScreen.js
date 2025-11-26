@@ -98,7 +98,7 @@ const GroupsScreen = ({ navigation }) => {
         Toast.show({
           type: 'success',
           text1: 'Sucesso!',
-          text2: `Você entrou no grupo ${result.data.group.name}`,
+          text2: `Você entrou no grupo ${result.data.group.name}${result.data.your_role ? ` como ${result.data.your_role === 'patient' ? 'paciente' : 'cuidador'}` : ''}`,
         });
         setInviteModalVisible(false);
         setInviteCode('');
@@ -106,10 +106,15 @@ const GroupsScreen = ({ navigation }) => {
         // Recarregar grupos
         loadGroups();
       } else {
+        // Tratar erro específico de paciente duplicado
+        const errorMessage = result.error || 'Código inválido';
+        const isPatientLimitError = errorMessage.includes('já possui um paciente');
+        
         Toast.show({
           type: 'error',
-          text1: 'Erro',
-          text2: result.error || 'Código inválido',
+          text1: isPatientLimitError ? 'Grupo Completo' : 'Erro',
+          text2: errorMessage,
+          visibilityTime: isPatientLimitError ? 5000 : 3000, // Mais tempo para ler mensagem importante
         });
       }
     } catch (error) {
