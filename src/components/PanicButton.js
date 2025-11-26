@@ -262,12 +262,27 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
         onPressOut={handlePressOut}
         style={styles.buttonWrapper}
       >
+        {/* Fundo que escala */}
         <Animated.View
           style={[
-            styles.button,
+            styles.buttonBackground,
             {
               backgroundColor,
               transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        />
+        
+        {/* Conteúdo que NÃO escala */}
+        <Animated.View
+          style={[
+            styles.buttonContent,
+            {
+              opacity: scaleAnim.interpolate({
+                inputRange: [1, 3],
+                outputRange: [1, 0], // Fade out quando escala muito
+                extrapolate: 'clamp',
+              }),
             },
           ]}
         >
@@ -318,20 +333,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonWrapper: {
+    width: 80,
+    height: 80,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  button: {
+  buttonBackground: {
+    position: 'absolute',
     width: 80,
     height: 80,
     borderRadius: 1000,
-    alignItems: 'center',
-    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  buttonContent: {
+    width: 80,
+    height: 80,
+    borderRadius: 1000,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
   defaultContent: {
     alignItems: 'center',
