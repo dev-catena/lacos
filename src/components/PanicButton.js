@@ -219,11 +219,7 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
     outputRange: ['#FF3B30', '#C70000'],
   });
 
-  // Tamanho do botão durante hold
-  const buttonSize = holdProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [80, SCREEN_WIDTH * 2],
-  });
+  // Removido buttonSize interpolado - agora usa apenas scale transform
 
   if (isCallActive) {
     return (
@@ -271,8 +267,6 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
             styles.button,
             {
               backgroundColor,
-              width: buttonSize,
-              height: buttonSize,
               transform: [{ scale: scaleAnim }],
             },
           ]}
@@ -328,6 +322,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   button: {
+    width: 80,
+    height: 80,
     borderRadius: 1000,
     alignItems: 'center',
     justifyContent: 'center',

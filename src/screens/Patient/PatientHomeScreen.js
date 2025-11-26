@@ -826,7 +826,7 @@ const styles = StyleSheet.create({
   },
   panicButtonContainer: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 90, // Aumentado para ficar acima do TabBar (altura ~60px + margem)
     right: 24,
     zIndex: 1000,
   },
