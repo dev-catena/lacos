@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Alert } from 'react-native';
+import medicationService from './medicationService';
 
-const MEDICATIONS_STORAGE_KEY = '@lacos_medications';
 const DOSE_HISTORY_STORAGE_KEY = '@lacos_dose_history';
 
 /**
@@ -11,13 +11,34 @@ const DOSE_HISTORY_STORAGE_KEY = '@lacos_dose_history';
  */
 export const generateAdhesionReport = async (groupId, startDate, endDate) => {
   try {
-    // Carregar medicamentos do grupo
-    const medsJson = await AsyncStorage.getItem(MEDICATIONS_STORAGE_KEY);
-    if (!medsJson) {
-      throw new Error('Nenhum medicamento encontrado');
+    // Carregar medicamentos do grupo da API
+    const medicationsResult = await medicationService.getMedications(groupId);
+    
+    if (!medicationsResult.success || !medicationsResult.data || medicationsResult.data.length === 0) {
+      // Fallback para AsyncStorage se a API falhar
+      const medsJson = await AsyncStorage.getItem('@lacos_medications');
+      if (!medsJson) {
+        throw new Error('Nenhum medicamento encontrado');
+      }
+      const allMeds = JSON.parse(medsJson);
+      var groupMeds = allMeds.filter(m => m.groupId === groupId);
+    } else {
+      // Transformar dados da API para o formato esperado
+      var groupMeds = medicationsResult.data.map(med => {
+        const frequency = typeof med.frequency === 'string' 
+          ? JSON.parse(med.frequency) 
+          : (med.frequency || {});
+        
+        return {
+          id: med.id,
+          name: med.name,
+          dosage: med.dosage,
+          unit: med.unit,
+          form: med.pharmaceutical_form || med.form,
+          frequency: frequency.type === 'advanced' ? 'advanced' : (frequency.details?.interval || '24'),
+        };
+      });
     }
-    const allMeds = JSON.parse(medsJson);
-    const groupMeds = allMeds.filter(m => m.groupId === groupId);
 
     // Carregar histórico de doses
     const historyJson = await AsyncStorage.getItem(DOSE_HISTORY_STORAGE_KEY);
@@ -33,7 +54,9 @@ export const generateAdhesionReport = async (groupId, startDate, endDate) => {
 
     // Calcular estatísticas por medicamento
     const medicationStats = groupMeds.map(med => {
-      const medHistory = filteredHistory.filter(h => h.medicationId === med.id);
+      const medHistory = filteredHistory.filter(h => 
+        h.medicationId === med.id || h.medicationId === med.id.toString()
+      );
       
       const taken = medHistory.filter(h => h.status === 'taken').length;
       const notAdministered = medHistory.filter(h => h.status === 'not_administered').length;
@@ -42,9 +65,9 @@ export const generateAdhesionReport = async (groupId, startDate, endDate) => {
 
       return {
         name: med.name,
-        dosage: `${med.dosage} ${med.unit}`,
-        form: med.form,
-        frequency: med.frequency,
+        dosage: `${med.dosage || 'N/A'} ${med.unit || ''}`,
+        form: med.form || med.pharmaceutical_form || 'N/A',
+        frequency: med.frequency || 'N/A',
         taken,
         notAdministered,
         total,

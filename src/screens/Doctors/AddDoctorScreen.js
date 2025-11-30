@@ -71,6 +71,28 @@ const AddDoctorScreen = ({ route, navigation }) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const checkDuplicateDoctor = async (name, crm) => {
+    try {
+      const response = await doctorService.getDoctors(groupId);
+      if (response && response.success && response.data) {
+        const existingDoctors = response.data;
+        
+        // Verificar se já existe médico com mesmo nome ou CRM
+        const duplicate = existingDoctors.find(doc => {
+          const nameMatch = doc.name?.toLowerCase().trim() === name.toLowerCase().trim();
+          const crmMatch = crm && doc.crm && doc.crm.trim() === crm.trim();
+          return nameMatch || crmMatch;
+        });
+        
+        return duplicate || null;
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao verificar médico duplicado:', error);
+      return null;
+    }
+  };
+
   const handleSave = async () => {
     // Validações
     if (!formData.name.trim()) {
@@ -82,6 +104,53 @@ const AddDoctorScreen = ({ route, navigation }) => {
       return;
     }
 
+    try {
+      // Se não estiver editando, verificar se já existe médico com mesmo nome ou CRM
+      if (!isEditing) {
+        const duplicate = await checkDuplicateDoctor(
+          formData.name.trim(),
+          formData.crm.trim()
+        );
+        
+        if (duplicate) {
+          Alert.alert(
+            'Médico já cadastrado',
+            `Já existe um médico cadastrado com ${duplicate.name === formData.name.trim() ? 'este nome' : 'este CRM'}:\n\n${duplicate.name}${duplicate.crm ? `\nCRM: ${duplicate.crm}` : ''}${duplicate.medical_specialty?.name ? `\n${duplicate.medical_specialty.name}` : ''}\n\nDeseja usar o médico existente ou continuar cadastrando um novo?`,
+            [
+              {
+                text: 'Usar existente',
+                onPress: () => {
+                  // Voltar e selecionar o médico existente
+                  navigation.goBack();
+                  // Passar o médico existente via callback (se necessário)
+                  // Por enquanto, apenas volta e o usuário pode selecionar
+                },
+              },
+              {
+                text: 'Continuar cadastrando',
+                style: 'default',
+                onPress: async () => {
+                  // Continuar com o cadastro
+                  await proceedWithSave();
+                },
+              },
+            ]
+          );
+          return;
+        }
+      }
+
+      await proceedWithSave();
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Erro ao salvar',
+        text2: error.message || 'Tente novamente',
+      });
+    }
+  };
+
+  const proceedWithSave = async () => {
     try {
       const doctorData = {
         group_id: groupId,
@@ -116,6 +185,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
         text1: 'Erro ao salvar',
         text2: error.message || 'Tente novamente',
       });
+      throw error;
     }
   };
 
@@ -147,7 +217,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
 
       {/* Header */}

@@ -129,7 +129,7 @@ const NoGroupsScreen = ({ navigation, route, onGroupJoined }) => {
   // GUARD: Se não estiver autenticado, mostrar mensagem de erro
   if (!signed || !user) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
         <StatusBar style="dark" />
         <View style={styles.errorContainer}>
           <Ionicons name="lock-closed-outline" size={80} color={colors.error} />
@@ -146,7 +146,7 @@ const NoGroupsScreen = ({ navigation, route, onGroupJoined }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       <KeyboardAvoidingView

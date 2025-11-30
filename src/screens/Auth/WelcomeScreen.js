@@ -55,7 +55,7 @@ const WelcomeScreen = ({ navigation }) => {
     setTimeout(() => setDebugTaps(0), 3000);
   };
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="light" />
       
       <KeyboardAvoidingView

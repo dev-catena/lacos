@@ -57,7 +57,7 @@ const ShowGroupCodesScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Carregando grupos...</Text>
         </View>
@@ -66,7 +66,7 @@ const ShowGroupCodesScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}

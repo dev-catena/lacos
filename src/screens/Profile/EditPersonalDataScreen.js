@@ -14,21 +14,22 @@ import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
+import userService from '../../services/userService';
 
 const EditPersonalDataScreen = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   
   const [formData, setFormData] = useState({
     name: user?.name || '',
-    lastName: user?.lastName || '',
+    lastName: user?.lastName || user?.last_name || '',
     email: user?.email || '',
     phone: user?.phone || '',
     cpf: user?.cpf || '',
-    birthDate: user?.birthDate || '',
+    birthDate: user?.birthDate || user?.birth_date || '',
     address: user?.address || '',
     city: user?.city || '',
     state: user?.state || '',
-    zipCode: user?.zipCode || '',
+    zipCode: user?.zipCode || user?.zip_code || '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -48,22 +49,50 @@ const EditPersonalDataScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // TODO: Integrar com API
-      // await updateUserProfile(formData);
+      console.log('💾 Salvando dados do usuário...');
       
-      Toast.show({
-        type: 'success',
-        text1: '✅ Dados atualizados',
-        text2: 'Suas informações foram salvas com sucesso',
-        position: 'bottom',
-      });
+      // Preparar dados para envio (usar snake_case para o backend)
+      const dataToUpdate = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+      };
 
-      setTimeout(() => {
-        navigation.goBack();
-      }, 1000);
+      // Adicionar campos opcionais apenas se preenchidos
+      if (formData.phone) dataToUpdate.phone = formData.phone;
+      if (formData.cpf) dataToUpdate.cpf = formData.cpf;
+      if (formData.birthDate) dataToUpdate.birth_date = formData.birthDate;
+      if (formData.address) dataToUpdate.address = formData.address;
+      if (formData.city) dataToUpdate.city = formData.city;
+      if (formData.state) dataToUpdate.state = formData.state;
+      if (formData.zipCode) dataToUpdate.zip_code = formData.zipCode;
+
+      // Enviar para API
+      const response = await userService.updateUserData(user.id, dataToUpdate);
+      
+      console.log('📥 Resposta da API:', response);
+
+      if (response.success && response.data) {
+        // Atualizar contexto com novos dados
+        if (updateUser) {
+          updateUser(response.data);
+        }
+        
+        Toast.show({
+          type: 'success',
+          text1: '✅ Dados atualizados',
+          text2: 'Suas informações foram salvas com sucesso',
+          position: 'bottom',
+        });
+
+        setTimeout(() => {
+          navigation.goBack();
+        }, 1000);
+      } else {
+        throw new Error(response.error || 'Erro ao atualizar dados');
+      }
     } catch (error) {
-      console.error('Erro ao atualizar dados:', error);
-      Alert.alert('Erro', 'Não foi possível atualizar os dados');
+      console.error('❌ Erro ao atualizar dados:', error);
+      Alert.alert('Erro', error.message || 'Não foi possível atualizar os dados');
     } finally {
       setLoading(false);
     }
@@ -74,7 +103,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}

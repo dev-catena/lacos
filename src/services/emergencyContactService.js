@@ -70,8 +70,18 @@ class EmergencyContactService {
    */
   async updateEmergencyContact(contactId, contactData) {
     try {
-      const response = await apiService.put(`/emergency-contacts/${contactId}`, contactData);
-      return { success: true, data: response };
+      // Se for FormData (upload de foto), usar POST com _method para contornar limitação do Laravel
+      if (contactData instanceof FormData) {
+        // Adicionar _method para simular PUT (method spoofing)
+        contactData.append('_method', 'PUT');
+        // Usar POST ao invés de PUT
+        const response = await apiService.post(`/emergency-contacts/${contactId}`, contactData);
+        return { success: true, data: response };
+      } else {
+        // Se for JSON normal, usar PUT normalmente
+        const response = await apiService.put(`/emergency-contacts/${contactId}`, contactData);
+        return { success: true, data: response };
+      }
     } catch (error) {
       console.error('Erro ao atualizar contato:', error);
       

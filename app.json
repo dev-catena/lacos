@@ -14,7 +14,16 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lacos.app"
+      "bundleIdentifier": "com.lacos.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Este app precisa acessar o microfone para gravar anotações de áudio sobre consultas.",
+        "NSContactsUsageDescription": "Este app precisa acessar seus contatos para facilitar as ligações.",
+        "NSLocationWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
+        "NSLocationAlwaysUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
+        "NSPhotoLibraryUsageDescription": "Este app precisa acessar suas fotos e vídeos para compartilhar momentos com o grupo de cuidados.",
+        "NSPhotoLibraryAddUsageDescription": "Este app precisa salvar fotos e vídeos na galeria para compartilhar momentos com o grupo de cuidados."
+      }
     },
     "android": {
       "package": "com.lacos.app",
@@ -30,20 +39,15 @@
       ],
       "softwareKeyboardLayoutMode": "pan"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.lacos.app",
-      "infoPlist": {
-        "NSMicrophoneUsageDescription": "Este app precisa acessar o microfone para gravar anotações de áudio sobre consultas.",
-        "NSContactsUsageDescription": "Este app precisa acessar seus contatos para facilitar as ligações.",
-        "NSLocationWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
-        "NSLocationAlwaysUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima."
-      }
-    },
     "plugins": [
       "expo-asset",
       "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Este app precisa acessar suas fotos e vídeos para compartilhar momentos com o grupo de cuidados."
+        }
+      ],
       [
         "expo-av",
         {

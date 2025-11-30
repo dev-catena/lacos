@@ -48,6 +48,12 @@ class ActivityService {
       patient_changed: 'Paciente Alterado',
       group_created: 'Grupo Criado',
       group_updated: 'Grupo Atualizado',
+      medication_created: 'Medicamento Cadastrado',
+      medication_updated: 'Medicamento Atualizado',
+      medication_discontinued: 'Medicamento Descontinuado',
+      document_created: 'Documento Adicionado',
+      consultation_created: 'Consulta Agendada',
+      occurrence_created: 'Ocorrência Registrada',
     };
     return labels[actionType] || actionType;
   }
@@ -63,6 +69,12 @@ class ActivityService {
       patient_changed: 'swap-horizontal',
       group_created: 'add-circle',
       group_updated: 'create',
+      medication_created: 'medical',
+      medication_updated: 'create-outline',
+      medication_discontinued: 'close-circle',
+      document_created: 'document-text',
+      consultation_created: 'calendar',
+      occurrence_created: 'warning',
     };
     return icons[actionType] || 'notifications';
   }
@@ -78,6 +90,12 @@ class ActivityService {
       patient_changed: '#FF9800', // Laranja
       group_created: '#9C27B0', // Roxo
       group_updated: '#607D8B', // Cinza azulado
+      medication_created: '#4CAF50', // Verde
+      medication_updated: '#2196F3', // Azul
+      medication_discontinued: '#F44336', // Vermelho
+      document_created: '#FF9800', // Laranja
+      consultation_created: '#9C27B0', // Roxo
+      occurrence_created: '#F44336', // Vermelho
     };
     return colors[actionType] || '#757575';
   }

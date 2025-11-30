@@ -23,6 +23,11 @@ import {
   shareViaEmail,
   saveAndShareReport,
 } from '../../services/medicationReportService';
+import medicationService from '../../services/medicationService';
+import medicationSearchService from '../../services/medicationSearchService';
+import medicationPriceService from '../../services/medicationPriceService';
+import NearbyPharmacies from '../../components/NearbyPharmacies';
+import PopularPharmacies from '../../components/PopularPharmacies';
 
 const MEDICATIONS_STORAGE_KEY = '@lacos_medications';
 const DOSE_HISTORY_STORAGE_KEY = '@lacos_dose_history';
@@ -38,6 +43,9 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
   const [selectedScheduleTime, setSelectedScheduleTime] = useState(null);
   const [customTime, setCustomTime] = useState('');
   const [justification, setJustification] = useState('');
+  const [isFarmaciaPopular, setIsFarmaciaPopular] = useState(false);
+  const [medicationPrice, setMedicationPrice] = useState(null);
+  const [loadingPrice, setLoadingPrice] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -47,12 +55,60 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
     try {
       setLoading(true);
 
-      // Carregar medicamento
-      const medsJson = await AsyncStorage.getItem(MEDICATIONS_STORAGE_KEY);
-      if (medsJson) {
-        const meds = JSON.parse(medsJson);
-        const med = meds.find(m => m.id === medicationId);
-        setMedication(med);
+      // Carregar medicamento da API
+      try {
+        const result = await medicationService.getMedication(medicationId);
+        if (result.success && result.data) {
+          const med = result.data;
+          
+          // Transformar dados da API para o formato esperado pela UI
+          const frequency = typeof med.frequency === 'string' 
+            ? JSON.parse(med.frequency) 
+            : (med.frequency || {});
+          
+          const frequencyDetails = frequency.details || {};
+          const frequencyType = frequency.type || 'simple';
+          
+          const duration = typeof med.duration === 'string'
+            ? JSON.parse(med.duration)
+            : (med.duration || { type: 'continuo', value: null });
+          
+          const transformedMed = {
+            ...med,
+            form: med.pharmaceutical_form || med.form,
+            frequency: frequencyType === 'advanced' ? 'advanced' : (frequencyDetails.interval || '24'),
+            schedule: med.times || frequencyDetails.schedule || [],
+            advancedFrequency: frequencyType === 'advanced' ? frequencyDetails : null,
+            durationType: duration.type || 'continuo',
+            durationDays: duration.value || null,
+          };
+          
+          setMedication(transformedMed);
+          
+          // Verificar se é da Farmácia Popular
+          if (med.name) {
+            const isPopular = medicationSearchService.isFarmaciaPopular(med.name);
+            setIsFarmaciaPopular(isPopular);
+            
+            // Buscar preço de referência
+            loadMedicationPrice(med.name);
+          }
+        }
+      } catch (apiError) {
+        console.warn('Erro ao carregar da API, tentando AsyncStorage:', apiError);
+        // Fallback para AsyncStorage se a API falhar
+        const medsJson = await AsyncStorage.getItem(MEDICATIONS_STORAGE_KEY);
+        if (medsJson) {
+          const meds = JSON.parse(medsJson);
+          const med = meds.find(m => m.id === medicationId);
+          setMedication(med);
+          
+          if (med && med.name) {
+            const isPopular = medicationSearchService.isFarmaciaPopular(med.name);
+            setIsFarmaciaPopular(isPopular);
+            loadMedicationPrice(med.name);
+          }
+        }
       }
 
       // Carregar histórico de doses
@@ -66,6 +122,24 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
       console.error('Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Buscar preço de referência do medicamento
+  const loadMedicationPrice = async (medicationName) => {
+    if (!medicationName) return;
+    
+    try {
+      setLoadingPrice(true);
+      const priceResult = await medicationPriceService.getMedicationPrice(medicationName);
+      
+      if (priceResult.success && priceResult.data && priceResult.data.price) {
+        setMedicationPrice(priceResult.data.price);
+      }
+    } catch (error) {
+      console.warn('Erro ao buscar preço (não crítico):', error);
+    } finally {
+      setLoadingPrice(false);
     }
   };
 
@@ -194,16 +268,47 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const medsJson = await AsyncStorage.getItem(MEDICATIONS_STORAGE_KEY);
-              if (medsJson) {
-                const meds = JSON.parse(medsJson);
-                const updatedMeds = meds.map(m => 
-                  m.id === medicationId 
-                    ? { ...m, active: false, discontinuedAt: new Date().toISOString() }
-                    : m
-                );
-                await AsyncStorage.setItem(MEDICATIONS_STORAGE_KEY, JSON.stringify(updatedMeds));
-                
+              // Buscar dados completos do medicamento primeiro
+              const medResult = await medicationService.getMedication(medicationId);
+              
+              if (!medResult.success || !medResult.data) {
+                throw new Error('Não foi possível carregar dados do medicamento');
+              }
+              
+              const med = medResult.data;
+              
+              // Preparar dados para atualização
+              const frequency = typeof med.frequency === 'string' 
+                ? JSON.parse(med.frequency) 
+                : (med.frequency || {});
+              
+              const frequencyDetails = frequency.details || {};
+              const frequencyType = frequency.type || 'simple';
+              
+              const duration = typeof med.duration === 'string'
+                ? JSON.parse(med.duration)
+                : (med.duration || { type: 'continuo', value: null });
+              
+              // Atualizar na API - apenas marcar como inativo
+              const result = await medicationService.updateMedication(medicationId, {
+                name: med.name,
+                form: med.pharmaceutical_form,
+                dosage: med.dosage,
+                unit: med.unit,
+                administrationRoute: med.administration_route,
+                frequencyType: frequencyType,
+                frequencyDetails: frequencyType === 'advanced' ? frequencyDetails : {
+                  interval: frequencyDetails.interval || '24',
+                  schedule: med.times || frequencyDetails.schedule || [],
+                },
+                firstDoseAt: med.first_dose_at,
+                durationType: duration.type || 'continuo',
+                durationValue: duration.value,
+                notes: med.notes || '',
+                isActive: false, // Descontinuar = inativo
+              });
+
+              if (result.success) {
                 Toast.show({
                   type: 'success',
                   text1: 'Medicamento descontinuado',
@@ -211,9 +316,37 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                 });
 
                 navigation.goBack();
+              } else {
+                throw new Error(result.error || 'Erro ao descontinuar');
               }
             } catch (error) {
               console.error('Erro ao descontinuar:', error);
+              
+              // Fallback para AsyncStorage se a API falhar
+              try {
+                const medsJson = await AsyncStorage.getItem(MEDICATIONS_STORAGE_KEY);
+                if (medsJson) {
+                  const meds = JSON.parse(medsJson);
+                  const updatedMeds = meds.map(m => 
+                    m.id === medicationId 
+                      ? { ...m, active: false, discontinuedAt: new Date().toISOString() }
+                      : m
+                  );
+                  await AsyncStorage.setItem(MEDICATIONS_STORAGE_KEY, JSON.stringify(updatedMeds));
+                  
+                  Toast.show({
+                    type: 'success',
+                    text1: 'Medicamento descontinuado',
+                    text2: `${medication.name} foi removido da lista`,
+                  });
+
+                  navigation.goBack();
+                  return;
+                }
+              } catch (fallbackError) {
+                console.error('Erro no fallback:', fallbackError);
+              }
+              
               Alert.alert('Erro', 'Não foi possível descontinuar o medicamento');
             }
           },
@@ -326,7 +459,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
 
   if (loading || !medication) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
         <View style={styles.loadingContainer}>
           <Text>Carregando...</Text>
         </View>
@@ -335,7 +468,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -437,27 +570,59 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
           })}
         </View>
 
-        {/* Farmácia Popular */}
+        {/* Preço e Farmácias */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Farmácia Popular</Text>
-          <TouchableOpacity
-            style={styles.pharmacyCard}
-            onPress={handleFindPharmacy}
-            disabled={loadingLocation}
-          >
-            <View style={styles.pharmacyIcon}>
-              <Ionicons name="location" size={28} color={colors.success} />
+          <Text style={styles.sectionTitle}>Preço e Farmácias</Text>
+          
+          {/* Preço de Referência */}
+          {loadingPrice ? (
+            <View style={styles.priceCard}>
+              <Text style={styles.priceNote}>Buscando preço de referência...</Text>
             </View>
-            <View style={styles.pharmacyInfo}>
-              <Text style={styles.pharmacyTitle}>
-                {loadingLocation ? 'Buscando...' : 'Encontrar Farmácia Próxima'}
+          ) : medicationPrice !== null && (
+            <View style={styles.priceCard}>
+              <View style={styles.priceHeader}>
+                <Ionicons name="cash-outline" size={24} color={colors.primary} />
+                <Text style={styles.priceLabel}>Preço de Referência</Text>
+              </View>
+              <Text style={styles.priceValue}>
+                R$ {medicationPrice.toFixed(2).replace('.', ',')}
               </Text>
-              <Text style={styles.pharmacySubtitle}>
-                Verifique disponibilidade do medicamento
+              <Text style={styles.priceNote}>
+                Preço médio de referência no mercado
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
-          </TouchableOpacity>
+          )}
+          
+          {/* Badge Farmácia Popular */}
+          {isFarmaciaPopular && (
+            <View style={styles.farmaciaPopularBadge}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <Text style={styles.farmaciaPopularText}>
+                Disponível na Farmácia Popular
+              </Text>
+            </View>
+          )}
+          
+          {/* Farmácias Populares Próximas */}
+          {isFarmaciaPopular && medication && medication.name && (
+            <View style={{ marginTop: 12 }}>
+              <PopularPharmacies 
+                medicationName={medication.name} 
+                groupId={groupId} 
+              />
+            </View>
+          )}
+          
+          {/* Farmácias Próximas (genéricas) */}
+          {medication && medication.name && (
+            <View style={{ marginTop: 12 }}>
+              <NearbyPharmacies 
+                medicationName={medication.name} 
+                groupId={groupId} 
+              />
+            </View>
+          )}
         </View>
 
         {/* Relatório de Adesão */}
@@ -944,6 +1109,53 @@ const styles = StyleSheet.create({
   reportSubtitle: {
     fontSize: 14,
     color: colors.textLight,
+  },
+  priceCard: {
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  priceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  priceLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  priceValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.primary,
+    marginVertical: 4,
+  },
+  priceNote: {
+    fontSize: 12,
+    color: colors.textLight,
+    fontStyle: 'italic',
+  },
+  farmaciaPopularBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.success + '15',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.success + '30',
+    gap: 8,
+    marginBottom: 12,
+  },
+  farmaciaPopularText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.success,
+    flex: 1,
   },
   pharmacyCard: {
     flexDirection: 'row',

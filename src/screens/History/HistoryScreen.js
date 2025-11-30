@@ -129,7 +129,7 @@ const HistoryScreen = ({ route, navigation }) => {
     : events.filter(e => e.type === filterType);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar style="dark" />
       
       {/* Header */}

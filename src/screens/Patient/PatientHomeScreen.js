@@ -10,38 +10,176 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  Image,
+  ImageBackground,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
 import PanicButton from '../../components/PanicButton';
+import MediaCarousel from '../../components/MediaCarousel';
+import AlertCard from '../../components/AlertCard';
+import VideoPlayerModal from '../../components/VideoPlayerModal';
 import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import appointmentService from '../../services/appointmentService';
 import medicationService from '../../services/medicationService';
 import emergencyContactService from '../../services/emergencyContactService';
+import mediaService from '../../services/mediaService';
+import alertService from '../../services/alertService';
+import websocketService from '../../services/websocketService';
+import API_CONFIG from '../../config/api';
 
 const PATIENT_SESSION_KEY = '@lacos_patient_session';
 const GROUPS_STORAGE_KEY = '@lacos_groups';
 
 const PatientHomeScreen = ({ navigation }) => {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [patientSession, setPatientSession] = useState(null);
   const [contacts, setContacts] = useState([]);
-  const [sosContacts, setSosContacts] = useState([]);
   const [groupId, setGroupId] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [media, setMedia] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+  
+  // Calcular padding bottom para o ScrollView (altura do tab bar + inset do Android)
+  const tabBarHeight = 60;
+  const tabBarPaddingBottom = Platform.OS === 'android' 
+    ? Math.max(insets.bottom, 8) 
+    : 8;
+  const scrollViewPaddingBottom = tabBarHeight + tabBarPaddingBottom + 20; // +20 para espaçamento extra
 
   useFocusEffect(
     React.useCallback(() => {
       loadPatientData();
-    }, [])
+      
+      // Inicializar WebSocket quando a tela ganhar foco
+      return () => {
+        // Limpar listeners quando a tela perder foco
+        if (groupId) {
+          websocketService.stopListeningToGroup(groupId);
+        }
+      };
+    }, [groupId])
   );
+
+  // Efeito para escutar eventos WebSocket quando groupId mudar
+  useEffect(() => {
+    if (!groupId) return;
+
+    console.log('🔌 PatientHomeScreen - Inicializando WebSocket para grupo:', groupId);
+
+    // Inicializar WebSocket
+    const initWebSocket = async () => {
+      try {
+        await websocketService.initialize();
+        console.log('✅ PatientHomeScreen - WebSocket inicializado');
+        
+        // Aguardar um pouco antes de escutar eventos para garantir conexão
+        setTimeout(() => {
+          console.log('🔌 PatientHomeScreen - Configurando listeners do WebSocket...');
+          // Escutar eventos do grupo
+          websocketService.listenToGroup(groupId, {
+      onMediaDeleted: (data) => {
+        console.log('📡 PatientHomeScreen - Mídia deletada via WebSocket:', data);
+        console.log('📡 PatientHomeScreen - Dados recebidos:', JSON.stringify(data, null, 2));
+        
+        // Extrair ID da mídia (pode vir como media_id ou id)
+        const deletedMediaId = data.media_id || data.id || data.media?.id;
+        
+        if (!deletedMediaId) {
+          console.warn('⚠️ PatientHomeScreen - ID da mídia não encontrado nos dados:', data);
+          // Se não tiver ID, recarregar lista completa após um pequeno delay
+          setTimeout(() => {
+            console.log('🔄 PatientHomeScreen - Recarregando mídias (fallback)...');
+            loadGroupMedia(groupId);
+          }, 500);
+          return;
+        }
+        
+        console.log('🗑️ PatientHomeScreen - Removendo mídia ID:', deletedMediaId);
+        console.log('📋 PatientHomeScreen - Estado atual de mídias:', media.length, 'itens');
+        
+        // Remover mídia da lista
+        setMedia(prev => {
+          const beforeCount = prev.length;
+          console.log('📋 PatientHomeScreen - IDs antes da remoção:', prev.map(m => ({ id: m.id, media_id: m.media_id })));
+          
+          const filtered = prev.filter(m => {
+            // Comparar tanto com id quanto com media_id para garantir
+            const mediaId = m.id || m.media_id;
+            // Converter ambos para string para comparação mais robusta
+            const shouldKeep = String(mediaId) !== String(deletedMediaId);
+            if (!shouldKeep) {
+              console.log('✅ PatientHomeScreen - Mídia encontrada e será removida:', mediaId);
+            }
+            return shouldKeep;
+          });
+          const afterCount = filtered.length;
+          
+          console.log('📋 PatientHomeScreen - IDs depois da remoção:', filtered.map(m => ({ id: m.id, media_id: m.media_id })));
+          
+          if (beforeCount === afterCount) {
+            console.warn('⚠️ PatientHomeScreen - Mídia não encontrada na lista para remover:', deletedMediaId);
+            console.log('📋 PatientHomeScreen - IDs na lista atual:', prev.map(m => ({ id: m.id, media_id: m.media_id })));
+            // Se não encontrou, recarregar lista completa
+            setTimeout(() => {
+              console.log('🔄 PatientHomeScreen - Recarregando mídias (mídia não encontrada)...');
+              loadGroupMedia(groupId);
+            }, 500);
+            return prev; // Retornar lista original se não encontrou
+          } else {
+            console.log(`✅ PatientHomeScreen - Mídia removida com sucesso: ${beforeCount} → ${afterCount} itens`);
+            // Forçar re-render do MediaCarousel
+            return filtered;
+          }
+        });
+      },
+      onMediaCreated: (data) => {
+        console.log('📡 PatientHomeScreen - Nova mídia criada via WebSocket:', data);
+        // Adicionar nova mídia à lista
+        if (data.media && data.media.id) {
+          setMedia(prev => {
+            // Verificar se já existe para evitar duplicatas
+            const exists = prev.some(m => m.id === data.media.id);
+            if (exists) {
+              console.log('📡 PatientHomeScreen - Mídia já existe na lista, atualizando...');
+              return prev.map(m => m.id === data.media.id ? data.media : m);
+            }
+            // Adicionar no início da lista
+            return [data.media, ...prev];
+          });
+        } else {
+          // Se não tiver dados completos, recarregar
+          console.log('📡 PatientHomeScreen - Recarregando mídias...');
+          loadPatientData();
+        }
+      },
+          });
+        }, 1000);
+      } catch (error) {
+        console.error('❌ PatientHomeScreen - Erro ao inicializar WebSocket:', error);
+      }
+    };
+
+    initWebSocket();
+
+    // Cleanup quando groupId mudar ou componente desmontar
+    return () => {
+      if (groupId) {
+        websocketService.stopListeningToGroup(groupId);
+      }
+    };
+  }, [groupId]);
 
   const loadPatientData = async () => {
     setLoading(true);
@@ -62,7 +200,13 @@ const PatientHomeScreen = ({ navigation }) => {
         // 3. Carregar contatos de emergência da API
         await loadEmergencyContacts(currentGroupId);
         
-        // 4. Manter sessão no AsyncStorage (temporário)
+        // 4. Carregar mídias do grupo
+        await loadGroupMedia(currentGroupId);
+        
+        // 5. Carregar alertas ativos
+        await loadActiveAlerts(currentGroupId);
+        
+        // 6. Manter sessão no AsyncStorage (temporário)
         const sessionJson = await AsyncStorage.getItem(PATIENT_SESSION_KEY);
         if (sessionJson) {
           const session = JSON.parse(sessionJson);
@@ -180,6 +324,7 @@ const PatientHomeScreen = ({ navigation }) => {
       // Adicionar contatos de emergência (tabela emergency_contacts)
       if (contactsResult.success && contactsResult.data) {
         const emergencyContacts = Array.isArray(contactsResult.data) ? contactsResult.data : [];
+        console.log('🔍 PatientHomeScreen - Contatos da API:', emergencyContacts);
         emergencyContacts.forEach((contact, index) => {
           allContacts.push({
             id: `emergency-${contact.id}`,
@@ -188,7 +333,10 @@ const PatientHomeScreen = ({ navigation }) => {
             relationship: contact.relationship || 'Contato de Emergência',
             color: colorOptions[index % colorOptions.length],
             type: 'emergency',
+            photo: contact.photo,
+            photo_url: contact.photo_url,
           });
+          console.log(`📸 Contato ${contact.name}: photo=${contact.photo}, photo_url=${contact.photo_url}`);
         });
       }
       
@@ -214,13 +362,119 @@ const PatientHomeScreen = ({ navigation }) => {
       
       console.log(`✅ PatientHomeScreen - ${quickContacts.length} contato(s) rápido(s) carregado(s)`);
       setContacts(quickContacts);
-      
-      // SOS contacts = todos os contatos (para o botão de pânico)
-      setSosContacts(allContacts);
     } catch (error) {
       console.error('❌ PatientHomeScreen - Erro ao carregar contatos:', error);
       setContacts([]);
-      setSosContacts([]);
+    }
+  };
+
+  const loadGroupMedia = async (currentGroupId) => {
+    try {
+      console.log('📥 PatientHomeScreen - Carregando mídias do grupo:', currentGroupId);
+      const mediaResult = await mediaService.getGroupMedia(currentGroupId);
+      
+      if (mediaResult.success && mediaResult.data) {
+        console.log(`✅ PatientHomeScreen - ${mediaResult.data.length} mídia(s) carregada(s)`);
+        console.log('📋 PatientHomeScreen - IDs das mídias:', mediaResult.data.map(m => ({ id: m.id, media_id: m.media_id })));
+        setMedia(mediaResult.data);
+      } else {
+        console.log('⚠️ PatientHomeScreen - Nenhuma mídia encontrada');
+        setMedia([]);
+      }
+    } catch (error) {
+      console.error('❌ PatientHomeScreen - Erro ao carregar mídias:', error);
+      setMedia([]);
+    }
+  };
+
+  const loadActiveAlerts = async (currentGroupId) => {
+    try {
+      const alertsResult = await alertService.getActiveAlerts(currentGroupId);
+      
+      // Sempre definir os alertas, mesmo se houver erro (retorna array vazio)
+      if (alertsResult.success && alertsResult.data) {
+        setAlerts(Array.isArray(alertsResult.data) ? alertsResult.data : []);
+        if (alertsResult.data.length > 0) {
+          console.log(`✅ PatientHomeScreen - ${alertsResult.data.length} alerta(s) ativo(s)`);
+        }
+      } else {
+        // Se houver erro, definir array vazio para não quebrar a UI
+        setAlerts([]);
+        if (alertsResult.error) {
+          console.warn('⚠️ PatientHomeScreen - Erro ao carregar alertas (não crítico):', alertsResult.error);
+        }
+      }
+    } catch (error) {
+      console.error('❌ PatientHomeScreen - Erro ao carregar alertas:', error);
+      // Sempre definir array vazio em caso de erro para não quebrar a UI
+      setAlerts([]);
+    }
+  };
+
+  const handleMarkAsTaken = async (alertId) => {
+    try {
+      const result = await alertService.markMedicationTaken(alertId);
+      
+      if (result.success) {
+        // Remover alerta da lista
+        setAlerts(prev => prev.filter(a => a.id !== alertId));
+        Toast.show({
+          type: 'success',
+          text1: 'Medicamento marcado',
+          text2: 'Registrado com sucesso!',
+        });
+      }
+    } catch (error) {
+      console.error('❌ Erro ao marcar medicamento:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro',
+        text2: 'Não foi possível marcar o medicamento',
+      });
+    }
+  };
+
+  const handleDismissAlert = async (alertId) => {
+    try {
+      const result = await alertService.dismissAlert(alertId);
+      
+      if (result.success) {
+        setAlerts(prev => prev.filter(a => a.id !== alertId));
+      }
+    } catch (error) {
+      console.error('❌ Erro ao dispensar alerta:', error);
+    }
+  };
+
+  const handleMediaPress = (mediaItem) => {
+    console.log('📱 PatientHomeScreen - Mídia pressionada:', mediaItem);
+    
+    const isVideo = mediaItem.type === 'video' || mediaItem.media_type === 'video';
+    let mediaUrl = mediaItem.url || mediaItem.media_url || mediaItem.file_url;
+    
+    // Construir URL completa se for relativa
+    if (mediaUrl && !mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
+      const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+      if (mediaUrl.startsWith('/storage/')) {
+        mediaUrl = `${baseUrl}${mediaUrl}`;
+      } else if (mediaUrl.startsWith('storage/')) {
+        mediaUrl = `${baseUrl}/${mediaUrl}`;
+      } else {
+        mediaUrl = mediaUrl.startsWith('/') ? `${baseUrl}${mediaUrl}` : `${baseUrl}/${mediaUrl}`;
+      }
+    }
+    
+    if (isVideo && mediaUrl) {
+      console.log('▶️ PatientHomeScreen - Abrindo player de vídeo:', mediaUrl);
+      setSelectedVideo({
+        uri: mediaUrl,
+        title: mediaItem.description || 'Vídeo',
+      });
+      setShowVideoPlayer(true);
+    } else if (!isVideo && mediaUrl) {
+      // Para imagens, poderia abrir um modal de visualização também
+      console.log('🖼️ PatientHomeScreen - Imagem clicada:', mediaUrl);
+      // TODO: Implementar visualização de imagem em tela cheia
     }
   };
 
@@ -329,8 +583,58 @@ const PatientHomeScreen = ({ navigation }) => {
       return;
     }
 
-    // Ligar direto
-    performCall(contact.name, cleanPhone);
+    // 🎯 ESTRATÉGIA INTELIGENTE POR PLATAFORMA
+    if (Platform.OS === 'android') {
+      // ✅ ANDROID: WhatsApp funciona melhor
+      console.log('📱 Android detectado - Tentando WhatsApp...');
+      tryWhatsAppCall(contact.name, cleanPhone);
+    } else {
+      // ✅ iOS: Chamada telefônica é mais confiável
+      console.log('🍎 iOS detectado - Chamada telefônica direta...');
+      performCall(contact.name, cleanPhone);
+    }
+  };
+
+  const tryWhatsAppCall = async (contactName, cleanPhone) => {
+    // Formatar número para WhatsApp
+    let whatsappNumber = cleanPhone;
+    if (whatsappNumber.startsWith('0')) {
+      whatsappNumber = whatsappNumber.substring(1);
+    }
+    if (!whatsappNumber.startsWith('55')) {
+      whatsappNumber = '55' + whatsappNumber;
+    }
+
+    console.log('💬 WhatsApp - Iniciando chamada:', whatsappNumber);
+
+    try {
+      // 🎯 ANDROID: Tentar deep link de chamada direta
+      const whatsappCallUrl = `whatsapp://send?phone=${whatsappNumber}`;
+      
+      const canOpen = await Linking.canOpenURL(whatsappCallUrl);
+      
+      if (canOpen) {
+        await Linking.openURL(whatsappCallUrl);
+        console.log('✅ WhatsApp aberto para:', contactName);
+        
+        // Mostrar toast com instrução
+        Toast.show({
+          type: 'success',
+          text1: '💬 WhatsApp Aberto',
+          text2: `Toque no ícone de telefone 📞 para ligar`,
+          position: 'top',
+          visibilityTime: 5000,
+        });
+      } else {
+        // WhatsApp não instalado - Fallback para telefone
+        console.log('⚠️ WhatsApp não disponível, usando telefone...');
+        performCall(contactName, cleanPhone);
+      }
+    } catch (error) {
+      // Erro - Fallback para telefone
+      console.error('⚠️ Erro ao abrir WhatsApp:', error);
+      performCall(contactName, cleanPhone);
+    }
   };
 
   const performCall = async (contactName, cleanPhone) => {
@@ -372,114 +676,6 @@ const PatientHomeScreen = ({ navigation }) => {
     }
   };
 
-  const handleSOS = async () => {
-    // Verificar se há contatos SOS configurados
-    if (!sosContacts || sosContacts.length === 0) {
-      Alert.alert(
-        'Nenhum Contato SOS',
-        'Não há contatos de emergência configurados. Peça ao seu cuidador para adicionar contatos SOS.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              Toast.show({
-                type: 'error',
-                text1: 'Configure Contatos SOS',
-                text2: 'Peça ao cuidador para adicionar contatos de emergência',
-                position: 'bottom',
-              });
-            },
-          },
-        ]
-      );
-      return;
-    }
-
-    // Filtrar contatos com telefone válido
-    const validSOSContacts = sosContacts.filter(c => c.phone && c.phone.replace(/\D/g, '').length >= 10);
-
-    if (validSOSContacts.length === 0) {
-      Toast.show({
-        type: 'error',
-        text1: 'Contatos SOS Inválidos',
-        text2: 'Nenhum contato SOS tem número válido',
-        position: 'bottom',
-      });
-      return;
-    }
-
-    // Confirmar SOS - mantém confirmação por ser emergência
-    Alert.alert(
-      '🚨 SOS EMERGÊNCIA',
-      `Ligar para:\n${validSOSContacts.map(c => `📞 ${c.name}`).join('\n')}`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'LIGAR AGORA',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('[SOS] Ativando SOS para', validSOSContacts.length, 'contatos');
-
-              // Ligar para o primeiro contato
-              const firstContact = validSOSContacts[0];
-              let cleanPhone = firstContact.phone.replace(/\D/g, '');
-              
-              // Formatar com + para formato internacional
-              if (!cleanPhone.startsWith('+')) {
-                if (cleanPhone.startsWith('55')) {
-                  cleanPhone = `+${cleanPhone}`;
-                } else {
-                  cleanPhone = `+55${cleanPhone}`;
-                }
-              }
-              
-              console.log('[SOS] Ligando para:', firstContact.name, '-', cleanPhone);
-              
-              await Linking.openURL(`tel:${cleanPhone}`);
-
-              Toast.show({
-                type: 'success',
-                text1: '🚨 SOS ATIVADO',
-                text2: `Ligando para ${firstContact.name}`,
-                position: 'top',
-                visibilityTime: 3000,
-              });
-
-              // Se houver mais contatos, mostrar opção de ligar para os próximos
-              if (validSOSContacts.length > 1) {
-                setTimeout(() => {
-                  Alert.alert(
-                    'Ligar para Próximo Contato?',
-                    `Deseja ligar para ${validSOSContacts[1].name}?`,
-                    [
-                      { text: 'Não', style: 'cancel' },
-                      {
-                        text: 'Sim',
-                        onPress: () => {
-                          const nextPhone = validSOSContacts[1].phone.replace(/\D/g, '');
-                          Linking.openURL(`tel:${nextPhone}`);
-                        },
-                      },
-                    ]
-                  );
-                }, 2000);
-              }
-            } catch (error) {
-              console.error('Erro ao acionar SOS:', error);
-              Toast.show({
-                type: 'error',
-                text1: 'Erro no SOS',
-                text2: 'Não foi possível fazer a chamada de emergência',
-                position: 'bottom',
-              });
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const handleNotificationPress = async (notification) => {
     if (notification.type === 'appointment') {
       // Navegar para tela de detalhes da consulta
@@ -517,7 +713,7 @@ const PatientHomeScreen = ({ navigation }) => {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
         <StatusBar style="dark" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -528,7 +724,7 @@ const PatientHomeScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -542,55 +738,100 @@ const PatientHomeScreen = ({ navigation }) => {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: scrollViewPaddingBottom }}
+      >
+        {/* Active Alerts */}
+        {alerts.length > 0 && (
+          <View style={styles.alertsSection}>
+            {alerts.map((alert) => (
+              <AlertCard
+                key={alert.id}
+                alert={alert}
+                onMarkAsTaken={alert.type === 'medication' ? () => handleMarkAsTaken(alert.id) : null}
+                onDismiss={() => handleDismissAlert(alert.id)}
+              />
+            ))}
+          </View>
+        )}
+
         {/* Contact Cards */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contatos Rápidos</Text>
           
-          {contacts.length === 0 ? (
-            <View style={styles.emptyContacts}>
-              <Ionicons name="call-outline" size={48} color={colors.gray300} />
-              <Text style={styles.emptyContactsText}>
-                Nenhum contato configurado
-              </Text>
-              <Text style={styles.emptyContactsSubtext}>
-                Peça ao seu cuidador para adicionar contatos rápidos
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.cardsGrid}>
-              {/* Contact Cards */}
-              {contacts.map((contact, index) => (
+          <View style={styles.cardsGrid}>
+            {/* Contact Cards (max 3) */}
+            {contacts.slice(0, 3).map((contact, index) => {
+              const hasPhoto = contact.photo || contact.photo_url;
+              
+              return (
                 <TouchableOpacity
                   key={contact.id}
-                  style={[styles.card, { backgroundColor: contact.color }]}
+                  style={[styles.card, !hasPhoto && { backgroundColor: contact.color }]}
                   onPress={() => makePhoneCall(contact)}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="call" size={32} color={colors.textWhite} />
-                  <Text style={styles.cardTitle}>{contact.name}</Text>
-                  <View style={styles.cardBadge}>
-                    <Text style={styles.cardBadgeText}>Ligar</Text>
-                  </View>
+                  {hasPhoto ? (
+                    <ImageBackground
+                      source={{ uri: contact.photo_url || contact.photo }}
+                      style={styles.cardImageBackground}
+                      imageStyle={styles.cardImage}
+                    >
+                      <View style={styles.cardOverlay}>
+                        <Ionicons 
+                          name={Platform.OS === 'android' ? 'logo-whatsapp' : 'call'} 
+                          size={36} 
+                          color={colors.textWhite} 
+                        />
+                        <Text style={styles.cardTitle}>{contact.name}</Text>
+                        <View style={styles.cardBadge}>
+                          <Text style={styles.cardBadgeText}>
+                            {Platform.OS === 'android' ? '💬 WhatsApp' : '📞 Ligar'}
+                          </Text>
+                        </View>
+                      </View>
+                    </ImageBackground>
+                  ) : (
+                    <>
+                      <Ionicons 
+                        name={Platform.OS === 'android' ? 'logo-whatsapp' : 'call'} 
+                        size={36} 
+                        color={colors.textWhite} 
+                      />
+                      <Text style={styles.cardTitle}>{contact.name}</Text>
+                      <View style={styles.cardBadge}>
+                        <Text style={styles.cardBadgeText}>
+                          {Platform.OS === 'android' ? '💬 WhatsApp' : '📞 Ligar'}
+                        </Text>
+                      </View>
+                    </>
+                  )}
                 </TouchableOpacity>
-              ))}
+              );
+            })}
 
-              {/* SOS Card */}
-              <TouchableOpacity
-                style={[styles.card, styles.sosCard]}
-                onPress={handleSOS}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="alert-circle" size={40} color={colors.textWhite} />
-                <Text style={[styles.cardTitle, styles.sosText]}>Ajuda</Text>
-                <View style={[styles.cardBadge, styles.sosBadge]}>
-                  <Text style={styles.cardBadgeText}>SOS</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
+            {/* Botão de Pânico como Quarto Card */}
+            {groupId && (
+              <View style={styles.panicCard}>
+                <PanicButton 
+                  groupId={groupId}
+                  fullSize={true}
+                  onPanicTriggered={(data) => {
+                    console.log('Pânico acionado:', data);
+                  }}
+                />
+              </View>
+            )}
+          </View>
 
         </View>
+
+        {/* Media Carousel */}
+        <MediaCarousel 
+          media={media}
+          onMediaPress={handleMediaPress}
+        />
 
         {/* Notifications */}
         <View style={styles.section}>
@@ -645,20 +886,18 @@ const PatientHomeScreen = ({ navigation }) => {
           })}
         </View>
 
-        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Botão de Pânico Flutuante */}
-      {groupId && (
-        <View style={styles.panicButtonContainer}>
-          <PanicButton 
-            groupId={groupId}
-            onPanicTriggered={(data) => {
-              console.log('Pânico acionado:', data);
-            }}
-          />
-        </View>
-      )}
+      {/* Video Player Modal */}
+      <VideoPlayerModal
+        visible={showVideoPlayer}
+        videoUri={selectedVideo?.uri}
+        videoTitle={selectedVideo?.title}
+        onClose={() => {
+          setShowVideoPlayer(false);
+          setSelectedVideo(null);
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -699,6 +938,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  alertsSection: {
+    marginTop: 16,
+  },
   section: {
     paddingHorizontal: 20,
     marginTop: 24,
@@ -725,9 +967,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+    overflow: 'hidden',
   },
-  sosCard: {
-    backgroundColor: colors.error,
+  cardImageBackground: {
+    flex: 1,
+    margin: -16, // Compensar padding do card
+    justifyContent: 'space-between',
+  },
+  cardImage: {
+    borderRadius: 16,
+  },
+  cardOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Overlay escuro semi-transparente
+    padding: 16,
+    justifyContent: 'space-between',
   },
   cardTitle: {
     fontSize: 16,
@@ -735,18 +989,12 @@ const styles = StyleSheet.create({
     color: colors.textWhite,
     marginTop: 8,
   },
-  sosText: {
-    fontSize: 20,
-  },
   cardBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
     alignSelf: 'flex-start',
-  },
-  sosBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
   cardBadgeText: {
     fontSize: 12,
@@ -824,11 +1072,11 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textAlign: 'center',
   },
-  panicButtonContainer: {
-    position: 'absolute',
-    bottom: 90, // Aumentado para ficar acima do TabBar (altura ~60px + margem)
-    right: 24,
-    zIndex: 1000,
+  panicCard: {
+    width: '47%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   loadingContainer: {
     flex: 1,

@@ -11,15 +11,22 @@ import {
   Clipboard,
   Share,
   Platform,
+  TextInput,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import groupMemberService from '../../services/groupMemberService';
+import Toast from 'react-native-toast-message';
+import API_CONFIG from '../../config/api';
 import {
   VitalSignsIcon,
   PermissionsIcon,
@@ -41,6 +48,13 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   const [groupData, setGroupData] = useState(null);
   const [members, setMembers] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Informações Básicas do Grupo
+  const [editedGroupName, setEditedGroupName] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
+  const [groupPhotoUrl, setGroupPhotoUrl] = useState(null);
+  const [newGroupPhoto, setNewGroupPhoto] = useState(null);
+  const [photoKey, setPhotoKey] = useState(0); // Key para forçar reload da imagem
 
   // Sinais Vitais
   const [vitalSigns, setVitalSigns] = useState({
@@ -64,7 +78,26 @@ const GroupSettingsScreen = ({ route, navigation }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      loadGroupData();
+      let isMounted = true;
+      let timeoutId = null;
+      
+      const loadData = async () => {
+        if (isMounted) {
+          await loadGroupData();
+        }
+      };
+      
+      // Pequeno delay para evitar múltiplas chamadas
+      timeoutId = setTimeout(() => {
+        loadData();
+      }, 100);
+      
+      return () => {
+        isMounted = false;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      };
     }, [groupId])
   );
 
@@ -76,7 +109,47 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       
       if (result.success && result.data) {
         console.log('✅ GroupSettings - Grupo carregado:', result.data);
+        console.log('📸 GroupSettings - photo_url do servidor:', result.data.photo_url);
         setGroupData(result.data);
+        setEditedGroupName(result.data.name || '');
+        setEditedDescription(result.data.description || '');
+        
+        // Adicionar cache-busting na URL da foto para forçar reload
+        // IMPORTANTE: Só atualizar groupPhotoUrl se NÃO houver newGroupPhoto
+        // Se houver newGroupPhoto, significa que o usuário selecionou uma nova foto
+        // mas ainda não salvou, então manter newGroupPhoto como prioridade
+        const photoUrl = result.data.photo_url;
+        console.log('📸 GroupSettings.loadGroupData - photo_url do servidor:', photoUrl);
+        console.log('📸 GroupSettings.loadGroupData - newGroupPhoto existe?', !!newGroupPhoto);
+        
+        // Só atualizar groupPhotoUrl se não houver newGroupPhoto (foto selecionada mas não salva)
+        if (!newGroupPhoto) {
+          if (photoUrl) {
+            // Construir URL completa se necessário
+            let fullPhotoUrl = photoUrl;
+            if (!photoUrl.startsWith('http')) {
+              // Se não for URL completa, construir usando a base URL da API
+              const baseUrl = API_CONFIG.BASE_URL.replace('/api', ''); // Remover /api do final
+              fullPhotoUrl = photoUrl.startsWith('/') 
+                ? `${baseUrl}${photoUrl}` 
+                : `${baseUrl}/${photoUrl}`;
+            }
+            
+            const separator = fullPhotoUrl.includes('?') ? '&' : '?';
+            const timestamp = Date.now();
+            const newPhotoUrl = `${fullPhotoUrl}${separator}t=${timestamp}`;
+            console.log('📸 GroupSettings.loadGroupData - Atualizando photoUrl com cache-busting:', newPhotoUrl);
+            setGroupPhotoUrl(newPhotoUrl);
+            // Atualizar o key para forçar reload da imagem
+            setPhotoKey(timestamp);
+          } else {
+            console.log('📸 GroupSettings.loadGroupData - Sem photo_url, limpando groupPhotoUrl');
+            setGroupPhotoUrl(null);
+            setPhotoKey(Date.now()); // Forçar reload mesmo sem foto
+          }
+        } else {
+          console.log('📸 GroupSettings.loadGroupData - Mantendo newGroupPhoto, não atualizando groupPhotoUrl ainda');
+        }
       } else {
         console.error('❌ GroupSettings - Erro ao carregar grupo:', result.error);
         Alert.alert('Erro', 'Não foi possível carregar os dados do grupo');
@@ -131,11 +204,217 @@ const GroupSettingsScreen = ({ route, navigation }) => {
     if (groupData?.code) {
       try {
         await Share.share({
-          message: `Olá! Use este código para acessar o aplicativo Laços como paciente:\n\nCódigo: ${groupData.code}\n\nAbra o app, selecione "Sou Paciente" e digite este código.`,
+          message: ``,
         });
       } catch (error) {
         console.error('Erro ao compartilhar código:', error);
       }
+    }
+  };
+
+  const pickGroupPhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permissão Necessária',
+          'Precisamos de permissão para acessar suas fotos.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setNewGroupPhoto(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar a imagem');
+    }
+  };
+
+  const removeGroupPhoto = () => {
+    Alert.alert(
+      'Remover Foto',
+      'Deseja remover a foto do grupo?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: () => {
+            setNewGroupPhoto(null);
+            setGroupPhotoUrl(null);
+          },
+        },
+      ]
+    );
+  };
+
+  const saveGroupBasicInfo = async () => {
+    try {
+      setSaving(true);
+
+      // Se houver uma nova foto, enviar tudo via FormData (como no createGroup)
+      if (newGroupPhoto) {
+        console.log('📤 GroupSettings - Iniciando salvamento de foto do grupo...');
+        console.log('📤 GroupSettings - Grupo ID:', groupId);
+        console.log('📤 GroupSettings - URI da foto:', newGroupPhoto);
+        
+        // Verificar se o arquivo existe
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(newGroupPhoto);
+          if (!fileInfo.exists) {
+            throw new Error('Arquivo de foto não encontrado');
+          }
+          console.log('📤 GroupSettings - Arquivo existe, tamanho:', fileInfo.size, 'bytes');
+        } catch (fileError) {
+          console.error('❌ GroupSettings - Erro ao verificar arquivo:', fileError);
+          Alert.alert('Erro', 'Arquivo de foto não encontrado. Por favor, selecione novamente.');
+          setSaving(false);
+          return;
+        }
+        
+        const formData = new FormData();
+        formData.append('name', editedGroupName);
+        formData.append('description', editedDescription || '');
+
+        const filename = newGroupPhoto.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+        // Preparar objeto de arquivo para FormData
+        const photoFile = {
+          uri: newGroupPhoto,
+          name: filename || `group_photo_${Date.now()}.jpg`,
+          type: type,
+        };
+
+        formData.append('photo', photoFile);
+
+        console.log('📤 GroupSettings - FormData preparado:', { 
+          name: editedGroupName, 
+          description: editedDescription,
+          photo: { 
+            filename: photoFile.name, 
+            type: photoFile.type,
+            uri: newGroupPhoto.substring(0, 50) + '...' // Log parcial da URI
+          }
+        });
+
+        console.log('📤 GroupSettings - Chamando groupService.updateGroup...');
+        const result = await groupService.updateGroup(groupId, formData);
+        console.log('📤 GroupSettings - Resposta recebida:', result);
+        
+        if (result.success) {
+          console.log('✅ GroupSettings - Dados e foto salvos!');
+          console.log('✅ GroupSettings - Resultado completo:', JSON.stringify(result.data, null, 2));
+          
+          // Tentar pegar a URL da foto da resposta (verificar vários campos possíveis)
+          const photoUrl = result.data?.photo_url || 
+                          result.data?.photo || 
+                          result.data?.url ||
+                          result.data?.group?.photo_url ||
+                          result.data?.group?.photo ||
+                          result.data?.data?.photo_url ||
+                          result.data?.data?.photo;
+          
+          console.log('📸 GroupSettings - URL da foto encontrada na resposta:', photoUrl);
+          console.log('📸 GroupSettings - Estrutura completa da resposta:', {
+            keys: Object.keys(result.data || {}),
+            hasPhotoUrl: !!result.data?.photo_url,
+            hasPhoto: !!result.data?.photo,
+            photoUrl: result.data?.photo_url,
+          });
+          
+          Toast.show({
+            type: 'success',
+            text1: 'Sucesso!',
+            text2: 'Informações e foto atualizadas',
+          });
+          
+          // NÃO limpar newGroupPhoto ainda - manter a foto local até confirmar que o servidor atualizou
+          // Se temos a URL na resposta, atualizar groupPhotoUrl mas manter newGroupPhoto
+          if (photoUrl) {
+            // Construir URL completa se necessário
+            let fullPhotoUrl = photoUrl;
+            if (!photoUrl.startsWith('http')) {
+              const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+              fullPhotoUrl = photoUrl.startsWith('/') 
+                ? `${baseUrl}${photoUrl}` 
+                : `${baseUrl}/${photoUrl}`;
+            }
+            
+            const separator = fullPhotoUrl.includes('?') ? '&' : '?';
+            const timestamp = Date.now();
+            const newPhotoUrl = `${fullPhotoUrl}${separator}t=${timestamp}`;
+            console.log('📸 GroupSettings - Atualizando groupPhotoUrl imediatamente:', newPhotoUrl);
+            
+            // Atualizar estado mas MANTER newGroupPhoto por enquanto
+            setGroupPhotoUrl(newPhotoUrl);
+            setPhotoKey(timestamp);
+          }
+          
+          // Recarregar dados do servidor e só então limpar newGroupPhoto
+          setTimeout(async () => {
+            console.log('🔄 GroupSettings - Recarregando dados do grupo após salvar foto...');
+            await loadGroupData();
+            
+            // Após recarregar e confirmar que groupPhotoUrl foi atualizado, limpar newGroupPhoto
+            // Aguardar um pouco mais para garantir que a imagem foi carregada
+            setTimeout(() => {
+              console.log('📸 GroupSettings - Limpando newGroupPhoto após confirmar atualização');
+              setNewGroupPhoto(null);
+              // Forçar outro reload para garantir que a foto foi atualizada
+              setPhotoKey(Date.now());
+            }, 500);
+          }, 1500);
+        } else {
+          console.error('❌ GroupSettings - Erro ao salvar:', result.error);
+          console.error('❌ GroupSettings - Detalhes do erro:', JSON.stringify(result, null, 2));
+          Alert.alert(
+            'Erro ao Salvar Foto', 
+            result.error || 'Não foi possível atualizar a foto do grupo. Verifique os logs para mais detalhes.'
+          );
+        }
+      } else {
+        // Sem foto nova, enviar apenas os dados
+        const nameChanged = editedGroupName !== groupData?.name;
+        const descChanged = editedDescription !== (groupData?.description || '');
+        
+        if (nameChanged || descChanged) {
+          const result = await groupService.updateGroup(groupId, {
+            name: editedGroupName,
+            description: editedDescription,
+          });
+          
+          if (result.success) {
+            Toast.show({
+              type: 'success',
+              text1: 'Sucesso!',
+              text2: 'Informações atualizadas',
+            });
+            
+            setTimeout(() => {
+              loadGroupData();
+            }, 1000);
+          } else {
+            Alert.alert('Erro', result.error || 'Não foi possível atualizar');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro ao salvar:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar as informações');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -151,6 +430,253 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       ...prev,
       [key]: !prev[key],
     }));
+  };
+
+  // Gerenciamento de membros
+  const handlePromoteToAdmin = (member) => {
+    if (!isAdmin) {
+      Toast.show({
+        type: 'error',
+        text1: 'Sem Permissão',
+        text2: 'Apenas administradores podem promover membros',
+      });
+      return;
+    }
+
+    Alert.alert(
+      'Promover para Administrador',
+      `Deseja promover ${member.user?.name} para administrador?\n\nEle terá acesso total às configurações do grupo.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Promover',
+          style: 'default',
+          onPress: async () => {
+            try {
+              const result = await groupMemberService.promoteMemberToAdmin(groupId, member.id);
+              if (result.success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Sucesso!',
+                  text2: `${member.user?.name} agora é administrador`,
+                });
+                loadGroupData();
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Erro',
+                  text2: result.error || 'Não foi possível promover o membro',
+                });
+              }
+            } catch (error) {
+              console.error('Erro ao promover membro:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Erro',
+                text2: 'Não foi possível promover o membro',
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDemoteAdmin = (member) => {
+    if (!isAdmin) return;
+
+    Alert.alert(
+      'Remover Administrador',
+      `Deseja rebaixar ${member.user?.name} para cuidador?\n\nEle perderá acesso às configurações do grupo.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Rebaixar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await groupMemberService.demoteAdminToCaregiver(groupId, member.id);
+              if (result.success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Sucesso!',
+                  text2: `${member.user?.name} agora é cuidador`,
+                });
+                loadGroupData();
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Erro',
+                  text2: result.error || 'Não foi possível rebaixar',
+                });
+              }
+            } catch (error) {
+              console.error('Erro ao rebaixar:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Erro',
+                text2: 'Não foi possível rebaixar membro',
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handlePatientToCaregiver = (member) => {
+    if (!isAdmin) return;
+
+    Alert.alert(
+      'Transformar em Cuidador',
+      `Deseja transformar ${member.user?.name} de paciente para cuidador?\n\nO grupo ficará sem paciente designado.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          style: 'default',
+          onPress: async () => {
+            try {
+              // Usa o mesmo método de demote para trocar role
+              const result = await groupMemberService.demoteAdminToCaregiver(groupId, member.id);
+              if (result.success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Sucesso!',
+                  text2: `${member.user?.name} agora é cuidador`,
+                });
+                loadGroupData();
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Erro',
+                  text2: result.error || 'Não foi possível alterar',
+                });
+              }
+            } catch (error) {
+              console.error('Erro ao transformar paciente em cuidador:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Erro',
+                text2: 'Não foi possível alterar',
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRemoveMember = (member) => {
+    if (!isAdmin) return;
+
+    // Não pode remover a si mesmo
+    if (member.user_id === user?.id) {
+      Toast.show({
+        type: 'error',
+        text1: 'Não Permitido',
+        text2: 'Você não pode remover a si mesmo do grupo',
+      });
+      return;
+    }
+
+    Alert.alert(
+      'Remover Membro',
+      `Deseja remover ${member.user?.name} do grupo?\n\nEsta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await groupMemberService.removeMember(groupId, member.id);
+              if (result.success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Membro Removido',
+                  text2: `${member.user?.name} foi removido do grupo`,
+                });
+                loadGroupData();
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Erro',
+                  text2: result.error || 'Não foi possível remover o membro',
+                });
+              }
+            } catch (error) {
+              console.error('Erro ao remover membro:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Erro',
+                text2: 'Não foi possível remover o membro',
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleChangePatient = (member) => {
+    if (!isAdmin) return;
+
+    // Só pode trocar se for um cuidador
+    if (member.role === 'patient') {
+      Toast.show({
+        type: 'info',
+        text1: 'Info',
+        text2: 'Este membro já é o paciente',
+      });
+      return;
+    }
+
+    // Encontrar paciente atual
+    const currentPatient = members.find(m => m.role === 'patient');
+
+    Alert.alert(
+      'Trocar Paciente',
+      `Deseja tornar ${member.user?.name} o paciente do grupo?\n\n${currentPatient ? `${currentPatient.user?.name} voltará a ser cuidador.` : 'Esta pessoa será o novo paciente.'}`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          style: 'default',
+          onPress: async () => {
+            try {
+              const result = await groupMemberService.changePatient(
+                groupId,
+                currentPatient?.id || null,
+                member.id
+              );
+              
+              if (result.success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Paciente Alterado',
+                  text2: `${member.user?.name} agora é o paciente`,
+                });
+                loadGroupData();
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Erro',
+                  text2: result.error || 'Não foi possível trocar o paciente',
+                });
+              }
+            } catch (error) {
+              console.error('Erro ao trocar paciente:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Erro',
+                text2: 'Não foi possível trocar o paciente',
+              });
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSave = async () => {
@@ -273,7 +799,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -292,6 +818,120 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Informações Básicas do Grupo */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="information-circle" size={24} color={colors.primary} />
+            <Text style={styles.sectionTitle}>Informações do Grupo</Text>
+          </View>
+
+          {/* Foto do Grupo */}
+          {isAdmin && (
+            <View style={styles.photoSection}>
+              <Text style={styles.label}>Foto do Grupo</Text>
+              {(newGroupPhoto || groupPhotoUrl) ? (
+                <View style={styles.photoContainer}>
+                  <Image 
+                    key={newGroupPhoto ? `new-${Date.now()}-${newGroupPhoto}` : `url-${photoKey}-${groupPhotoUrl}`}
+                    source={{ 
+                      uri: newGroupPhoto || groupPhotoUrl,
+                      cache: 'reload' // Forçar reload do cache
+                    }} 
+                    style={styles.groupPhotoLarge}
+                    // Priorizar newGroupPhoto se existir (foto selecionada mas ainda não salva)
+                    defaultSource={newGroupPhoto ? { uri: newGroupPhoto } : null}
+                    onError={(error) => {
+                      console.error('❌ Erro ao carregar imagem:', error);
+                      // Se a foto do servidor falhar e tiver foto local, usar a local
+                      if (!newGroupPhoto && groupPhotoUrl) {
+                        console.log('⚠️ Tentando recarregar foto do servidor...');
+                        setTimeout(() => {
+                          setPhotoKey(Date.now());
+                        }, 1000);
+                      }
+                    }}
+                    onLoad={() => {
+                      console.log('✅ Imagem carregada com sucesso');
+                    }}
+                  />
+                  <View style={styles.photoActions}>
+                    <TouchableOpacity
+                      style={styles.photoActionButton}
+                      onPress={pickGroupPhoto}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="camera" size={20} color={colors.primary} />
+                      <Text style={styles.photoActionText}>Trocar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.photoActionButton, styles.photoRemoveButton]}
+                      onPress={removeGroupPhoto}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="trash-outline" size={20} color={colors.error} />
+                      <Text style={[styles.photoActionText, { color: colors.error }]}>Remover</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.addPhotoButton}
+                  onPress={pickGroupPhoto}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="camera" size={48} color={colors.primary} />
+                  <Text style={styles.addPhotoText}>Adicionar Foto</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Nome do Grupo</Text>
+            <TextInput
+              style={styles.input}
+              value={editedGroupName}
+              onChangeText={setEditedGroupName}
+              placeholder="Nome do grupo"
+              placeholderTextColor={colors.gray400}
+              editable={isAdmin}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Descrição</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={editedDescription}
+              onChangeText={setEditedDescription}
+              placeholder="Descrição do grupo"
+              placeholderTextColor={colors.gray400}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+              editable={isAdmin}
+            />
+          </View>
+
+          {isAdmin && (editedGroupName !== groupData?.name || editedDescription !== groupData?.description || newGroupPhoto) && (
+            <TouchableOpacity
+              style={[styles.saveBasicInfoButton, saving && styles.saveBasicInfoButtonDisabled]}
+              onPress={saveGroupBasicInfo}
+              disabled={saving}
+              activeOpacity={0.8}
+            >
+              {saving ? (
+                <ActivityIndicator color={colors.textWhite} />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color={colors.textWhite} />
+                  <Text style={styles.saveBasicInfoText}>Salvar Alterações</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Código do Paciente */}
         {groupData?.code && (
           <View style={styles.codeSection}>
@@ -389,26 +1029,34 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             {members.length > 0 ? (
               <>
                 {members.map((member) => {
-                  const isAdmin = member.role === 'admin';
-                  const isPatient = member.role === 'patient';
-                  const isCaregiver = member.role === 'caregiver';
+                  const memberIsAdmin = member.role === 'admin';
+                  const memberIsPatient = member.role === 'patient';
+                  const memberIsCaregiver = member.role === 'caregiver';
+
+                  // Card do paciente é clicável para editar dados
+                  const CardComponent = memberIsPatient ? TouchableOpacity : View;
+                  const cardProps = memberIsPatient ? {
+                    onPress: () => navigation.navigate('EditPatientData', { groupId, groupName }),
+                    activeOpacity: 0.7,
+                  } : {};
 
                   return (
-                    <View 
+                    <CardComponent 
                       key={member.id} 
                       style={[
                         styles.memberCard,
-                        isPatient && styles.patientCard
+                        memberIsPatient && styles.patientCard
                       ]}
+                      {...cardProps}
                     >
                       <View style={[
                         styles.memberAvatar,
-                        isPatient && styles.patientAvatar
+                        memberIsPatient && styles.patientAvatar
                       ]}>
                         <Ionicons 
-                          name={isPatient ? 'heart' : 'person'} 
+                          name={memberIsPatient ? 'heart' : 'person'} 
                           size={32} 
-                          color={isPatient ? colors.secondary : colors.primary} 
+                          color={memberIsPatient ? colors.secondary : colors.primary} 
                         />
                       </View>
                       <View style={styles.memberInfo}>
@@ -416,19 +1064,24 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                           <Text style={styles.memberName}>
                             {member.user?.name || 'Membro'}
                           </Text>
-                          {isAdmin && (
+                          {memberIsAdmin && (
                             <View style={styles.adminBadge}>
                               <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
                               <Text style={styles.adminBadgeText}>Administrador</Text>
                             </View>
                           )}
-                          {isPatient && (
-                            <View style={styles.patientBadge}>
-                              <Ionicons name="medkit" size={14} color={colors.secondary} />
-                              <Text style={styles.patientBadgeText}>Paciente</Text>
-                            </View>
+                          {memberIsPatient && (
+                            <>
+                              <View style={styles.patientBadge}>
+                                <Ionicons name="medkit" size={14} color={colors.secondary} />
+                                <Text style={styles.patientBadgeText}>Paciente</Text>
+                              </View>
+                              <View style={styles.editIconContainer}>
+                                <Ionicons name="create-outline" size={18} color={colors.secondary} />
+                              </View>
+                            </>
                           )}
-                          {isCaregiver && !isAdmin && (
+                          {memberIsCaregiver && !memberIsAdmin && (
                             <View style={styles.caregiverBadge}>
                               <Ionicons name="heart" size={14} color={colors.info} />
                               <Text style={styles.caregiverBadgeText}>Cuidador</Text>
@@ -436,7 +1089,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                           )}
                         </View>
                         <Text style={styles.memberRole}>
-                          {isAdmin ? 'Cuidador Principal' : isPatient ? 'Pessoa Acompanhada' : 'Cuidador'}
+                          {memberIsAdmin ? 'Cuidador Principal' : memberIsPatient ? 'Pessoa Acompanhada' : 'Cuidador'}
                         </Text>
                         {member.joined_at && (
                           <View style={styles.memberDetail}>
@@ -454,8 +1107,79 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                             </Text>
                           </View>
                         )}
+                        
+                        {/* Botões de Ação (só visíveis para admin e não para si mesmo) */}
+                        {(() => {
+                          const shouldShowActions = isAdmin && member.user_id !== user?.id;
+                          console.log(`🔧 Membro: ${member.user?.name} | isAdmin: ${isAdmin} | member.user_id: ${member.user_id} | user.id: ${user?.id} | Mostrar ações: ${shouldShowActions}`);
+                          return shouldShowActions;
+                        })() && (
+                          <View style={styles.memberActions}>
+                            {/* Promover/Rebaixar Admin ou Tornar Cuidador (se for paciente) */}
+                            {member.role === 'admin' ? (
+                              <TouchableOpacity
+                                style={[styles.actionButton, styles.demoteButton]}
+                                onPress={() => handleDemoteAdmin(member)}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons name="arrow-down-circle-outline" size={18} color={colors.warning} />
+                                <Text style={[styles.actionButtonText, { color: colors.warning }]}>
+                                  Rebaixar
+                                </Text>
+                              </TouchableOpacity>
+                            ) : member.role === 'caregiver' ? (
+                              <TouchableOpacity
+                                style={[styles.actionButton, styles.promoteButton]}
+                                onPress={() => handlePromoteToAdmin(member)}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons name="arrow-up-circle-outline" size={18} color={colors.success} />
+                                <Text style={[styles.actionButtonText, { color: colors.success }]}>
+                                  Promover
+                                </Text>
+                              </TouchableOpacity>
+                            ) : member.role === 'patient' ? (
+                              <TouchableOpacity
+                                style={[styles.actionButton, styles.changePatientButton]}
+                                onPress={() => handlePatientToCaregiver(member)}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons name="people-outline" size={18} color={colors.info} />
+                                <Text style={[styles.actionButtonText, { color: colors.info }]}>
+                                  Tornar Cuidador
+                                </Text>
+                              </TouchableOpacity>
+                            ) : null}
+                            
+                            {/* Trocar Paciente (só para não-pacientes) */}
+                            {member.role !== 'patient' && (
+                              <TouchableOpacity
+                                style={[styles.actionButton, styles.changePatientButton]}
+                                onPress={() => handleChangePatient(member)}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons name="swap-horizontal-outline" size={18} color={colors.info} />
+                                <Text style={[styles.actionButtonText, { color: colors.info }]}>
+                                  Tornar Paciente
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                            
+                            {/* Remover (sempre visível) */}
+                            <TouchableOpacity
+                              style={[styles.actionButton, styles.removeButton]}
+                              onPress={() => handleRemoveMember(member)}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons name="trash-outline" size={18} color={colors.error} />
+                              <Text style={[styles.actionButtonText, { color: colors.error }]}>
+                                Remover
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
                       </View>
-                    </View>
+                    </CardComponent>
                   );
                 })}
               </>
@@ -472,19 +1196,6 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                 Atualmente este grupo tem {members.length} membro{members.length !== 1 ? 's' : ''}.
               </Text>
             </View>
-
-            {/* Botão Gerenciar Membros */}
-            <TouchableOpacity
-              style={styles.manageMembersButton}
-              onPress={() => navigation.navigate('GroupMembers', { groupId, groupName })}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="settings-outline" size={20} color={colors.primary} />
-              <Text style={styles.manageMembersButtonText}>
-                Gerenciar Membros
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-            </TouchableOpacity>
           </View>
         )}
 
@@ -934,6 +1645,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 4,
   },
+  editIconContainer: {
+    marginLeft: 'auto',
+  },
   caregiverBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1046,6 +1760,143 @@ const styles = StyleSheet.create({
   panicDescription: {
     fontSize: 14,
     color: colors.gray400,
+  },
+  // Estilos dos botões de ação inline
+  memberActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+  },
+  promoteButton: {
+    borderColor: colors.success + '40',
+    backgroundColor: colors.success + '10',
+  },
+  demoteButton: {
+    borderColor: colors.warning + '40',
+    backgroundColor: colors.warning + '10',
+  },
+  changePatientButton: {
+    borderColor: colors.info + '40',
+    backgroundColor: colors.info + '10',
+  },
+  removeButton: {
+    borderColor: colors.error + '40',
+    backgroundColor: colors.error + '10',
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  // Estilos para informações básicas do grupo
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  textArea: {
+    height: 90,
+    paddingTop: 14,
+  },
+  saveBasicInfoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginTop: 8,
+    gap: 8,
+  },
+  saveBasicInfoButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveBasicInfoText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.textWhite,
+  },
+  // Estilos para foto do grupo
+  photoSection: {
+    marginBottom: 20,
+  },
+  photoContainer: {
+    alignItems: 'center',
+  },
+  groupPhotoLarge: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.gray200,
+    marginBottom: 12,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  photoActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    gap: 6,
+  },
+  photoRemoveButton: {
+    borderColor: colors.error,
+  },
+  photoActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  addPhotoButton: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+  },
+  addPhotoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    marginTop: 8,
   },
 });
 

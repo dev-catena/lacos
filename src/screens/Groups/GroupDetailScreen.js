@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,9 +16,39 @@ import {
   PulseIcon, 
   SettingsIcon,
 } from '../../components/CustomIcons';
+import { useAuth } from '../../contexts/AuthContext';
+import groupService from '../../services/groupService';
 
 const GroupDetailScreen = ({ route, navigation }) => {
   const { groupId, groupName, accompaniedName } = route.params || {};
+  const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkAdminStatus();
+  }, [groupId]);
+
+  const checkAdminStatus = async () => {
+    try {
+      const result = await groupService.getGroup(groupId);
+      if (result.success && result.data) {
+        const group = result.data;
+        // Verificar se o usuário é o criador ou tem role=admin no grupo
+        const isCreator = group.created_by === user?.id;
+        const memberData = group.group_members?.find(m => m.user_id === user?.id);
+        const hasAdminRole = memberData?.role === 'admin';
+        
+        setIsAdmin(isCreator || hasAdminRole);
+        console.log('🔐 GroupDetail - É admin?', isCreator || hasAdminRole);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar admin:', error);
+      setIsAdmin(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const menuItems = [
     {
@@ -86,6 +117,19 @@ const GroupDetailScreen = ({ route, navigation }) => {
       }),
     },
     {
+      id: 'media',
+      title: 'Mídias',
+      subtitle: 'Fotos e vídeos do grupo',
+      icon: 'images',
+      IconComponent: null,
+      color: '#FF6F00',
+      backgroundColor: '#FF6F0020',
+      onPress: () => navigation.navigate('GroupMedia', { 
+        groupId, 
+        groupName 
+      }),
+    },
+    {
       id: 'vitalsigns',
       title: 'Sinais Vitais',
       subtitle: 'Registrar pressão, glicose e peso',
@@ -114,8 +158,27 @@ const GroupDetailScreen = ({ route, navigation }) => {
     },
   ];
 
+  // Filtrar menuItems: só mostrar Configurações se for admin
+  const visibleMenuItems = menuItems.filter(item => {
+    if (item.id === 'settings') {
+      return isAdmin;
+    }
+    return true;
+  });
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+        <StatusBar style="dark" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -154,7 +217,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
 
         {/* Cards de Menu */}
         <View style={styles.menuContainer}>
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const IconComponent = item.IconComponent;
             
             return (
@@ -211,6 +274,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',

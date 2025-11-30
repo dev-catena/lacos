@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,12 +18,10 @@ import colors from '../../constants/colors';
 import AdvancedFrequencyModal from './AdvancedFrequencyModal';
 import { scheduleMedicationNotifications } from '../../services/notificationService';
 import medicationService from '../../services/medicationService';
-
-// Dados de autocomplete
-const COMMON_MEDICATIONS = [
-  'Losartana', 'Sinvastatina', 'Omeprazol', 'Metformina', 'Enalapril',
-  'Atenolol', 'Hidroclorotiazida', 'Captopril', 'Levotiroxina', 'Amoxicilina'
-];
+import medicationSearchService from '../../services/medicationSearchService';
+import MedicationAutocomplete from '../../components/MedicationAutocomplete';
+import documentService from '../../services/documentService';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const PHARMACEUTICAL_FORMS = [
   'Comprimido', 'Cápsula', 'Solução oral', 'Gotas', 'Xarope',
@@ -41,7 +41,7 @@ const FREQUENCIES = [
 ];
 
 const AddMedicationScreen = ({ route, navigation }) => {
-  let { groupId, groupName, prescriptionId } = route.params;
+  let { groupId, groupName, prescriptionId, doctorId, doctorName, prescriptionImage } = route.params;
   
   // TEMPORÁRIO: Se groupId é um timestamp, usar o grupo de teste
   if (groupId && groupId > 999999999999) {
@@ -49,6 +49,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
   }
 
   const [name, setName] = useState('');
+  const [isFarmaciaPopular, setIsFarmaciaPopular] = useState(false);
   const [form, setForm] = useState('');
   const [dosage, setDosage] = useState('');
   const [unit, setUnit] = useState('mg');
@@ -62,6 +63,81 @@ const AddMedicationScreen = ({ route, navigation }) => {
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
 
   const [saving, setSaving] = useState(false);
+  const [prescriptionSaved, setPrescriptionSaved] = useState(false); // Flag para evitar salvar receita múltiplas vezes
+  
+  // Estados para autocomplete de medicamentos
+  const [medicationSuggestions, setMedicationSuggestions] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef(null);
+
+  // Buscar sugestões de medicamentos
+  const handleNameChange = async (text) => {
+    // Atualizar o nome
+    setName(text);
+    
+    // Verificar se é da Farmácia Popular quando o usuário digita
+    if (text.length >= 2) {
+      const isPopular = medicationSearchService.isFarmaciaPopular(text);
+      setIsFarmaciaPopular(isPopular);
+    } else {
+      setIsFarmaciaPopular(false);
+    }
+    
+    // Limpar timeout anterior
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Se o texto tiver menos de 2 caracteres, não buscar
+    if (text.length < 2) {
+      setMedicationSuggestions([]);
+      return;
+    }
+    
+    // Debounce: aguardar 300ms antes de buscar
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      
+      try {
+        const results = await medicationSearchService.searchMedications(text, 10);
+        setMedicationSuggestions(results);
+      } catch (error) {
+        console.error('Erro ao buscar medicamentos:', error);
+        setMedicationSuggestions([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
+
+  // Selecionar medicamento da sugestão
+  const handleSelectMedication = (medication) => {
+    // Atualizar o nome do medicamento
+    setName(medication.name);
+    setMedicationSuggestions([]);
+    
+    // Verificar se é da Farmácia Popular (apenas para exibir badge informativo)
+    const isPopular = medicationSearchService.isFarmaciaPopular(medication.name);
+    setIsFarmaciaPopular(isPopular);
+    
+    // Feedback visual de seleção
+    Toast.show({
+      type: 'success',
+      text1: 'Medicamento selecionado',
+      text2: medication.name,
+      visibilityTime: 1500,
+    });
+  };
+
+  // Cleanup do timeout quando componente desmontar
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
 
   const handleAdvancedFrequencyConfirm = (config) => {
     setAdvancedFrequency(config);
@@ -100,6 +176,65 @@ const AddMedicationScreen = ({ route, navigation }) => {
     return freq ? freq.label : 'Frequência personalizada';
   };
 
+  // Salvar receita escaneada como documento
+  const savePrescriptionAsDocument = async () => {
+    if (!prescriptionImage || prescriptionSaved) {
+      // Se já foi salva, não tentar salvar novamente
+      return;
+    }
+
+    try {
+      // Criar FormData para upload
+      const formData = new FormData();
+      
+      // Extrair nome do arquivo da URI
+      const uriParts = prescriptionImage.split('/');
+      const fileName = uriParts[uriParts.length - 1] || `receita_${Date.now()}.jpg`;
+      
+      // Adicionar arquivo
+      formData.append('file', {
+        uri: prescriptionImage,
+        type: 'image/jpeg',
+        name: fileName,
+      });
+      
+      // Adicionar dados do documento (formato esperado pelo backend)
+      formData.append('group_id', groupId.toString());
+      formData.append('type', 'prescription');
+      formData.append('title', doctorName 
+        ? `Receita - ${doctorName}` 
+        : 'Receita Médica');
+      formData.append('document_date', new Date().toISOString());
+      // consultation_id pode ser null se não houver consulta vinculada
+      formData.append('consultation_id', '');
+      formData.append('notes', doctorName 
+        ? `Receita médica prescrita por ${doctorName} com medicamentos cadastrados`
+        : 'Receita médica com medicamentos cadastrados');
+
+      // Fazer upload do documento
+      await documentService.uploadDocument(formData);
+      
+      // Marcar como salva para evitar tentar salvar novamente
+      setPrescriptionSaved(true);
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Receita salva',
+        text2: 'A receita foi salva na seção de Arquivos',
+        position: 'bottom',
+      });
+    } catch (error) {
+      console.error('Erro ao salvar receita como documento:', error);
+      // Não bloquear o fluxo se falhar ao salvar o documento
+      Toast.show({
+        type: 'info',
+        text1: 'Receita não salva',
+        text2: 'A receita não pôde ser salva, mas os medicamentos foram cadastrados',
+        position: 'bottom',
+      });
+    }
+  };
+
   const handleSave = async () => {
     // Validações
     if (!name.trim()) {
@@ -124,6 +259,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
       // Preparar dados para API
       const medicationData = {
         groupId: groupId,
+        doctorId: doctorId || null, // Incluir doctorId se houver (receita médica)
         name: name.trim(),
         form: form.trim(),
         dosage: dosage.trim(),
@@ -165,8 +301,57 @@ const AddMedicationScreen = ({ route, navigation }) => {
           position: 'bottom',
         });
 
-        navigation.goBack();
-        navigation.goBack(); // Voltar para a tela de medicamentos
+        // Se estiver cadastrando uma receita (com prescriptionImage), oferecer opção de adicionar mais
+        if (prescriptionImage) {
+          Alert.alert(
+            'Medicamento cadastrado!',
+            'Deseja adicionar outro medicamento desta receita?',
+            [
+              {
+                text: 'Finalizar Receita',
+                style: 'default',
+                onPress: async () => {
+                  // Salvar a receita como documento antes de finalizar
+                  await savePrescriptionAsDocument();
+                  // Voltar para a lista de medicamentos
+                  navigation.navigate('Medications', { groupId, groupName });
+                },
+              },
+              {
+                text: 'Adicionar Outro',
+                style: 'default',
+                onPress: () => {
+                  // Limpar formulário mas manter dados da receita
+                  setName('');
+                  setForm('');
+                  setDosage('');
+                  setUnit('mg');
+                  setAdministrationRoute('Oral');
+                  setFrequency('24');
+                  setFirstDoseTime('08:00');
+                  setInstructions('');
+                  setDurationType('continuo');
+                  setDurationDays('');
+                  setAdvancedFrequency(null);
+                  setIsFarmaciaPopular(false);
+                  
+                  // Manter na mesma tela para adicionar outro medicamento
+                  Toast.show({
+                    type: 'info',
+                    text1: 'Adicione o próximo medicamento',
+                    text2: 'Preencha os dados do próximo medicamento da receita',
+                    position: 'bottom',
+                  });
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+        } else {
+          // Se não for receita, voltar normalmente
+          navigation.goBack();
+          navigation.goBack(); // Voltar para a tela de medicamentos
+        }
       } else {
         Alert.alert('Erro', result.error || 'Não foi possível salvar o medicamento');
       }
@@ -195,7 +380,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -207,22 +392,40 @@ const AddMedicationScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
-          <Text style={styles.title}>Cadastrar Remédio</Text>
-          <Text style={styles.subtitle}>{groupName}</Text>
+          <Text style={styles.title}>
+            {prescriptionImage ? 'Receita Médica' : 'Cadastrar Remédio'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {doctorName ? `${doctorName} - ${groupName}` : groupName}
+          </Text>
         </View>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.form}>
+          {/* Indicador de Receita */}
+          {prescriptionImage && (
+            <View style={styles.prescriptionIndicator}>
+              <Ionicons name="document-text" size={20} color={colors.secondary} />
+              <Text style={styles.prescriptionIndicatorText}>
+                Cadastrando medicamentos da receita
+              </Text>
+            </View>
+          )}
+
           {/* Nome do Medicamento */}
           <View style={styles.field}>
             <Text style={styles.label}>Nome do medicamento *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: Losartana"
+            <MedicationAutocomplete
               value={name}
-              onChangeText={setName}
+              onChangeText={handleNameChange}
+              onSelect={handleSelectMedication}
+              suggestions={medicationSuggestions}
+              placeholder="Ex: Losartana"
+              isLoading={isSearching}
+              showPrice={false}
+              isFarmaciaPopular={isFarmaciaPopular}
             />
           </View>
 
@@ -528,6 +731,9 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 8,
   },
+  inputContainer: {
+    position: 'relative',
+  },
   input: {
     backgroundColor: colors.backgroundLight,
     borderWidth: 1,
@@ -536,6 +742,57 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: colors.text,
+  },
+  searchingIndicator: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+  },
+  inputFilled: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '08',
+  },
+  suggestionsContainer: {
+    marginTop: 8,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    maxHeight: 200,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: colors.text,
+    marginLeft: 12,
+    flex: 1,
+  },
+  noResultsContainer: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: colors.info + '10',
+    borderRadius: 8,
+  },
+  noResultsText: {
+    fontSize: 12,
+    color: colors.textLight,
+    fontStyle: 'italic',
   },
   textArea: {
     minHeight: 80,
@@ -697,6 +954,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.textWhite,
+  },
+  prescriptionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.secondary + '15',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.secondary + '30',
+  },
+  prescriptionIndicatorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.secondary,
+    flex: 1,
   },
 });
 

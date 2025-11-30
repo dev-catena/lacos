@@ -11,10 +11,10 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
@@ -28,16 +28,27 @@ import {
 } from '../../components/CustomIcons';
 import groupService from '../../services/groupService';
 import Toast from 'react-native-toast-message';
-
-const GROUPS_STORAGE_KEY = '@lacos_groups';
+import { useAuth } from '../../contexts/AuthContext';
 
 const GroupsScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [searchText, setSearchText] = useState('');
   const [myGroups, setMyGroups] = useState([]);
+  const [participatingGroups, setParticipatingGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [joiningGroup, setJoiningGroup] = useState(false);
+
+  // Função auxiliar para verificar se é admin do grupo
+  const isAdminOfGroup = (group) => {
+    if (!user) return false;
+    // Verificar se é criador
+    if (group.created_by === user.id || group.is_creator === true) return true;
+    // Verificar se tem role=admin
+    const memberData = group.group_members?.find(m => m.user_id === user.id);
+    return memberData?.role === 'admin';
+  };
 
   // Carregar grupos quando a tela recebe foco
   useFocusEffect(
@@ -49,32 +60,42 @@ const GroupsScreen = ({ navigation }) => {
   const loadGroups = async () => {
     try {
       setLoading(true);
-      const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
-      let groups = [];
+      console.log('📋 GroupsScreen - Carregando grupos da API...');
       
-      if (groupsJson) {
-        groups = JSON.parse(groupsJson);
+      const result = await groupService.getMyGroups();
+      
+      if (result.success && result.data) {
+        const allGroups = result.data;
+        console.log(`✅ GroupsScreen - ${allGroups.length} grupo(s) encontrado(s)`);
+        
+        // "Meus Grupos" = grupos que EU criei (is_creator=true)
+        // FALLBACK: Se is_creator não existir, usa is_admin como critério temporário
+        const myCreatedGroups = allGroups.filter(g => {
+          if (g.is_creator !== undefined) {
+            return g.is_creator === true;
+          }
+          // Fallback: considera que admins são criadores
+          return g.is_admin === true;
+        });
+        
+        // "Participo" = grupos onde fui convidado (is_creator=false)
+        const joinedGroups = allGroups.filter(g => {
+          if (g.is_creator !== undefined) {
+            return g.is_creator === false;
+          }
+          // Fallback: não-admins são participantes
+          return g.is_admin === false;
+        });
+        
+        console.log(`📊 GroupsScreen - Meus: ${myCreatedGroups.length}, Participo: ${joinedGroups.length}`);
+        
+        setMyGroups(myCreatedGroups);
+        setParticipatingGroups(joinedGroups);
       }
-      
-      // TEMPORÁRIO: Adicionar grupo de teste do banco de dados
-      const testGroup = {
-        id: 1,
-        groupName: 'Grupo Pessoal (Teste)',
-        accompaniedName: 'João Silva',
-        accessCode: 'TESTE123',
-        isAdmin: true,
-        memberCount: 1,
-        createdAt: new Date().toISOString(),
-      };
-      
-      const hasTestGroup = groups.some(g => g.id === 1);
-      if (!hasTestGroup) {
-        groups.unshift(testGroup);
-      }
-      
-      setMyGroups(groups);
     } catch (error) {
-      console.error('Erro ao carregar grupos:', error);
+      console.error('❌ GroupsScreen - Erro ao carregar grupos:', error);
+      setMyGroups([]);
+      setParticipatingGroups([]);
     } finally {
       setLoading(false);
     }
@@ -129,7 +150,7 @@ const GroupsScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -138,12 +159,20 @@ const GroupsScreen = ({ navigation }) => {
           <LacosIcon size={36} />
           <Text style={styles.title}>Grupos</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => navigation.navigate('CreateGroup')}
-        >
-          <AddIcon size={24} color={colors.textWhite} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => navigation.navigate('CreateGroup')}
+          >
+            <AddIcon size={24} color={colors.textWhite} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Ionicons name="person-circle-outline" size={28} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search Bar */}
@@ -175,22 +204,29 @@ const GroupsScreen = ({ navigation }) => {
                 style={styles.groupCard}
                 onPress={() => navigation.navigate('GroupDetail', {
                   groupId: group.id,
-                  groupName: group.groupName,
-                  accompaniedName: group.accompaniedName,
+                  groupName: group.name,
+                  accompaniedName: group.accompanied_name,
                 })}
                 activeOpacity={0.7}
               >
             <View style={styles.groupHeader}>
-              <View style={styles.groupIconContainer}>
-                <PersonIcon size={28} color={colors.primary} />
-              </View>
+              {group.photo_url ? (
+                <Image 
+                  source={{ uri: group.photo_url }} 
+                  style={styles.groupPhoto}
+                />
+              ) : (
+                <View style={styles.groupIconContainer}>
+                  <PersonIcon size={28} color={colors.primary} />
+                </View>
+              )}
               <View style={styles.groupContent}>
-                    <Text style={styles.groupName}>{group.groupName}</Text>
+                    <Text style={styles.groupName}>{group.name}</Text>
                     <View style={styles.groupMembersRow}>
                       <Ionicons name="people" size={14} color={colors.textLight} />
-                      <Text style={styles.groupMembers}>2 membros</Text>
+                      <Text style={styles.groupMembers}>{group.members_count || 0} membro{group.members_count !== 1 ? 's' : ''}</Text>
                     </View>
-                    {group.accompaniedName && (
+                    {group.accompanied_name && (
                       <View style={styles.membersListContainer}>
                         <View style={styles.memberItem}>
                           <Ionicons name="shield-checkmark" size={12} color={colors.primary} />
@@ -198,7 +234,7 @@ const GroupsScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.memberItem}>
                           <Ionicons name="heart" size={12} color={colors.secondary} />
-                          <Text style={styles.memberName}>{group.accompaniedName}</Text>
+                          <Text style={styles.memberName}>{group.accompanied_name}</Text>
                         </View>
                       </View>
                     )}
@@ -223,7 +259,7 @@ const GroupsScreen = ({ navigation }) => {
                       style={styles.actionButton}
                       onPress={() => navigation.navigate('Medications', { 
                         groupId: group.id, 
-                        groupName: group.groupName
+                        groupName: group.name
                       })}
                     >
                       <Ionicons name="medical" size={18} color={colors.secondary} />
@@ -233,7 +269,7 @@ const GroupsScreen = ({ navigation }) => {
                   style={styles.actionButton}
                   onPress={() => navigation.navigate('Agenda', { 
                         groupId: group.id, 
-                        groupName: group.groupName
+                        groupName: group.name
                   })}
                 >
                   <CalendarIcon size={18} color={colors.warning} />
@@ -243,23 +279,25 @@ const GroupsScreen = ({ navigation }) => {
                   style={styles.actionButton}
                   onPress={() => navigation.navigate('AddVitalSigns', { 
                         groupId: group.id, 
-                        groupName: group.groupName,
+                        groupName: group.name,
                         accompaniedPersonId: group.id
                   })}
                 >
                   <PulseIcon size={18} color={colors.success} />
                   <Text style={styles.actionButtonText}>Sinais</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={() => navigation.navigate('GroupSettings', { 
-                        groupId: group.id, 
-                        groupName: group.groupName
-                  })}
-                >
-                  <SettingsIcon size={18} color={colors.primary} />
-                  <Text style={styles.actionButtonText}>Config</Text>
-                </TouchableOpacity>
+                {isAdminOfGroup(group) && (
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('GroupSettings', { 
+                          groupId: group.id, 
+                          groupName: group.name
+                    })}
+                  >
+                    <SettingsIcon size={18} color={colors.primary} />
+                    <Text style={styles.actionButtonText}>Config</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </TouchableOpacity>
@@ -279,14 +317,95 @@ const GroupsScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Grupos que Participo</Text>
           
-          {/* Empty state */}
-          <View style={styles.emptyCard}>
-            <Ionicons name="people-outline" size={40} color={colors.gray300} />
-            <Text style={styles.emptyTitle}>Nenhum grupo ainda</Text>
-            <Text style={styles.emptyText}>
-              Você ainda não foi adicionado a nenhum grupo de cuidados
-            </Text>
-          </View>
+          {participatingGroups.length > 0 ? (
+            participatingGroups.map((group) => (
+              <TouchableOpacity
+                key={group.id}
+                style={styles.groupCard}
+                onPress={() => navigation.navigate('GroupDetail', {
+                  groupId: group.id,
+                  groupName: group.name,
+                  accompaniedName: group.accompanied_name
+                })}
+                activeOpacity={0.7}
+              >
+                <View style={styles.groupCardHeader}>
+                  {group.photo_url ? (
+                    <Image 
+                      source={{ uri: group.photo_url }} 
+                      style={styles.groupPhotoSmall}
+                    />
+                  ) : (
+                    <View style={styles.groupIconContainer}>
+                      <PersonIcon size={24} color={colors.primary} />
+                    </View>
+                  )}
+                  <View style={styles.groupInfo}>
+                    <Text style={styles.groupName}>{group.name}</Text>
+                    {group.accompanied_name && (
+                      <Text style={styles.groupSubtitle}>Paciente: {group.accompanied_name}</Text>
+                    )}
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
+                </View>
+
+                {/* Actions */}
+                <View style={styles.groupActions}>
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('Medications', { 
+                      groupId: group.id, 
+                      groupName: group.name
+                    })}
+                  >
+                    <Ionicons name="medical" size={18} color={colors.secondary} />
+                    <Text style={styles.actionButtonText}>Remédios</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('Agenda', { 
+                      groupId: group.id, 
+                      groupName: group.name
+                    })}
+                  >
+                    <CalendarIcon size={18} color={colors.warning} />
+                    <Text style={styles.actionButtonText}>Agenda</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('AddVitalSigns', { 
+                      groupId: group.id, 
+                      groupName: group.name,
+                      accompaniedPersonId: group.id
+                    })}
+                  >
+                    <PulseIcon size={18} color={colors.success} />
+                    <Text style={styles.actionButtonText}>Sinais</Text>
+                  </TouchableOpacity>
+                  {isAdminOfGroup(group) && (
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => navigation.navigate('GroupSettings', { 
+                        groupId: group.id, 
+                        groupName: group.name
+                      })}
+                    >
+                      <SettingsIcon size={18} color={colors.primary} />
+                      <Text style={styles.actionButtonText}>Config</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyCard}>
+              <Ionicons name="people-outline" size={40} color={colors.gray300} />
+              <Text style={styles.emptyTitle}>Nenhum grupo ainda</Text>
+              <Text style={styles.emptyText}>
+                Você ainda não foi adicionado a nenhum grupo de cuidados
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Botões de ação */}
@@ -383,6 +502,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -393,6 +517,13 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -443,6 +574,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  groupPhoto: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginRight: 12,
+    backgroundColor: colors.gray200,
+  },
+  groupPhotoSmall: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 12,
+    backgroundColor: colors.gray200,
   },
   groupContent: {
     flex: 1,

@@ -11,69 +11,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
-import { ElderlyIcon, InviteCodeIcon } from '../../components/CustomIcons';
 import groupService from '../../services/groupService';
 
-const GROUPS_STORAGE_KEY = '@lacos_groups';
-
 const CreateGroupScreen = ({ navigation }) => {
-  const [step, setStep] = useState(1); // 1: Dados do acompanhado, 2: Dados do grupo
   const [loading, setLoading] = useState(false);
-  
-  // Dados do Acompanhado
-  const [accompaniedData, setAccompaniedData] = useState({
-    name: '',
-    lastName: '',
-    birthDate: '',
-    gender: '',
-    bloodType: '',
-    phone: '',
-    email: '',
-  });
-
-  // Dados do Grupo
-  const [groupData, setGroupData] = useState({
-    groupName: '',
-    description: '',
-    generateCode: true,
-  });
-
-  const [generatedCode, setGeneratedCode] = useState('');
+  const [groupName, setGroupName] = useState('');
+  const [description, setDescription] = useState('');
   const [groupPhoto, setGroupPhoto] = useState(null);
-
-  const handleNext = () => {
-    // Validações do Step 1
-    if (step === 1) {
-      if (!accompaniedData.name || !accompaniedData.birthDate || !accompaniedData.gender) {
-        Alert.alert('Erro', 'Preencha os campos obrigatórios');
-        return;
-      }
-      
-      // Usar o nome do paciente como nome do grupo automaticamente
-      const patientFullName = `${accompaniedData.name}${accompaniedData.lastName ? ' ' + accompaniedData.lastName : ''}`.trim();
-      setGroupData(prev => ({
-        ...prev,
-        groupName: patientFullName,
-      }));
-      
-      setStep(2);
-    }
-  };
-
-  const handleBack = () => {
-    if (step === 2) {
-      setStep(1);
-    } else {
-      navigation.goBack();
-    }
-  };
 
   const pickImage = async () => {
     try {
@@ -99,423 +50,207 @@ const CreateGroupScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('Erro ao selecionar imagem:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Erro ao selecionar foto',
-      });
+      Alert.alert('Erro', 'Não foi possível selecionar a imagem');
     }
   };
 
+  const removeImage = () => {
+    setGroupPhoto(null);
+  };
+
   const handleCreateGroup = async () => {
-    if (!groupData.groupName) {
-      Alert.alert('Erro', 'Digite um nome para o grupo');
+    // Validação
+    if (!groupName.trim()) {
+      Alert.alert('Atenção', 'Por favor, informe o nome do grupo');
       return;
     }
 
-    setLoading(true);
-
     try {
-      console.log('📝 Criando grupo via API...');
-      
-      // Converter gênero de português para inglês
-      const genderMap = {
-        'masculino': 'male',
-        'feminino': 'female',
-        'outro': 'other'
-      };
-      
-      const genderInEnglish = genderMap[accompaniedData.gender] || null;
-      console.log('🔄 Convertendo gênero:', accompaniedData.gender, '→', genderInEnglish);
-      
-      // Dados para enviar ao backend (formato esperado pelo groupService)
-      const groupPayload = {
-        groupName: groupData.groupName,
-        description: groupData.description || '',
-        accompaniedName: `${accompaniedData.name}${accompaniedData.lastName ? ' ' + accompaniedData.lastName : ''}`,
-        accompaniedAge: accompaniedData.age || null,
-        accompaniedGender: genderInEnglish,
-        accessCode: null, // Será gerado pelo backend
-        healthInfo: accompaniedData.observations ? { observations: accompaniedData.observations } : null,
-      };
+      setLoading(true);
 
-      console.log('📤 Payload:', groupPayload);
-
-      // Criar grupo via API
-      const result = await groupService.createGroup(groupPayload);
-
-      if (!result.success) {
-        throw new Error(result.error || 'Erro ao criar grupo');
+      // Preparar dados para envio
+      const formData = new FormData();
+      formData.append('name', groupName.trim());
+      
+      if (description.trim()) {
+        formData.append('description', description.trim());
       }
 
-      const createdGroup = result.data;
-      console.log('✅ Grupo criado com sucesso:', createdGroup);
-
-      // Se tem foto, fazer upload
+      // Adicionar foto se selecionada
       if (groupPhoto) {
-        console.log('📤 Fazendo upload da foto...');
-        const uploadResult = await groupService.uploadGroupPhoto(createdGroup.id, groupPhoto);
-        if (uploadResult.success) {
-          console.log('✅ Foto enviada com sucesso');
-        }
+        const filename = groupPhoto.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+        formData.append('photo', {
+          uri: groupPhoto,
+          name: filename,
+          type: type,
+        });
       }
 
-      // Gerar código de convite (mock por enquanto, ou usar o do backend)
-      const inviteCode = createdGroup.invite_code || Math.random().toString(36).substring(2, 10).toUpperCase();
-      setGeneratedCode(inviteCode);
+      console.log('📤 Criando grupo:', groupName);
+      const result = await groupService.createGroup(formData);
 
-      Toast.show({
-        type: 'success',
-        text1: 'Grupo criado! 🎉',
-        text2: `Código de convite: ${inviteCode}`,
-        visibilityTime: 4000,
-      });
+      if (result.success) {
+        const newGroup = result.data;
+        
+        Toast.show({
+          type: 'success',
+          text1: 'Grupo Criado!',
+          text2: `${groupName} foi criado com sucesso`,
+        });
 
-      console.log('✅ Navegando para Home após criar grupo');
-      // Navegar para Home, que vai recarregar os grupos automaticamente
-      navigation.navigate('Home');
+        // Mostrar o código de convite
+        if (newGroup.code) {
+          Alert.alert(
+            '✅ Grupo Criado!',
+            `Compartilhe este código com os membros:\n\n${newGroup.code}`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Navegar para a home
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'HomeMain' }],
+                  });
+                },
+              },
+            ]
+          );
+        } else {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'HomeMain' }],
+          });
+        }
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível criar o grupo');
+      }
     } catch (error) {
       console.error('❌ Erro ao criar grupo:', error);
-      Alert.alert('Erro', error.message || 'Erro ao criar grupo');
+      Alert.alert('Erro', 'Não foi possível criar o grupo. Tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
-  const updateAccompaniedField = (field, value) => {
-    setAccompaniedData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const updateGroupField = (field, value) => {
-    setGroupData(prev => ({ ...prev, [field]: value }));
-  };
-
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Criar Novo Grupo</Text>
+          <Text style={styles.headerSubtitle}>Preencha as informações básicas</Text>
+        </View>
+        <View style={{ width: 40 }} />
+      </View>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+        style={{ flex: 1 }}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBack}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {step === 1 ? 'Dados do Acompanhado' : 'Dados do Grupo'}
-          </Text>
-          <View style={styles.placeholder} />
-        </View>
-
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressStep, step >= 1 && styles.progressStepActive]}>
-            <View style={[styles.progressCircle, step >= 1 && styles.progressCircleActive]}>
-              <Text style={[styles.progressNumber, step >= 1 && styles.progressNumberActive]}>1</Text>
-            </View>
-            <Text style={[styles.progressLabel, step >= 1 && styles.progressLabelActive]}>
-              Acompanhado
-            </Text>
-          </View>
-          <View style={[styles.progressLine, step >= 2 && styles.progressLineActive]} />
-          <View style={[styles.progressStep, step >= 2 && styles.progressStepActive]}>
-            <View style={[styles.progressCircle, step >= 2 && styles.progressCircleActive]}>
-              <Text style={[styles.progressNumber, step >= 2 && styles.progressNumberActive]}>2</Text>
-            </View>
-            <Text style={[styles.progressLabel, step >= 2 && styles.progressLabelActive]}>
-              Grupo
-            </Text>
-          </View>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-          {step === 1 ? (
-            // STEP 1: Dados do Acompanhado
-            <View style={styles.content}>
-              <View style={styles.iconContainer}>
-                <ElderlyIcon size={48} color={colors.primary} />
-              </View>
-
-              <Text style={styles.title}>Quem você vai acompanhar?</Text>
-              <Text style={styles.subtitle}>
-                Informe os dados da pessoa que será acompanhada neste grupo
-              </Text>
-
-              {/* Nome */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>
-                  Nome <Text style={styles.required}>*</Text>
-                </Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="person-outline" size={20} color={colors.gray400} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Nome da pessoa"
-                    value={accompaniedData.name}
-                    onChangeText={(value) => updateAccompaniedField('name', value)}
-                    autoCapitalize="words"
-                  />
-                </View>
-              </View>
-
-              {/* Sobrenome */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Sobrenome</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="person-outline" size={20} color={colors.gray400} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Sobrenome"
-                    value={accompaniedData.lastName}
-                    onChangeText={(value) => updateAccompaniedField('lastName', value)}
-                    autoCapitalize="words"
-                  />
-                </View>
-              </View>
-
-              {/* Data de Nascimento */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>
-                  Data de Nascimento <Text style={styles.required}>*</Text>
-                </Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="calendar-outline" size={20} color={colors.gray400} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="DD/MM/AAAA"
-                    value={accompaniedData.birthDate}
-                    onChangeText={(value) => updateAccompaniedField('birthDate', value)}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-
-              {/* Sexo */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>
-                  Sexo <Text style={styles.required}>*</Text>
-                </Text>
-                <View style={styles.genderContainer}>
-                  {['masculino', 'feminino', 'outro'].map((gender) => (
-                    <TouchableOpacity
-                      key={gender}
-                      style={[
-                        styles.genderButton,
-                        accompaniedData.gender === gender && styles.genderButtonActive,
-                      ]}
-                      onPress={() => updateAccompaniedField('gender', gender)}
-                    >
-                      <Text
-                        style={[
-                          styles.genderButtonText,
-                          accompaniedData.gender === gender && styles.genderButtonTextActive,
-                        ]}
-                      >
-                        {gender.charAt(0).toUpperCase() + gender.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Tipo Sanguíneo */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Tipo Sanguíneo</Text>
-                <View style={styles.bloodTypeContainer}>
-                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.bloodTypeButton,
-                        accompaniedData.bloodType === type && styles.bloodTypeButtonActive,
-                      ]}
-                      onPress={() => updateAccompaniedField('bloodType', type)}
-                    >
-                      <Text
-                        style={[
-                          styles.bloodTypeButtonText,
-                          accompaniedData.bloodType === type && styles.bloodTypeButtonTextActive,
-                        ]}
-                      >
-                        {type}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Telefone */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Telefone</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="call-outline" size={20} color={colors.gray400} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="(11) 99999-9999"
-                    value={accompaniedData.phone}
-                    onChangeText={(value) => updateAccompaniedField('phone', value)}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-              </View>
-
-              {/* Email */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>E-mail</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail-outline" size={20} color={colors.gray400} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="email@exemplo.com"
-                    value={accompaniedData.email}
-                    onChangeText={(value) => updateAccompaniedField('email', value)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.nextButton}
-                onPress={handleNext}
-              >
-                <Text style={styles.nextButtonText}>Próximo</Text>
-                <Ionicons name="arrow-forward" size={20} color={colors.textWhite} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            // STEP 2: Dados do Grupo
-            <View style={styles.content}>
-              <View style={styles.iconContainer}>
-                <InviteCodeIcon size={48} color={colors.secondary} />
-              </View>
-
-              <Text style={styles.title}>Configure o Grupo</Text>
-              <Text style={styles.subtitle}>
-                Defina um nome e gere o código para o aplicativo do acompanhado
-              </Text>
-
-              {/* Nome do Grupo */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>
-                  Nome do Grupo <Text style={styles.required}>*</Text>
-                </Text>
-                <Text style={styles.helperText}>
-                  Preenchido automaticamente com o nome do paciente. Você pode editar se preferir.
-                </Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="people-outline" size={20} color={colors.gray400} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder={`Ex: ${accompaniedData.name || 'Grupo de Cuidados'}`}
-                    value={groupData.groupName}
-                    onChangeText={(value) => updateGroupField('groupName', value)}
-                  />
-                </View>
-              </View>
-
-              {/* Foto do Grupo */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Foto do Grupo (opcional)</Text>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Foto do Grupo */}
+          <View style={styles.photoSection}>
+            <Text style={styles.sectionTitle}>Foto do Grupo (Opcional)</Text>
+            
+            {groupPhoto ? (
+              <View style={styles.photoContainer}>
+                <Image source={{ uri: groupPhoto }} style={styles.groupImage} />
                 <TouchableOpacity
-                  style={styles.photoSelector}
-                  onPress={pickImage}
+                  style={styles.removePhotoButton}
+                  onPress={removeImage}
                   activeOpacity={0.7}
                 >
-                  {groupPhoto ? (
-                    <Image source={{ uri: groupPhoto }} style={styles.groupPhoto} />
-                  ) : (
-                    <View style={styles.photoPlaceholder}>
-                      <Ionicons name="image-outline" size={48} color={colors.gray300} />
-                      <Text style={styles.photoPlaceholderText}>
-                        Toque para adicionar foto
-                      </Text>
-                    </View>
-                  )}
+                  <Ionicons name="close-circle" size={32} color={colors.error} />
                 </TouchableOpacity>
-                {groupPhoto && (
-                  <TouchableOpacity
-                    style={styles.changePhotoButton}
-                    onPress={pickImage}
-                  >
-                    <Ionicons name="camera-outline" size={16} color={colors.primary} />
-                    <Text style={styles.changePhotoText}>Alterar foto</Text>
-                  </TouchableOpacity>
-                )}
               </View>
-
-              {/* Descrição */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Descrição (opcional)</Text>
-                <View style={[styles.inputWrapper, styles.textAreaWrapper]}>
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Descreva o propósito deste grupo..."
-                    value={groupData.description}
-                    onChangeText={(value) => updateGroupField('description', value)}
-                    multiline
-                    numberOfLines={3}
-                  />
-                </View>
-              </View>
-
-              {/* Info sobre código */}
-              <View style={styles.infoCard}>
-                <Ionicons name="information-circle" size={24} color={colors.info} />
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoTitle}>Código de Pareamento</Text>
-                  <Text style={styles.infoText}>
-                    Um código único será gerado para que o acompanhado possa instalar e conectar o aplicativo companion.
-                  </Text>
-                </View>
-              </View>
-
-              {/* Resumo */}
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryTitle}>Resumo</Text>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Acompanhado:</Text>
-                  <Text style={styles.summaryValue}>
-                    {accompaniedData.name} {accompaniedData.lastName}
-                  </Text>
-                </View>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Data de Nascimento:</Text>
-                  <Text style={styles.summaryValue}>{accompaniedData.birthDate}</Text>
-                </View>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Sexo:</Text>
-                  <Text style={styles.summaryValue}>
-                    {accompaniedData.gender.charAt(0).toUpperCase() + accompaniedData.gender.slice(1)}
-                  </Text>
-                </View>
-                {accompaniedData.bloodType && (
-                  <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Tipo Sanguíneo:</Text>
-                    <Text style={styles.summaryValue}>{accompaniedData.bloodType}</Text>
-                  </View>
-                )}
-              </View>
-
+            ) : (
               <TouchableOpacity
-                style={[styles.createButton, loading && styles.createButtonDisabled]}
-                onPress={handleCreateGroup}
-                disabled={loading}
+                style={styles.addPhotoButton}
+                onPress={pickImage}
+                activeOpacity={0.7}
               >
-                {loading ? (
-                  <Text style={styles.createButtonText}>Criando grupo...</Text>
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={20} color={colors.textWhite} />
-                    <Text style={styles.createButtonText}>Criar Grupo</Text>
-                  </>
-                )}
+                <Ionicons name="camera" size={48} color={colors.primary} />
+                <Text style={styles.addPhotoText}>Adicionar Foto</Text>
               </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Nome do Grupo */}
+          <View style={styles.inputSection}>
+            <Text style={styles.label}>Nome do Grupo *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: Cuidados Vovó Maria"
+              placeholderTextColor={colors.gray400}
+              value={groupName}
+              onChangeText={setGroupName}
+              autoCapitalize="words"
+            />
+          </View>
+
+          {/* Descrição */}
+          <View style={styles.inputSection}>
+            <Text style={styles.label}>Descrição (Opcional)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Adicione uma descrição sobre este grupo de cuidados"
+              placeholderTextColor={colors.gray400}
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+          </View>
+
+          {/* Informativo */}
+          <View style={styles.infoCard}>
+            <Ionicons name="information-circle" size={24} color={colors.info} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>Próximos Passos</Text>
+              <Text style={styles.infoText}>
+                Após criar o grupo, você poderá:
+                {'\n'}• Adicionar dados do paciente nas Configurações
+                {'\n'}• Convidar outros cuidadores
+                {'\n'}• Configurar contatos de emergência
+                {'\n'}• Gerenciar medicamentos e consultas
+              </Text>
             </View>
-          )}
+          </View>
+
+          {/* Botão Criar */}
+          <TouchableOpacity
+            style={[styles.createButton, loading && styles.createButtonDisabled]}
+            onPress={handleCreateGroup}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.textWhite} />
+            ) : (
+              <>
+                <Ionicons name="add-circle" size={24} color={colors.textWhite} />
+                <Text style={styles.createButtonText}>Criar Grupo</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -527,15 +262,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  keyboardView: {
-    flex: 1,
-  },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    backgroundColor: colors.backgroundLight,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -543,91 +276,72 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.backgroundLight,
+    backgroundColor: colors.background,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitleContainer: {
+    flex: 1,
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: colors.text,
   },
-  placeholder: {
-    width: 40,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 24,
-    backgroundColor: colors.backgroundLight,
-  },
-  progressStep: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  progressCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.gray200,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressCircleActive: {
-    backgroundColor: colors.primary,
-  },
-  progressNumber: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.gray400,
-  },
-  progressNumberActive: {
-    color: colors.textWhite,
-  },
-  progressLabel: {
-    fontSize: 12,
+  headerSubtitle: {
+    fontSize: 14,
     color: colors.textLight,
-  },
-  progressLabelActive: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  progressLine: {
-    height: 2,
-    backgroundColor: colors.gray200,
-    width: 60,
-    marginBottom: 28,
-  },
-  progressLineActive: {
-    backgroundColor: colors.primary,
-  },
-  scrollView: {
-    flex: 1,
+    marginTop: 2,
   },
   content: {
     padding: 20,
   },
-  iconContainer: {
-    alignItems: 'center',
+  photoSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
     marginBottom: 16,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 8,
+  photoContainer: {
+    position: 'relative',
+    alignSelf: 'center',
   },
-  subtitle: {
-    fontSize: 15,
-    color: colors.textLight,
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 22,
+  groupImage: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: colors.gray200,
   },
-  inputContainer: {
+  removePhotoButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 16,
+  },
+  addPhotoButton: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+  },
+  addPhotoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    marginTop: 8,
+  },
+  inputSection: {
     marginBottom: 20,
   },
   label: {
@@ -636,219 +350,62 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 8,
   },
-  helperText: {
-    fontSize: 12,
-    color: colors.gray500,
-    marginBottom: 8,
-    fontStyle: 'italic',
-  },
-  required: {
-    color: colors.error,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  input: {
     backgroundColor: colors.backgroundLight,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
     paddingHorizontal: 16,
-    height: 52,
-    gap: 12,
-  },
-  textAreaWrapper: {
-    height: 100,
-    alignItems: 'flex-start',
-    paddingVertical: 12,
-  },
-  input: {
-    flex: 1,
+    paddingVertical: 14,
     fontSize: 16,
     color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   textArea: {
-    textAlignVertical: 'top',
-  },
-  genderContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  genderButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.backgroundLight,
-    alignItems: 'center',
-  },
-  genderButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  genderButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  genderButtonTextActive: {
-    color: colors.textWhite,
-  },
-  bloodTypeContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  bloodTypeButton: {
-    width: '22%',
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.backgroundLight,
-    alignItems: 'center',
-  },
-  bloodTypeButtonActive: {
-    backgroundColor: colors.error,
-    borderColor: colors.error,
-  },
-  bloodTypeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  bloodTypeButtonTextActive: {
-    color: colors.textWhite,
-  },
-  nextButton: {
-    flexDirection: 'row',
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    gap: 8,
-  },
-  nextButtonText: {
-    color: colors.textWhite,
-    fontSize: 16,
-    fontWeight: 'bold',
+    height: 100,
+    paddingTop: 14,
   },
   infoCard: {
     flexDirection: 'row',
-    backgroundColor: colors.info + '20',
-    padding: 16,
+    backgroundColor: colors.info + '10',
     borderRadius: 12,
+    padding: 16,
     marginBottom: 24,
-    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.info + '20',
   },
   infoContent: {
     flex: 1,
+    marginLeft: 12,
   },
   infoTitle: {
     fontSize: 15,
-    fontWeight: '600',
-    color: colors.info,
-    marginBottom: 4,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 6,
   },
   infoText: {
     fontSize: 13,
-    color: colors.text,
-    lineHeight: 18,
-  },
-  summaryCard: {
-    backgroundColor: colors.backgroundLight,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 12,
-  },
-  summaryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  summaryLabel: {
-    fontSize: 14,
     color: colors.textLight,
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
+    lineHeight: 20,
   },
   createButton: {
     flexDirection: 'row',
-    backgroundColor: colors.success,
-    paddingVertical: 16,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginBottom: 32,
     gap: 8,
-    shadowColor: colors.success,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   createButtonDisabled: {
     opacity: 0.6,
   },
   createButtonText: {
-    color: colors.textWhite,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-  },
-  // Estilos de Foto do Grupo
-  photoSelector: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: colors.gray200,
-    borderStyle: 'dashed',
-  },
-  groupPhoto: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  photoPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.gray100,
-  },
-  photoPlaceholderText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: colors.gray400,
-  },
-  changePhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  changePhotoText: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '500',
+    color: colors.textWhite,
   },
 });
 
 export default CreateGroupScreen;
-

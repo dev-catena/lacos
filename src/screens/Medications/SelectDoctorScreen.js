@@ -6,70 +6,193 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  TextInput,
+  Platform,
+  Image,
   Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
-
-const DOCTORS_STORAGE_KEY = '@lacos_doctors';
+import doctorService from '../../services/doctorService';
 
 const SelectDoctorScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params;
+  const insets = useSafeAreaInsets();
   const [doctors, setDoctors] = useState([]);
+  const [allDoctors, setAllDoctors] = useState([]); // Lista completa para filtro
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [prescriptionImage, setPrescriptionImage] = useState(null);
+  
+  // Calcular posição do FAB considerando safe area
+  const fabBottom = Platform.OS === 'android' 
+    ? Math.max(insets.bottom, 20) 
+    : 20;
 
-  useEffect(() => {
-    loadDoctors();
-  }, []);
+  // Recarregar médicos quando a tela ganhar foco (após cadastrar novo médico)
+  useFocusEffect(
+    React.useCallback(() => {
+      loadDoctors();
+    }, [groupId])
+  );
 
   const loadDoctors = async () => {
     try {
-      const doctorsJson = await AsyncStorage.getItem(DOCTORS_STORAGE_KEY);
-      if (doctorsJson) {
-        const allDoctors = JSON.parse(doctorsJson);
-        const groupDoctors = allDoctors.filter(doc => doc.groupId === groupId);
-        setDoctors(groupDoctors);
+      setLoading(true);
+      const response = await doctorService.getDoctors(groupId);
+      
+      if (response && response.success && response.data) {
+        setAllDoctors(response.data);
+        filterDoctors(response.data, searchQuery);
+        console.log(`✅ SelectDoctorScreen - ${response.data.length} médico(s) carregado(s)`);
+      } else {
+        setAllDoctors([]);
+        setDoctors([]);
       }
     } catch (error) {
-      console.error('Erro ao carregar médicos:', error);
+      console.error('❌ SelectDoctorScreen - Erro ao carregar médicos:', error);
+      setAllDoctors([]);
+      setDoctors([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectDoctor = (doctor) => {
-    // TODO: Ir para tela de upload de receita
+  const filterDoctors = (doctorsList, query) => {
+    if (!query || query.trim() === '') {
+      setDoctors(doctorsList);
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase().trim();
+    const filtered = doctorsList.filter(doctor => {
+      const nameMatch = doctor.name?.toLowerCase().includes(lowerQuery);
+      const crmMatch = doctor.crm?.toLowerCase().includes(lowerQuery);
+      const specialtyMatch = doctor.medical_specialty?.name?.toLowerCase().includes(lowerQuery);
+      
+      return nameMatch || crmMatch || specialtyMatch;
+    });
+
+    setDoctors(filtered);
+  };
+
+  const handleSearchChange = (text) => {
+    setSearchQuery(text);
+    filterDoctors(allDoctors, text);
+  };
+
+  const handleScanPrescription = async () => {
+    try {
+      // Solicitar permissão da câmera
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permissão Necessária',
+          'Precisamos de permissão para usar a câmera para escanear a receita.'
+        );
+        return;
+      }
+
+      // Abrir câmera
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        aspect: [3, 4], // Proporção adequada para receitas
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPrescriptionImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Erro ao escanear receita:', error);
+      Alert.alert('Erro', 'Não foi possível escanear a receita');
+    }
+  };
+
+  const handlePickFromGallery = async () => {
+    try {
+      // Solicitar permissão da galeria
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permissão Necessária',
+          'Precisamos de permissão para acessar suas fotos.'
+        );
+        return;
+      }
+
+      // Abrir galeria
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        aspect: [3, 4],
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPrescriptionImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar a imagem');
+    }
+  };
+
+  const handleRemovePrescription = () => {
     Alert.alert(
-      'Em desenvolvimento',
-      'A funcionalidade de upload de receita será implementada em breve. Por enquanto, você pode cadastrar medicamentos sem prescrição.',
+      'Remover Receita',
+      'Deseja remover a foto da receita?',
       [
-        { text: 'OK', onPress: () => navigation.goBack() }
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: () => setPrescriptionImage(null),
+        },
       ]
     );
   };
 
+  const handleSelectDoctor = (doctor) => {
+    // Navegar direto para cadastro de medicamento com o médico selecionado e a imagem da receita
+    navigation.navigate('AddMedication', { 
+      groupId, 
+      groupName, 
+      prescriptionId: null,
+      doctorId: doctor.id,
+      doctorName: doctor.name,
+      prescriptionImage: prescriptionImage, // Passar a imagem da receita
+    });
+  };
+
   const handleAddNewDoctor = () => {
-    Alert.alert(
-      'Em desenvolvimento',
-      'O cadastro de médicos será implementado em breve. Por enquanto, você pode cadastrar medicamentos sem prescrição.',
-      [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]
-    );
+    // Navegar para tela de cadastro de médico
+    navigation.navigate('AddDoctor', { 
+      groupId, 
+      groupName,
+      // Não é edição, é novo cadastro
+    });
   };
 
   const handleSkipPrescription = () => {
     navigation.navigate('AddMedication', { 
       groupId, 
       groupName, 
-      prescriptionId: null 
+      prescriptionId: null,
+      prescriptionImage: prescriptionImage, // Passar a imagem mesmo se pular
     });
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -89,11 +212,96 @@ const SelectDoctorScreen = ({ route, navigation }) => {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
+          {/* Seção de Escanear Receita */}
+          <View style={styles.prescriptionSection}>
+            <Text style={styles.prescriptionTitle}>Escanear Receita</Text>
+            <Text style={styles.prescriptionSubtitle}>
+              Tire uma foto da receita médica ou selecione da galeria
+            </Text>
+            
+            {prescriptionImage ? (
+              <View style={styles.prescriptionImageContainer}>
+                <Image 
+                  source={{ uri: prescriptionImage }} 
+                  style={styles.prescriptionImage}
+                  resizeMode="contain"
+                />
+                <TouchableOpacity
+                  style={styles.removeImageButton}
+                  onPress={handleRemovePrescription}
+                >
+                  <Ionicons name="close-circle" size={24} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.scanButtonsContainer}>
+                <TouchableOpacity
+                  style={[styles.scanButton, styles.scanButtonPrimary]}
+                  onPress={handleScanPrescription}
+                >
+                  <Ionicons name="camera" size={24} color={colors.primary} />
+                  <Text style={styles.scanButtonText}>Tirar Foto</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.scanButton, styles.scanButtonSecondary]}
+                  onPress={handlePickFromGallery}
+                >
+                  <Ionicons name="images" size={24} color={colors.secondary} />
+                  <Text style={[styles.scanButtonText, { color: colors.secondary }]}>
+                    Galeria
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
           <Text style={styles.question}>Qual médico prescreveu o medicamento?</Text>
 
+          {/* Pular Prescrição - Movido para cima */}
+          <TouchableOpacity
+            style={styles.skipButton}
+            onPress={handleSkipPrescription}
+          >
+            <Ionicons name="flash" size={20} color={colors.info} />
+            <Text style={styles.skipButtonText}>
+              Pular e cadastrar sem prescrição
+            </Text>
+          </TouchableOpacity>
+
+          {/* Campo de Busca */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color={colors.textLight} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar por nome, CRM ou especialidade..."
+              placeholderTextColor={colors.textLight}
+              value={searchQuery}
+              onChangeText={handleSearchChange}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => handleSearchChange('')}
+                style={styles.clearButton}
+              >
+                <Ionicons name="close-circle" size={20} color={colors.textLight} />
+              </TouchableOpacity>
+            )}
+          </View>
+
           {/* Lista de Médicos */}
-          {doctors.length > 0 ? (
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>Carregando médicos...</Text>
+            </View>
+          ) : doctors.length > 0 ? (
             <>
+              {searchQuery && (
+                <Text style={styles.searchResults}>
+                  {doctors.length} médico(s) encontrado(s)
+                </Text>
+              )}
               {doctors.map((doctor) => (
                 <TouchableOpacity
                   key={doctor.id}
@@ -105,7 +313,9 @@ const SelectDoctorScreen = ({ route, navigation }) => {
                   </View>
                   <View style={styles.doctorInfo}>
                     <Text style={styles.doctorName}>{doctor.name}</Text>
-                    <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
+                    {doctor.medical_specialty?.name && (
+                      <Text style={styles.doctorSpecialty}>{doctor.medical_specialty.name}</Text>
+                    )}
                     {doctor.crm && (
                       <Text style={styles.doctorCrm}>CRM: {doctor.crm}</Text>
                     )}
@@ -127,34 +337,6 @@ const SelectDoctorScreen = ({ route, navigation }) => {
             </View>
           )}
 
-          {/* Botão Adicionar Novo Médico */}
-          <TouchableOpacity
-            style={styles.addDoctorButton}
-            onPress={handleAddNewDoctor}
-          >
-            <View style={styles.addDoctorIcon}>
-              <Ionicons name="add-circle" size={28} color={colors.primary} />
-            </View>
-            <View style={styles.addDoctorContent}>
-              <Text style={styles.addDoctorTitle}>Cadastrar Novo Médico</Text>
-              <Text style={styles.addDoctorSubtitle}>
-                Adicionar médico e anexar receita
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.primary} />
-          </TouchableOpacity>
-
-          {/* Pular Prescrição */}
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={handleSkipPrescription}
-          >
-            <Ionicons name="flash" size={20} color={colors.info} />
-            <Text style={styles.skipButtonText}>
-              Pular e cadastrar sem prescrição
-            </Text>
-          </TouchableOpacity>
-
           {/* Info */}
           <View style={styles.infoCard}>
             <Ionicons name="information-circle" size={20} color={colors.info} />
@@ -164,6 +346,15 @@ const SelectDoctorScreen = ({ route, navigation }) => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Botão Flutuante - Cadastrar Novo Médico */}
+      <TouchableOpacity
+        style={[styles.fab, { bottom: fabBottom }]}
+        onPress={handleAddNewDoctor}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="add" size={28} color="#FFFFFF" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -278,32 +469,6 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginHorizontal: 16,
   },
-  addDoctorButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary + '10',
-    borderWidth: 2,
-    borderColor: colors.primary + '40',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  addDoctorIcon: {
-    marginRight: 12,
-  },
-  addDoctorContent: {
-    flex: 1,
-  },
-  addDoctorTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  addDoctorSubtitle: {
-    fontSize: 14,
-    color: colors.textLight,
-  },
   skipButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -334,6 +499,127 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text,
     lineHeight: 16,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginTop: 12,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 20,
+    height: 48,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
+    paddingVertical: 0,
+  },
+  clearButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  searchResults: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  prescriptionSection: {
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  prescriptionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  prescriptionSubtitle: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 16,
+  },
+  scanButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  scanButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  scanButtonPrimary: {
+    backgroundColor: colors.primary + '10',
+    borderColor: colors.primary,
+  },
+  scanButtonSecondary: {
+    backgroundColor: colors.secondary + '10',
+    borderColor: colors.secondary,
+  },
+  scanButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  prescriptionImageContainer: {
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  prescriptionImage: {
+    width: '100%',
+    height: 300,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    padding: 4,
   },
 });
 

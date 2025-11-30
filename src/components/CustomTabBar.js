@@ -1,11 +1,16 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../constants/colors';
 
 const CustomTabBar = ({ state, descriptors, navigation }) => {
+  console.log('📱 CustomTabBar - Renderizando com SafeArea (Android + iOS)');
+  console.log('📱 Platform:', Platform.OS);
+  
   return (
-    <View style={styles.tabBar}>
+    <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+      <View style={styles.tabBar}>
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const label = options.tabBarLabel || route.name;
@@ -17,6 +22,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
           iconName = isFocused ? 'home' : 'home-outline';
         } else if (route.name === 'Groups') {
           iconName = isFocused ? 'people' : 'people-outline';
+        } else if (route.name === 'Media') {
+          iconName = isFocused ? 'images' : 'images-outline';
         } else if (route.name === 'Notifications') {
           iconName = isFocused ? 'notifications' : 'notifications-outline';
         } else if (route.name === 'Profile') {
@@ -72,17 +79,20 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
         );
       })}
     </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: colors.backgroundLight,
+  },
   tabBar: {
     flexDirection: 'row',
     height: 60,
     backgroundColor: colors.backgroundLight,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 5,
     paddingTop: 5,
     elevation: 8,
     shadowColor: '#000',

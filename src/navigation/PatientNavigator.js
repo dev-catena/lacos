@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../constants/colors';
 import groupService from '../services/groupService';
@@ -17,6 +18,14 @@ const Tab = createBottomTabNavigator();
 
 // Tab Navigator para Home e Perfil
 const PatientTabNavigator = () => {
+  const insets = useSafeAreaInsets();
+  
+  // Calcular altura do tab bar considerando a barra de navegação do Android
+  const tabBarHeight = 60;
+  const tabBarPaddingBottom = Platform.OS === 'android' 
+    ? Math.max(insets.bottom, 8) // Usar o inset do Android ou mínimo de 8
+    : 8;
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -27,10 +36,14 @@ const PatientTabNavigator = () => {
           backgroundColor: colors.backgroundLight,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
+          height: tabBarHeight + tabBarPaddingBottom,
+          paddingBottom: tabBarPaddingBottom,
           paddingTop: 5,
           elevation: 8,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
         },
         tabBarLabelStyle: {
           fontSize: 12,

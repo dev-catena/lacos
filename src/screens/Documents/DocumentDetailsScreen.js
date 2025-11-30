@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,25 @@ import {
   Image,
   Linking,
   Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
+import documentService from '../../services/documentService';
+import API_CONFIG from '../../config/api';
 
 const DocumentDetailsScreen = ({ route, navigation }) => {
   const { document } = route.params || {};
+  const [downloading, setDownloading] = useState(false);
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'Data não informada';
     const date = new Date(dateString);
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
@@ -26,7 +35,12 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
     });
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    if (!document || !document.id) {
+      Alert.alert('Erro', 'Documento inválido');
+      return;
+    }
+
     Alert.alert(
       'Download',
       'Deseja baixar este documento?',
@@ -34,9 +48,75 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
         { text: 'Cancelar', style: 'cancel' },
         { 
           text: 'Baixar', 
-          onPress: () => {
-            // TODO: Implementar download
-            console.log('Download:', document.file_url);
+          onPress: async () => {
+            try {
+              setDownloading(true);
+              
+              // Usar o endpoint de download do backend (que requer autenticação)
+              const downloadUrl = `${API_CONFIG.BASE_URL}/documents/${document.id}/download`;
+              
+              console.log('📥 Download - URL:', downloadUrl);
+              console.log('📥 Download - Document:', JSON.stringify(document, null, 2));
+
+              // Obter token de autenticação
+              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+              const token = await AsyncStorage.getItem('@lacos:token');
+              
+              if (!token) {
+                throw new Error('Usuário não autenticado');
+              }
+
+              // Determinar nome e tipo do arquivo
+              const fileExtension = document.file_name?.split('.').pop() || 
+                                   (document.file_type?.includes('jpeg') || document.file_type?.includes('jpg') ? 'jpg' : 
+                                    document.file_type?.includes('png') ? 'png' : 
+                                    document.file_type?.includes('pdf') ? 'pdf' : 'jpg');
+              const fileName = document.file_name || `documento_${document.id}.${fileExtension}`;
+              const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+              
+              // Fazer download do arquivo com autenticação
+              const downloadResult = await FileSystem.downloadAsync(
+                downloadUrl,
+                fileUri,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                  },
+                }
+              );
+              
+              console.log('📥 Download - Arquivo salvo em:', downloadResult.uri);
+              console.log('📥 Download - Status:', downloadResult.status);
+              
+              if (downloadResult.status !== 200) {
+                throw new Error(`Erro ao baixar arquivo: Status ${downloadResult.status}`);
+              }
+              
+              // Compartilhar/abrir o arquivo
+              const canShare = await Sharing.isAvailableAsync();
+              if (canShare) {
+                await Sharing.shareAsync(downloadResult.uri, {
+                  mimeType: document.file_type || 'image/jpeg',
+                  dialogTitle: 'Compartilhar Documento',
+                });
+                
+                Toast.show({
+                  type: 'success',
+                  text1: 'Download concluído',
+                  text2: 'Arquivo pronto para compartilhar',
+                });
+              } else {
+                Alert.alert('Sucesso', `Arquivo salvo em: ${downloadResult.uri}`);
+              }
+            } catch (error) {
+              console.error('Erro ao fazer download:', error);
+              Alert.alert(
+                'Erro ao baixar',
+                error.message || 'Não foi possível baixar o documento. Tente novamente.'
+              );
+            } finally {
+              setDownloading(false);
+            }
           }
         },
       ]
@@ -62,7 +142,7 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -82,18 +162,34 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Preview do Arquivo */}
         <View style={styles.previewSection}>
-          {document.file_type === 'image' ? (
-            <Image 
-              source={{ uri: document.file_url }} 
-              style={styles.imagePreview}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={styles.pdfPreview}>
-              <Ionicons name="document-text" size={80} color={colors.primary} />
-              <Text style={styles.pdfText}>Documento PDF</Text>
-            </View>
-          )}
+          {(() => {
+            // Construir URL do arquivo para preview
+            const fileUrl = document.file_path 
+              ? `${API_CONFIG.BASE_URL.replace('/api', '')}/storage/${document.file_path}`
+              : document.url || document.file_url;
+            
+            const isImage = document.file_type && (
+              document.file_type.includes('image') || 
+              document.file_type.includes('jpeg') || 
+              document.file_type.includes('jpg') || 
+              document.file_type.includes('png')
+            );
+            
+            return isImage && fileUrl ? (
+              <Image 
+                source={{ uri: fileUrl }} 
+                style={styles.imagePreview}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.pdfPreview}>
+                <Ionicons name="document-text" size={80} color={colors.primary} />
+                <Text style={styles.pdfText}>
+                  {document.file_type === 'pdf' ? 'Documento PDF' : 'Documento'}
+                </Text>
+              </View>
+            );
+          })()}
         </View>
 
         {/* Informações */}
@@ -109,7 +205,7 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
           <View style={styles.infoRow}>
             <Ionicons name="calendar" size={20} color={colors.gray600} />
             <Text style={styles.infoLabel}>Data:</Text>
-            <Text style={styles.infoValue}>{formatDate(document.date)}</Text>
+            <Text style={styles.infoValue}>{formatDate(document.document_date || document.date)}</Text>
           </View>
 
           {document.doctor_name && (
@@ -123,9 +219,19 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
 
         {/* Ações */}
         <View style={styles.actionsSection}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleDownload}>
-            <Ionicons name="download-outline" size={24} color={colors.white} />
-            <Text style={styles.actionButtonText}>Baixar Documento</Text>
+          <TouchableOpacity 
+            style={[styles.actionButton, downloading && styles.actionButtonDisabled]} 
+            onPress={handleDownload}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Ionicons name="download-outline" size={24} color={colors.white} />
+            )}
+            <Text style={styles.actionButtonText}>
+              {downloading ? 'Baixando...' : 'Baixar Documento'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -247,6 +353,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.white,
+  },
+  actionButtonDisabled: {
+    opacity: 0.6,
   },
 });
 

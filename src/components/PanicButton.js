@@ -20,7 +20,7 @@ import panicService from '../services/panicService';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HOLD_DURATION = 5000; // 5 segundos
 
-const PanicButton = ({ groupId, onPanicTriggered }) => {
+const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
   const [isHolding, setIsHolding] = useState(false);
   const [isCallActive, setIsCallActive] = useState(false);
   const [currentPanicEvent, setCurrentPanicEvent] = useState(null);
@@ -30,6 +30,29 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
   const holdProgress = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const sirenBlink = useRef(new Animated.Value(1)).current;
+
+  // Animação de piscar da sirene quando botão está idle
+  useEffect(() => {
+    if (!isHolding && !isCallActive) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(sirenBlink, {
+            toValue: 0.3,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(sirenBlink, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      sirenBlink.setValue(1);
+    }
+  }, [isHolding, isCallActive]);
 
   // Animação de pulso quando chamada está ativa
   useEffect(() => {
@@ -253,8 +276,8 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
               onPress={endCall}
               activeOpacity={0.8}
             >
-              <Ionicons name="call" size={24} color={colors.white} style={{ transform: [{ rotate: '135deg' }] }} />
-              <Text style={styles.endCallText}>Desligar</Text>
+              <Ionicons name="call" size={24} color="#FF3B30" style={{ transform: [{ rotate: '135deg' }] }} />
+              <Text style={styles.endCallText}>Encerrar Pânico</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -263,17 +286,17 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={fullSize ? styles.containerFull : styles.container}>
       <TouchableOpacity
         activeOpacity={1}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={styles.buttonWrapper}
+        style={fullSize ? styles.buttonWrapperFull : styles.buttonWrapper}
       >
         {/* Fundo que escala */}
         <Animated.View
           style={[
-            styles.buttonBackground,
+            fullSize ? styles.buttonBackgroundFull : styles.buttonBackground,
             {
               backgroundColor,
               transform: [{ scale: scaleAnim }],
@@ -284,7 +307,7 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
         {/* Conteúdo que NÃO escala */}
         <Animated.View
           style={[
-            styles.buttonContent,
+            isHolding ? styles.buttonContentHolding : styles.buttonContent,
             {
               opacity: scaleAnim.interpolate({
                 inputRange: [1, 3],
@@ -319,7 +342,9 @@ const PanicButton = ({ groupId, onPanicTriggered }) => {
           )}
           {!isHolding && (
             <View style={styles.defaultContent}>
-              <Ionicons name="warning" size={32} color={colors.white} />
+              <Animated.View style={{ opacity: sirenBlink }}>
+                <Ionicons name="notifications" size={32} color="#FFFFFF" />
+              </Animated.View>
               <Text style={styles.buttonText}>SOS</Text>
             </View>
           )}
@@ -340,9 +365,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  containerFull: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   buttonWrapper: {
     width: 80,
     height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonWrapperFull: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -357,9 +396,28 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  buttonBackgroundFull: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
   buttonContent: {
     width: 80,
     height: 80,
+    borderRadius: 1000,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  buttonContentHolding: {
+    minWidth: 200,
+    minHeight: 200,
     borderRadius: 1000,
     alignItems: 'center',
     justifyContent: 'center',
@@ -379,20 +437,22 @@ const styles = StyleSheet.create({
   holdContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 20,
+    gap: 4,
+    width: 200,
   },
   holdText: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.white,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   holdTextBold: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: colors.white,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   progressBar: {
     width: 120,
@@ -452,23 +512,28 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   callActiveTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: colors.white,
     textAlign: 'center',
+    paddingHorizontal: 40,
+    maxWidth: SCREEN_WIDTH - 80,
+    flexWrap: 'wrap',
   },
   callActiveSubtitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     paddingHorizontal: 40,
+    maxWidth: SCREEN_WIDTH - 80,
+    flexWrap: 'wrap',
   },
   endCallButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 30,

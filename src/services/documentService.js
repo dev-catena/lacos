@@ -4,11 +4,8 @@ const documentService = {
   // Upload de documento
   async uploadDocument(formData) {
     try {
-      const response = await apiService.post('/documents', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Não passar headers manualmente - o apiService detecta FormData e gerencia automaticamente
+      const response = await apiService.post('/documents', formData);
       return response;
     } catch (error) {
       console.error('Erro ao fazer upload do documento:', error.response?.data || error);

@@ -7,32 +7,174 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
+  Image,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
 import { useAuth } from '../../contexts/AuthContext';
+import groupService from '../../services/groupService';
+import userService from '../../services/userService';
+import Toast from 'react-native-toast-message';
 
 const PATIENT_SESSION_KEY = '@lacos_patient_session';
 
 const PatientProfileScreen = ({ navigation }) => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateUser } = useAuth();
+  const insets = useSafeAreaInsets();
   const [patientSession, setPatientSession] = useState(null);
+  const [groupData, setGroupData] = useState(null);
+  const [memberSince, setMemberSince] = useState(null);
+  const [adminName, setAdminName] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [photoUri, setPhotoUri] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  
+  // Calcular padding bottom para o ScrollView (altura do tab bar + inset do Android)
+  const tabBarHeight = 60;
+  const tabBarPaddingBottom = Platform.OS === 'android' 
+    ? Math.max(insets.bottom, 8) 
+    : 8;
+  const scrollViewPaddingBottom = tabBarHeight + tabBarPaddingBottom + 20;
 
-  useEffect(() => {
-    loadPatientSession();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProfileData();
+    }, [])
+  );
 
-  const loadPatientSession = async () => {
+  const loadProfileData = async () => {
+    setLoading(true);
     try {
+      // Carregar sessão do paciente (compatibilidade)
       const sessionJson = await AsyncStorage.getItem(PATIENT_SESSION_KEY);
       if (sessionJson) {
         setPatientSession(JSON.parse(sessionJson));
       }
+
+      // Carregar foto do usuário (preferir photo_url que tem URL completa)
+      if (user?.photo_url) {
+        setPhotoUri(user.photo_url);
+      } else if (user?.photo) {
+        setPhotoUri(user.photo);
+      }
+
+      // Buscar grupos do usuário
+      const groupsResult = await groupService.getMyGroups();
+      if (groupsResult.success && groupsResult.data && groupsResult.data.length > 0) {
+        const patientGroup = groupsResult.data[0]; // Paciente tem apenas 1 grupo
+        setGroupData(patientGroup);
+
+        // Buscar membros do grupo para obter data de entrada e admin
+        const membersResult = await groupService.getGroupMembers(patientGroup.id);
+        if (membersResult.success && membersResult.data) {
+          const members = membersResult.data;
+          
+          // Buscar data de entrada do paciente
+          const currentMember = members.find(m => m.user_id === user?.id);
+          if (currentMember && currentMember.created_at) {
+            setMemberSince(currentMember.created_at);
+          }
+
+          // Buscar quem é o admin
+          const admin = members.find(m => m.role === 'admin');
+          if (admin && admin.user) {
+            setAdminName(admin.user.name);
+          }
+        }
+      }
     } catch (error) {
-      console.error('Erro ao carregar sessão:', error);
+      console.error('Erro ao carregar dados do perfil:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePhoto = async () => {
+    try {
+      // Solicitar permissão
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert(
+          'Permissão Necessária',
+          'Precisamos de permissão para acessar suas fotos.'
+        );
+        return;
+      }
+
+      // Abrir galeria
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImage = result.assets[0];
+        
+        setUploadingPhoto(true);
+        
+        console.log('📸 Imagem selecionada:', selectedImage.uri);
+        
+        // Criar FormData para upload
+        const formData = new FormData();
+        
+        // Extrair extensão e tipo do arquivo
+        const uriParts = selectedImage.uri.split('.');
+        const fileType = uriParts[uriParts.length - 1];
+        
+        // Adicionar foto com formato correto
+        formData.append('photo', {
+          uri: selectedImage.uri,
+          type: `image/${fileType}`,
+          name: `profile.${fileType}`,
+        });
+
+        console.log('📤 Enviando FormData para API...');
+        console.log('👤 User ID:', user?.id);
+
+        // Enviar para API
+        const response = await userService.updateProfile(user?.id, formData);
+        
+        console.log('📥 Resposta da API:', response);
+        
+        if (response.success && response.data) {
+          // Usar photo_url da API se disponível, senão usar URI local
+          const newPhotoUri = response.data.photo_url || selectedImage.uri;
+          setPhotoUri(newPhotoUri);
+          
+          // Atualizar contexto
+          if (updateUser) {
+            updateUser(response.data);
+          }
+          
+          Toast.show({
+            type: 'success',
+            text1: 'Foto Atualizada',
+            text2: 'Sua foto de perfil foi alterada com sucesso',
+            position: 'bottom',
+          });
+        } else {
+          throw new Error(response.error || 'Erro ao atualizar foto');
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao trocar foto:', error);
+      Alert.alert(
+        'Erro',
+        'Não foi possível atualizar a foto. Tente novamente.'
+      );
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -79,8 +221,27 @@ const PatientProfileScreen = ({ navigation }) => {
     </View>
   );
 
+  // Loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+        <StatusBar style="dark" />
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <LacosIcon size={36} />
+            <Text style={styles.title}>Meu Perfil</Text>
+          </View>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Carregando...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <StatusBar style="dark" />
 
       {/* Header */}
@@ -91,19 +252,42 @@ const PatientProfileScreen = ({ navigation }) => {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: scrollViewPaddingBottom }}
+      >
         {/* User Card */}
         <View style={styles.userCard}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={48} color={colors.textWhite} />
-          </View>
+          <TouchableOpacity 
+            style={styles.avatarContainer}
+            onPress={handleChangePhoto}
+            disabled={uploadingPhoto}
+            activeOpacity={0.7}
+          >
+            <View style={styles.avatar}>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.avatarImage} />
+              ) : (
+                <Ionicons name="person" size={48} color={colors.textWhite} />
+              )}
+              {uploadingPhoto && (
+                <View style={styles.avatarLoading}>
+                  <ActivityIndicator color={colors.textWhite} size="large" />
+                </View>
+              )}
+            </View>
+            <View style={styles.cameraIconContainer}>
+              <Ionicons name="camera" size={20} color={colors.textWhite} />
+            </View>
+          </TouchableOpacity>
+          
           <Text style={styles.userName}>
             {user?.name || patientSession?.accompaniedName || 'Paciente'}
           </Text>
           <View style={styles.groupBadge}>
             <Ionicons name="people" size={14} color={colors.primary} />
             <Text style={styles.groupBadgeText}>
-              {patientSession?.groupName || 'Grupo de Cuidados'}
+              {groupData?.name || patientSession?.groupName || 'Grupo de Cuidados'}
             </Text>
           </View>
           {user?.profile && (
@@ -120,17 +304,31 @@ const PatientProfileScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Informações</Text>
           
           <InfoCard
+            icon="mail-outline"
+            label="E-mail"
+            value={user?.email || 'Não informado'}
+            color={colors.secondary}
+          />
+
+          <InfoCard
             icon="people-outline"
             label="Grupo de Cuidados"
-            value={patientSession?.groupName || 'Não definido'}
+            value={groupData?.name || patientSession?.groupName || 'Não definido'}
             color={colors.primary}
           />
 
           <InfoCard
-            icon="time-outline"
-            label="Conectado desde"
-            value={patientSession?.loginTime 
-              ? new Date(patientSession.loginTime).toLocaleDateString('pt-BR', {
+            icon="person-outline"
+            label="Administrador"
+            value={adminName || 'Não disponível'}
+            color={colors.warning}
+          />
+
+          <InfoCard
+            icon="calendar-outline"
+            label="Membro desde"
+            value={memberSince 
+              ? new Date(memberSince).toLocaleDateString('pt-BR', {
                   day: '2-digit',
                   month: 'long',
                   year: 'numeric'
@@ -221,6 +419,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
   avatar: {
     width: 100,
     height: 100,
@@ -228,7 +430,36 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
+  },
+  avatarLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 50,
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.backgroundLight,
   },
   userName: {
     fontSize: 24,
@@ -364,6 +595,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textWhite,
     opacity: 0.9,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.text,
   },
 });
 

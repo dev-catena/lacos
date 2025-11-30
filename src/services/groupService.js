@@ -10,13 +10,20 @@ class GroupService {
    */
   async createGroup(groupData) {
     try {
+      // Se já for FormData (com foto), envia direto
+      if (groupData instanceof FormData) {
+        const response = await apiService.post('/groups', groupData);
+        return { success: true, data: response };
+      }
+      
+      // Se for objeto simples, monta o payload
       const data = {
-        name: groupData.groupName,
+        name: groupData.groupName || groupData.name,
         description: groupData.description || null,
-        code: groupData.accessCode,
-        accompanied_name: groupData.accompaniedName,
+        code: groupData.accessCode || groupData.code,
+        accompanied_name: groupData.accompaniedName || groupData.accompanied_name,
         accompanied_age: groupData.accompaniedAge ? parseInt(groupData.accompaniedAge) : null,
-        accompanied_gender: groupData.accompaniedGender || null,
+        accompanied_gender: groupData.accompaniedGender || groupData.accompanied_gender || null,
         health_info: groupData.healthInfo ? JSON.stringify(groupData.healthInfo) : null,
       };
 
@@ -78,14 +85,63 @@ class GroupService {
   async updateGroup(groupId, groupData) {
     try {
       const endpoint = apiService.replaceParams('/groups/:id', { id: groupId });
-      const data = {
-        name: groupData.groupName,
-        description: groupData.description,
-        accompanied_name: groupData.accompaniedName,
-        accompanied_age: groupData.accompaniedAge ? parseInt(groupData.accompaniedAge) : null,
-        accompanied_gender: groupData.accompaniedGender,
-        health_info: groupData.healthInfo ? JSON.stringify(groupData.healthInfo) : null,
-      };
+      
+      // Se já for FormData (com foto), envia direto
+      if (groupData instanceof FormData) {
+        console.log('📤 GroupService.updateGroup - Enviando FormData com foto');
+        console.log('📤 GroupService.updateGroup - Endpoint:', endpoint);
+        console.log('📤 GroupService.updateGroup - FormData contém foto');
+        
+        try {
+          // Não passar headers manualmente - o apiService já gerencia isso
+          const response = await apiService.put(endpoint, groupData);
+          console.log('✅ GroupService.updateGroup - Resposta recebida:', {
+            hasData: !!response,
+            keys: response ? Object.keys(response) : [],
+            hasPhotoUrl: !!(response?.photo_url || response?.photo || response?.url),
+          });
+          return { success: true, data: response };
+        } catch (apiError) {
+          console.error('❌ GroupService.updateGroup - Erro na API:', apiError);
+          console.error('❌ GroupService.updateGroup - Status:', apiError.status);
+          console.error('❌ GroupService.updateGroup - Mensagem:', apiError.message);
+          throw apiError;
+        }
+      }
+      
+      // Aceita tanto o formato antigo (groupName, accompaniedName) quanto o novo (name, accompanied_name)
+      const data = {};
+      
+      // Nome do grupo
+      if (groupData.groupName) data.name = groupData.groupName;
+      if (groupData.name) data.name = groupData.name;
+      
+      // Descrição
+      if (groupData.description !== undefined) data.description = groupData.description;
+      
+      // Dados do paciente - formato antigo (camelCase)
+      if (groupData.accompaniedName) data.accompanied_name = groupData.accompaniedName;
+      if (groupData.accompaniedAge) data.accompanied_age = parseInt(groupData.accompaniedAge);
+      if (groupData.accompaniedGender) data.accompanied_gender = groupData.accompaniedGender;
+      if (groupData.accompaniedBirthDate) data.accompanied_birth_date = groupData.accompaniedBirthDate;
+      if (groupData.accompaniedBloodType) data.accompanied_blood_type = groupData.accompaniedBloodType;
+      if (groupData.accompaniedPhone) data.accompanied_phone = groupData.accompaniedPhone;
+      if (groupData.accompaniedEmail) data.accompanied_email = groupData.accompaniedEmail;
+      
+      // Dados do paciente - formato novo (snake_case direto da API)
+      if (groupData.accompanied_name) data.accompanied_name = groupData.accompanied_name;
+      if (groupData.accompanied_age) data.accompanied_age = groupData.accompanied_age;
+      if (groupData.accompanied_gender) data.accompanied_gender = groupData.accompanied_gender;
+      if (groupData.accompanied_birth_date) data.accompanied_birth_date = groupData.accompanied_birth_date;
+      if (groupData.accompanied_blood_type) data.accompanied_blood_type = groupData.accompanied_blood_type;
+      if (groupData.accompanied_phone) data.accompanied_phone = groupData.accompanied_phone;
+      if (groupData.accompanied_email) data.accompanied_email = groupData.accompanied_email;
+      
+      // Health info
+      if (groupData.healthInfo) data.health_info = JSON.stringify(groupData.healthInfo);
+      if (groupData.health_info) data.health_info = typeof groupData.health_info === 'string' 
+        ? groupData.health_info 
+        : JSON.stringify(groupData.health_info);
 
       const response = await apiService.put(endpoint, data);
       return { success: true, data: response };
@@ -170,12 +226,10 @@ class GroupService {
 
       console.log('📤 Enviando foto:', { groupId, filename, type });
 
-      const response = await apiService.post(`/groups/${groupId}/photo`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Não passar headers manualmente - o apiService já gerencia isso
+      const response = await apiService.post(`/groups/${groupId}/photo`, formData);
 
+      console.log('✅ Foto enviada com sucesso:', response);
       return { success: true, data: response };
     } catch (error) {
       console.error('Erro ao fazer upload da foto:', error);

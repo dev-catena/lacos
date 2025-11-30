@@ -8,6 +8,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +29,7 @@ const MedicationsScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('all'); // all, morning, afternoon, night
   const [showDiscontinued, setShowDiscontinued] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -48,24 +51,33 @@ const MedicationsScreen = ({ route, navigation }) => {
         
         // Transformar dados da API para o formato esperado pela UI
         const transformedMeds = filteredMeds.map(med => {
-          const frequencyDetails = typeof med.frequency_details === 'string' 
-            ? JSON.parse(med.frequency_details) 
-            : med.frequency_details;
+          // O backend agora retorna frequency como array { type, details }
+          // e duration como array { type, value }
+          const frequency = typeof med.frequency === 'string' 
+            ? JSON.parse(med.frequency) 
+            : (med.frequency || {});
+          
+          const frequencyDetails = frequency.details || {};
+          const frequencyType = frequency.type || 'simple';
+          
+          const duration = typeof med.duration === 'string'
+            ? JSON.parse(med.duration)
+            : (med.duration || { type: 'continuo', value: null });
           
           return {
             id: med.id,
             groupId: med.group_id,
             name: med.name,
-            form: med.form,
+            form: med.pharmaceutical_form || med.form, // Backend retorna pharmaceutical_form
             dosage: med.dosage,
             unit: med.unit,
             route: med.administration_route,
-            frequency: med.frequency_type === 'advanced' ? 'advanced' : frequencyDetails.interval,
-            schedule: frequencyDetails.schedule || [],
-            advancedFrequency: med.frequency_type === 'advanced' ? frequencyDetails : null,
+            frequency: frequencyType === 'advanced' ? 'advanced' : (frequencyDetails.interval || '24'),
+            schedule: med.times || frequencyDetails.schedule || [],
+            advancedFrequency: frequencyType === 'advanced' ? frequencyDetails : null,
             instructions: med.notes,
-            durationType: med.duration_type,
-            durationDays: med.duration_value,
+            durationType: duration.type || 'continuo',
+            durationDays: duration.value || null,
             active: med.is_active,
           };
         });
@@ -107,7 +119,17 @@ const MedicationsScreen = ({ route, navigation }) => {
   };
 
   const handleAddMedication = () => {
-    navigation.navigate('AddMedicationChoice', { groupId, groupName });
+    setShowAddMenu(true);
+  };
+
+  const handleWithPrescription = () => {
+    setShowAddMenu(false);
+    navigation.navigate('SelectDoctor', { groupId, groupName });
+  };
+
+  const handleWithoutPrescription = () => {
+    setShowAddMenu(false);
+    navigation.navigate('AddMedication', { groupId, groupName, prescriptionId: null });
   };
 
   const periods = getMedicationsByPeriod();
@@ -125,7 +147,7 @@ const MedicationsScreen = ({ route, navigation }) => {
   const filteredPeriods = getFilteredPeriods();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -333,6 +355,51 @@ const MedicationsScreen = ({ route, navigation }) => {
       >
         <Ionicons name="add" size={28} color={colors.textWhite} />
       </TouchableOpacity>
+
+      {/* Menu Suspenso de Opções */}
+      <Modal
+        visible={showAddMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAddMenu(false)}
+      >
+        <Pressable 
+          style={styles.menuOverlay}
+          onPress={() => setShowAddMenu(false)}
+        >
+          <View style={styles.menuContainer}>
+            <TouchableOpacity
+              style={styles.menuOption}
+              onPress={handleWithPrescription}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuOptionIcon, { backgroundColor: colors.secondary + '20' }]}>
+                <Ionicons name="document-text" size={24} color={colors.secondary} />
+              </View>
+              <View style={styles.menuOptionText}>
+                <Text style={styles.menuOptionTitle}>Receita</Text>
+                <Text style={styles.menuOptionSubtitle}>Com prescrição médica</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuOption}
+              onPress={handleWithoutPrescription}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuOptionIcon, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="add-circle" size={24} color={colors.primary} />
+              </View>
+              <View style={styles.menuOptionText}>
+                <Text style={styles.menuOptionTitle}>Sem prescrição</Text>
+                <Text style={styles.menuOptionSubtitle}>Cadastro rápido</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -558,6 +625,55 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  menuContainer: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  menuOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  menuOptionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  menuOptionText: {
+    flex: 1,
+  },
+  menuOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  menuOptionSubtitle: {
+    fontSize: 14,
+    color: colors.textLight,
   },
 });
 

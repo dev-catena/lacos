@@ -13,12 +13,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import { LacosIcon, LacosLogoFull } from '../../components/LacosLogo';
-import ProfileSwitcher from '../../components/ProfileSwitcher';
 import groupService from '../../services/groupService';
 import activityService from '../../services/activityService';
 import moment from 'moment';
@@ -29,8 +27,6 @@ import {
   MessagesIcon,
 } from '../../components/CustomIcons';
 
-const CURRENT_PROFILE_KEY = '@lacos_current_profile';
-
 const HomeScreen = ({ navigation }) => {
   const { user, signed } = useAuth();
   const [myGroups, setMyGroups] = useState([]);
@@ -38,7 +34,6 @@ const HomeScreen = ({ navigation }) => {
   const [selectedTab, setSelectedTab] = useState('myGroups');
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentProfile, setCurrentProfile] = useState('caregiver');
 
   // Verificar autenticação
   useEffect(() => {
@@ -48,48 +43,15 @@ const HomeScreen = ({ navigation }) => {
     }
   }, [signed, user]);
 
-  // Carregar perfil salvo
-  useEffect(() => {
-    loadCurrentProfile();
-  }, []);
-
-  // Carregar grupos quando a tela recebe foco
+  // Carregar grupos e atividades quando a tela recebe foco
   useFocusEffect(
     React.useCallback(() => {
       if (signed && user) {
         loadGroups();
+        loadActivities(); // Carregar atividades independentemente dos grupos
       }
     }, [signed, user])
   );
-
-  const loadCurrentProfile = async () => {
-    try {
-      const savedProfile = await AsyncStorage.getItem(CURRENT_PROFILE_KEY);
-      if (savedProfile) {
-        setCurrentProfile(savedProfile);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar perfil:', error);
-    }
-  };
-
-  const handleProfileChange = async (newProfile) => {
-    setCurrentProfile(newProfile);
-    try {
-      await AsyncStorage.setItem(CURRENT_PROFILE_KEY, newProfile);
-      
-      // Se mudar para paciente, navegar para PatientApp
-      if (newProfile === 'patient') {
-        // TODO: Implementar navegação para interface do paciente
-        Alert.alert(
-          'Modo Paciente',
-          'Navegação para interface simplificada em desenvolvimento'
-        );
-      }
-    } catch (error) {
-      console.error('Erro ao salvar perfil:', error);
-    }
-  };
 
   const loadGroups = async () => {
     console.log('🔄 HomeScreen - Carregando grupos...');
@@ -112,10 +74,24 @@ const HomeScreen = ({ navigation }) => {
           return;
         }
         
-        // "Meus Grupos" = grupos onde sou admin
-        // "Participo" = grupos onde não sou admin
-        const myCreatedGroups = groups.filter(g => g.is_admin || g.isAdmin);
-        const joinedGroups = groups.filter(g => !g.is_admin && !g.isAdmin);
+        // "Meus Grupos" = grupos que EU criei (is_creator=true)
+        // "Participo" = grupos onde fui convidado (is_creator=false)
+        // FALLBACK: Se is_creator não existir, usa is_admin como critério temporário
+        const myCreatedGroups = groups.filter(g => {
+          if (g.is_creator !== undefined) {
+            return g.is_creator === true;
+          }
+          // Fallback: considera que admins são criadores
+          return g.is_admin === true;
+        });
+        
+        const joinedGroups = groups.filter(g => {
+          if (g.is_creator !== undefined) {
+            return g.is_creator === false;
+          }
+          // Fallback: não-admins são participantes
+          return g.is_admin === false;
+        });
         
         console.log(`✅ HomeScreen - Meus Grupos: ${myCreatedGroups.length}, Participo: ${joinedGroups.length}`);
         
@@ -168,10 +144,6 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const handleNotifications = () => {
-    navigation.navigate('Notifications');
-  };
-
   const handleGroupPress = () => {
     navigation.navigate('Groups');
   };
@@ -215,7 +187,7 @@ const HomeScreen = ({ navigation }) => {
   // GUARD: Se não estiver autenticado, mostrar mensagem de erro
   if (!signed || !user) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
         <StatusBar style="dark" />
         <View style={styles.errorContainer}>
           <Ionicons name="lock-closed-outline" size={80} color={colors.error} />
@@ -234,7 +206,7 @@ const HomeScreen = ({ navigation }) => {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
         <StatusBar style="dark" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -245,7 +217,7 @@ const HomeScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -258,19 +230,11 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
         <View style={styles.headerRight}>
-          <ProfileSwitcher 
-            currentProfile={currentProfile}
-            onProfileChange={handleProfileChange}
-            style={{ marginRight: 12 }}
-          />
           <TouchableOpacity 
-            style={styles.notificationButton}
-            onPress={handleNotifications}
+            style={styles.profileButton}
+            onPress={() => navigation.navigate('Profile')}
           >
-            <Ionicons name="notifications-outline" size={24} color={colors.text} />
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>3</Text>
-            </View>
+            <Ionicons name="person-circle-outline" size={28} color={colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -528,29 +492,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
   },
-  notificationButton: {
+  profileButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.backgroundLight,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  badge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: colors.error,
-    borderRadius: 10,
-    width: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: colors.textWhite,
-    fontSize: 10,
-    fontWeight: 'bold',
   },
   section: {
     paddingHorizontal: 20,

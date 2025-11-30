@@ -127,7 +127,7 @@ const PatientJoinGroupScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar style="dark" />
       
       {/* Botão Sair no topo */}

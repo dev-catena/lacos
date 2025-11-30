@@ -8,27 +8,31 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
+import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
-
-const GROUPS_STORAGE_KEY = '@lacos_groups';
+import emergencyContactService from '../../services/emergencyContactService';
+import groupService from '../../services/groupService';
 
 const GroupContactsScreen = ({ route, navigation }) => {
   const { groupId } = route.params;
   const [groupName, setGroupName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [contacts, setContacts] = useState([
-    { id: '1', name: '', phone: '', isSOS: false },
-    { id: '2', name: '', phone: '', isSOS: false },
-    { id: '3', name: '', phone: '', isSOS: false },
+    { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
+    { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
+    { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
   ]);
   const [sosContacts, setSosContacts] = useState([
-    { id: 'sos1', name: '', phone: '' },
-    { id: 'sos2', name: '', phone: '' },
+    { id: null, name: '', phone: '', relationship: 'SOS', photo: null, photoUri: null },
+    { id: null, name: '', phone: '', relationship: 'SOS', photo: null, photoUri: null },
   ]);
 
   useFocusEffect(
@@ -39,59 +43,60 @@ const GroupContactsScreen = ({ route, navigation }) => {
 
   const loadGroupContacts = async () => {
     try {
-      console.log('[GroupContacts] Carregando contatos para grupo:', groupId);
-      const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
+      setLoading(true);
+      console.log('📞 [GroupContacts] Carregando contatos para grupo:', groupId);
       
-      if (groupsJson) {
-        const groups = JSON.parse(groupsJson);
-        console.log('[GroupContacts] Total de grupos encontrados:', groups.length);
+      // Carregar informações do grupo
+      const groupResponse = await groupService.getGroup(groupId);
+      if (groupResponse?.success && groupResponse.data) {
+        const group = groupResponse.data;
+        console.log('✅ [GroupContacts] Grupo encontrado:', group.name);
+        setGroupName(group.name);
+      }
+      
+      // Carregar contatos de emergência da API
+      const contactsResponse = await emergencyContactService.getEmergencyContacts(groupId);
+      
+      if (contactsResponse?.success && contactsResponse.data) {
+        const apiContacts = Array.isArray(contactsResponse.data) ? contactsResponse.data : [];
+        console.log('✅ [GroupContacts] Contatos carregados:', apiContacts.length);
         
-        const group = groups.find(g => g.id === groupId);
+        // Separar contatos rápidos e SOS
+        const quickContacts = apiContacts.filter(c => c.relationship !== 'SOS').slice(0, 3);
+        const sosContactsList = apiContacts.filter(c => c.relationship === 'SOS').slice(0, 2);
         
-        if (group) {
-          console.log('[GroupContacts] Grupo encontrado:', group.groupName);
-          console.log('[GroupContacts] Quick Contacts:', group.quickContacts);
-          console.log('[GroupContacts] SOS Contacts:', group.sosContacts);
-          
-          setGroupName(group.groupName);
-          
-          // Carregar contatos existentes
-          if (group.quickContacts && group.quickContacts.length > 0) {
-            console.log('[GroupContacts] Carregando', group.quickContacts.length, 'contatos rápidos');
-            setContacts(group.quickContacts);
-          } else {
-            console.log('[GroupContacts] Nenhum contato rápido salvo, usando padrão');
-            // Resetar para o padrão se não houver contatos salvos
-            setContacts([
-              { id: '1', name: '', phone: '' },
-              { id: '2', name: '', phone: '' },
-              { id: '3', name: '', phone: '' },
-            ]);
-          }
-          
-          if (group.sosContacts && group.sosContacts.length > 0) {
-            console.log('[GroupContacts] Carregando', group.sosContacts.length, 'contatos SOS');
-            setSosContacts(group.sosContacts);
-          } else {
-            console.log('[GroupContacts] Nenhum contato SOS salvo, usando padrão');
-            setSosContacts([
-              { id: 'sos1', name: '', phone: '' },
-              { id: 'sos2', name: '', phone: '' },
-            ]);
-          }
-        } else {
-          console.error('[GroupContacts] Grupo não encontrado com ID:', groupId);
-        }
+        // Preencher contatos rápidos (sempre 3 slots)
+        const filledQuickContacts = [
+          quickContacts[0] ? {...quickContacts[0], photoUri: null} : { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
+          quickContacts[1] ? {...quickContacts[1], photoUri: null} : { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
+          quickContacts[2] ? {...quickContacts[2], photoUri: null} : { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
+        ];
+        
+        // Preencher contatos SOS (sempre 2 slots)
+        const filledSosContacts = [
+          sosContactsList[0] ? {...sosContactsList[0], photoUri: null} : { id: null, name: '', phone: '', relationship: 'SOS', photo: null, photoUri: null },
+          sosContactsList[1] ? {...sosContactsList[1], photoUri: null} : { id: null, name: '', phone: '', relationship: 'SOS', photo: null, photoUri: null },
+        ];
+        
+        setContacts(filledQuickContacts);
+        setSosContacts(filledSosContacts);
+        
+        console.log('✅ [GroupContacts] Contatos configurados:', {
+          quick: filledQuickContacts.length,
+          sos: filledSosContacts.length
+        });
       } else {
-        console.warn('[GroupContacts] Nenhum grupo encontrado no AsyncStorage');
+        console.log('ℹ️ [GroupContacts] Nenhum contato encontrado, usando padrão');
       }
     } catch (error) {
-      console.error('[GroupContacts] Erro ao carregar contatos:', error);
+      console.error('❌ [GroupContacts] Erro ao carregar contatos:', error);
       Toast.show({
         type: 'error',
         text1: 'Erro',
         text2: 'Não foi possível carregar os contatos',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -111,16 +116,59 @@ const GroupContactsScreen = ({ route, navigation }) => {
     }
   };
 
-  const updateContact = (id, field, value) => {
-    setContacts(prev => prev.map(contact => 
-      contact.id === id ? { ...contact, [field]: field === 'phone' ? formatPhoneNumber(value) : value } : contact
+  const updateContact = (index, field, value) => {
+    setContacts(prev => prev.map((contact, idx) => 
+      idx === index ? { ...contact, [field]: field === 'phone' ? formatPhoneNumber(value) : value } : contact
     ));
   };
 
-  const updateSOSContact = (id, field, value) => {
-    setSosContacts(prev => prev.map(contact => 
-      contact.id === id ? { ...contact, [field]: field === 'phone' ? formatPhoneNumber(value) : value } : contact
+  const updateSOSContact = (index, field, value) => {
+    setSosContacts(prev => prev.map((contact, idx) => 
+      idx === index ? { ...contact, [field]: field === 'phone' ? formatPhoneNumber(value) : value } : contact
     ));
+  };
+
+  // Função para selecionar foto de contato
+  const pickImage = async (index, isSOSContact = false) => {
+    try {
+      // Solicitar permissão
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permissão Necessária',
+          'Precisamos de permissão para acessar suas fotos.'
+        );
+        return;
+      }
+
+      // Abrir seletor de imagens
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        console.log('📸 [GroupContacts] Foto selecionada:', imageUri);
+        
+        // Atualizar o contato com a URI da foto
+        if (isSOSContact) {
+          setSosContacts(prev => prev.map((contact, idx) => 
+            idx === index ? { ...contact, photoUri: imageUri } : contact
+          ));
+        } else {
+          setContacts(prev => prev.map((contact, idx) => 
+            idx === index ? { ...contact, photoUri: imageUri } : contact
+          ));
+        }
+      }
+    } catch (error) {
+      console.error('❌ [GroupContacts] Erro ao selecionar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
+    }
   };
 
   const validatePhoneNumber = (phone) => {
@@ -129,40 +177,11 @@ const GroupContactsScreen = ({ route, navigation }) => {
     return cleaned.length >= 10;
   };
 
-  const showDebugInfo = async () => {
-    try {
-      const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
-      if (groupsJson) {
-        const groups = JSON.parse(groupsJson);
-        const group = groups.find(g => g.id === groupId);
-        
-        if (group) {
-          const quickCount = group.quickContacts?.length || 0;
-          const sosCount = group.sosContacts?.length || 0;
-          const quickNames = group.quickContacts?.map(c => c.name).join(', ') || 'Nenhum';
-          const sosNames = group.sosContacts?.map(c => c.name).join(', ') || 'Nenhum';
-          
-          Alert.alert(
-            'Debug - Dados Salvos',
-            `Grupo: ${group.groupName}\n\n` +
-            `Contatos Rápidos (${quickCount}):\n${quickNames}\n\n` +
-            `Contatos SOS (${sosCount}):\n${sosNames}\n\n` +
-            `Última atualização:\n${group.contactsUpdatedAt ? new Date(group.contactsUpdatedAt).toLocaleString('pt-BR') : 'Nunca'}`,
-            [{ text: 'OK' }]
-          );
-        } else {
-          Alert.alert('Debug', 'Grupo não encontrado');
-        }
-      } else {
-        Alert.alert('Debug', 'Nenhum dado no AsyncStorage');
-      }
-    } catch (error) {
-      Alert.alert('Erro', error.message);
-    }
-  };
 
   const saveContacts = async () => {
     try {
+      setSaving(true);
+      
       // Validar que pelo menos um contato rápido está preenchido
       const validQuickContacts = contacts.filter(c => c.name && c.phone);
       
@@ -171,6 +190,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
           'Contatos Incompletos',
           'Preencha pelo menos um contato rápido com nome e telefone.'
         );
+        setSaving(false);
         return;
       }
 
@@ -181,6 +201,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
             'Telefone Inválido',
             `O telefone de ${contact.name} está incompleto. Um número válido deve ter pelo menos 10 dígitos.`
           );
+          setSaving(false);
           return;
         }
       }
@@ -193,49 +214,150 @@ const GroupContactsScreen = ({ route, navigation }) => {
             'Telefone SOS Inválido',
             `O telefone SOS de ${contact.name} está incompleto.`
           );
+          setSaving(false);
           return;
         }
       }
 
-      // Salvar no AsyncStorage
-      console.log('[GroupContacts] Salvando contatos...');
-      console.log('[GroupContacts] Quick Contacts válidos:', validQuickContacts);
-      console.log('[GroupContacts] SOS Contacts válidos:', validSOSContacts);
+      // Salvar na API
+      console.log('💾 [GroupContacts] Salvando contatos na API...');
+      console.log('💾 [GroupContacts] Quick Contacts válidos:', validQuickContacts.length);
+      console.log('💾 [GroupContacts] SOS Contacts válidos:', validSOSContacts.length);
       
-      const groupsJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
-      if (groupsJson) {
-        const groups = JSON.parse(groupsJson);
-        console.log('[GroupContacts] Grupos antes da atualização:', groups.length);
+      let successCount = 0;
+      let errorCount = 0;
+      
+      // Salvar/atualizar contatos rápidos
+      for (const contact of validQuickContacts) {
+        // Preparar FormData se houver foto
+        let contactData;
+        if (contact.photoUri) {
+          contactData = new FormData();
+          contactData.append('group_id', groupId);
+          contactData.append('name', contact.name);
+          contactData.append('phone', contact.phone.replace(/\D/g, ''));
+          contactData.append('relationship', contact.relationship || 'Contato Rápido');
+          contactData.append('is_primary', '0');
+          
+          // Adicionar foto
+          const filename = contact.photoUri.split('/').pop();
+          const match = /\.(\w+)$/.exec(filename);
+          const type = match ? `image/${match[1]}` : 'image/jpeg';
+          
+          contactData.append('photo', {
+            uri: contact.photoUri,
+            name: filename,
+            type: type,
+          });
+          
+          console.log('📸 [GroupContacts] Upload de foto incluído:', filename);
+        } else {
+          contactData = {
+            group_id: groupId,
+            name: contact.name,
+            phone: contact.phone.replace(/\D/g, ''), // Remove formatação
+            relationship: contact.relationship || 'Contato Rápido',
+            is_primary: false,
+          };
+        }
         
-        const updatedGroups = groups.map(g => {
-          if (g.id === groupId) {
-            console.log('[GroupContacts] Atualizando grupo:', g.groupName);
-            return {
-              ...g,
-              quickContacts: validQuickContacts,
-              sosContacts: validSOSContacts,
-              contactsUpdatedAt: new Date().toISOString(),
-            };
+        try {
+          if (contact.id) {
+            // Atualizar contato existente
+            const result = await emergencyContactService.updateEmergencyContact(contact.id, contactData);
+            if (result.success) {
+              successCount++;
+              console.log('✅ [GroupContacts] Contato atualizado:', contact.name);
+            } else {
+              errorCount++;
+              console.error('❌ [GroupContacts] Erro ao atualizar:', contact.name, result.error);
+            }
+          } else {
+            // Criar novo contato
+            const result = await emergencyContactService.createEmergencyContact(contactData);
+            if (result.success) {
+              successCount++;
+              console.log('✅ [GroupContacts] Contato criado:', contact.name);
+            } else {
+              errorCount++;
+              console.error('❌ [GroupContacts] Erro ao criar:', contact.name, result.error);
+            }
           }
-          return g;
-        });
-
-        console.log('[GroupContacts] Salvando no AsyncStorage...');
-        await AsyncStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(updatedGroups));
+        } catch (error) {
+          errorCount++;
+          console.error('❌ [GroupContacts] Erro ao salvar contato:', contact.name, error);
+        }
+      }
+      
+      // Salvar/atualizar contatos SOS
+      for (const contact of validSOSContacts) {
+        // Preparar FormData se houver foto
+        let contactData;
+        if (contact.photoUri) {
+          contactData = new FormData();
+          contactData.append('group_id', groupId);
+          contactData.append('name', contact.name);
+          contactData.append('phone', contact.phone.replace(/\D/g, ''));
+          contactData.append('relationship', 'SOS');
+          contactData.append('is_primary', '1');
+          
+          // Adicionar foto
+          const filename = contact.photoUri.split('/').pop();
+          const match = /\.(\w+)$/.exec(filename);
+          const type = match ? `image/${match[1]}` : 'image/jpeg';
+          
+          contactData.append('photo', {
+            uri: contact.photoUri,
+            name: filename,
+            type: type,
+          });
+          
+          console.log('📸 [GroupContacts] Upload de foto SOS incluído:', filename);
+        } else {
+          contactData = {
+            group_id: groupId,
+            name: contact.name,
+            phone: contact.phone.replace(/\D/g, ''), // Remove formatação
+            relationship: 'SOS',
+            is_primary: true,
+          };
+        }
         
-        // Verificar se foi salvo corretamente
-        const verifyJson = await AsyncStorage.getItem(GROUPS_STORAGE_KEY);
-        const verifyGroups = JSON.parse(verifyJson);
-        const verifyGroup = verifyGroups.find(g => g.id === groupId);
-        console.log('[GroupContacts] Verificação - Contatos salvos:', {
-          quickContacts: verifyGroup?.quickContacts?.length || 0,
-          sosContacts: verifyGroup?.sosContacts?.length || 0,
-        });
-
+        try {
+          if (contact.id) {
+            // Atualizar contato existente
+            const result = await emergencyContactService.updateEmergencyContact(contact.id, contactData);
+            if (result.success) {
+              successCount++;
+              console.log('✅ [GroupContacts] Contato SOS atualizado:', contact.name);
+            } else {
+              errorCount++;
+              console.error('❌ [GroupContacts] Erro ao atualizar SOS:', contact.name, result.error);
+            }
+          } else {
+            // Criar novo contato
+            const result = await emergencyContactService.createEmergencyContact(contactData);
+            if (result.success) {
+              successCount++;
+              console.log('✅ [GroupContacts] Contato SOS criado:', contact.name);
+            } else {
+              errorCount++;
+              console.error('❌ [GroupContacts] Erro ao criar SOS:', contact.name, result.error);
+            }
+          }
+        } catch (error) {
+          errorCount++;
+          console.error('❌ [GroupContacts] Erro ao salvar contato SOS:', contact.name, error);
+        }
+      }
+      
+      console.log(`✅ [GroupContacts] Salvamento concluído: ${successCount} sucesso, ${errorCount} erros`);
+      
+      if (successCount > 0) {
         Toast.show({
           type: 'success',
           text1: 'Contatos Salvos! ✅',
-          text2: `${validQuickContacts.length} rápidos e ${validSOSContacts.length} SOS salvos`,
+          text2: `${successCount} contato(s) salvo(s)${errorCount > 0 ? `, ${errorCount} erro(s)` : ''}`,
         });
 
         // Aguardar um pouco e voltar
@@ -243,25 +365,26 @@ const GroupContactsScreen = ({ route, navigation }) => {
           navigation.goBack();
         }, 1500);
       } else {
-        console.error('[GroupContacts] Nenhum grupo encontrado para salvar');
         Toast.show({
           type: 'error',
-          text1: 'Erro',
-          text2: 'Nenhum grupo encontrado',
+          text1: 'Erro ao Salvar',
+          text2: 'Não foi possível salvar nenhum contato',
         });
       }
     } catch (error) {
-      console.error('Erro ao salvar contatos:', error);
+      console.error('❌ [GroupContacts] Erro ao salvar contatos:', error);
       Toast.show({
         type: 'error',
         text1: 'Erro',
         text2: 'Não foi possível salvar os contatos',
       });
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -273,121 +396,181 @@ const GroupContactsScreen = ({ route, navigation }) => {
           <Text style={styles.headerTitle}>Contatos do Grupo</Text>
           <Text style={styles.headerSubtitle}>{groupName}</Text>
         </View>
-        <TouchableOpacity onPress={showDebugInfo} style={styles.debugButton}>
-          <Ionicons name="bug" size={20} color={colors.textLight} />
-        </TouchableOpacity>
+        <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Info Card */}
-        <View style={styles.infoCard}>
-          <Ionicons name="information-circle" size={24} color={colors.info} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Configuração de Contatos</Text>
-            <Text style={styles.infoText}>
-              Configure os contatos que o paciente poderá ligar com um único toque.
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Carregando contatos...</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Info Card */}
+          <View style={styles.infoCard}>
+            <Ionicons name="information-circle" size={24} color={colors.info} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>Configuração de Contatos</Text>
+              <Text style={styles.infoText}>
+                Configure os contatos que o paciente poderá ligar com um único toque.
+              </Text>
+            </View>
+          </View>
+
+          {/* Quick Contacts Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="call" size={24} color={colors.primary} />
+              <Text style={styles.sectionTitle}>Contatos Rápidos (3)</Text>
+            </View>
+            <Text style={styles.sectionDescription}>
+              Configure até 3 contatos para ligação rápida
             </Text>
-          </View>
-        </View>
 
-        {/* Quick Contacts Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="call" size={24} color={colors.primary} />
-            <Text style={styles.sectionTitle}>Contatos Rápidos (3)</Text>
-          </View>
-          <Text style={styles.sectionDescription}>
-            Configure até 3 contatos para ligação rápida
-          </Text>
-
-          {contacts.map((contact, index) => (
-            <View key={contact.id} style={styles.contactCard}>
-              <View style={styles.contactHeader}>
-                <View style={styles.contactNumber}>
-                  <Text style={styles.contactNumberText}>{index + 1}</Text>
+            {contacts.map((contact, index) => (
+              <View key={`quick-${index}`} style={styles.contactCard}>
+                <View style={styles.contactHeader}>
+                  <View style={styles.contactNumber}>
+                    <Text style={styles.contactNumberText}>{index + 1}</Text>
+                  </View>
+                  <Text style={styles.contactLabel}>Contato {index + 1}</Text>
                 </View>
-                <Text style={styles.contactLabel}>Contato {index + 1}</Text>
-              </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Nome</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ex: João Silva"
-                  placeholderTextColor={colors.placeholder}
-                  value={contact.name}
-                  onChangeText={(text) => updateContact(contact.id, 'name', text)}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Telefone</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="+55 (11) 99999-9999"
-                  placeholderTextColor={colors.placeholder}
-                  value={contact.phone}
-                  onChangeText={(text) => updateContact(contact.id, 'phone', text)}
-                  keyboardType="phone-pad"
-                />
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* SOS Contacts Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="alert-circle" size={24} color={colors.error} />
-            <Text style={styles.sectionTitle}>Contatos SOS</Text>
-          </View>
-          <Text style={styles.sectionDescription}>
-            Contatos que serão chamados em caso de emergência
-          </Text>
-
-          {sosContacts.map((contact, index) => (
-            <View key={contact.id} style={[styles.contactCard, styles.sosContactCard]}>
-              <View style={styles.contactHeader}>
-                <View style={[styles.contactNumber, styles.sosContactNumber]}>
-                  <Ionicons name="alert" size={16} color={colors.textWhite} />
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Nome</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ex: João Silva"
+                    placeholderTextColor={colors.placeholder}
+                    value={contact.name}
+                    onChangeText={(text) => updateContact(index, 'name', text)}
+                  />
                 </View>
-                <Text style={styles.contactLabel}>SOS {index + 1}</Text>
-              </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Nome</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ex: Maria Santos"
-                  placeholderTextColor={colors.placeholder}
-                  value={contact.name}
-                  onChangeText={(text) => updateSOSContact(contact.id, 'name', text)}
-                />
-              </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Telefone</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="+55 (11) 99999-9999"
+                    placeholderTextColor={colors.placeholder}
+                    value={contact.phone}
+                    onChangeText={(text) => updateContact(index, 'phone', text)}
+                    keyboardType="phone-pad"
+                  />
+                </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Telefone</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="+55 (11) 99999-9999"
-                  placeholderTextColor={colors.placeholder}
-                  value={contact.phone}
-                  onChangeText={(text) => updateSOSContact(contact.id, 'phone', text)}
-                  keyboardType="phone-pad"
-                />
+                {/* Foto do Contato */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Foto (Opcional)</Text>
+                  <TouchableOpacity 
+                    style={styles.photoButton}
+                    onPress={() => pickImage(index, false)}
+                  >
+                    {contact.photoUri || contact.photo ? (
+                      <Image 
+                        source={{ uri: contact.photoUri || contact.photo }} 
+                        style={styles.photoPreview}
+                      />
+                    ) : (
+                      <View style={styles.photoPlaceholder}>
+                        <Ionicons name="camera" size={32} color={colors.textLight} />
+                        <Text style={styles.photoPlaceholderText}>Adicionar Foto</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
+            ))}
+          </View>
+
+          {/* SOS Contacts Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="alert-circle" size={24} color={colors.error} />
+              <Text style={styles.sectionTitle}>Contatos SOS</Text>
             </View>
-          ))}
-        </View>
+            <Text style={styles.sectionDescription}>
+              Contatos que serão chamados em caso de emergência
+            </Text>
 
-        {/* Save Button */}
-        <TouchableOpacity style={styles.saveButton} onPress={saveContacts}>
-          <Ionicons name="checkmark-circle" size={24} color={colors.textWhite} />
-          <Text style={styles.saveButtonText}>Salvar Contatos</Text>
-        </TouchableOpacity>
+            {sosContacts.map((contact, index) => (
+              <View key={`sos-${index}`} style={[styles.contactCard, styles.sosContactCard]}>
+                <View style={styles.contactHeader}>
+                  <View style={[styles.contactNumber, styles.sosContactNumber]}>
+                    <Ionicons name="alert" size={16} color={colors.textWhite} />
+                  </View>
+                  <Text style={styles.contactLabel}>SOS {index + 1}</Text>
+                </View>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Nome</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ex: Maria Santos"
+                    placeholderTextColor={colors.placeholder}
+                    value={contact.name}
+                    onChangeText={(text) => updateSOSContact(index, 'name', text)}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Telefone</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="+55 (11) 99999-9999"
+                    placeholderTextColor={colors.placeholder}
+                    value={contact.phone}
+                    onChangeText={(text) => updateSOSContact(index, 'phone', text)}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+
+                {/* Foto do Contato SOS */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Foto (Opcional)</Text>
+                  <TouchableOpacity 
+                    style={styles.photoButton}
+                    onPress={() => pickImage(index, true)}
+                  >
+                    {contact.photoUri || contact.photo ? (
+                      <Image 
+                        source={{ uri: contact.photoUri || contact.photo }} 
+                        style={styles.photoPreview}
+                      />
+                    ) : (
+                      <View style={styles.photoPlaceholder}>
+                        <Ionicons name="camera" size={32} color={colors.textLight} />
+                        <Text style={styles.photoPlaceholderText}>Adicionar Foto</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Save Button */}
+          <TouchableOpacity 
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
+            onPress={saveContacts}
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <ActivityIndicator size="small" color={colors.textWhite} />
+                <Text style={styles.saveButtonText}>Salvando...</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={24} color={colors.textWhite} />
+                <Text style={styles.saveButtonText}>Salvar Contatos</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
@@ -431,13 +614,16 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 40,
   },
-  debugButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.backgroundLight,
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.textLight,
   },
   content: {
     flex: 1,
@@ -542,6 +728,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
+  photoButton: {
+    width: '100%',
+    height: 120,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  photoPreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  photoPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+  },
+  photoPlaceholderText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: colors.textLight,
+  },
   saveButton: {
     flexDirection: 'row',
     backgroundColor: colors.primary,
@@ -561,6 +772,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.textWhite,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
 });
 

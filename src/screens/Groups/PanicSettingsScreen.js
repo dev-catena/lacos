@@ -303,12 +303,13 @@ const PanicSettingsScreen = ({ route, navigation }) => {
               </Text>
             </View>
           ) : (
-            <FlatList
-              data={members}
-              renderItem={renderMemberItem}
-              keyExtractor={(item) => item.id.toString()}
-              scrollEnabled={false}
-            />
+            <View>
+              {members.map((item) => (
+                <View key={item.id.toString()}>
+                  {renderMemberItem({ item })}
+                </View>
+              ))}
+            </View>
           )}
 
           {emergencyContacts.length === 0 && members.length > 0 && (
@@ -333,12 +334,13 @@ const PanicSettingsScreen = ({ route, navigation }) => {
               </Text>
             </View>
           ) : (
-            <FlatList
-              data={panicEvents}
-              renderItem={renderEventItem}
-              keyExtractor={(item) => item.id.toString()}
-              scrollEnabled={false}
-            />
+            <View>
+              {panicEvents.map((item) => (
+                <View key={item.id.toString()}>
+                  {renderEventItem({ item })}
+                </View>
+              ))}
+            </View>
           )}
         </View>
 

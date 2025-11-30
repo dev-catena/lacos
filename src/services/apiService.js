@@ -29,6 +29,7 @@ class ApiService {
       body = null,
       headers = {},
       requiresAuth = true,
+      timeout = null, // Timeout customizado (em ms). Se null, usa o padrão
     } = options;
 
     try {
@@ -77,8 +78,10 @@ class ApiService {
       }
 
       // Fazer requisição com timeout
+      // Usar timeout customizado se fornecido, senão usar o padrão
+      const requestTimeout = timeout || this.timeout;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+      const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
 
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         ...config,
@@ -92,6 +95,9 @@ class ApiService {
         let errorData = {};
         const contentType = response.headers.get('content-type');
         
+        // 404 em /pharmacy-prices/last não é erro crítico (apenas significa que não há preço informado)
+        const isPharmacyPrice404 = response.status === 404 && endpoint.includes('pharmacy-prices/last');
+        
         // Tentar fazer parse do JSON de erro se houver conteúdo
         if (contentType && contentType.includes('application/json')) {
           try {
@@ -102,11 +108,28 @@ class ApiService {
           }
         }
         
-        throw {
+        // Para erros 500 em endpoints não críticos (como alertas), não logar como erro crítico
+        // 404 em /pharmacy-prices/last também não é erro crítico (apenas significa que não há preço informado)
+        const isNonCriticalEndpoint = endpoint.includes('/alerts/active');
+        const errorMessage = errorData.message || `Erro na requisição: ${response.status}`;
+        
+        // Criar objeto de erro sem logar ainda
+        const errorObj = {
           status: response.status,
-          message: errorData.message || `Erro na requisição: ${response.status}`,
+          message: errorMessage,
           errors: errorData.errors || {},
         };
+        
+        // Não logar 404 de preços de farmácia como erro (é esperado quando não há preço informado)
+        // Não logar 500 em endpoints não críticos
+        const shouldLogError = !isPharmacyPrice404 && (!isNonCriticalEndpoint || response.status !== 500);
+        if (shouldLogError) {
+          console.error(`❌ API Error:`, errorMessage);
+        }
+        // Para endpoints não críticos com erro 500, não logar nada aqui
+        // O serviço específico vai tratar e logar como warning se necessário
+        
+        throw errorObj;
       }
 
       // Parse response JSON - verificar se há conteúdo
@@ -141,7 +164,18 @@ class ApiService {
         };
       }
 
-      console.error('API Error:', error);
+      // Verificar se é endpoint não crítico antes de logar
+      const isNonCriticalEndpoint = endpoint.includes('/alerts/active');
+      const isPharmacyPrice404 = error.status === 404 && endpoint.includes('pharmacy-prices/last');
+      const isNonCriticalError = isNonCriticalEndpoint && (error.status === 500 || error.status >= 500);
+      
+      // Não logar 404 de preços de farmácia (é esperado quando não há preço informado)
+      // Não logar erros não críticos
+      if (!isPharmacyPrice404 && !isNonCriticalError) {
+        console.error('API Error:', error);
+      }
+      // Para erros não críticos, não logar nada - o serviço específico vai tratar
+      
       throw error;
     }
   }

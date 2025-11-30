@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,112 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import { LacosIcon } from '../../components/LacosLogo';
+import userService from '../../services/userService';
+import Toast from 'react-native-toast-message';
 
 const ProfileScreen = ({ navigation }) => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateUser } = useAuth();
+  const [photoUri, setPhotoUri] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  useEffect(() => {
+    // Carregar foto do usuário (preferir photo_url que tem URL completa)
+    if (user?.photo_url) {
+      setPhotoUri(user.photo_url);
+    } else if (user?.photo) {
+      setPhotoUri(user.photo);
+    }
+  }, [user]);
+
+  const handleChangePhoto = async () => {
+    try {
+      // Solicitar permissão
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert(
+          'Permissão Necessária',
+          'Precisamos de permissão para acessar suas fotos.'
+        );
+        return;
+      }
+
+      // Abrir galeria
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImage = result.assets[0];
+        
+        setUploadingPhoto(true);
+        
+        console.log('📸 Imagem selecionada:', selectedImage.uri);
+        
+        // Criar FormData para upload
+        const formData = new FormData();
+        
+        // Extrair extensão e tipo do arquivo
+        const uriParts = selectedImage.uri.split('.');
+        const fileType = uriParts[uriParts.length - 1];
+        
+        // Adicionar foto com formato correto
+        formData.append('photo', {
+          uri: selectedImage.uri,
+          type: `image/${fileType}`,
+          name: `profile.${fileType}`,
+        });
+
+        console.log('📤 Enviando FormData para API...');
+        console.log('👤 User ID:', user?.id);
+
+        // Enviar para API
+        const response = await userService.updateProfile(user?.id, formData);
+        
+        console.log('📥 Resposta da API:', response);
+        
+        if (response.success && response.data) {
+          // Usar photo_url da API se disponível, senão usar URI local
+          const newPhotoUri = response.data.photo_url || selectedImage.uri;
+          setPhotoUri(newPhotoUri);
+          
+          // Atualizar contexto
+          if (updateUser) {
+            updateUser(response.data);
+          }
+          
+          Toast.show({
+            type: 'success',
+            text1: 'Foto Atualizada',
+            text2: 'Sua foto de perfil foi alterada com sucesso',
+            position: 'bottom',
+          });
+        } else {
+          throw new Error(response.error || 'Erro ao atualizar foto');
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao trocar foto:', error);
+      Alert.alert(
+        'Erro',
+        'Não foi possível atualizar a foto. Tente novamente.'
+      );
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -53,7 +150,7 @@ const ProfileScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -67,19 +164,35 @@ const ProfileScreen = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* User Info Card */}
         <View style={styles.userCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {user?.name?.charAt(0).toUpperCase() || 'U'}
-            </Text>
-          </View>
+          <TouchableOpacity 
+            style={styles.avatarContainer}
+            onPress={handleChangePhoto}
+            disabled={uploadingPhoto}
+            activeOpacity={0.7}
+          >
+            <View style={styles.avatar}>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {user?.name?.charAt(0).toUpperCase() || 'U'}
+                </Text>
+              )}
+              {uploadingPhoto && (
+                <View style={styles.avatarLoading}>
+                  <ActivityIndicator color={colors.textWhite} size="large" />
+                </View>
+              )}
+            </View>
+            <View style={styles.cameraIconContainer}>
+              <Ionicons name="camera" size={18} color={colors.textWhite} />
+            </View>
+          </TouchableOpacity>
+          
           <Text style={styles.userName}>
             {user?.name} {user?.lastName}
           </Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
-          <TouchableOpacity style={styles.editProfileButton}>
-            <Ionicons name="create-outline" size={18} color={colors.primary} />
-            <Text style={styles.editProfileText}>Editar Perfil</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Menu Conta */}
@@ -198,19 +311,52 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
   },
   avatarText: {
-    fontSize: 32,
+    fontSize: 40,
     fontWeight: 'bold',
     color: colors.textWhite,
+  },
+  avatarLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 50,
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.backgroundLight,
   },
   userName: {
     fontSize: 20,
@@ -221,22 +367,6 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 14,
     color: colors.textLight,
-    marginBottom: 16,
-  },
-  editProfileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  editProfileText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
   },
   section: {
     paddingHorizontal: 20,

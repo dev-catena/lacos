@@ -11,8 +11,9 @@ class MedicationService {
     try {
       const data = {
         group_id: medicationData.groupId,
+        doctor_id: medicationData.doctorId || null, // Incluir doctor_id se houver
         name: medicationData.name,
-        form: medicationData.form,
+        pharmaceutical_form: medicationData.form, // Backend espera 'pharmaceutical_form'
         dosage: medicationData.dosage,
         unit: medicationData.unit,
         administration_route: medicationData.administrationRoute,
@@ -82,7 +83,7 @@ class MedicationService {
       const endpoint = apiService.replaceParams('/medications/:id', { id: medicationId });
       const data = {
         name: medicationData.name,
-        form: medicationData.form,
+        pharmaceutical_form: medicationData.form, // Backend espera 'pharmaceutical_form'
         dosage: medicationData.dosage,
         unit: medicationData.unit,
         administration_route: medicationData.administrationRoute,

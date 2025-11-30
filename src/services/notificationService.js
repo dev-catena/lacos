@@ -1,35 +1,64 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MEDICATIONS_STORAGE_KEY = '@lacos_medications';
 
+// Verificar se está rodando no Expo Go (SDK 53+ removeu push notifications do Android no Expo Go)
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+const isAndroid = Platform.OS === 'android';
+
 // Configurar como as notificações devem ser tratadas quando o app está em primeiro plano
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Apenas se não estiver no Expo Go no Android
+if (!(isExpoGo && isAndroid)) {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (error) {
+    console.warn('⚠️ NotificationService - Erro ao configurar handler:', error);
+  }
+}
 
 /**
  * Solicita permissão para enviar notificações
  */
 export const requestNotificationPermission = async () => {
   try {
-    if (!Device.isDevice) {
-      console.log('Notificações não funcionam em simulador');
+    // Verificar se está no Expo Go no Android (SDK 53+)
+    if (isExpoGo && isAndroid) {
+      console.warn('⚠️ NotificationService - Push notifications não estão disponíveis no Expo Go para Android (SDK 53+). Use uma build customizada.');
+      Alert.alert(
+        'Notificações não disponíveis',
+        'As notificações push do Android foram removidas do Expo Go no SDK 53. Para usar notificações, você precisa criar uma build customizada (development build ou production build).',
+        [{ text: 'OK' }]
+      );
       return false;
     }
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
+    if (!Device.isDevice) {
+      console.log('⚠️ NotificationService - Notificações não funcionam em simulador');
+      return false;
+    }
 
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+    let finalStatus;
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+    } catch (permError) {
+      console.error('❌ NotificationService - Erro ao solicitar permissão:', permError);
+      return false;
     }
 
     if (finalStatus !== 'granted') {
@@ -41,19 +70,23 @@ export const requestNotificationPermission = async () => {
     }
 
     // Configurar canal de notificação (Android)
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('medication-reminders', {
-        name: 'Lembretes de Medicamentos',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        sound: 'default',
-        lightColor: '#FF6B6B',
-      });
+    if (Platform.OS === 'android' && !isExpoGo) {
+      try {
+        await Notifications.setNotificationChannelAsync('medication-reminders', {
+          name: 'Lembretes de Medicamentos',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          sound: 'default',
+          lightColor: '#FF6B6B',
+        });
+      } catch (channelError) {
+        console.warn('⚠️ NotificationService - Erro ao configurar canal:', channelError);
+      }
     }
 
     return true;
   } catch (error) {
-    console.error('Erro ao solicitar permissão de notificação:', error);
+    console.error('❌ NotificationService - Erro ao solicitar permissão de notificação:', error);
     return false;
   }
 };
@@ -63,9 +96,15 @@ export const requestNotificationPermission = async () => {
  */
 export const scheduleMedicationNotifications = async (medication) => {
   try {
+    // Verificar se está no Expo Go no Android
+    if (isExpoGo && isAndroid) {
+      console.warn('⚠️ NotificationService - Não é possível agendar notificações no Expo Go para Android');
+      return [];
+    }
+
     const hasPermission = await requestNotificationPermission();
     if (!hasPermission) {
-      return;
+      return [];
     }
 
     // Cancelar notificações anteriores deste medicamento

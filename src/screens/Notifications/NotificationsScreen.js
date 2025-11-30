@@ -11,7 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 
-const NotificationsScreen = () => {
+const NotificationsScreen = ({ navigation }) => {
   const [filter, setFilter] = useState('todas'); // todas, lidas, nao-lidas
 
   // Mock de notificações para demonstração
@@ -49,15 +49,25 @@ const NotificationsScreen = () => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Notificações</Text>
-        <TouchableOpacity>
-          <Text style={styles.markAllRead}>Marcar todas como lidas</Text>
-        </TouchableOpacity>
+        <View style={styles.headerLeft}>
+          <Text style={styles.title}>Notificações</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => {}}>
+            <Text style={styles.markAllRead}>Marcar todas como lidas</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Ionicons name="person-circle-outline" size={28} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Filtros */}
@@ -137,6 +147,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -146,6 +166,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.primary,
     fontWeight: '600',
+  },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   filterContainer: {
     flexDirection: 'row',
