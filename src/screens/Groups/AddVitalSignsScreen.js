@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import { VitalSignsIcon } from '../../components/CustomIcons';
+import vitalSignService from '../../services/vitalSignService';
 
 const AddVitalSignsScreen = ({ route, navigation }) => {
   const { groupId, groupName, accompaniedPersonId } = route.params || {};
@@ -44,9 +45,14 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
     respiratory_rate: false,
   });
 
+  // Médias basais de cada sinal vital
+  const [basalAverages, setBasalAverages] = useState({});
+
   useEffect(() => {
     // TODO: Carregar configurações do grupo para saber quais sinais estão habilitados
     loadGroupSettings();
+    // Carregar médias basais
+    loadBasalAverages();
   }, [groupId]);
 
   const loadGroupSettings = async () => {
@@ -55,6 +61,213 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
     // const data = await response.json();
     // setEnabledSigns({ ... });
   };
+
+  const loadBasalAverages = async () => {
+    if (!groupId) {
+      console.log('📊 loadBasalAverages - groupId não definido');
+      return;
+    }
+
+    try {
+      console.log('📊 loadBasalAverages - Buscando sinais vitais para groupId:', groupId);
+      // Buscar todos os sinais vitais do grupo
+      const result = await vitalSignService.getVitalSigns(groupId);
+      
+      console.log('📊 loadBasalAverages - Resultado da API:', result);
+      console.log('📊 loadBasalAverages - result.success:', result?.success);
+      console.log('📊 loadBasalAverages - result.data:', result?.data);
+      
+      if (result.success && result.data) {
+        // Garantir que result.data é um array
+        let measurements = result.data;
+        
+        console.log('📊 loadBasalAverages - Tipo de result.data:', typeof measurements, Array.isArray(measurements));
+        
+        // Se não for array, tentar converter ou usar array vazio
+        if (!Array.isArray(measurements)) {
+          if (measurements && typeof measurements === 'object') {
+            // Se for um objeto, tentar extrair um array
+            measurements = measurements.data || measurements.items || [];
+            console.log('📊 loadBasalAverages - Extraído array do objeto:', measurements);
+          } else {
+            measurements = [];
+          }
+        }
+        
+        console.log('📊 loadBasalAverages - Total de medições:', measurements.length);
+        console.log('📊 loadBasalAverages - Primeiras 3 medições:', measurements.slice(0, 3));
+        
+        if (measurements.length === 0) {
+          console.log('📊 loadBasalAverages - Nenhuma medição encontrada');
+          setBasalAverages({});
+          return;
+        }
+        
+        // Calcular médias para cada tipo de sinal vital
+        const averages = {};
+        
+        // Função auxiliar para extrair valor numérico
+        const getNumericValue = (value) => {
+          if (typeof value === 'number') return value;
+          
+          // Se for array (JSON parseado pelo Laravel)
+          if (Array.isArray(value)) {
+            if (value.length > 0) {
+              // Se primeiro elemento é número, usar ele
+              if (typeof value[0] === 'number') return value[0];
+              // Se primeiro elemento é objeto, tentar extrair
+              if (typeof value[0] === 'object' && value[0] !== null) {
+                return parseFloat(value[0].value || value[0]) || null;
+              }
+            }
+            return null;
+          }
+          
+          if (typeof value === 'string') {
+            // Se for string como "120/80", extrair apenas o primeiro número para média
+            const match = value.match(/^(\d+)/);
+            return match ? parseFloat(match[1]) : parseFloat(value);
+          }
+          
+          if (typeof value === 'object' && value !== null) {
+            // Se for objeto JSON, tentar extrair valores
+            if (value.value !== undefined) return parseFloat(value.value);
+            if (value.systolic) return parseFloat(value.systolic);
+            // Tentar converter o objeto inteiro se for número
+            const num = parseFloat(value);
+            if (!isNaN(num)) return num;
+          }
+          
+          return null;
+        };
+
+        // Pressão Arterial (sistólica e diastólica)
+        const bloodPressureMeasurements = measurements.filter(m => m.type === 'blood_pressure');
+        const bloodPressureSystolic = [];
+        const bloodPressureDiastolic = [];
+        
+        bloodPressureMeasurements.forEach(m => {
+          let value = m.value;
+          
+          // Se value é array (JSON parseado pelo Laravel), pode ter estrutura diferente
+          if (Array.isArray(value)) {
+            // Se for array, pode ter [systolic, diastolic] ou [{systolic: X, diastolic: Y}]
+            if (value.length === 2 && typeof value[0] === 'number' && typeof value[1] === 'number') {
+              bloodPressureSystolic.push(value[0]);
+              bloodPressureDiastolic.push(value[1]);
+            } else if (value.length > 0 && typeof value[0] === 'object') {
+              const first = value[0];
+              if (first.systolic) {
+                const sys = parseFloat(first.systolic);
+                if (!isNaN(sys)) bloodPressureSystolic.push(sys);
+              }
+              if (first.diastolic) {
+                const dia = parseFloat(first.diastolic);
+                if (!isNaN(dia)) bloodPressureDiastolic.push(dia);
+              }
+            }
+          }
+          // Se value é string, pode ser "120/80"
+          else if (typeof value === 'string' && value.includes('/')) {
+            const parts = value.split('/');
+            if (parts.length === 2) {
+              const sys = parseFloat(parts[0]);
+              const dia = parseFloat(parts[1]);
+              if (!isNaN(sys)) bloodPressureSystolic.push(sys);
+              if (!isNaN(dia)) bloodPressureDiastolic.push(dia);
+            }
+          } 
+          // Se for objeto JSON
+          else if (typeof value === 'object' && value !== null) {
+            if (value.systolic) {
+              const sys = parseFloat(value.systolic);
+              if (!isNaN(sys)) bloodPressureSystolic.push(sys);
+            }
+            if (value.diastolic) {
+              const dia = parseFloat(value.diastolic);
+              if (!isNaN(dia)) bloodPressureDiastolic.push(dia);
+            }
+            // Também pode ter estrutura {systolic: X, diastolic: Y} diretamente
+            if (value.blood_pressure_systolic) {
+              const sys = parseFloat(value.blood_pressure_systolic);
+              if (!isNaN(sys)) bloodPressureSystolic.push(sys);
+            }
+            if (value.blood_pressure_diastolic) {
+              const dia = parseFloat(value.blood_pressure_diastolic);
+              if (!isNaN(dia)) bloodPressureDiastolic.push(dia);
+            }
+          }
+        });
+        
+        if (bloodPressureSystolic.length > 0 && bloodPressureDiastolic.length > 0) {
+          const avgSystolic = bloodPressureSystolic.reduce((a, b) => a + b, 0) / bloodPressureSystolic.length;
+          const avgDiastolic = bloodPressureDiastolic.reduce((a, b) => a + b, 0) / bloodPressureDiastolic.length;
+          averages.blood_pressure = `${Math.round(avgSystolic)}/${Math.round(avgDiastolic)}`;
+        }
+        
+        // Frequência Cardíaca
+        const heartRate = measurements
+          .filter(m => m.type === 'heart_rate')
+          .map(m => getNumericValue(m.value))
+          .filter(v => v !== null && !isNaN(v));
+        if (heartRate.length > 0) {
+          averages.heart_rate = Math.round(heartRate.reduce((a, b) => a + b, 0) / heartRate.length);
+        }
+        
+        // Saturação de Oxigênio
+        const oxygenSaturation = measurements
+          .filter(m => m.type === 'oxygen_saturation')
+          .map(m => getNumericValue(m.value))
+          .filter(v => v !== null && !isNaN(v));
+        if (oxygenSaturation.length > 0) {
+          averages.oxygen_saturation = Math.round(oxygenSaturation.reduce((a, b) => a + b, 0) / oxygenSaturation.length);
+        }
+        
+        // Glicemia
+        const bloodGlucose = measurements
+          .filter(m => m.type === 'blood_glucose')
+          .map(m => getNumericValue(m.value))
+          .filter(v => v !== null && !isNaN(v));
+        if (bloodGlucose.length > 0) {
+          averages.blood_glucose = Math.round(bloodGlucose.reduce((a, b) => a + b, 0) / bloodGlucose.length);
+        }
+        
+        // Temperatura
+        const temperature = measurements
+          .filter(m => m.type === 'temperature')
+          .map(m => getNumericValue(m.value))
+          .filter(v => v !== null && !isNaN(v));
+        if (temperature.length > 0) {
+          averages.temperature = (temperature.reduce((a, b) => a + b, 0) / temperature.length).toFixed(1);
+        }
+        
+        // Frequência Respiratória
+        const respiratoryRate = measurements
+          .filter(m => m.type === 'respiratory_rate')
+          .map(m => getNumericValue(m.value))
+          .filter(v => v !== null && !isNaN(v));
+        if (respiratoryRate.length > 0) {
+          averages.respiratory_rate = Math.round(respiratoryRate.reduce((a, b) => a + b, 0) / respiratoryRate.length);
+        }
+        
+        console.log('📊 loadBasalAverages - Médias calculadas:', averages);
+        console.log('📊 loadBasalAverages - Object.keys(averages):', Object.keys(averages));
+        setBasalAverages(averages);
+      } else {
+        console.log('📊 loadBasalAverages - result.success é false ou result.data não existe');
+        console.log('📊 loadBasalAverages - result completo:', JSON.stringify(result, null, 2));
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar médias basais:', error);
+      console.error('❌ Stack trace:', error.stack);
+    }
+  };
+
+  // Debug: monitorar mudanças em basalAverages
+  useEffect(() => {
+    console.log('📊 useEffect - basalAverages mudou:', basalAverages);
+    console.log('📊 useEffect - Object.keys(basalAverages):', Object.keys(basalAverages));
+  }, [basalAverages]);
 
   const updateVitalSign = (key, value) => {
     setVitalSigns(prev => ({
@@ -156,24 +369,65 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
         });
       }
 
-      // TODO: Implementar chamada à API
-      const alertsFound = Math.random() > 0.7; // Mock
+      // Salvar cada sinal vital na API
+      console.log('💾 handleSave - Preparando para salvar:', vitalSignsToSend.length, 'sinais vitais');
+      console.log('💾 handleSave - groupId:', groupId);
+      console.log('💾 handleSave - recordedAt:', recordedAt);
+      
+      const savePromises = vitalSignsToSend.map(vitalSign => {
+        console.log('💾 handleSave - Salvando:', vitalSign.type, '=', vitalSign.value);
+        return vitalSignService.createVitalSign({
+          groupId: groupId,
+          type: vitalSign.type,
+          value: vitalSign.value,
+          unit: vitalSign.unit,
+          measuredAt: recordedAt, // já é uma string ISO
+        });
+      });
 
-      Alert.alert(
-        alertsFound ? '⚠️ Atenção!' : '✅ Sucesso',
-        alertsFound 
-          ? `Sinais vitais registrados!\n\n${vitalSignsToSend.length} medições salvas.\n\n⚠️ Alguns valores estão fora da faixa normal.\n\nIntegração com API em desenvolvimento.`
-          : `Sinais vitais registrados!\n\n${vitalSignsToSend.length} medições salvas.\n\nTodos os valores estão normais.\n\nIntegração com API em desenvolvimento.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
+      const results = await Promise.all(savePromises);
+      console.log('💾 handleSave - Resultados do salvamento:', results);
+      const successCount = results.filter(r => r.success).length;
+      const failedCount = results.length - successCount;
+      console.log('💾 handleSave - Sucessos:', successCount, 'Falhas:', failedCount);
+
+      if (failedCount > 0) {
+        Alert.alert(
+          '⚠️ Atenção!',
+          `Sinais vitais registrados parcialmente.\n\n${successCount} de ${vitalSignsToSend.length} medições salvas com sucesso.\n\n${failedCount} falharam.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Recarregar médias basais após salvar
+                loadBasalAverages();
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+      } else {
+        console.log('💾 handleSave - Todos os sinais vitais foram salvos com sucesso');
+        Alert.alert(
+          '✅ Sucesso',
+          `Sinais vitais registrados!\n\n${successCount} medições salvas com sucesso.`,
+          [
+            {
+              text: 'OK',
+              onPress: async () => {
+                // Recarregar médias basais após salvar
+                console.log('💾 handleSave - Recarregando médias basais...');
+                await loadBasalAverages();
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+      }
 
     } catch (error) {
-      Alert.alert('Erro', 'Erro ao registrar sinais vitais');
+      console.error('❌ handleSave - Erro geral:', error);
+      Alert.alert('Erro', `Erro ao registrar sinais vitais: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
     }
@@ -342,16 +596,44 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
             {vitalSignsConfig.map((item) => {
               if (!item.enabled) return null;
 
+              // Obter média basal para este sinal vital
+              const getBasalAverage = () => {
+                if (item.key === 'blood_pressure') {
+                  return basalAverages.blood_pressure;
+                }
+                return basalAverages[item.key];
+              };
+
+              const basalAverage = getBasalAverage();
+              
+              // Debug para todos os cards
+              console.log(`📊 Card ${item.key}:`, {
+                basalAverage,
+                'basalAverages[item.key]': basalAverages[item.key],
+                'basalAverages.blood_pressure': basalAverages.blood_pressure,
+                'basalAverages completo': basalAverages,
+              });
+
               return (
                 <View key={item.key} style={styles.vitalSignCard}>
                   <View style={styles.vitalSignHeader}>
-                    <View style={[styles.vitalSignIcon, { backgroundColor: item.color + '20' }]}>
-                      <Ionicons name={item.icon} size={24} color={item.color} />
+                    <View style={styles.vitalSignHeaderLeft}>
+                      <View style={[styles.vitalSignIcon, { backgroundColor: item.color + '20' }]}>
+                        <Ionicons name={item.icon} size={24} color={item.color} />
+                      </View>
+                      <View style={styles.vitalSignInfo}>
+                        <Text style={styles.vitalSignLabel}>{item.label}</Text>
+                        <Text style={styles.vitalSignHint}>{item.hint}</Text>
+                      </View>
                     </View>
-                    <View style={styles.vitalSignInfo}>
-                      <Text style={styles.vitalSignLabel}>{item.label}</Text>
-                      <Text style={styles.vitalSignHint}>{item.hint}</Text>
-                    </View>
+                    {basalAverage ? (
+                      <View style={styles.basalBadge}>
+                        <Text style={styles.basalLabel}>Basal:</Text>
+                        <Text style={styles.basalValue}>{basalAverage} {item.unit || ''}</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.basalBadgePlaceholder} />
+                    )}
                   </View>
 
                   <View style={styles.fieldsContainer}>
@@ -530,7 +812,13 @@ const styles = StyleSheet.create({
   vitalSignHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  vitalSignHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   vitalSignIcon: {
     width: 48,
@@ -552,6 +840,26 @@ const styles = StyleSheet.create({
   vitalSignHint: {
     fontSize: 13,
     color: colors.textLight,
+  },
+  basalBadge: {
+    alignItems: 'flex-end',
+    backgroundColor: colors.primary + '15',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+  },
+  basalLabel: {
+    fontSize: 10,
+    color: colors.textLight,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  basalValue: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
   },
   fieldsContainer: {
     flexDirection: 'row',

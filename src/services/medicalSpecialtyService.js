@@ -7,7 +7,10 @@ const medicalSpecialtyService = {
   getSpecialties: async (search = '') => {
     try {
       const params = search ? { search } : {};
-      const response = await apiService.get('/medical-specialties', { params });
+      const response = await apiService.get('/medical-specialties', {
+        params,
+        requiresAuth: false, // Não requer autenticação para buscar especialidades
+      });
       
       // Retornar exatamente como o apiService retorna
       return response;

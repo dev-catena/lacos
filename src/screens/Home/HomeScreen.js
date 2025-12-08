@@ -121,25 +121,53 @@ const HomeScreen = ({ navigation }) => {
       console.log('📊 HomeScreen - Carregando atividades recentes...');
       const result = await activityService.getRecentActivities(10);
       
-      if (result.success && result.data) {
-        const formattedActivities = result.data.map(activity => ({
-          id: activity.id,
-          title: activityService.getActivityTypeLabel(activity.action_type),
-          description: activity.description,
-          groupName: activity.group?.name || 'Grupo',
-          icon: activityService.getActivityIcon(activity.action_type),
-          color: activityService.getActivityColor(activity.action_type),
-          time: moment(activity.created_at).fromNow(),
-        }));
+      // Sempre usar result.data, mesmo se result.success for false (pode ter array vazio)
+      const activities = result.data || [];
+      
+      if (activities.length > 0) {
+        console.log('📊 HomeScreen - Dados brutos das atividades:', JSON.stringify(activities, null, 2));
+        
+        const formattedActivities = activities.map(activity => {
+          // Extrair group_id de diferentes formas possíveis
+          const groupId = activity.group_id || activity.group?.id || activity.group_id || null;
+          const groupName = activity.group?.name || activity.group_name || 'Grupo';
+          
+          console.log(`📋 HomeScreen - Formatando atividade:`, {
+            id: activity.id,
+            action_type: activity.action_type,
+            group_id: groupId,
+            group_name: groupName,
+            has_group_object: !!activity.group,
+          });
+          
+          return {
+            id: activity.id,
+            title: activityService.getActivityTypeLabel(activity.action_type),
+            description: activity.description,
+            groupName: groupName,
+            groupId: groupId,
+            icon: activityService.getActivityIcon(activity.action_type),
+            color: activityService.getActivityColor(activity.action_type),
+            time: moment(activity.created_at).fromNow(),
+          };
+        });
+        
+        console.log(`✅ HomeScreen - ${formattedActivities.length} atividade(s) formatada(s):`, formattedActivities.map(a => ({ id: a.id, title: a.title, groupName: a.groupName })));
         
         setRecentActivities(formattedActivities);
         console.log(`✅ HomeScreen - ${formattedActivities.length} atividade(s) carregada(s)`);
       } else {
-        console.warn('⚠️ HomeScreen - Nenhuma atividade encontrada');
+        console.warn('⚠️ HomeScreen - Nenhuma atividade encontrada. Result:', result);
         setRecentActivities([]);
       }
     } catch (error) {
-      console.error('❌ HomeScreen - Erro ao carregar atividades:', error);
+      // Se for timeout (408), apenas logar como warning e continuar
+      if (error.status === 408) {
+        console.warn('⚠️ HomeScreen - Timeout ao carregar atividades, continuando sem atividades');
+      } else {
+        console.error('❌ HomeScreen - Erro ao carregar atividades:', error);
+      }
+      // Sempre setar array vazio para não travar a tela
       setRecentActivities([]);
     }
   };
@@ -362,15 +390,86 @@ const HomeScreen = ({ navigation }) => {
           )}
         </View>
 
+        {/* Buscar Cuidadores - Apenas para cuidadores/amigos */}
+        {user?.profile === 'caregiver' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Buscar Cuidadores</Text>
+            <TouchableOpacity
+              style={styles.caregiverSearchCard}
+              onPress={() => navigation.navigate('CaregiversList')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.caregiverSearchIcon}>
+                <Ionicons name="people" size={32} color="#2D5016" />
+              </View>
+              <View style={styles.caregiverSearchContent}>
+                <Text style={styles.caregiverSearchTitle}>Encontrar Cuidador Profissional</Text>
+                <Text style={styles.caregiverSearchDescription}>
+                  Busque por avaliações, proximidade e disponibilidade
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#2D5016" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Últimas Atualizações */}
         {(() => {
           const currentGroups = selectedTab === 'myGroups' ? myGroups : participatingGroups;
           const hasGroups = currentGroups.length > 0;
           
           // Filtrar atividades apenas dos grupos da aba atual
+          // Usar IDs dos grupos para comparação (mais confiável que nomes)
+          const currentGroupIds = currentGroups.map(g => g.id).filter(id => id != null);
+          
+          console.log(`📊 HomeScreen - DEBUG: Total de atividades recebidas: ${recentActivities.length}`);
+          console.log(`📊 HomeScreen - DEBUG: Grupos atuais (IDs):`, currentGroupIds);
+          console.log(`📊 HomeScreen - DEBUG: Grupos atuais (nomes):`, currentGroups.map(g => ({ id: g.id, name: g.name })));
+          console.log(`📊 HomeScreen - DEBUG: Todas as atividades:`, recentActivities.map(a => ({ 
+            id: a.id, 
+            title: a.title,
+            groupName: a.groupName, 
+            groupId: a.groupId 
+          })));
+          
           const filteredActivities = recentActivities.filter(activity => {
-            return currentGroups.some(group => group.groupName === activity.groupName);
+            // Se a atividade tem groupId, comparar diretamente
+            if (activity.groupId) {
+              const matches = currentGroupIds.includes(activity.groupId);
+              if (matches) {
+                console.log(`✅ HomeScreen - Atividade "${activity.title}" corresponde ao grupo ID ${activity.groupId}`);
+              } else {
+                console.log(`❌ HomeScreen - Atividade "${activity.title}" NÃO corresponde: groupId ${activity.groupId} não está em [${currentGroupIds.join(', ')}]`);
+              }
+              return matches;
+            }
+            
+            // Se não tem groupId, tentar comparar por nome
+            if (activity.groupName && activity.groupName !== 'Grupo') {
+              const matches = currentGroups.some(group => {
+                const groupName = group.name || group.groupName || '';
+                const match = groupName === activity.groupName && groupName !== '';
+                
+                if (!match && groupName && activity.groupName) {
+                  console.log(`🔍 HomeScreen - Atividade não corresponde por nome: grupo "${groupName}" (ID: ${group.id}) !== atividade "${activity.groupName}"`);
+                }
+                
+                return match;
+              });
+              
+              if (matches) {
+                console.log(`✅ HomeScreen - Atividade "${activity.title}" corresponde ao grupo (por nome)`);
+              }
+              
+              return matches;
+            }
+            
+            // Se não tem nem groupId nem groupName válido, não mostrar
+            console.log(`⚠️ HomeScreen - Atividade "${activity.title}" sem grupo válido (groupId: ${activity.groupId}, groupName: ${activity.groupName})`);
+            return false;
           });
+          
+          console.log(`📊 HomeScreen - RESULTADO: Total de atividades: ${recentActivities.length}, Filtradas: ${filteredActivities.length}`);
 
           if (!hasGroups) {
             return null; // Não mostrar seção se não há grupos
@@ -758,6 +857,42 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textAlign: 'center',
     marginTop: 12,
+  },
+  caregiverSearchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#B8E6B8', // Verde pastel suave
+    padding: 20,
+    borderRadius: 16,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  caregiverSearchIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(45, 80, 22, 0.15)', // Verde escuro com transparência para fundo pastel
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  caregiverSearchContent: {
+    flex: 1,
+  },
+  caregiverSearchTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2D5016', // Verde escuro para contraste com fundo pastel
+    marginBottom: 4,
+  },
+  caregiverSearchDescription: {
+    fontSize: 14,
+    color: '#4A7C2A', // Verde médio para contraste
+    opacity: 0.9,
   },
 });
 

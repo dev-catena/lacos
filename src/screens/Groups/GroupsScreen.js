@@ -23,7 +23,6 @@ import {
   PulseIcon, 
   SettingsIcon, 
   PersonIcon,
-  AddIcon,
   CloseIcon 
 } from '../../components/CustomIcons';
 import groupService from '../../services/groupService';
@@ -160,12 +159,6 @@ const GroupsScreen = ({ navigation }) => {
           <Text style={styles.title}>Grupos</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => navigation.navigate('CreateGroup')}
-          >
-            <AddIcon size={24} color={colors.textWhite} />
-          </TouchableOpacity>
           <TouchableOpacity 
             style={styles.profileButton}
             onPress={() => navigation.navigate('Profile')}
@@ -511,14 +504,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   profileButton: {
     width: 44,

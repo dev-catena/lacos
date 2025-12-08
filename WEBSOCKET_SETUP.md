@@ -164,3 +164,8 @@ Atualizar `websocketService.js` para usar Socket.io ao invés de Pusher (requer 
 4. **Reconexão** - O serviço tenta reconectar automaticamente em caso de falha
 
 
+
+
+
+
+

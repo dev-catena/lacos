@@ -156,3 +156,8 @@ php geocodificar_farmacias.php  # Se optar por geocodificar
 3. **Atualização**: Execute periodicamente para manter os dados atualizados.
 4. **Backup**: Faça backup antes de executar scripts de importação em massa.
 
+
+
+
+
+

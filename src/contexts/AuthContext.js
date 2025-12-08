@@ -106,6 +106,24 @@ export const AuthProvider = ({ children }) => {
         profile: userData.profile || 'caregiver', // Novo: Perfil do usuário
       };
 
+      // Adicionar campos específicos de cuidador profissional
+      if (userData.profile === 'professional_caregiver') {
+        registerData.city = userData.city;
+        registerData.neighborhood = userData.neighborhood;
+        registerData.formation_details = userData.formation_details;
+        registerData.hourly_rate = userData.hourly_rate ? parseFloat(userData.hourly_rate) : null;
+        registerData.availability = userData.availability;
+      }
+      
+      // Adicionar campos específicos de médico
+      if (userData.profile === 'doctor') {
+        registerData.city = userData.city;
+        registerData.neighborhood = userData.neighborhood;
+        registerData.crm = userData.crm;
+        registerData.medical_specialty_id = userData.medical_specialty_id;
+        registerData.availability = userData.availability;
+      }
+
       console.log('🔑 AuthContext - Dados de registro:', { ...registerData, password: '***' });
 
       // Chamada à API real

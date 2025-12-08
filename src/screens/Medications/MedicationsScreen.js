@@ -28,13 +28,13 @@ const MedicationsScreen = ({ route, navigation }) => {
   const [medications, setMedications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('all'); // all, morning, afternoon, night
-  const [showDiscontinued, setShowDiscontinued] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('active'); // active, discontinued, completed
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
       loadMedications();
-    }, [groupId, showDiscontinued])
+    }, [groupId, selectedStatus])
   );
 
   const loadMedications = async () => {
@@ -44,10 +44,49 @@ const MedicationsScreen = ({ route, navigation }) => {
       
       if (result.success) {
         const allMeds = result.data || [];
-        // Filtrar por ativos ou descontinuados
-        const filteredMeds = allMeds.filter(med => 
-          showDiscontinued ? !med.is_active : med.is_active
-        );
+        // Filtrar por status (ativo/descontinuado/concluído) baseado no selectedStatus
+        const filteredMeds = allMeds.filter(med => {
+          if (selectedStatus === 'active') {
+            // Em uso: ativo e não concluído
+            if (!med.is_active) return false;
+            if (med.end_date) {
+              const endDate = new Date(med.end_date);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return endDate >= today; // Ainda não terminou
+            }
+            return true; // Sem end_date = contínuo
+          }
+          if (selectedStatus === 'discontinued') {
+            // Descontinuado: não ativo (independente de end_date)
+            // Mas não deve aparecer se já foi concluído (end_date no passado)
+            if (med.is_active) return false;
+            
+            // Se tem end_date e está no passado, é concluído, não descontinuado
+            if (med.end_date) {
+              const endDate = new Date(med.end_date);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              if (endDate < today) {
+                return false; // Já concluído, não é descontinuado
+              }
+            }
+            
+            // is_active === false e (sem end_date ou end_date no futuro) = descontinuado
+            return true;
+          }
+          if (selectedStatus === 'completed') {
+            // Concluído: medicamento que terminou (end_date no passado)
+            if (med.end_date) {
+              const endDate = new Date(med.end_date);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              return endDate < today;
+            }
+            return false;
+          }
+          return true; // 'all' - mostrar todos
+        });
         
         // Transformar dados da API para o formato esperado pela UI
         const transformedMeds = filteredMeds.map(med => {
@@ -169,19 +208,57 @@ const MedicationsScreen = ({ route, navigation }) => {
           </View>
         </View>
         
-        <TouchableOpacity
-          style={styles.toggleButton}
-          onPress={() => setShowDiscontinued(!showDiscontinued)}
-        >
-          <Ionicons 
-            name={showDiscontinued ? "list" : "archive"} 
-            size={24} 
-            color={colors.primary} 
-          />
-        </TouchableOpacity>
+        <View style={styles.headerRight} />
       </View>
 
-      {/* Filtros por turno */}
+      {/* Filtros de Status - Estilo Tab */}
+      <View style={styles.statusFiltersContainer}>
+        <View style={styles.statusFilters}>
+          <TouchableOpacity
+            style={[styles.statusTab, selectedStatus === 'active' && styles.statusTabActive]}
+            onPress={() => setSelectedStatus('active')}
+          >
+            <Ionicons 
+              name="checkmark-circle" 
+              size={20} 
+              color={selectedStatus === 'active' ? colors.success : colors.textLight} 
+            />
+            <Text style={[styles.statusTabText, selectedStatus === 'active' && styles.statusTabTextActive]}>
+              Em uso
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.statusTab, selectedStatus === 'discontinued' && styles.statusTabActive]}
+            onPress={() => setSelectedStatus('discontinued')}
+          >
+            <Ionicons 
+              name="archive" 
+              size={20} 
+              color={selectedStatus === 'discontinued' ? colors.error : colors.textLight} 
+            />
+            <Text style={[styles.statusTabText, selectedStatus === 'discontinued' && styles.statusTabTextActive]}>
+              Descontinuado
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.statusTab, selectedStatus === 'completed' && styles.statusTabActive]}
+            onPress={() => setSelectedStatus('completed')}
+          >
+            <Ionicons 
+              name="checkmark-done-circle" 
+              size={20} 
+              color={selectedStatus === 'completed' ? colors.info : colors.textLight} 
+            />
+            <Text style={[styles.statusTabText, selectedStatus === 'completed' && styles.statusTabTextActive]}>
+              Concluído
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Filtros por turno - Estilo Chip */}
       {medications.length > 0 && (
         <View style={styles.filtersContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
@@ -274,16 +351,26 @@ const MedicationsScreen = ({ route, navigation }) => {
         ) : medications.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons 
-              name={showDiscontinued ? "archive-outline" : "medical-outline"} 
+              name={
+                selectedStatus === 'discontinued' ? "archive-outline" :
+                selectedStatus === 'completed' ? "checkmark-done-circle-outline" :
+                "medical-outline"
+              } 
               size={80} 
               color={colors.gray300} 
             />
             <Text style={styles.emptyTitle}>
-              {showDiscontinued ? 'Nenhum remédio descontinuado' : 'Nenhum remédio cadastrado'}
+              {selectedStatus === 'discontinued' 
+                ? 'Nenhum remédio descontinuado' 
+                : selectedStatus === 'completed'
+                ? 'Nenhum remédio concluído'
+                : 'Nenhum remédio em uso'}
             </Text>
             <Text style={styles.emptyText}>
-              {showDiscontinued 
-                ? 'Medicamentos descontinuados aparecerão aqui' 
+              {selectedStatus === 'discontinued'
+                ? 'Medicamentos descontinuados aparecerão aqui'
+                : selectedStatus === 'completed'
+                ? 'Medicamentos concluídos aparecerão aqui'
                 : 'Cadastre os medicamentos da pessoa acompanhada para gerenciar horários e doses'}
             </Text>
           </View>
@@ -435,18 +522,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  toggleButton: {
+  headerRight: {
     width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  toggleButtonText: {
-    fontSize: 12,
+  statusFiltersContainer: {
+    backgroundColor: colors.backgroundLight,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: 8,
+  },
+  statusFilters: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  statusTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+    borderWidth: 2,
+    borderColor: colors.border,
+  },
+  statusTabActive: {
+    backgroundColor: colors.primary + '15',
+    borderColor: colors.primary,
+  },
+  statusTabText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.textLight,
+  },
+  statusTabTextActive: {
+    color: colors.text,
+    fontWeight: '700',
   },
   title: {
     fontSize: 24,

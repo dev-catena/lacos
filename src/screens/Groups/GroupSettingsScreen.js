@@ -55,6 +55,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   const [groupPhotoUrl, setGroupPhotoUrl] = useState(null);
   const [newGroupPhoto, setNewGroupPhoto] = useState(null);
   const [photoKey, setPhotoKey] = useState(0); // Key para forçar reload da imagem
+  const [imageSource, setImageSource] = useState(null); // Source da imagem para forçar remount
 
   // Sinais Vitais
   const [vitalSigns, setVitalSigns] = useState({
@@ -115,40 +116,55 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         setEditedDescription(result.data.description || '');
         
         // Adicionar cache-busting na URL da foto para forçar reload
-        // IMPORTANTE: Só atualizar groupPhotoUrl se NÃO houver newGroupPhoto
-        // Se houver newGroupPhoto, significa que o usuário selecionou uma nova foto
-        // mas ainda não salvou, então manter newGroupPhoto como prioridade
+        // Sempre atualizar groupPhotoUrl com a foto do servidor
         const photoUrl = result.data.photo_url;
         console.log('📸 GroupSettings.loadGroupData - photo_url do servidor:', photoUrl);
         console.log('📸 GroupSettings.loadGroupData - newGroupPhoto existe?', !!newGroupPhoto);
+        console.log('📸 GroupSettings.loadGroupData - groupPhotoUrl atual:', groupPhotoUrl);
         
-        // Só atualizar groupPhotoUrl se não houver newGroupPhoto (foto selecionada mas não salva)
-        if (!newGroupPhoto) {
-          if (photoUrl) {
-            // Construir URL completa se necessário
-            let fullPhotoUrl = photoUrl;
-            if (!photoUrl.startsWith('http')) {
-              // Se não for URL completa, construir usando a base URL da API
-              const baseUrl = API_CONFIG.BASE_URL.replace('/api', ''); // Remover /api do final
-              fullPhotoUrl = photoUrl.startsWith('/') 
-                ? `${baseUrl}${photoUrl}` 
-                : `${baseUrl}/${photoUrl}`;
-            }
-            
-            const separator = fullPhotoUrl.includes('?') ? '&' : '?';
-            const timestamp = Date.now();
-            const newPhotoUrl = `${fullPhotoUrl}${separator}t=${timestamp}`;
-            console.log('📸 GroupSettings.loadGroupData - Atualizando photoUrl com cache-busting:', newPhotoUrl);
-            setGroupPhotoUrl(newPhotoUrl);
-            // Atualizar o key para forçar reload da imagem
-            setPhotoKey(timestamp);
-          } else {
-            console.log('📸 GroupSettings.loadGroupData - Sem photo_url, limpando groupPhotoUrl');
-            setGroupPhotoUrl(null);
-            setPhotoKey(Date.now()); // Forçar reload mesmo sem foto
+        if (photoUrl) {
+          // Construir URL completa se necessário
+          let fullPhotoUrl = photoUrl;
+          if (!photoUrl.startsWith('http')) {
+            // Se não for URL completa, construir usando a base URL da API
+            const baseUrl = API_CONFIG.BASE_URL.replace('/api', ''); // Remover /api do final
+            fullPhotoUrl = photoUrl.startsWith('/') 
+              ? `${baseUrl}${photoUrl}` 
+              : `${baseUrl}/${photoUrl}`;
+          }
+          
+          // SEMPRE atualizar com cache-busting para forçar reload
+          const separator = fullPhotoUrl.includes('?') ? '&' : '?';
+          const timestamp = Date.now();
+          const newPhotoUrl = `${fullPhotoUrl}${separator}t=${timestamp}`;
+          
+          // Comparar URLs sem o timestamp para ver se realmente mudou
+          const currentUrlWithoutTimestamp = groupPhotoUrl ? groupPhotoUrl.split('?')[0].split('&')[0] : null;
+          const newUrlWithoutTimestamp = fullPhotoUrl.split('?')[0].split('&')[0];
+          
+          console.log('📸 GroupSettings.loadGroupData - Comparando URLs:', {
+            current: currentUrlWithoutTimestamp,
+            new: newUrlWithoutTimestamp,
+            changed: currentUrlWithoutTimestamp !== newUrlWithoutTimestamp
+          });
+          
+          // SEMPRE atualizar groupPhotoUrl, mesmo se a URL base não mudou (pode ser cache)
+          console.log('📸 GroupSettings.loadGroupData - Atualizando photoUrl com cache-busting:', newPhotoUrl);
+          setGroupPhotoUrl(newPhotoUrl);
+          // Atualizar o key para forçar reload da imagem
+          setPhotoKey(timestamp);
+          // Atualizar imageSource para forçar remount
+          setImageSource({ uri: newPhotoUrl, cache: 'reload' });
+          
+          // Se newGroupPhoto existe mas a URL do servidor mudou, limpar newGroupPhoto
+          if (newGroupPhoto && currentUrlWithoutTimestamp !== newUrlWithoutTimestamp) {
+            console.log('📸 GroupSettings.loadGroupData - URL mudou e newGroupPhoto existe, limpando newGroupPhoto');
+            setNewGroupPhoto(null);
           }
         } else {
-          console.log('📸 GroupSettings.loadGroupData - Mantendo newGroupPhoto, não atualizando groupPhotoUrl ainda');
+          console.log('📸 GroupSettings.loadGroupData - Sem photo_url, limpando groupPhotoUrl');
+          setGroupPhotoUrl(null);
+          setPhotoKey(Date.now()); // Forçar reload mesmo sem foto
         }
       } else {
         console.error('❌ GroupSettings - Erro ao carregar grupo:', result.error);
@@ -332,7 +348,31 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             hasPhotoUrl: !!result.data?.photo_url,
             hasPhoto: !!result.data?.photo,
             photoUrl: result.data?.photo_url,
+            fullData: result.data,
           });
+          
+          // Se não encontrou photo_url, recarregar o grupo para pegar a foto atualizada
+          if (!photoUrl) {
+            console.log('⚠️ GroupSettings - photo_url não encontrado na resposta, recarregando grupo...');
+            setTimeout(async () => {
+              const groupResult = await groupService.getGroup(groupId);
+              if (groupResult.success && groupResult.data?.photo_url) {
+                console.log('📸 GroupSettings - photo_url encontrado após recarregar:', groupResult.data.photo_url);
+                const reloadedPhotoUrl = groupResult.data.photo_url;
+                const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+                const fullPhotoUrl = reloadedPhotoUrl.startsWith('http') 
+                  ? reloadedPhotoUrl 
+                  : (reloadedPhotoUrl.startsWith('/') ? `${baseUrl}${reloadedPhotoUrl}` : `${baseUrl}/${reloadedPhotoUrl}`);
+                const timestamp = Date.now();
+                const newPhotoUrl = `${fullPhotoUrl}?t=${timestamp}`;
+                setNewGroupPhoto(null);
+                setGroupPhotoUrl(newPhotoUrl);
+                setPhotoKey(timestamp);
+                setImageSource({ uri: newPhotoUrl, cache: 'reload' });
+                console.log('📸 GroupSettings - Foto atualizada após recarregar grupo');
+              }
+            }, 500);
+          }
           
           Toast.show({
             type: 'success',
@@ -340,8 +380,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             text2: 'Informações e foto atualizadas',
           });
           
-          // NÃO limpar newGroupPhoto ainda - manter a foto local até confirmar que o servidor atualizou
-          // Se temos a URL na resposta, atualizar groupPhotoUrl mas manter newGroupPhoto
+          // Se temos a URL na resposta, atualizar groupPhotoUrl e limpar newGroupPhoto imediatamente
           if (photoUrl) {
             // Construir URL completa se necessário
             let fullPhotoUrl = photoUrl;
@@ -352,29 +391,52 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                 : `${baseUrl}/${photoUrl}`;
             }
             
+            // Adicionar timestamp para forçar reload
             const separator = fullPhotoUrl.includes('?') ? '&' : '?';
             const timestamp = Date.now();
             const newPhotoUrl = `${fullPhotoUrl}${separator}t=${timestamp}`;
             console.log('📸 GroupSettings - Atualizando groupPhotoUrl imediatamente:', newPhotoUrl);
+            console.log('📸 GroupSettings - Comparando URLs:', {
+              current: groupPhotoUrl ? groupPhotoUrl.split('?')[0] : null,
+              new: fullPhotoUrl,
+              changed: groupPhotoUrl ? groupPhotoUrl.split('?')[0] !== fullPhotoUrl : true
+            });
             
-            // Atualizar estado mas MANTER newGroupPhoto por enquanto
+            // Atualizar tudo de uma vez para garantir sincronização
+            // Primeiro limpar newGroupPhoto, depois atualizar groupPhotoUrl e photoKey
+            setNewGroupPhoto(null);
             setGroupPhotoUrl(newPhotoUrl);
             setPhotoKey(timestamp);
+            
+            // Atualizar imageSource para forçar remount completo do componente Image
+            setImageSource({ uri: newPhotoUrl, cache: 'reload' });
+            
+            console.log('📸 GroupSettings - Estados atualizados: newGroupPhoto=null, groupPhotoUrl=' + newPhotoUrl);
+            
+            // Recarregar dados do grupo após salvar para garantir que temos a foto mais recente
+            setTimeout(async () => {
+              console.log('📸 GroupSettings - Recarregando dados do grupo após salvar...');
+              await loadGroupData();
+            }, 300);
+          } else {
+            console.warn('⚠️ GroupSettings - Foto salva mas não há URL na resposta. Recarregando dados...');
+            // Se não temos URL, recarregar dados e tentar novamente
+            setTimeout(async () => {
+              await loadGroupData();
+              // Limpar newGroupPhoto após recarregar
+              setNewGroupPhoto(null);
+            }, 1000);
           }
           
-          // Recarregar dados do servidor e só então limpar newGroupPhoto
+          // Recarregar dados do servidor para garantir sincronização completa
           setTimeout(async () => {
             console.log('🔄 GroupSettings - Recarregando dados do grupo após salvar foto...');
             await loadGroupData();
             
-            // Após recarregar e confirmar que groupPhotoUrl foi atualizado, limpar newGroupPhoto
-            // Aguardar um pouco mais para garantir que a imagem foi carregada
+            // Forçar outro reload da imagem após recarregar dados
             setTimeout(() => {
-              console.log('📸 GroupSettings - Limpando newGroupPhoto após confirmar atualização');
-              setNewGroupPhoto(null);
-              // Forçar outro reload para garantir que a foto foi atualizada
               setPhotoKey(Date.now());
-            }, 500);
+            }, 300);
           }, 1500);
         } else {
           console.error('❌ GroupSettings - Erro ao salvar:', result.error);
@@ -832,16 +894,15 @@ const GroupSettingsScreen = ({ route, navigation }) => {
               {(newGroupPhoto || groupPhotoUrl) ? (
                 <View style={styles.photoContainer}>
                   <Image 
-                    key={newGroupPhoto ? `new-${Date.now()}-${newGroupPhoto}` : `url-${photoKey}-${groupPhotoUrl}`}
-                    source={{ 
-                      uri: newGroupPhoto || groupPhotoUrl,
-                      cache: 'reload' // Forçar reload do cache
-                    }} 
+                    key={`photo-${photoKey}-${newGroupPhoto ? 'local-' + newGroupPhoto.substring(newGroupPhoto.length - 10) : 'server-' + (groupPhotoUrl ? groupPhotoUrl.split('/').pop() : 'none')}`}
+                    source={newGroupPhoto && !imageSource
+                      ? { uri: newGroupPhoto, cache: 'reload' }
+                      : (imageSource || { uri: groupPhotoUrl, cache: 'reload' })
+                    } 
                     style={styles.groupPhotoLarge}
-                    // Priorizar newGroupPhoto se existir (foto selecionada mas ainda não salva)
-                    defaultSource={newGroupPhoto ? { uri: newGroupPhoto } : null}
                     onError={(error) => {
                       console.error('❌ Erro ao carregar imagem:', error);
+                      console.error('❌ URI tentada:', newGroupPhoto || groupPhotoUrl);
                       // Se a foto do servidor falhar e tiver foto local, usar a local
                       if (!newGroupPhoto && groupPhotoUrl) {
                         console.log('⚠️ Tentando recarregar foto do servidor...');
@@ -852,6 +913,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                     }}
                     onLoad={() => {
                       console.log('✅ Imagem carregada com sucesso');
+                      console.log('✅ URI carregada:', newGroupPhoto || groupPhotoUrl);
                     }}
                   />
                   <View style={styles.photoActions}>
@@ -1081,15 +1143,24 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                               </View>
                             </>
                           )}
-                          {memberIsCaregiver && !memberIsAdmin && (
+                          {memberIsCaregiver && !memberIsAdmin && member.user?.profile !== 'professional_caregiver' && (
                             <View style={styles.caregiverBadge}>
                               <Ionicons name="heart" size={14} color={colors.info} />
                               <Text style={styles.caregiverBadgeText}>Cuidador</Text>
                             </View>
                           )}
                         </View>
+                        {memberIsCaregiver && !memberIsAdmin && member.user?.profile === 'professional_caregiver' && (
+                          <View style={styles.professionalCaregiverBadge}>
+                            <Ionicons name="medical" size={14} color={colors.success} />
+                            <Text style={styles.professionalCaregiverBadgeText}>Cuidador profissional</Text>
+                          </View>
+                        )}
                         <Text style={styles.memberRole}>
-                          {memberIsAdmin ? 'Cuidador Principal' : memberIsPatient ? 'Pessoa Acompanhada' : 'Cuidador'}
+                          {memberIsAdmin ? 'Cuidador Principal' : 
+                           memberIsPatient ? 'Pessoa Acompanhada' : 
+                           member.user?.profile === 'professional_caregiver' ? 'Cuidador profissional' :
+                           'Cuidador'}
                         </Text>
                         {member.joined_at && (
                           <View style={styles.memberDetail}>
@@ -1151,8 +1222,8 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                               </TouchableOpacity>
                             ) : null}
                             
-                            {/* Trocar Paciente (só para não-pacientes) */}
-                            {member.role !== 'patient' && (
+                            {/* Trocar Paciente (só para não-pacientes e não para cuidador profissional) */}
+                            {member.role !== 'patient' && member.user?.profile !== 'professional_caregiver' && (
                               <TouchableOpacity
                                 style={[styles.actionButton, styles.changePatientButton]}
                                 onPress={() => handleChangePatient(member)}
@@ -1661,6 +1732,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: colors.info,
+  },
+  professionalCaregiverBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.success + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  professionalCaregiverBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.success,
   },
   emptyMembersCard: {
     alignItems: 'center',

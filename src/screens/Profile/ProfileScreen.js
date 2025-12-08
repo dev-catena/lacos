@@ -193,6 +193,38 @@ const ProfileScreen = ({ navigation }) => {
             {user?.name} {user?.lastName}
           </Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
+          {user?.profile && (
+            <View style={[
+              styles.profileBadge,
+              user?.profile === 'professional_caregiver' && { backgroundColor: colors.success + '20' },
+              user?.profile === 'doctor' && { backgroundColor: '#4A90E2' + '20' },
+              user?.profile === 'accompanied' && { backgroundColor: colors.secondary + '20' },
+              user?.profile === 'caregiver' && { backgroundColor: colors.info + '20' },
+            ]}>
+              <Ionicons 
+                name={user?.profile === 'professional_caregiver' ? 'medical' : user?.profile === 'doctor' ? 'medical-outline' : user?.profile === 'accompanied' ? 'person' : 'heart'} 
+                size={14} 
+                color={
+                  user?.profile === 'professional_caregiver' ? colors.success :
+                  user?.profile === 'doctor' ? '#4A90E2' :
+                  user?.profile === 'accompanied' ? colors.secondary :
+                  colors.info
+                } 
+              />
+              <Text style={[
+                styles.profileBadgeText,
+                user?.profile === 'professional_caregiver' && { color: colors.success },
+                user?.profile === 'doctor' && { color: '#4A90E2' },
+                user?.profile === 'accompanied' && { color: colors.secondary },
+                user?.profile === 'caregiver' && { color: colors.info },
+              ]}>
+                {user?.profile === 'professional_caregiver' ? 'Cuidador profissional' :
+                 user?.profile === 'doctor' ? 'Médico' :
+                 user?.profile === 'accompanied' ? 'Paciente' :
+                 'Amigo/cuidador'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Menu Conta */}
@@ -206,6 +238,15 @@ const ProfileScreen = ({ navigation }) => {
               color={colors.primary}
               onPress={() => navigation.navigate('EditPersonalData')}
             />
+            {(user?.profile === 'professional_caregiver' || user?.profile === 'doctor') && (
+              <MenuItem
+                icon="medical-outline"
+                title="Dados Profissionais"
+                subtitle="Formação, valor/hora, disponibilidade"
+                color={colors.success}
+                onPress={() => navigation.navigate('ProfessionalCaregiverData')}
+              />
+            )}
             <MenuItem
               icon="lock-closed-outline"
               title="Segurança"
@@ -367,6 +408,20 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 14,
     color: colors.textLight,
+    marginBottom: 8,
+  },
+  profileBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  profileBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   section: {
     paddingHorizontal: 20,

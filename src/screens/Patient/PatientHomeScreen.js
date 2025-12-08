@@ -25,6 +25,7 @@ import PanicButton from '../../components/PanicButton';
 import MediaCarousel from '../../components/MediaCarousel';
 import AlertCard from '../../components/AlertCard';
 import VideoPlayerModal from '../../components/VideoPlayerModal';
+import ImageViewerModal from '../../components/ImageViewerModal';
 import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import appointmentService from '../../services/appointmentService';
@@ -50,6 +51,8 @@ const PatientHomeScreen = ({ navigation }) => {
   const [alerts, setAlerts] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [showImageViewer, setShowImageViewer] = useState(false);
   
   // Calcular padding bottom para o ScrollView (altura do tab bar + inset do Android)
   const tabBarHeight = 60;
@@ -472,9 +475,14 @@ const PatientHomeScreen = ({ navigation }) => {
       });
       setShowVideoPlayer(true);
     } else if (!isVideo && mediaUrl) {
-      // Para imagens, poderia abrir um modal de visualização também
-      console.log('🖼️ PatientHomeScreen - Imagem clicada:', mediaUrl);
-      // TODO: Implementar visualização de imagem em tela cheia
+      // Para imagens, abrir modal de visualização em tela cheia
+      console.log('🖼️ PatientHomeScreen - Abrindo visualizador de imagem:', mediaUrl);
+      setSelectedImage({
+        uri: mediaUrl,
+        title: mediaItem.description || 'Imagem',
+        description: mediaItem.description || null,
+      });
+      setShowImageViewer(true);
     }
   };
 
@@ -896,6 +904,18 @@ const PatientHomeScreen = ({ navigation }) => {
         onClose={() => {
           setShowVideoPlayer(false);
           setSelectedVideo(null);
+        }}
+      />
+
+      {/* Image Viewer Modal */}
+      <ImageViewerModal
+        visible={showImageViewer}
+        imageUri={selectedImage?.uri}
+        imageTitle={selectedImage?.title}
+        imageDescription={selectedImage?.description}
+        onClose={() => {
+          setShowImageViewer(false);
+          setSelectedImage(null);
         }}
       />
     </SafeAreaView>

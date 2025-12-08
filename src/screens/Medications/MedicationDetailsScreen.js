@@ -10,6 +10,8 @@ import {
   Linking,
   TextInput,
   Modal,
+  Pressable,
+  Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,12 +19,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import * as Location from 'expo-location';
 import colors from '../../constants/colors';
-import {
-  generateAdhesionReport,
-  shareViaWhatsApp,
-  shareViaEmail,
-  saveAndShareReport,
-} from '../../services/medicationReportService';
 import medicationService from '../../services/medicationService';
 import medicationSearchService from '../../services/medicationSearchService';
 import medicationPriceService from '../../services/medicationPriceService';
@@ -76,6 +72,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
           const transformedMed = {
             ...med,
             form: med.pharmaceutical_form || med.form,
+            route: med.administration_route || med.route || '',
             frequency: frequencyType === 'advanced' ? 'advanced' : (frequencyDetails.interval || '24'),
             schedule: med.times || frequencyDetails.schedule || [],
             advancedFrequency: frequencyType === 'advanced' ? frequencyDetails : null,
@@ -150,18 +147,29 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
     const scheduledDateTime = new Date(today);
     scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
-    // Verificar se já foi tomado hoje
-    const takenToday = doseHistory.find(h => {
+    // Verificar se há registro para este horário hoje
+    const recordToday = doseHistory.find(h => {
       const hDate = new Date(h.takenAt);
       return hDate.toISOString().split('T')[0] === today && h.scheduledTime === scheduleTime;
     });
 
-    if (takenToday) {
+    // Verificar se foi marcado como não administrado
+    if (recordToday && recordToday.status === 'not_administered') {
+      return {
+        status: 'not_administered',
+        color: colors.error,
+        icon: 'close-circle',
+        label: recordToday.justification || 'Não administrado',
+      };
+    }
+
+    // Verificar se já foi tomado hoje
+    if (recordToday && recordToday.status === 'taken') {
       return {
         status: 'taken',
         color: colors.success,
         icon: 'checkmark-circle',
-        label: `Tomado às ${new Date(takenToday.takenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+        label: `Tomado às ${new Date(recordToday.takenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
       };
     }
 
@@ -235,15 +243,26 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
         takenAt: new Date().toISOString(),
         registeredBy: 'caregiver',
         status: 'not_administered',
-        justification: reason,
+        justification: reason || '',
       };
 
       const historyJson = await AsyncStorage.getItem(DOSE_HISTORY_STORAGE_KEY);
       const history = historyJson ? JSON.parse(historyJson) : [];
-      history.push(doseRecord);
-      await AsyncStorage.setItem(DOSE_HISTORY_STORAGE_KEY, JSON.stringify(history));
+      
+      // Remover registro anterior do mesmo horário no mesmo dia, se houver
+      const today = new Date().toISOString().split('T')[0];
+      const filteredHistory = history.filter(h => {
+        const hDate = new Date(h.takenAt);
+        const hToday = hDate.toISOString().split('T')[0];
+        return !(h.medicationId === medicationId && h.scheduledTime === scheduledTime && hToday === today);
+      });
+      
+      filteredHistory.push(doseRecord);
+      await AsyncStorage.setItem(DOSE_HISTORY_STORAGE_KEY, JSON.stringify(filteredHistory));
 
-      setDoseHistory(history.filter(h => h.medicationId === medicationId));
+      // Atualizar o estado local
+      const updatedHistory = filteredHistory.filter(h => h.medicationId === medicationId);
+      setDoseHistory(updatedHistory);
 
       Toast.show({
         type: 'info',
@@ -289,21 +308,36 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                 ? JSON.parse(med.duration)
                 : (med.duration || { type: 'continuo', value: null });
               
+              // Preparar frequencyDetails para envio
+              let frequencyDetailsToSend;
+              if (frequencyType === 'advanced') {
+                frequencyDetailsToSend = frequencyDetails;
+              } else {
+                frequencyDetailsToSend = {
+                  interval: frequencyDetails.interval || '24',
+                  schedule: med.times || frequencyDetails.schedule || [],
+                };
+              }
+              
+              console.log('📋 MedicationDetailsScreen - Dados para descontinuar:', {
+                medicationId,
+                isActive: false,
+                frequencyType,
+                frequencyDetails: frequencyDetailsToSend,
+              });
+              
               // Atualizar na API - apenas marcar como inativo
               const result = await medicationService.updateMedication(medicationId, {
                 name: med.name,
-                form: med.pharmaceutical_form,
-                dosage: med.dosage,
-                unit: med.unit,
-                administrationRoute: med.administration_route,
+                form: med.pharmaceutical_form || '',
+                dosage: med.dosage || '',
+                unit: med.unit || '',
+                administrationRoute: med.administration_route || '',
                 frequencyType: frequencyType,
-                frequencyDetails: frequencyType === 'advanced' ? frequencyDetails : {
-                  interval: frequencyDetails.interval || '24',
-                  schedule: med.times || frequencyDetails.schedule || [],
-                },
-                firstDoseAt: med.first_dose_at,
+                frequencyDetails: frequencyDetailsToSend,
+                firstDoseAt: med.first_dose_at || null,
                 durationType: duration.type || 'continuo',
-                durationValue: duration.value,
+                durationValue: duration.value || null,
                 notes: med.notes || '',
                 isActive: false, // Descontinuar = inativo
               });
@@ -320,34 +354,137 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                 throw new Error(result.error || 'Erro ao descontinuar');
               }
             } catch (error) {
-              console.error('Erro ao descontinuar:', error);
+              console.error('❌ MedicationDetailsScreen - Erro ao descontinuar:', error);
+              console.error('❌ MedicationDetailsScreen - Detalhes do erro:', error.response?.data || error.message);
               
-              // Fallback para AsyncStorage se a API falhar
-              try {
-                const medsJson = await AsyncStorage.getItem(MEDICATIONS_STORAGE_KEY);
-                if (medsJson) {
-                  const meds = JSON.parse(medsJson);
-                  const updatedMeds = meds.map(m => 
-                    m.id === medicationId 
-                      ? { ...m, active: false, discontinuedAt: new Date().toISOString() }
-                      : m
-                  );
-                  await AsyncStorage.setItem(MEDICATIONS_STORAGE_KEY, JSON.stringify(updatedMeds));
-                  
-                  Toast.show({
-                    type: 'success',
-                    text1: 'Medicamento descontinuado',
-                    text2: `${medication.name} foi removido da lista`,
-                  });
-
-                  navigation.goBack();
-                  return;
+              let errorMessage = 'Não foi possível descontinuar o medicamento';
+              
+              // Tentar extrair mensagem de erro mais específica
+              if (error.response?.data) {
+                if (error.response.data.message) {
+                  errorMessage = error.response.data.message;
+                } else if (error.response.data.error) {
+                  errorMessage = error.response.data.error;
+                } else if (error.response.data.errors) {
+                  const errors = Object.values(error.response.data.errors).flat();
+                  errorMessage = errors.join(', ');
                 }
-              } catch (fallbackError) {
-                console.error('Erro no fallback:', fallbackError);
+              } else if (error.message) {
+                errorMessage = error.message;
               }
               
-              Alert.alert('Erro', 'Não foi possível descontinuar o medicamento');
+              Alert.alert('Erro', errorMessage);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleComplete = async () => {
+    Alert.alert(
+      'Concluir Medicamento',
+      `Tem certeza que deseja marcar ${medication.name} como concluído? O medicamento será movido para a lista de concluídos.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Concluir',
+          style: 'default',
+          onPress: async () => {
+            try {
+              // Buscar dados completos do medicamento primeiro
+              const medResult = await medicationService.getMedication(medicationId);
+              
+              if (!medResult.success || !medResult.data) {
+                throw new Error('Não foi possível carregar dados do medicamento');
+              }
+              
+              const med = medResult.data;
+              
+              // Preparar dados para atualização
+              const frequency = typeof med.frequency === 'string' 
+                ? JSON.parse(med.frequency) 
+                : (med.frequency || {});
+              
+              const frequencyDetails = frequency.details || {};
+              const frequencyType = frequency.type || 'simple';
+              
+              const duration = typeof med.duration === 'string'
+                ? JSON.parse(med.duration)
+                : (med.duration || { type: 'continuo', value: null });
+              
+              // Definir end_date como hoje para marcar como concluído
+              const today = new Date();
+              today.setHours(23, 59, 59, 999); // Final do dia
+              const endDate = today.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+              
+              // Preparar frequencyDetails para envio
+              let frequencyDetailsToSend;
+              if (frequencyType === 'advanced') {
+                frequencyDetailsToSend = frequencyDetails;
+              } else {
+                frequencyDetailsToSend = {
+                  interval: frequencyDetails.interval || '24',
+                  schedule: med.times || frequencyDetails.schedule || [],
+                };
+              }
+              
+              console.log('📋 MedicationDetailsScreen - Dados para atualização:', {
+                medicationId,
+                endDate,
+                frequencyType,
+                frequencyDetails: frequencyDetailsToSend,
+              });
+              
+              // Atualizar na API - definir end_date
+              const result = await medicationService.updateMedication(medicationId, {
+                name: med.name,
+                form: med.pharmaceutical_form || '',
+                dosage: med.dosage || '',
+                unit: med.unit || '',
+                administrationRoute: med.administration_route || '',
+                frequencyType: frequencyType,
+                frequencyDetails: frequencyDetailsToSend,
+                firstDoseAt: med.first_dose_at || null,
+                durationType: duration.type || 'continuo',
+                durationValue: duration.value || null,
+                notes: med.notes || '',
+                isActive: med.is_active !== false, // Manter status ativo
+                endDate: endDate, // Definir data de conclusão
+              });
+
+              if (result.success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Medicamento concluído',
+                  text2: `${medication.name} foi movido para concluídos`,
+                });
+
+                navigation.goBack();
+              } else {
+                throw new Error(result.error || 'Erro ao concluir medicamento');
+              }
+            } catch (error) {
+              console.error('❌ MedicationDetailsScreen - Erro ao concluir:', error);
+              console.error('❌ MedicationDetailsScreen - Detalhes do erro:', error.response?.data || error.message);
+              
+              let errorMessage = 'Não foi possível concluir o medicamento';
+              
+              // Tentar extrair mensagem de erro mais específica
+              if (error.response?.data) {
+                if (error.response.data.message) {
+                  errorMessage = error.response.data.message;
+                } else if (error.response.data.error) {
+                  errorMessage = error.response.data.error;
+                } else if (error.response.data.errors) {
+                  const errors = Object.values(error.response.data.errors).flat();
+                  errorMessage = errors.join(', ');
+                }
+              } else if (error.message) {
+                errorMessage = error.message;
+              }
+              
+              Alert.alert('Erro', errorMessage);
             }
           },
         },
@@ -360,64 +497,6 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
     setCustomTime('');
     setJustification('');
     setShowRegisterModal(true);
-  };
-
-  const handleExportReport = () => {
-    Alert.alert(
-      'Exportar Relatório',
-      'Escolha como deseja exportar o relatório de adesão:',
-      [
-        {
-          text: 'WhatsApp',
-          onPress: async () => {
-            try {
-              const endDate = new Date();
-              const startDate = new Date();
-              startDate.setDate(startDate.getDate() - 30); // Últimos 30 dias
-
-              const report = await generateAdhesionReport(groupId, startDate, endDate);
-              await shareViaWhatsApp(report, 'Grupo', medication.name);
-            } catch (error) {
-              Alert.alert('Erro', 'Não foi possível gerar o relatório');
-            }
-          },
-        },
-        {
-          text: 'Email',
-          onPress: async () => {
-            try {
-              const endDate = new Date();
-              const startDate = new Date();
-              startDate.setDate(startDate.getDate() - 30);
-
-              const report = await generateAdhesionReport(groupId, startDate, endDate);
-              await shareViaEmail(report, 'Grupo', medication.name);
-            } catch (error) {
-              Alert.alert('Erro', 'Não foi possível gerar o relatório');
-            }
-          },
-        },
-        {
-          text: 'Outro App',
-          onPress: async () => {
-            try {
-              const endDate = new Date();
-              const startDate = new Date();
-              startDate.setDate(startDate.getDate() - 30);
-
-              const report = await generateAdhesionReport(groupId, startDate, endDate);
-              await saveAndShareReport(report, 'Grupo', medication.name);
-            } catch (error) {
-              Alert.alert('Erro', 'Não foi possível gerar o relatório');
-            }
-          },
-        },
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-      ]
-    );
   };
 
   const handleFindPharmacy = async () => {
@@ -513,7 +592,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
             <View style={styles.infoItem}>
               <Ionicons name="water" size={20} color={colors.info} />
               <Text style={styles.infoLabel}>Via</Text>
-              <Text style={styles.infoValue}>{medication.route}</Text>
+              <Text style={styles.infoValue}>{medication.route || 'Não informado'}</Text>
             </View>
             <View style={styles.infoItem}>
               <Ionicons name="calendar" size={20} color={colors.info} />
@@ -546,7 +625,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
               <TouchableOpacity
                 key={index}
                 style={[styles.scheduleCard, { borderLeftColor: status.color }]}
-                onPress={() => status.status !== 'taken' && handleRegisterDose(time)}
+                onPress={() => status.status !== 'taken' && status.status !== 'not_administered' && handleRegisterDose(time)}
                 onLongPress={() => openRegisterModal(time)}
                 delayLongPress={500}
                 activeOpacity={0.7}
@@ -560,7 +639,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                     </Text>
                   </View>
                 </View>
-                {status.status !== 'taken' && (
+                {status.status !== 'taken' && status.status !== 'not_administered' && (
                   <View style={[styles.quickRegisterBadge, { backgroundColor: status.color + '20' }]}>
                     <Ionicons name="checkmark" size={16} color={status.color} />
                   </View>
@@ -625,73 +704,41 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
           )}
         </View>
 
-        {/* Relatório de Adesão */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Relatórios</Text>
-          <TouchableOpacity
-            style={styles.reportButton}
-            onPress={handleExportReport}
-          >
-            <View style={styles.reportIcon}>
-              <Ionicons name="document-text" size={28} color={colors.primary} />
-            </View>
-            <View style={styles.reportInfo}>
-              <Text style={styles.reportTitle}>Relatório de Adesão</Text>
-              <Text style={styles.reportSubtitle}>
-                Exportar para WhatsApp, Email ou outro app
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
-          </TouchableOpacity>
-        </View>
-
         {/* Ações do Medicamento */}
         <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.discontinueButton}
-            onPress={handleDiscontinue}
-          >
-            <Ionicons name="close-circle" size={24} color={colors.error} />
-            <Text style={styles.discontinueButtonText}>Descontinuar Medicamento</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Histórico Recente */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Histórico Recente</Text>
-          {doseHistory.length > 0 ? (
-            doseHistory.slice(0, 10).map((record) => (
-              <View key={record.id} style={styles.historyCard}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-                <View style={styles.historyInfo}>
-                  <Text style={styles.historyTime}>
-                    {new Date(record.takenAt).toLocaleString('pt-BR', {
-                      day: '2-digit',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </Text>
-                  <Text style={styles.historyScheduled}>
-                    Horário agendado: {record.scheduledTime}
-                  </Text>
-                </View>
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyHistory}>
-              <Ionicons name="calendar-outline" size={48} color={colors.gray300} />
-              <Text style={styles.emptyHistoryText}>Nenhum registro ainda</Text>
-            </View>
-          )}
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity
+              style={styles.completeButton}
+              onPress={handleComplete}
+            >
+              <Ionicons name="checkmark-done-circle" size={24} color={colors.info} />
+              <Text style={styles.completeButtonText}>Concluir Medicamento</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.discontinueButton}
+              onPress={handleDiscontinue}
+            >
+              <Ionicons name="close-circle" size={24} color={colors.error} />
+              <Text style={styles.discontinueButtonText}>Descontinuar Medicamento</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Modal de Registro Avançado */}
-      {showRegisterModal && (
-        <View style={styles.modalOverlay}>
+      <Modal
+        visible={showRegisterModal && medication !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowRegisterModal(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setShowRegisterModal(false)}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Registrar Dose</Text>
@@ -700,10 +747,19 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
-              <Text style={styles.modalMedicationName}>{medication.name}</Text>
+            {medication && (
+            <View style={styles.modalBodyContainer}>
+              <ScrollView 
+                style={styles.modalBodyScroll}
+                contentContainerStyle={styles.modalBodyContent}
+                showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                bounces={false}
+              >
+              <Text style={styles.modalMedicationName}>{medication.name || 'Medicamento'}</Text>
               <Text style={styles.modalScheduledTime}>
-                Horário agendado: {selectedScheduleTime}
+                Horário agendado: {selectedScheduleTime || 'N/A'}
               </Text>
 
               {/* Opção 1: Registrar como tomado */}
@@ -733,20 +789,49 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                   </Text>
                   <TextInput
                     style={styles.modalInput}
-                    placeholder="Ex: 09:30"
+                    placeholder="HH:MM (ex: 09:30)"
                     value={customTime}
-                    onChangeText={setCustomTime}
+                    onChangeText={(text) => {
+                      // Remover tudo que não é número
+                      const numbers = text.replace(/\D/g, '');
+                      
+                      // Limitar a 4 dígitos (HHMM)
+                      const limitedNumbers = numbers.slice(0, 4);
+                      
+                      // Aplicar máscara HH:MM automaticamente
+                      let formatted = '';
+                      if (limitedNumbers.length === 0) {
+                        formatted = '';
+                      } else if (limitedNumbers.length <= 2) {
+                        // Apenas horas (ex: "09")
+                        formatted = limitedNumbers;
+                      } else {
+                        // Horas e minutos (ex: "0930" -> "09:30")
+                        const hours = limitedNumbers.slice(0, 2);
+                        const minutes = limitedNumbers.slice(2, 4);
+                        formatted = `${hours}:${minutes}`;
+                      }
+                      
+                      setCustomTime(formatted);
+                    }}
                     keyboardType="numeric"
+                    maxLength={5}
                   />
                   <TouchableOpacity
                     style={styles.modalSubmitButton}
                     onPress={() => {
                       if (customTime) {
-                        const [h, m] = customTime.split(':');
-                        const today = new Date();
-                        today.setHours(parseInt(h), parseInt(m), 0, 0);
-                        handleRegisterDose(selectedScheduleTime, today.toISOString());
-                        setShowRegisterModal(false);
+                        // Validar formato HH:MM
+                        const timeRegex = /^([0-1][0-9]|2[0-3]):([0-5][0-9])$/;
+                        if (timeRegex.test(customTime)) {
+                          const [h, m] = customTime.split(':');
+                          const today = new Date();
+                          today.setHours(parseInt(h), parseInt(m), 0, 0);
+                          handleRegisterDose(selectedScheduleTime, today.toISOString());
+                          setShowRegisterModal(false);
+                        } else {
+                          Alert.alert('Erro', 'Digite o horário no formato HH:MM (ex: 09:30)');
+                        }
                       } else {
                         Alert.alert('Erro', 'Digite o horário no formato HH:MM');
                       }
@@ -784,10 +869,12 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                   </TouchableOpacity>
                 </View>
               </View>
+              </ScrollView>
             </View>
+            )}
           </View>
-        </View>
-      )}
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -957,6 +1044,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  actionsContainer: {
+    gap: 12,
+  },
+  completeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    backgroundColor: colors.info + '10',
+    borderWidth: 2,
+    borderColor: colors.info + '40',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  completeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.info,
+  },
   discontinueButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -987,8 +1094,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderRadius: 20,
     margin: 20,
-    maxHeight: '80%',
+    height: Dimensions.get('window').height * 0.75,
     width: '90%',
+    flexDirection: 'column',
+    maxWidth: 500,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1005,6 +1119,17 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 20,
+  },
+  modalBodyContainer: {
+    height: Dimensions.get('window').height * 0.75 - 80, // Altura total menos header
+  },
+  modalBodyScroll: {
+    height: '100%',
+  },
+  modalBodyContent: {
+    padding: 20,
+    paddingBottom: 120,
+    paddingTop: 0,
   },
   modalMedicationName: {
     fontSize: 18,
@@ -1078,37 +1203,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.textWhite,
-  },
-  reportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary + '10',
-    borderWidth: 2,
-    borderColor: colors.primary + '40',
-    borderRadius: 12,
-    padding: 16,
-  },
-  reportIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  reportInfo: {
-    flex: 1,
-  },
-  reportTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  reportSubtitle: {
-    fontSize: 14,
-    color: colors.textLight,
   },
   priceCard: {
     backgroundColor: colors.backgroundLight,
@@ -1187,37 +1281,6 @@ const styles = StyleSheet.create({
   pharmacySubtitle: {
     fontSize: 14,
     color: colors.textLight,
-  },
-  historyCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.backgroundLight,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  historyInfo: {
-    flex: 1,
-  },
-  historyTime: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  historyScheduled: {
-    fontSize: 12,
-    color: colors.textLight,
-  },
-  emptyHistory: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyHistoryText: {
-    fontSize: 14,
-    color: colors.textLight,
-    marginTop: 12,
   },
 });
 

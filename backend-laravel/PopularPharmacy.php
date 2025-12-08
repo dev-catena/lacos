@@ -79,3 +79,8 @@ class PopularPharmacy extends Model
     }
 }
 
+
+
+
+
+

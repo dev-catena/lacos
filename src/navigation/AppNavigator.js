@@ -18,6 +18,7 @@ import NoGroupsScreen from '../screens/Groups/NoGroupsScreen';
 import GroupsScreen from '../screens/Groups/GroupsScreen';
 import CreateGroupScreen from '../screens/Groups/CreateGroupScreen';
 import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
+import GroupChatScreen from '../screens/Groups/GroupChatScreen';
 import GroupSettingsScreen from '../screens/Groups/GroupSettingsScreen';
 import GroupMembersScreen from '../screens/Groups/GroupMembersScreen';
 import GroupContactsScreen from '../screens/Groups/GroupContactsScreen';
@@ -26,14 +27,22 @@ import PanicSettingsScreen from '../screens/Groups/PanicSettingsScreen';
 import AddVitalSignsScreen from '../screens/Groups/AddVitalSignsScreen';
 import AgendaScreen from '../screens/Groups/AgendaScreen';
 import AddAppointmentScreen from '../screens/Groups/AddAppointmentScreen';
+import AppointmentDetailsScreen from '../screens/Groups/AppointmentDetailsScreen';
 import NotificationsScreen from '../screens/Notifications/NotificationsScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 import EditPersonalDataScreen from '../screens/Profile/EditPersonalDataScreen';
+import ProfessionalCaregiverDataScreen from '../screens/Profile/ProfessionalCaregiverDataScreen';
 import SecurityScreen from '../screens/Profile/SecurityScreen';
 import NotificationPreferencesScreen from '../screens/Profile/NotificationPreferencesScreen';
+import CaregiversListScreen from '../screens/Caregivers/CaregiversListScreen';
+import CaregiverDetailsScreen from '../screens/Caregivers/CaregiverDetailsScreen';
+import CaregiverChatScreen from '../screens/Caregivers/CaregiverChatScreen';
 
 // Importa o PatientNavigator COMPLETO (já testado e funcionando)
 import PatientNavigator from './PatientNavigator';
+// Importa o ProfessionalCaregiverNavigator
+import ProfessionalCaregiverNavigator from './ProfessionalCaregiverNavigator';
+import DoctorNavigator from './DoctorNavigator';
 
 // Importa as telas de Medicamentos
 import MedicationsScreen from '../screens/Medications/MedicationsScreen';
@@ -160,6 +169,13 @@ const HomeStack = () => {
         }}
       />
       <Stack.Screen 
+        name="AppointmentDetails" 
+        component={AppointmentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Medications" 
         component={MedicationsScreen}
         options={{ 
@@ -279,6 +295,13 @@ const HomeStack = () => {
         }}
       />
       <Stack.Screen 
+        name="ProfessionalCaregiverData" 
+        component={ProfessionalCaregiverDataScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Security" 
         component={SecurityScreen}
         options={{ 
@@ -288,6 +311,27 @@ const HomeStack = () => {
       <Stack.Screen 
         name="NotificationPreferences" 
         component={NotificationPreferencesScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="CaregiversList" 
+        component={CaregiversListScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="CaregiverDetails" 
+        component={CaregiverDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="CaregiverChat" 
+        component={CaregiverChatScreen}
         options={{ 
           headerShown: false 
         }}
@@ -317,6 +361,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="GroupDetail" 
         component={GroupDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="GroupChat" 
+        component={GroupChatScreen}
         options={{ 
           headerShown: false 
         }}
@@ -385,6 +436,13 @@ const GroupsStack = () => {
         }}
       />
       <Stack.Screen 
+        name="AppointmentDetails" 
+        component={AppointmentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Medications" 
         component={MedicationsScreen}
         options={{ 
@@ -504,6 +562,13 @@ const GroupsStack = () => {
         }}
       />
       <Stack.Screen 
+        name="ProfessionalCaregiverData" 
+        component={ProfessionalCaregiverDataScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Security" 
         component={SecurityScreen}
         options={{ 
@@ -535,6 +600,13 @@ const ProfileStack = () => {
       <Stack.Screen 
         name="EditPersonalData" 
         component={EditPersonalDataScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="ProfessionalCaregiverData" 
+        component={ProfessionalCaregiverDataScreen}
         options={{ 
           headerShown: false 
         }}
@@ -683,6 +755,8 @@ const CaregiverNavigator = () => {
 const AppNavigator = () => {
   const { user } = useAuth();
   const [isPatient, setIsPatient] = useState(false);
+  const [isProfessionalCaregiver, setIsProfessionalCaregiver] = useState(false);
+  const [isDoctor, setIsDoctor] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -695,7 +769,29 @@ const AppNavigator = () => {
         
         // Primeiro, verificar o perfil cadastral
         const profileIsPatient = user?.profile === 'accompanied';
-        console.log(`📋 Perfil cadastral: ${user?.profile} → ${profileIsPatient ? '👤 PACIENTE' : '👨‍⚕️ CUIDADOR'}`);
+        const profileIsProfessionalCaregiver = user?.profile === 'professional_caregiver';
+        const profileIsDoctor = user?.profile === 'doctor';
+        console.log(`📋 Perfil cadastral: ${user?.profile} → ${profileIsPatient ? '👤 PACIENTE' : profileIsProfessionalCaregiver ? '👨‍⚕️ CUIDADOR PROFISSIONAL' : profileIsDoctor ? '👨‍⚕️ MÉDICO' : '👨‍⚕️ CUIDADOR'}`);
+        
+        // Se for cuidador profissional, não precisa verificar grupos
+        if (profileIsProfessionalCaregiver) {
+          console.log('✅ Perfil é Cuidador Profissional, usando ProfessionalCaregiverNavigator');
+          setIsProfessionalCaregiver(true);
+          setIsPatient(false);
+          setIsDoctor(false);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Se for médico, não precisa verificar grupos
+        if (profileIsDoctor) {
+          console.log('✅ Perfil é Médico, usando DoctorNavigator');
+          setIsDoctor(true);
+          setIsPatient(false);
+          setIsProfessionalCaregiver(false);
+          setIsLoading(false);
+          return;
+        }
         
         // Depois, verificar a role nos grupos COM TIMEOUT
         console.log('📡 Buscando grupos do usuário...');
@@ -807,13 +903,21 @@ const AppNavigator = () => {
   }
 
   // Se for PACIENTE, mostra navegação simplificada (PatientNavigator já existe e está testado!)
+  // Se for CUIDADOR PROFISSIONAL, mostra navegação de cuidador profissional
+  // Se for MÉDICO, mostra navegação de médico
   // Se for CUIDADOR, mostra navegação completa
   console.log('\n🎬 AppNavigator - RENDERIZANDO:');
   console.log(`   isPatient = ${isPatient}`);
-  console.log(`   Navegador: ${isPatient ? 'PatientNavigator 👤' : 'CaregiverNavigator 👨‍⚕️'}\n`);
+  console.log(`   isProfessionalCaregiver = ${isProfessionalCaregiver}`);
+  console.log(`   isDoctor = ${isDoctor}`);
+  console.log(`   Navegador: ${isPatient ? 'PatientNavigator 👤' : isProfessionalCaregiver ? 'ProfessionalCaregiverNavigator 👨‍⚕️' : isDoctor ? 'DoctorNavigator 👨‍⚕️' : 'CaregiverNavigator 👨‍⚕️'}\n`);
   
   if (isPatient) {
     return <PatientNavigator />;
+  } else if (isProfessionalCaregiver) {
+    return <ProfessionalCaregiverNavigator />;
+  } else if (isDoctor) {
+    return <DoctorNavigator />;
   } else {
     return <CaregiverNavigator />;
   }

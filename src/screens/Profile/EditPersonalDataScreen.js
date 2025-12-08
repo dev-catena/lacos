@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,23 +16,89 @@ import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import userService from '../../services/userService';
 
+// Função para converter data de AAAA-MM-DD para DD/MM/AAAA
+const formatDateFromBackend = (dateString) => {
+  if (!dateString) return '';
+  // Se já estiver no formato DD/MM/AAAA, retornar como está
+  if (dateString.includes('/')) return dateString;
+  // Converter de AAAA-MM-DD para DD/MM/AAAA
+  const dateParts = dateString.split('-');
+  if (dateParts.length === 3) {
+    return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+  }
+  return dateString;
+};
+
+// Função para aplicar máscara de telefone (+55 (XX) XXXXX-XXXX ou +55 (XX) XXXXX-XXXXX)
+const formatPhone = (value) => {
+  // Se value for string vazia ou apenas espaços, retornar +55
+  if (!value || value.toString().trim() === '') {
+    return '+55';
+  }
+  
+  // Remove tudo que não é número
+  const numbers = value.toString().replace(/\D/g, '');
+  
+  // Se não houver números, retornar +55
+  if (numbers.length === 0) {
+    return '+55';
+  }
+  
+  // Se começar com 55, remover (já está no prefixo +55)
+  let cleanNumbers = numbers.startsWith('55') ? numbers.slice(2) : numbers;
+  
+  // Limita a 12 dígitos (DDD + número com até 10 dígitos)
+  if (cleanNumbers.length > 12) {
+    cleanNumbers = cleanNumbers.slice(0, 12);
+  }
+  
+  // Aplica a máscara
+  if (cleanNumbers.length === 0) {
+    return '+55';
+  } else if (cleanNumbers.length <= 2) {
+    return `+55 (${cleanNumbers}`;
+  } else if (cleanNumbers.length <= 7) {
+    return `+55 (${cleanNumbers.slice(0, 2)}) ${cleanNumbers.slice(2)}`;
+  } else if (cleanNumbers.length <= 11) {
+    return `+55 (${cleanNumbers.slice(0, 2)}) ${cleanNumbers.slice(2, 7)}-${cleanNumbers.slice(7, 11)}`;
+  } else {
+    // Para 12 dígitos: +55 (XX) XXXXX-XXXXX
+    return `+55 (${cleanNumbers.slice(0, 2)}) ${cleanNumbers.slice(2, 7)}-${cleanNumbers.slice(7, 12)}`;
+  }
+};
+
+// Função para formatar telefone do backend (remove +55 se existir)
+const formatPhoneFromBackend = (phoneString) => {
+  if (!phoneString) return '+55';
+  // Se já tiver +55, manter como está
+  if (phoneString.startsWith('+55')) return phoneString;
+  // Se tiver apenas números, adicionar +55 e formatar
+  const numbers = phoneString.replace(/\D/g, '');
+  if (numbers.length === 0) return '+55';
+  return formatPhone(numbers);
+};
+
 const EditPersonalDataScreen = ({ navigation }) => {
   const { user, updateUser } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     lastName: user?.lastName || user?.last_name || '',
     email: user?.email || '',
-    phone: user?.phone || '',
+    phone: formatPhoneFromBackend(user?.phone || ''),
     cpf: user?.cpf || '',
-    birthDate: user?.birthDate || user?.birth_date || '',
+    birthDate: formatDateFromBackend(user?.birthDate || user?.birth_date || ''),
     address: user?.address || '',
+    addressNumber: user?.address_number || user?.addressNumber || '',
+    addressComplement: user?.address_complement || user?.addressComplement || '',
     city: user?.city || '',
     state: user?.state || '',
     zipCode: user?.zipCode || user?.zip_code || '',
   });
 
   const [loading, setLoading] = useState(false);
+  const [loadingCEP, setLoadingCEP] = useState(false);
+  const cepTimeoutRef = useRef(null);
 
   const handleSave = async () => {
     // Validações básicas
@@ -57,11 +123,43 @@ const EditPersonalDataScreen = ({ navigation }) => {
         email: formData.email.trim(),
       };
 
+      // Adicionar sobrenome se preenchido
+      if (formData.lastName && formData.lastName.trim()) {
+        dataToUpdate.last_name = formData.lastName.trim();
+      }
+
       // Adicionar campos opcionais apenas se preenchidos
-      if (formData.phone) dataToUpdate.phone = formData.phone;
-      if (formData.cpf) dataToUpdate.cpf = formData.cpf;
-      if (formData.birthDate) dataToUpdate.birth_date = formData.birthDate;
-      if (formData.address) dataToUpdate.address = formData.address;
+      if (formData.phone && formData.phone !== '+55') {
+        // Remover +55 e formatação, manter apenas números
+        const phoneNumbers = formData.phone.replace(/\D/g, '');
+        // Se começar com 55, manter; senão, adicionar 55
+        dataToUpdate.phone = phoneNumbers.startsWith('55') ? phoneNumbers : `55${phoneNumbers}`;
+      }
+      if (formData.cpf && formData.cpf.trim()) {
+        // Remover formatação do CPF antes de enviar
+        const cleanCPF = formData.cpf.replace(/\D/g, '');
+        if (cleanCPF.length === 11) {
+          dataToUpdate.cpf = cleanCPF;
+        } else {
+          dataToUpdate.cpf = formData.cpf.trim();
+        }
+      }
+      if (formData.birthDate) {
+        // Converter data de DD/MM/AAAA para AAAA-MM-DD (formato do banco)
+        const dateParts = formData.birthDate.split('/');
+        if (dateParts.length === 3) {
+          const [day, month, year] = dateParts;
+          dataToUpdate.birth_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        } else {
+          // Se não estiver no formato correto, enviar como está
+          dataToUpdate.birth_date = formData.birthDate;
+        }
+      }
+      if (formData.address && formData.address.trim()) {
+        dataToUpdate.address = formData.address.trim();
+      }
+      if (formData.addressNumber) dataToUpdate.address_number = formData.addressNumber;
+      if (formData.addressComplement) dataToUpdate.address_complement = formData.addressComplement;
       if (formData.city) dataToUpdate.city = formData.city;
       if (formData.state) dataToUpdate.state = formData.state;
       if (formData.zipCode) dataToUpdate.zip_code = formData.zipCode;
@@ -100,6 +198,193 @@ const EditPersonalDataScreen = ({ navigation }) => {
 
   const updateField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Função para aplicar máscara de data (DD/MM/AAAA)
+  const formatDate = (value) => {
+    // Remove tudo que não é número
+    const numbers = value.replace(/\D/g, '');
+    
+    // Aplica a máscara
+    if (numbers.length <= 2) {
+      return numbers;
+    } else if (numbers.length <= 4) {
+      return `${numbers.slice(0, 2)}/${numbers.slice(2)}`;
+    } else {
+      return `${numbers.slice(0, 2)}/${numbers.slice(2, 4)}/${numbers.slice(4, 8)}`;
+    }
+  };
+
+  // Função para lidar com mudança na data
+  const handleDateChange = (value) => {
+    // Remove caracteres não numéricos
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limita a 8 dígitos (DDMMAAAA)
+    if (numbers.length <= 8) {
+      const formatted = formatDate(numbers);
+      updateField('birthDate', formatted);
+    }
+  };
+
+
+  // Função para lidar com mudança no telefone
+  const handlePhoneChange = (text) => {
+    // Se o campo estiver vazio ou só tiver +, definir como +55
+    if (!text || text.trim() === '' || text === '+') {
+      updateField('phone', '+55');
+      return;
+    }
+    
+    // Extrair apenas os números do valor digitado
+    const numbers = text.replace(/\D/g, '');
+    
+    // Se não houver números após extrair, manter apenas +55
+    if (numbers.length === 0) {
+      updateField('phone', '+55');
+      return;
+    }
+    
+    // Se começar com 55, remover (já está no prefixo +55)
+    let cleanNumbers = numbers.startsWith('55') ? numbers.slice(2) : numbers;
+    
+    // Limita a 12 dígitos (DDD + número com até 10 dígitos)
+    if (cleanNumbers.length > 12) {
+      cleanNumbers = cleanNumbers.slice(0, 12);
+    }
+    
+    // Aplicar formatação
+    const formatted = formatPhone(cleanNumbers);
+    updateField('phone', formatted);
+  };
+
+  // Função para lidar com foco no campo de telefone
+  const handlePhoneFocus = () => {
+    // Se o campo estiver vazio ou só tiver +55, manter editável
+    // O campo já é editável por padrão, mas garantimos que funcione
+    if (!formData.phone || formData.phone === '+55') {
+      // Manter +55 mas permitir edição
+      return;
+    }
+  };
+
+  // Função para aplicar máscara de CPF (000.000.000-00)
+  const formatCPF = (value) => {
+    // Remove tudo que não é número
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limita a 11 dígitos
+    const limitedNumbers = numbers.slice(0, 11);
+    
+    // Aplica a máscara
+    if (limitedNumbers.length === 0) {
+      return '';
+    } else if (limitedNumbers.length <= 3) {
+      return limitedNumbers;
+    } else if (limitedNumbers.length <= 6) {
+      return `${limitedNumbers.slice(0, 3)}.${limitedNumbers.slice(3)}`;
+    } else if (limitedNumbers.length <= 9) {
+      return `${limitedNumbers.slice(0, 3)}.${limitedNumbers.slice(3, 6)}.${limitedNumbers.slice(6)}`;
+    } else {
+      return `${limitedNumbers.slice(0, 3)}.${limitedNumbers.slice(3, 6)}.${limitedNumbers.slice(6, 9)}-${limitedNumbers.slice(9, 11)}`;
+    }
+  };
+
+  // Função para lidar com mudança no CPF
+  const handleCPFChange = (text) => {
+    const formatted = formatCPF(text);
+    updateField('cpf', formatted);
+  };
+
+  // Função para buscar CEP usando ViaCEP
+  const searchCEP = async (cep) => {
+    // Remove formatação do CEP
+    const cleanCEP = cep.replace(/\D/g, '');
+    
+    // Verifica se tem 8 dígitos
+    if (cleanCEP.length !== 8) {
+      return;
+    }
+    
+    try {
+      setLoadingCEP(true);
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
+      const data = await response.json();
+      
+      if (data.erro) {
+        Toast.show({
+          type: 'error',
+          text1: 'CEP não encontrado',
+          text2: 'Verifique o CEP digitado',
+        });
+        return;
+      }
+      
+      // Preencher campos com os dados do CEP
+      if (data.logradouro) {
+        updateField('address', data.logradouro);
+      }
+      if (data.bairro) {
+        // Não temos campo bairro separado, mas podemos adicionar ao endereço se necessário
+      }
+      if (data.localidade) {
+        updateField('city', data.localidade);
+      }
+      if (data.uf) {
+        updateField('state', data.uf);
+      }
+      
+      Toast.show({
+        type: 'success',
+        text1: 'CEP encontrado',
+        text2: 'Endereço preenchido automaticamente',
+      });
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro ao buscar CEP',
+        text2: 'Tente novamente mais tarde',
+      });
+    } finally {
+      setLoadingCEP(false);
+    }
+  };
+
+  // Função para aplicar máscara de CEP (00000-000)
+  const formatCEP = (value) => {
+    // Remove tudo que não é número
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limita a 8 dígitos
+    const limitedNumbers = numbers.slice(0, 8);
+    
+    // Aplica a máscara
+    if (limitedNumbers.length <= 5) {
+      return limitedNumbers;
+    } else {
+      return `${limitedNumbers.slice(0, 5)}-${limitedNumbers.slice(5, 8)}`;
+    }
+  };
+
+  // Função para lidar com mudança no CEP
+  const handleCEPChange = (text) => {
+    const formatted = formatCEP(text);
+    updateField('zipCode', formatted);
+    
+    // Limpar timeout anterior se existir
+    if (cepTimeoutRef.current) {
+      clearTimeout(cepTimeoutRef.current);
+    }
+    
+    // Buscar CEP quando tiver 8 dígitos
+    const cleanCEP = formatted.replace(/\D/g, '');
+    if (cleanCEP.length === 8 && !loadingCEP) {
+      // Usar setTimeout para dar tempo do usuário terminar de digitar
+      cepTimeoutRef.current = setTimeout(() => {
+        searchCEP(cleanCEP);
+      }, 800);
+    }
   };
 
   return (
@@ -173,10 +458,14 @@ const EditPersonalDataScreen = ({ navigation }) => {
                 <Ionicons name="call-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
-                  placeholder="(11) 99999-9999"
+                  placeholder="+55 (11) 99999-9999"
                   value={formData.phone}
-                  onChangeText={(value) => updateField('phone', value)}
+                  onChangeText={handlePhoneChange}
+                  onFocus={handlePhoneFocus}
                   keyboardType="phone-pad"
+                  maxLength={19}
+                  editable={true}
+                  selectTextOnFocus={false}
                 />
               </View>
             </View>
@@ -189,8 +478,9 @@ const EditPersonalDataScreen = ({ navigation }) => {
                   style={styles.input}
                   placeholder="000.000.000-00"
                   value={formData.cpf}
-                  onChangeText={(value) => updateField('cpf', value)}
+                  onChangeText={handleCPFChange}
                   keyboardType="number-pad"
+                  maxLength={14}
                 />
               </View>
             </View>
@@ -203,8 +493,9 @@ const EditPersonalDataScreen = ({ navigation }) => {
                   style={styles.input}
                   placeholder="DD/MM/AAAA"
                   value={formData.birthDate}
-                  onChangeText={(value) => updateField('birthDate', value)}
+                  onChangeText={handleDateChange}
                   keyboardType="number-pad"
+                  maxLength={10}
                 />
               </View>
             </View>
@@ -222,8 +513,9 @@ const EditPersonalDataScreen = ({ navigation }) => {
                   style={styles.input}
                   placeholder="00000-000"
                   value={formData.zipCode}
-                  onChangeText={(value) => updateField('zipCode', value)}
+                  onChangeText={handleCEPChange}
                   keyboardType="number-pad"
+                  maxLength={9}
                 />
               </View>
             </View>
@@ -234,10 +526,44 @@ const EditPersonalDataScreen = ({ navigation }) => {
                 <Ionicons name="home-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Rua, número, complemento"
+                  placeholder="Rua, Avenida, etc"
                   value={formData.address}
                   onChangeText={(value) => updateField('address', value)}
                 />
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={[styles.inputContainer, { flex: 1 }]}>
+                <Text style={styles.label}>Número</Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="123"
+                    value={formData.addressNumber}
+                    onChangeText={(value) => updateField('addressNumber', value)}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+
+              <View style={[styles.inputContainer, { flex: 2 }]}>
+                <Text style={styles.label}>Complemento</Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Apto, Bloco, etc"
+                    value={formData.addressComplement}
+                    onChangeText={(value) => updateField('addressComplement', value)}
+                    onFocus={() => {
+                      // Se o campo estiver vazio, adicionar "Apto " ao receber foco
+                      if (!formData.addressComplement || formData.addressComplement.trim() === '') {
+                        updateField('addressComplement', 'Apto ');
+                      }
+                    }}
+                    editable={true}
+                  />
+                </View>
               </View>
             </View>
 

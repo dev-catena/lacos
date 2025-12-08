@@ -119,3 +119,8 @@ App\Models\PopularPharmacy::first();
 - Use o script de debug para ver a ordem real
 - Ajuste os índices no script de importação
 
+
+
+
+
+

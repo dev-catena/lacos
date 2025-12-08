@@ -9,22 +9,41 @@ class VitalSignService {
    */
   async createVitalSign(vitalSignData) {
     try {
+      // O campo value no banco é JSON (array no Laravel), então precisamos formatar corretamente
+      let valueToSend = vitalSignData.value;
+      
+      // Se for pressão arterial (formato "120/80"), converter para objeto
+      if (vitalSignData.type === 'blood_pressure' && typeof valueToSend === 'string' && valueToSend.includes('/')) {
+        const [systolic, diastolic] = valueToSend.split('/').map(v => parseFloat(v.trim()));
+        valueToSend = { systolic, diastolic };
+      } else if (typeof valueToSend === 'string' && !isNaN(parseFloat(valueToSend)) && !isNaN(valueToSend)) {
+        // Se for um número em string, converter para número
+        valueToSend = parseFloat(valueToSend);
+      } else if (typeof valueToSend === 'string') {
+        // Se for string não numérica, manter como string (será convertida para JSON string)
+        valueToSend = valueToSend;
+      }
+      
       const data = {
         group_id: vitalSignData.groupId,
         type: vitalSignData.type,
-        value: vitalSignData.value,
+        value: valueToSend,
         unit: vitalSignData.unit,
         measured_at: vitalSignData.measuredAt || new Date().toISOString(),
         notes: vitalSignData.notes,
       };
 
+      console.log('💾 createVitalSign - Enviando dados:', JSON.stringify(data, null, 2));
       const response = await apiService.post('/vital-signs', data);
+      console.log('💾 createVitalSign - Resposta da API:', response);
       return { success: true, data: response };
     } catch (error) {
-      console.error('Erro ao registrar sinal vital:', error);
+      console.error('❌ Erro ao registrar sinal vital:', error);
+      console.error('❌ Erro detalhado:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.message || 'Erro ao registrar sinal vital' 
+        error: error.message || 'Erro ao registrar sinal vital',
+        details: error.response?.data || null,
       };
     }
   }

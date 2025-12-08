@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../../constants/colors';
 import { 
   CalendarIcon, 
@@ -22,6 +24,7 @@ import groupService from '../../services/groupService';
 const GroupDetailScreen = ({ route, navigation }) => {
   const { groupId, groupName, accompaniedName } = route.params || {};
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -182,7 +185,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
       <StatusBar style="dark" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'android' ? insets.top + 16 : 16 }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -203,17 +206,30 @@ const GroupDetailScreen = ({ route, navigation }) => {
         contentContainerStyle={styles.scrollContent}
       >
         {/* Informação do Grupo */}
-        <View style={styles.infoCard}>
+        <TouchableOpacity 
+          style={styles.infoCard}
+          onPress={() => navigation.navigate('GroupChat', { 
+            groupId, 
+            groupName 
+          })}
+          activeOpacity={0.7}
+        >
           <View style={styles.infoIconContainer}>
             <Ionicons name="people" size={32} color={colors.primary} />
           </View>
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>Grupo de Cuidados</Text>
             <Text style={styles.infoText}>
-              Gerencie todas as informações médicas e cuidados
+              Feed de comunicação do grupo
             </Text>
           </View>
-        </View>
+          <Ionicons 
+            name="chatbubbles" 
+            size={24} 
+            color={colors.primary} 
+            style={styles.infoArrow}
+          />
+        </TouchableOpacity>
 
         {/* Cards de Menu */}
         <View style={styles.menuContainer}>
@@ -319,12 +335,16 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.primary + '10',
     padding: 20,
     borderRadius: 16,
     marginBottom: 24,
     borderWidth: 1,
     borderColor: colors.primary + '20',
+  },
+  infoArrow: {
+    marginLeft: 12,
   },
   infoIconContainer: {
     width: 56,

@@ -130,6 +130,23 @@ class GroupActivity extends Model
     }
 
     /**
+     * Registrar conclusão de medicamento
+     */
+    public static function logMedicationCompleted($groupId, $userId, $userName, $medicationName, $medicationId = null)
+    {
+        return self::create([
+            'group_id' => $groupId,
+            'user_id' => $userId,
+            'action_type' => 'medication_completed',
+            'description' => "{$userName} concluiu o medicamento {$medicationName}",
+            'metadata' => [
+                'medication_id' => $medicationId,
+                'medication_name' => $medicationName,
+            ],
+        ]);
+    }
+
+    /**
      * Registrar criação de documento
      */
     public static function logDocumentCreated($groupId, $userId, $userName, $documentTitle, $documentType, $documentId = null)
@@ -198,6 +215,39 @@ class GroupActivity extends Model
         ]);
     }
 
+    /**
+     * Registrar criação de compromisso/agenda
+     */
+    public static function logAppointmentCreated($groupId, $userId, $userName, $appointmentTitle, $appointmentDate, $appointmentType = 'common', $appointmentId = null)
+    {
+        $typeLabels = [
+            'common' => 'compromisso',
+            'medical' => 'consulta médica',
+            'fisioterapia' => 'sessão de fisioterapia',
+            'exames' => 'exame',
+        ];
+        
+        $typeLabel = $typeLabels[$appointmentType] ?? 'compromisso';
+        // Formatar data sem conversão de timezone
+        // Extrair apenas a parte da data (YYYY-MM-DD) antes de fazer parse para evitar problemas de timezone
+        $dateOnly = substr($appointmentDate, 0, 10); // Pega apenas YYYY-MM-DD
+        $carbonDate = \Carbon\Carbon::createFromFormat('Y-m-d', $dateOnly);
+        $formattedDate = $carbonDate->format('d/m/Y');
+        
+        return self::create([
+            'group_id' => $groupId,
+            'user_id' => $userId,
+            'action_type' => 'appointment_created',
+            'description' => "{$userName} agendou um {$typeLabel}: {$appointmentTitle} para {$formattedDate}",
+            'metadata' => [
+                'appointment_id' => $appointmentId,
+                'appointment_title' => $appointmentTitle,
+                'appointment_date' => $appointmentDate,
+                'appointment_type' => $appointmentType,
+            ],
+        ]);
+    }
+
     private static function getRoleLabel($role)
     {
         $labels = [
@@ -208,4 +258,6 @@ class GroupActivity extends Model
         return $labels[$role] ?? $role;
     }
 }
+
+
 

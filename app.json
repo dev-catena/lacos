@@ -22,7 +22,8 @@
         "NSLocationAlwaysUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
         "NSPhotoLibraryUsageDescription": "Este app precisa acessar suas fotos e vídeos para compartilhar momentos com o grupo de cuidados.",
-        "NSPhotoLibraryAddUsageDescription": "Este app precisa salvar fotos e vídeos na galeria para compartilhar momentos com o grupo de cuidados."
+        "NSPhotoLibraryAddUsageDescription": "Este app precisa salvar fotos e vídeos na galeria para compartilhar momentos com o grupo de cuidados.",
+        "NSCameraUsageDescription": "Este app precisa acessar a câmera para consultas de vídeo com pacientes."
       }
     },
     "android": {
@@ -35,11 +36,13 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "POST_NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM"
+        "SCHEDULE_EXACT_ALARM",
+        "CAMERA"
       ],
       "softwareKeyboardLayoutMode": "pan"
     },
     "plugins": [
+      "expo-dev-client",
       "expo-asset",
       "expo-font",
       [

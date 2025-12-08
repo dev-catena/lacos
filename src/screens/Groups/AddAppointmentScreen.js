@@ -23,12 +23,13 @@ import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { AppointmentIcon, LocationIcon } from '../../components/CustomIcons';
 import appointmentService from '../../services/appointmentService';
+import doctorService from '../../services/doctorService';
 import medicalSpecialtyService from '../../services/medicalSpecialtyService';
 import GOOGLE_MAPS_CONFIG from '../../config/maps';
 import { checkGoogleMapsConfig } from '../../utils/checkGoogleMapsConfig';
 
 const AddAppointmentScreen = ({ route, navigation }) => {
-  let { groupId, groupName } = route.params || {};
+  let { groupId, groupName, appointmentId, appointment } = route.params || {};
   
   // TEMPORÁRIO: Se groupId é um timestamp (> 999999999999), usar o grupo de teste
   if (groupId && groupId > 999999999999) {
@@ -37,8 +38,10 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   }
   
   const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showRecurrenceEndPicker, setShowRecurrenceEndPicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const googlePlacesRef = useRef(null);
   
@@ -49,7 +52,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   // Dados do compromisso
   const [formData, setFormData] = useState({
     title: '',
-    type: 'common', // common, medical, fisioterapia, exames
+    type: 'medical', // common, medical, fisioterapia, exames
     date: new Date().toISOString(),
     duration: '60',
     address: '',
@@ -66,7 +69,12 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   // Carregar especialidades ao montar o componente
   useEffect(() => {
     loadSpecialties();
-  }, []);
+    
+    // Se está editando, carregar dados do compromisso
+    if (appointmentId || appointment) {
+      loadAppointmentData();
+    }
+  }, [appointmentId, appointment]);
 
   const loadSpecialties = async () => {
     try {
@@ -79,8 +87,55 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     }
   };
 
+  const loadAppointmentData = async () => {
+    try {
+      setIsEditing(true);
+      let appointmentData = appointment;
+      
+      // Se não veio nos params, buscar da API
+      if (!appointmentData && appointmentId) {
+        const result = await appointmentService.getAppointment(appointmentId);
+        if (result.success) {
+          appointmentData = result.data;
+        }
+      }
+      
+      if (appointmentData) {
+        const appointmentDate = new Date(appointmentData.appointment_date || appointmentData.scheduled_at);
+        setSelectedDate(appointmentDate);
+        
+        setFormData({
+          title: appointmentData.title || '',
+          type: appointmentData.type || 'medical',
+          date: appointmentDate.toISOString(),
+          duration: '60',
+          address: appointmentData.location || '',
+          notes: appointmentData.notes || appointmentData.description || '',
+          selectedDoctor: appointmentData.doctor || null,
+          medicalSpecialtyId: appointmentData.medical_specialty_id || null,
+          recurrenceType: appointmentData.recurrence_type || 'none',
+          recurrenceDays: appointmentData.recurrence_days || (typeof appointmentData.recurrence_days === 'string' ? JSON.parse(appointmentData.recurrence_days) : []),
+          recurrenceStart: appointmentData.recurrence_start || appointmentDate.toISOString(),
+          recurrenceEnd: appointmentData.recurrence_end || '',
+          reminderOption: '3',
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do compromisso:', error);
+    }
+  };
+
   const updateField = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      
+      // Se mudou o tipo e não é mais "medical", limpar especialidade
+      if (field === 'type' && value !== 'medical') {
+        newData.medicalSpecialtyId = null;
+      }
+      
+      return newData;
+    });
   };
 
   const handleDateChange = (event, date) => {
@@ -88,6 +143,26 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     if (date) {
       setSelectedDate(date);
       updateField('date', date.toISOString());
+    }
+  };
+
+  const handleRecurrenceEndChange = (event, date) => {
+    setShowRecurrenceEndPicker(false);
+    if (date) {
+      // Validar que a data não ultrapasse 3 meses
+      const startDate = new Date(formData.date);
+      const maxDate = new Date(startDate);
+      maxDate.setMonth(maxDate.getMonth() + 3);
+      
+      if (date > maxDate) {
+        Alert.alert(
+          'Data Inválida',
+          'A data final não pode ser superior a 3 meses após a data inicial.',
+        );
+        return;
+      }
+      
+      updateField('recurrenceEnd', date.toISOString());
     }
   };
 
@@ -135,6 +210,22 @@ const AddAppointmentScreen = ({ route, navigation }) => {
       return;
     }
 
+    // Validar data final de recorrência (máximo 3 meses)
+    if (formData.recurrenceType !== 'none' && formData.recurrenceEnd) {
+      const startDate = new Date(formData.date);
+      const endDate = new Date(formData.recurrenceEnd);
+      const maxDate = new Date(startDate);
+      maxDate.setMonth(maxDate.getMonth() + 3);
+      
+      if (endDate > maxDate) {
+        Alert.alert(
+          'Data Inválida',
+          'A data final não pode ser superior a 3 meses após a data inicial.',
+        );
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -150,18 +241,44 @@ const AddAppointmentScreen = ({ route, navigation }) => {
         medical_specialty_id: formData.medicalSpecialtyId || null, // Especialidade médica
         location: formData.address.trim() || null,
         notes: formData.notes.trim() || null,
+        // Dados de recorrência
+        recurrence_type: formData.recurrenceType !== 'none' ? formData.recurrenceType : null,
+        recurrence_days: formData.recurrenceType === 'custom' && formData.recurrenceDays.length > 0 
+          ? JSON.stringify(formData.recurrenceDays) 
+          : null,
+        recurrence_start: formData.recurrenceType !== 'none' ? formData.date : null,
+        recurrence_end: formData.recurrenceType !== 'none' && formData.recurrenceEnd 
+          ? formData.recurrenceEnd 
+          : null,
       };
 
       console.log('📤 Salvando compromisso:', appointmentData);
       console.log('📋 Tipo selecionado:', formData.type);
 
-      const result = await appointmentService.createAppointment(appointmentData);
+      let result;
+      if (isEditing && appointmentId) {
+        // Atualizar compromisso existente
+        result = await appointmentService.updateAppointment(appointmentId, {
+          title: formData.title.trim(),
+          type: formData.type,
+          description: formData.notes.trim() || null,
+          scheduledAt: formData.date,
+          appointmentDate: formData.date,
+          doctorId: formData.selectedDoctor?.id || null,
+          medicalSpecialtyId: formData.medicalSpecialtyId || null,
+          location: formData.address.trim() || null,
+          notes: formData.notes.trim() || null,
+        });
+      } else {
+        // Criar novo compromisso
+        result = await appointmentService.createAppointment(appointmentData);
+      }
 
       if (result.success) {
         Toast.show({
           type: 'success',
-          text1: '✅ Compromisso agendado!',
-          text2: `${formData.title} foi cadastrado com sucesso`,
+          text1: isEditing ? '✅ Compromisso atualizado!' : '✅ Compromisso agendado!',
+          text2: `${formData.title} foi ${isEditing ? 'atualizado' : 'cadastrado'} com sucesso`,
           position: 'bottom',
         });
         navigation.goBack();
@@ -220,9 +337,13 @@ const AddAppointmentScreen = ({ route, navigation }) => {
               <AppointmentIcon size={48} color={colors.primary} />
             </View>
 
-            <Text style={styles.title}>Agendar Compromisso</Text>
+            <Text style={styles.title}>
+              {isEditing ? 'Editar Compromisso' : 'Agendar Compromisso'}
+            </Text>
             <Text style={styles.subtitle}>
-              Crie um compromisso ou consulta médica para o acompanhado
+              {isEditing 
+                ? 'Edite as informações do compromisso'
+                : 'Crie um compromisso ou consulta médica para o acompanhado'}
             </Text>
 
             {/* Título */}
@@ -243,30 +364,8 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Tipo de Compromisso *</Text>
               
-              {/* Linha 1: Comum e Médico */}
+              {/* Linha 1: Médico e Comum */}
               <View style={styles.typeContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeButton,
-                    formData.type === 'common' && styles.typeButtonActive,
-                  ]}
-                  onPress={() => updateField('type', 'common')}
-                >
-                  <Ionicons
-                    name="calendar-outline"
-                    size={24}
-                    color={formData.type === 'common' ? colors.primary : colors.gray400}
-                  />
-                  <Text
-                    style={[
-                      styles.typeButtonText,
-                      formData.type === 'common' && styles.typeButtonTextActive,
-                    ]}
-                  >
-                    Comum
-                  </Text>
-                </TouchableOpacity>
-
                 <TouchableOpacity
                   style={[
                     styles.typeButton,
@@ -286,6 +385,28 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     ]}
                   >
                     Médico
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.typeButton,
+                    formData.type === 'common' && styles.typeButtonActive,
+                  ]}
+                  onPress={() => updateField('type', 'common')}
+                >
+                  <Ionicons
+                    name="calendar-outline"
+                    size={24}
+                    color={formData.type === 'common' ? colors.primary : colors.gray400}
+                  />
+                  <Text
+                    style={[
+                      styles.typeButtonText,
+                      formData.type === 'common' && styles.typeButtonTextActive,
+                    ]}
+                  >
+                    Comum
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -367,20 +488,40 @@ const AddAppointmentScreen = ({ route, navigation }) => {
               <View style={styles.dateTimeRow}>
                 {/* Data */}
                 <TouchableOpacity 
-                  style={[styles.inputWrapper, { flex: 1 }]}
-                  onPress={() => setShowDatePicker(true)}
+                  style={[
+                    styles.inputWrapper, 
+                    { flex: 1 },
+                    formData.recurrenceType !== 'none' && styles.inputWrapperDisabled
+                  ]}
+                  onPress={() => {
+                    if (formData.recurrenceType === 'none') {
+                      setShowDatePicker(true);
+                    }
+                  }}
+                  disabled={formData.recurrenceType !== 'none'}
                 >
                   <Ionicons name="calendar-outline" size={20} color={colors.gray400} />
                   <Text style={styles.dateText}>
                     {new Date(formData.date).toLocaleDateString('pt-BR')}
                   </Text>
-                  <Ionicons name="create-outline" size={20} color={colors.primary} />
+                  {formData.recurrenceType === 'none' && (
+                    <Ionicons name="create-outline" size={20} color={colors.primary} />
+                  )}
                 </TouchableOpacity>
 
                 {/* Hora */}
                 <TouchableOpacity 
-                  style={[styles.inputWrapper, { flex: 1 }]}
-                  onPress={() => setShowTimePicker(true)}
+                  style={[
+                    styles.inputWrapper, 
+                    { flex: 1 },
+                    formData.recurrenceType !== 'none' && styles.inputWrapperDisabled
+                  ]}
+                  onPress={() => {
+                    if (formData.recurrenceType === 'none') {
+                      setShowTimePicker(true);
+                    }
+                  }}
+                  disabled={formData.recurrenceType !== 'none'}
                 >
                   <Ionicons name="time-outline" size={20} color={colors.gray400} />
                   <Text style={styles.dateText}>
@@ -389,7 +530,9 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                       minute: '2-digit' 
                     })}
                   </Text>
-                  <Ionicons name="create-outline" size={20} color={colors.primary} />
+                  {formData.recurrenceType === 'none' && (
+                    <Ionicons name="create-outline" size={20} color={colors.primary} />
+                  )}
                 </TouchableOpacity>
               </View>
               
@@ -434,6 +577,83 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   <Text style={styles.radioLabel}>{option.label}</Text>
                 </TouchableOpacity>
               ))}
+
+              {/* Campo "Até quando" para recorrências */}
+              {(formData.recurrenceType === 'daily' || 
+                formData.recurrenceType === 'weekdays' || 
+                formData.recurrenceType === 'custom') && (
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Até quando *</Text>
+                  <TouchableOpacity 
+                    style={styles.inputWrapper}
+                    onPress={() => setShowRecurrenceEndPicker(true)}
+                  >
+                    <Ionicons name="calendar-outline" size={20} color={colors.gray400} />
+                    <Text style={styles.dateText}>
+                      {formData.recurrenceEnd 
+                        ? new Date(formData.recurrenceEnd).toLocaleDateString('pt-BR')
+                        : 'Selecione a data final'}
+                    </Text>
+                    <Ionicons name="create-outline" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                  {showRecurrenceEndPicker && (
+                    <DateTimePicker
+                      value={formData.recurrenceEnd ? new Date(formData.recurrenceEnd) : new Date()}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={handleRecurrenceEndChange}
+                      minimumDate={new Date(formData.date)}
+                      maximumDate={(() => {
+                        const maxDate = new Date(formData.date);
+                        maxDate.setMonth(maxDate.getMonth() + 3); // 3 meses após a data inicial
+                        return maxDate;
+                      })()}
+                    />
+                  )}
+                </View>
+              )}
+
+              {/* Checkboxes de dias da semana para Personalizado */}
+              {formData.recurrenceType === 'custom' && (
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Dias da Semana *</Text>
+                  <View style={styles.weekDaysContainer}>
+                    {[
+                      { value: 0, label: 'Dom' },
+                      { value: 1, label: 'Seg' },
+                      { value: 2, label: 'Ter' },
+                      { value: 3, label: 'Qua' },
+                      { value: 4, label: 'Qui' },
+                      { value: 5, label: 'Sex' },
+                      { value: 6, label: 'Sáb' },
+                    ].map((day) => {
+                      const isSelected = formData.recurrenceDays.includes(day.value);
+                      return (
+                        <TouchableOpacity
+                          key={day.value}
+                          style={[
+                            styles.dayCheckbox,
+                            isSelected && styles.dayCheckboxActive,
+                          ]}
+                          onPress={() => {
+                            const newDays = isSelected
+                              ? formData.recurrenceDays.filter(d => d !== day.value)
+                              : [...formData.recurrenceDays, day.value].sort();
+                            updateField('recurrenceDays', newDays);
+                          }}
+                        >
+                          <Text style={[
+                            styles.dayCheckboxText,
+                            isSelected && styles.dayCheckboxTextActive,
+                          ]}>
+                            {day.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* Endereço com Autocomplete */}
@@ -635,7 +855,9 @@ const AddAppointmentScreen = ({ route, navigation }) => {
               ) : (
                 <>
                   <Ionicons name="checkmark-circle" size={20} color={colors.textWhite} />
-                  <Text style={styles.saveButtonText}>Agendar Compromisso</Text>
+                  <Text style={styles.saveButtonText}>
+                    {isEditing ? 'Salvar Alterações' : 'Agendar Compromisso'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -802,6 +1024,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     minHeight: 52,
     gap: 12,
+  },
+  inputWrapperDisabled: {
+    opacity: 0.5,
+    backgroundColor: colors.gray100,
+  },
+  weekDaysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  dayCheckbox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayCheckboxActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  dayCheckboxText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  dayCheckboxTextActive: {
+    color: colors.textWhite,
   },
   input: {
     flex: 1,

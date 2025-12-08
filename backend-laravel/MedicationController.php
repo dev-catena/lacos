@@ -13,7 +13,7 @@ class MedicationController extends Controller
     public function index(Request $request)
     {
         $groupId = $request->query('group_id');
-        $isActive = $request->query('is_active', true);
+        $isActive = $request->query('is_active'); // Sem valor padrão - null se não fornecido
 
         $query = Medication::with(['doctor']);
 
@@ -21,8 +21,10 @@ class MedicationController extends Controller
             $query->where('group_id', $groupId);
         }
 
+        // Só filtrar por is_active se o parâmetro foi explicitamente fornecido
         if ($isActive !== null) {
-            $query->where('is_active', $isActive);
+            $isActiveBool = filter_var($isActive, FILTER_VALIDATE_BOOLEAN);
+            $query->where('is_active', $isActiveBool);
         }
 
         return response()->json($query->get());
@@ -37,6 +39,8 @@ class MedicationController extends Controller
             'pharmaceutical_form' => 'nullable|string|max:50',
             'dosage' => 'nullable|string|max:50',
             'unit' => 'nullable|string|max:20',
+            'dose_quantity' => 'nullable|string|max:20',
+            'dose_quantity_unit' => 'nullable|string|max:20',
             'administration_route' => 'nullable|string|max:50',
             'frequency_type' => 'required|in:simple,advanced',
             'frequency_details' => 'required|json',
@@ -45,6 +49,8 @@ class MedicationController extends Controller
             'duration_value' => 'nullable|integer',
             'notes' => 'nullable|string',
             'is_active' => 'boolean',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
         ]);
 
         // Mapear frequency_type e frequency_details para frequency (array)
@@ -76,35 +82,49 @@ class MedicationController extends Controller
         unset($medicationData['first_dose_at']);
         
         // Adicionar campos obrigatórios que não foram enviados
-        // start_date e end_date podem ser calculados a partir de duration
+        // start_date e end_date podem ser calculados a partir de duration ou fornecidos (ex: dias intercalados)
         if (!isset($medicationData['start_date'])) {
             $medicationData['start_date'] = now();
         }
+        // Se start_date foi fornecido, usar ele (ex: para dias intercalados)
+        if (isset($validated['start_date'])) {
+            $medicationData['start_date'] = $validated['start_date'];
+        }
         
-        // Se for temporário, calcular end_date
-        if ($medicationData['duration']['type'] === 'temporario' && isset($medicationData['duration']['value'])) {
+        // Se for temporário, calcular end_date (a menos que já tenha sido fornecido)
+        if (!isset($medicationData['end_date']) && $medicationData['duration']['type'] === 'temporario' && isset($medicationData['duration']['value'])) {
             $medicationData['end_date'] = now()->addDays($medicationData['duration']['value']);
         }
         
         $medication = Medication::create($medicationData);
         $medication->load('doctor');
 
-        // Registrar atividade
-        try {
-            $user = Auth::user();
-            if ($user) {
-                GroupActivity::logMedicationCreated(
-                    $medication->group_id,
-                    $user->id,
-                    $user->name,
-                    $medication->name,
-                    $medication->id
-                );
-            }
-        } catch (\Exception $e) {
-            // Não falhar se não conseguir registrar atividade
-            \Log::warning('Erro ao registrar atividade de medicamento: ' . $e->getMessage());
+        // Registrar atividade - SEMPRE, sem try/catch que esconde erros
+        $user = Auth::user();
+        if (!$user) {
+            \Log::error('MedicationController.store - Usuário não autenticado!');
+            return response()->json(['error' => 'Usuário não autenticado'], 401);
         }
+        
+        \Log::info('MedicationController.store - Criando atividade para medicamento:', [
+            'medication_id' => $medication->id,
+            'medication_name' => $medication->name,
+            'group_id' => $medication->group_id,
+            'user_id' => $user->id,
+        ]);
+        
+        $activity = GroupActivity::logMedicationCreated(
+            $medication->group_id,
+            $user->id,
+            $user->name,
+            $medication->name,
+            $medication->id
+        );
+        
+        \Log::info('MedicationController.store - Atividade criada com sucesso:', [
+            'activity_id' => $activity->id,
+            'action_type' => $activity->action_type,
+        ]);
 
         return response()->json($medication, 201);
     }
@@ -124,6 +144,7 @@ class MedicationController extends Controller
             'pharmaceutical_form' => 'sometimes|string|max:50',
             'dosage' => 'sometimes|string|max:50',
             'unit' => 'sometimes|string|max:20',
+            'dose_quantity' => 'sometimes|string|max:20',
             'administration_route' => 'sometimes|string|max:50',
             'frequency_type' => 'sometimes|in:simple,advanced',
             'frequency_details' => 'sometimes|json',
@@ -131,12 +152,28 @@ class MedicationController extends Controller
             'duration_type' => 'sometimes|in:continuo,temporario',
             'duration_value' => 'nullable|integer',
             'notes' => 'nullable|string',
-            'is_active' => 'boolean',
+            'is_active' => 'sometimes|boolean', // Mudado de 'boolean' para 'sometimes|boolean'
+            'end_date' => 'nullable|date',
+        ]);
+        
+        // Log dos dados recebidos para debug
+        \Log::info('MedicationController.update - Dados recebidos:', [
+            'medication_id' => $id,
+            'is_active' => $request->input('is_active'),
+            'end_date' => $request->input('end_date'),
+            'validated_is_active' => $validated['is_active'] ?? 'not set',
+            'validated_end_date' => $validated['end_date'] ?? 'not set',
         ]);
 
         // Verificar se está descontinuando (is_active mudou de true para false)
-        $wasActive = $medication->is_active;
-        $willBeActive = $validated['is_active'] ?? $wasActive;
+        $wasActive = (bool) $medication->is_active;
+        
+        // Processar is_active corretamente (pode vir como string "false" ou boolean false)
+        $willBeActive = $wasActive; // Default: manter valor atual
+        if (isset($validated['is_active'])) {
+            // Converter para boolean (aceita true, false, "true", "false", 1, 0, "1", "0")
+            $willBeActive = filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN);
+        }
 
         // Se frequency_type ou frequency_details foram fornecidos, mapear para frequency
         if (isset($validated['frequency_type']) || isset($validated['frequency_details'])) {
@@ -168,37 +205,76 @@ class MedicationController extends Controller
         // Remover first_dose_at se não estiver no fillable
         unset($validated['first_dose_at']);
 
+        // Verificar se está concluindo (end_date foi definido e não tinha antes)
+        $hadEndDate = $medication->end_date !== null;
+        $willHaveEndDate = isset($validated['end_date']) && $validated['end_date'] !== null;
+        $isCompleting = !$hadEndDate && $willHaveEndDate;
+
+        \Log::info('MedicationController.update - Debug ANTES da atualização:', [
+            'medication_id' => $medication->id,
+            'medication_name' => $medication->name,
+            'wasActive' => $wasActive,
+            'willBeActive' => $willBeActive,
+            'isDiscontinuing' => ($wasActive && !$willBeActive),
+            'hadEndDate' => $hadEndDate,
+            'willHaveEndDate' => $willHaveEndDate,
+            'isCompleting' => $isCompleting,
+            'end_date_value' => $validated['end_date'] ?? 'not set',
+        ]);
+
+        // Registrar atividade ANTES de atualizar (para garantir que temos os dados corretos)
+        $user = Auth::user();
+        if (!$user) {
+            \Log::error('MedicationController.update - Usuário não autenticado!');
+            return response()->json(['error' => 'Usuário não autenticado'], 401);
+        }
+        
+        \Log::info('MedicationController.update - Usuário autenticado:', [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'group_id' => $medication->group_id,
+            'isCompleting' => $isCompleting,
+            'isDiscontinuing' => ($wasActive && !$willBeActive),
+        ]);
+        
+        // Se concluiu (definiu end_date), registrar atividade específica
+        if ($isCompleting) {
+            \Log::info('MedicationController.update - Registrando atividade: medication_completed');
+            $activity = GroupActivity::logMedicationCompleted(
+                $medication->group_id,
+                $user->id,
+                $user->name,
+                $medication->name,
+                $medication->id
+            );
+            \Log::info('MedicationController.update - Atividade medication_completed criada:', [
+                'activity_id' => $activity->id,
+                'group_id' => $activity->group_id,
+                'action_type' => $activity->action_type,
+            ]);
+        }
+        // Se descontinuou (mudou de ativo para inativo), registrar atividade específica
+        elseif ($wasActive && !$willBeActive) {
+            \Log::info('MedicationController.update - Registrando atividade: medication_discontinued');
+            $activity = GroupActivity::logMedicationDiscontinued(
+                $medication->group_id,
+                $user->id,
+                $user->name,
+                $medication->name,
+                $medication->id
+            );
+            \Log::info('MedicationController.update - Atividade medication_discontinued criada:', [
+                'activity_id' => $activity->id,
+                'group_id' => $activity->group_id,
+                'action_type' => $activity->action_type,
+            ]);
+        } else {
+            \Log::info('MedicationController.update - Não registrando atividade específica (não é conclusão nem descontinuação)');
+        }
+
+        // Atualizar o medicamento
         $medication->update($validated);
         $medication->load('doctor');
-
-        // Registrar atividade
-        try {
-            $user = Auth::user();
-            if ($user) {
-                // Se descontinuou, registrar atividade específica
-                if ($wasActive && !$willBeActive) {
-                    GroupActivity::logMedicationDiscontinued(
-                        $medication->group_id,
-                        $user->id,
-                        $user->name,
-                        $medication->name,
-                        $medication->id
-                    );
-                } else {
-                    // Caso contrário, registrar atualização
-                    GroupActivity::logMedicationUpdated(
-                        $medication->group_id,
-                        $user->id,
-                        $user->name,
-                        $medication->name,
-                        $medication->id
-                    );
-                }
-            }
-        } catch (\Exception $e) {
-            // Não falhar se não conseguir registrar atividade
-            \Log::warning('Erro ao registrar atividade de medicamento: ' . $e->getMessage());
-        }
 
         return response()->json($medication);
     }

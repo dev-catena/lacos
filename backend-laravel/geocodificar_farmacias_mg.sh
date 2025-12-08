@@ -63,3 +63,8 @@ echo \"   Com coordenadas: {\$comCoords} ({\$percent}%)\n\";
 echo \"   Sem coordenadas: {\$semCoords}\n\";
 " 2>&1 | grep -A 5 "Estatísticas"
 
+
+
+
+
+

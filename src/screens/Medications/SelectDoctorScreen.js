@@ -182,15 +182,6 @@ const SelectDoctorScreen = ({ route, navigation }) => {
     });
   };
 
-  const handleSkipPrescription = () => {
-    navigation.navigate('AddMedication', { 
-      groupId, 
-      groupName, 
-      prescriptionId: null,
-      prescriptionImage: prescriptionImage, // Passar a imagem mesmo se pular
-    });
-  };
-
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
@@ -257,17 +248,6 @@ const SelectDoctorScreen = ({ route, navigation }) => {
           </View>
 
           <Text style={styles.question}>Qual médico prescreveu o medicamento?</Text>
-
-          {/* Pular Prescrição - Movido para cima */}
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={handleSkipPrescription}
-          >
-            <Ionicons name="flash" size={20} color={colors.info} />
-            <Text style={styles.skipButtonText}>
-              Pular e cadastrar sem prescrição
-            </Text>
-          </TouchableOpacity>
 
           {/* Campo de Busca */}
           <View style={styles.searchContainer}>
@@ -468,23 +448,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textLight,
     marginHorizontal: 16,
-  },
-  skipButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.backgroundLight,
-    borderWidth: 1,
-    borderColor: colors.info,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  skipButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.info,
   },
   infoCard: {
     flexDirection: 'row',

@@ -124,7 +124,7 @@ export const formatReportAsText = (report, groupName, patientName) => {
 
   report.medications.forEach((med, index) => {
     text += `${index + 1}. ${med.name}\n`;
-    text += `   Dosagem: ${med.dosage} - ${med.form}\n`;
+    text += `   Concentração: ${med.dosage} - ${med.form}\n`;
     text += `   Total de doses: ${med.total}\n`;
     text += `   ✅ Tomadas: ${med.taken}\n`;
     text += `   ❌ Não administradas: ${med.notAdministered}\n`;

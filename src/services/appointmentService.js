@@ -106,10 +106,13 @@ class AppointmentService {
     try {
       const endpoint = apiService.replaceParams('/appointments/:id', { id: appointmentId });
       const data = {
+        type: appointmentData.type,
         title: appointmentData.title,
-        description: appointmentData.description,
-        scheduled_at: appointmentData.scheduledAt,
+        description: appointmentData.description || appointmentData.notes,
+        appointment_date: appointmentData.appointmentDate || appointmentData.scheduledAt,
+        scheduled_at: appointmentData.scheduledAt || appointmentData.appointmentDate,
         doctor_id: appointmentData.doctorId,
+        medical_specialty_id: appointmentData.medicalSpecialtyId,
         location: appointmentData.location,
         notes: appointmentData.notes,
       };
@@ -127,10 +130,18 @@ class AppointmentService {
 
   /**
    * Deletar consulta
+   * @param {number} appointmentId - ID do compromisso
+   * @param {string} exceptionDate - Data específica para excluir (opcional, para recorrências)
    */
-  async deleteAppointment(appointmentId) {
+  async deleteAppointment(appointmentId, exceptionDate = null) {
     try {
-      const endpoint = apiService.replaceParams('/appointments/:id', { id: appointmentId });
+      let endpoint = apiService.replaceParams('/appointments/:id', { id: appointmentId });
+      
+      // Se for uma exceção (excluir apenas um dia), adicionar parâmetro
+      if (exceptionDate) {
+        endpoint += `?exception_date=${exceptionDate}`;
+      }
+      
       await apiService.delete(endpoint);
       return { success: true };
     } catch (error) {

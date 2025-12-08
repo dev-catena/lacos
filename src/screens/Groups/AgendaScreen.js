@@ -37,6 +37,81 @@ const AgendaScreen = ({ route, navigation }) => {
 
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState('upcoming'); // 'upcoming', 'past', 'medical'
+
+  // Expandir compromissos recorrentes em múltiplos registros
+  const expandRecurringAppointments = (appointmentsList) => {
+    const expanded = [];
+    
+    appointmentsList.forEach(appointment => {
+      const recurrenceType = appointment.recurrence_type || appointment.recurrenceType;
+      const recurrenceEnd = appointment.recurrence_end || appointment.recurrenceEnd;
+      const recurrenceDays = appointment.recurrence_days || appointment.recurrenceDays || [];
+      
+      // Se não tem recorrência, adicionar como está
+      if (!recurrenceType || recurrenceType === 'none' || !recurrenceEnd) {
+        expanded.push(appointment);
+        return;
+      }
+      
+      const startDate = new Date(appointment.appointment_date || appointment.scheduled_at);
+      const endDate = new Date(recurrenceEnd);
+      const time = startDate.toTimeString().slice(0, 5); // HH:MM
+      
+      let currentDate = new Date(startDate);
+      
+      // Expandir baseado no tipo de recorrência
+      while (currentDate <= endDate) {
+        let shouldInclude = false;
+        
+        if (recurrenceType === 'daily') {
+          // Diariamente: incluir todos os dias
+          shouldInclude = true;
+        } else if (recurrenceType === 'weekdays') {
+          // Segunda a Sexta: 1-5
+          const dayOfWeek = currentDate.getDay();
+          shouldInclude = dayOfWeek >= 1 && dayOfWeek <= 5;
+        } else if (recurrenceType === 'custom') {
+          // Personalizado: verificar se o dia está na lista
+          const dayOfWeek = currentDate.getDay();
+          const daysArray = Array.isArray(recurrenceDays) 
+            ? recurrenceDays 
+            : (typeof recurrenceDays === 'string' ? JSON.parse(recurrenceDays) : []);
+          shouldInclude = daysArray.includes(dayOfWeek);
+        }
+        
+        if (shouldInclude) {
+          // Verificar se esta data está nas exceções
+          const dateStr = currentDate.toISOString().split('T')[0];
+          const exceptions = appointment.exceptions || [];
+          const isException = exceptions.some(exception => {
+            const exceptionDate = exception.exception_date || exception.exceptionDate;
+            return exceptionDate && exceptionDate.split('T')[0] === dateStr;
+          });
+          
+          // Se não for uma exceção, incluir
+          if (!isException) {
+            // Criar uma cópia do compromisso para esta data
+            const expandedAppointment = {
+              ...appointment,
+              id: `${appointment.id}_${dateStr}`,
+              appointment_date: new Date(currentDate.toISOString().split('T')[0] + 'T' + time).toISOString(),
+              scheduled_at: new Date(currentDate.toISOString().split('T')[0] + 'T' + time).toISOString(),
+              isRecurringInstance: true,
+              originalAppointmentId: appointment.id,
+              instanceDate: dateStr, // Guardar a data da instância para exclusão
+            };
+            expanded.push(expandedAppointment);
+          }
+        }
+        
+        // Avançar para o próximo dia
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    });
+    
+    return expanded;
+  };
 
   // Carregar compromissos da API
   const loadAppointments = async () => {
@@ -45,7 +120,10 @@ const AgendaScreen = ({ route, navigation }) => {
       const result = await appointmentService.getAppointments(groupId);
       
       if (result.success) {
-        setAppointments(result.data || []);
+        const rawAppointments = result.data || [];
+        // Expandir compromissos recorrentes
+        const expandedAppointments = expandRecurringAppointments(rawAppointments);
+        setAppointments(expandedAppointments);
       } else {
         console.error('Erro ao carregar compromissos:', result.error);
       }
@@ -76,6 +154,29 @@ const AgendaScreen = ({ route, navigation }) => {
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Filtrar appointments baseado no filtro ativo
+  const getFilteredAppointments = () => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Zerar horas para comparar apenas datas
+
+    return appointments.filter(item => {
+      const dateStr = item.appointment_date || item.scheduled_at || item.date;
+      if (!dateStr) return false;
+
+      const appointmentDate = new Date(dateStr);
+      appointmentDate.setHours(0, 0, 0, 0); // Zerar horas para comparar apenas datas
+
+      if (activeFilter === 'upcoming') {
+        // Próximos: data >= hoje
+        return appointmentDate >= now;
+      } else if (activeFilter === 'past') {
+        // Passados: data < hoje
+        return appointmentDate < now;
+      }
+      return true;
+    });
+  };
+
   const renderAppointmentCard = ({ item }) => {
     // Backend retorna appointment_date, mas adicionamos scheduled_at para compatibilidade
     const dateStr = item.appointment_date || item.scheduled_at || item.date;
@@ -84,7 +185,16 @@ const AgendaScreen = ({ route, navigation }) => {
     const isMedical = item.type === 'medical';
 
     return (
-      <TouchableOpacity style={styles.appointmentCard}>
+      <TouchableOpacity 
+        style={styles.appointmentCard}
+        onPress={() => {
+          navigation.navigate('AppointmentDetails', {
+            appointmentId: item.id,
+            appointment: item,
+            groupId,
+          });
+        }}
+      >
         {/* Data */}
         <View style={styles.dateContainer}>
           <Text style={styles.dateDay}>{day}</Text>
@@ -164,16 +274,21 @@ const AgendaScreen = ({ route, navigation }) => {
 
       {/* Filtros */}
       <View style={styles.filtersContainer}>
-        <TouchableOpacity style={[styles.filterChip, styles.filterChipActive]}>
-          <Text style={[styles.filterChipText, styles.filterChipTextActive]}>
+        <TouchableOpacity 
+          style={[styles.filterChip, activeFilter === 'upcoming' && styles.filterChipActive]}
+          onPress={() => setActiveFilter('upcoming')}
+        >
+          <Text style={[styles.filterChipText, activeFilter === 'upcoming' && styles.filterChipTextActive]}>
             Próximos
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.filterChip}>
-          <Text style={styles.filterChipText}>Passados</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.filterChip}>
-          <Text style={styles.filterChipText}>Médicos</Text>
+        <TouchableOpacity 
+          style={[styles.filterChip, activeFilter === 'past' && styles.filterChipActive]}
+          onPress={() => setActiveFilter('past')}
+        >
+          <Text style={[styles.filterChipText, activeFilter === 'past' && styles.filterChipTextActive]}>
+            Passados
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -183,23 +298,28 @@ const AgendaScreen = ({ route, navigation }) => {
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Carregando compromissos...</Text>
         </View>
-      ) : appointments.length > 0 ? (
-        <FlatList
-          data={appointments}
-          renderItem={renderAppointmentCard}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <View style={styles.emptyState}>
-          <AppointmentIcon size={64} color={colors.gray300} />
-          <Text style={styles.emptyTitle}>Nenhum compromisso</Text>
-          <Text style={styles.emptyText}>
-            Toque no botão + para agendar um compromisso ou consulta
-          </Text>
-        </View>
-      )}
+      ) : (() => {
+        const filteredAppointments = getFilteredAppointments();
+        return filteredAppointments.length > 0 ? (
+          <FlatList
+            data={filteredAppointments}
+            renderItem={renderAppointmentCard}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <AppointmentIcon size={64} color={colors.gray300} />
+            <Text style={styles.emptyTitle}>Nenhum compromisso</Text>
+            <Text style={styles.emptyText}>
+              {activeFilter === 'upcoming' && 'Nenhum compromisso futuro encontrado'}
+              {activeFilter === 'past' && 'Nenhum compromisso passado encontrado'}
+              {!activeFilter && 'Toque no botão + para agendar um compromisso ou consulta'}
+            </Text>
+          </View>
+        );
+      })()}
 
       {/* Botão Flutuante */}
       <TouchableOpacity

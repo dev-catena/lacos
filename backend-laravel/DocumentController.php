@@ -196,22 +196,28 @@ class DocumentController extends Controller
                 Log::warning('Erro ao carregar relacionamentos: ' . $e->getMessage());
             }
 
-            // Registrar atividade
-            try {
-                if ($user) {
-                    GroupActivity::logDocumentCreated(
-                        $document->group_id,
-                        $user->id,
-                        $user->name,
-                        $document->title,
-                        $document->type,
-                        $document->id
-                    );
-                }
-            } catch (\Exception $e) {
-                // Não falhar se não conseguir registrar atividade
-                Log::warning('Erro ao registrar atividade de documento: ' . $e->getMessage());
-            }
+            // Registrar atividade - SEMPRE, sem try/catch que esconde erros
+            Log::info('DocumentController.store - Criando atividade para documento:', [
+                'document_id' => $document->id,
+                'document_title' => $document->title,
+                'document_type' => $document->type,
+                'group_id' => $document->group_id,
+                'user_id' => $user->id,
+            ]);
+            
+            $activity = GroupActivity::logDocumentCreated(
+                $document->group_id,
+                $user->id,
+                $user->name,
+                $document->title,
+                $document->type,
+                $document->id
+            );
+            
+            Log::info('DocumentController.store - Atividade criada com sucesso:', [
+                'activity_id' => $activity->id,
+                'action_type' => $activity->action_type,
+            ]);
 
             return response()->json([
                 'success' => true,

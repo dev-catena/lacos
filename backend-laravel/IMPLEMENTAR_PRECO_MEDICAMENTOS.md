@@ -164,3 +164,8 @@ Resposta esperada:
 O frontend já está preparado para usar este endpoint. Quando o backend estiver implementado, o serviço `medicationPriceService.js` automaticamente tentará buscar no backend primeiro.
 
 
+
+
+
+
+

@@ -1,0 +1,49 @@
+# 📝 Instruções para Adicionar Relacionamentos ao User.php
+
+## 1. Adicionar Imports
+
+No início do arquivo `app/Models/User.php`, após os outros imports (por volta da linha 5-10), adicione:
+
+```php
+use App\Models\CaregiverReview;
+use App\Models\CaregiverCourse;
+```
+
+## 2. Adicionar Relacionamentos
+
+No final do arquivo, ANTES do fechamento `}`, adicione:
+
+```php
+    /**
+     * Relacionamento com avaliações recebidas como cuidador profissional
+     */
+    public function caregiverReviews()
+    {
+        return $this->hasMany(CaregiverReview::class, 'caregiver_id');
+    }
+
+    /**
+     * Relacionamento com cursos e certificações do cuidador profissional
+     */
+    public function caregiverCourses()
+    {
+        return $this->hasMany(CaregiverCourse::class, 'user_id');
+    }
+```
+
+## 3. Após adicionar, execute:
+
+```bash
+cd /var/www/lacos-backend
+php -l app/Models/User.php
+php artisan optimize:clear
+```
+
+## ✅ Verificação
+
+Teste a rota novamente no app. Se ainda der erro 404, verifique os logs:
+
+```bash
+tail -f storage/logs/laravel.log
+```
+

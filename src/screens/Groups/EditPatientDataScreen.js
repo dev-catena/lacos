@@ -37,6 +37,8 @@ const EditPatientDataScreen = ({ route, navigation }) => {
   const [bloodType, setBloodType] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [chronicDiseases, setChronicDiseases] = useState('');
+  const [allergies, setAllergies] = useState('');
   const [patientUserId, setPatientUserId] = useState(null);
   const [patientPhoto, setPatientPhoto] = useState(null);
   const [newPhoto, setNewPhoto] = useState(null);
@@ -80,6 +82,12 @@ const EditPatientDataScreen = ({ route, navigation }) => {
           if (patient.gender) setGender(patient.gender);
           if (patient.blood_type) setBloodType(patient.blood_type);
           if (patient.birth_date) setBirthDate(new Date(patient.birth_date));
+          // Sempre definir os campos, mesmo se vazios
+          setChronicDiseases(patient.chronic_diseases || '');
+          setAllergies(patient.allergies || '');
+          
+          console.log('📋 Doenças crônicas carregadas:', patient.chronic_diseases || '(vazio)');
+          console.log('📋 Alergias carregadas:', patient.allergies || '(vazio)');
         } else {
           Alert.alert('Aviso', 'Nenhum paciente encontrado neste grupo');
           navigation.goBack();
@@ -124,6 +132,9 @@ const EditPatientDataScreen = ({ route, navigation }) => {
         formData.append('gender', gender);
         formData.append('blood_type', bloodType.trim());
         formData.append('birth_date', birthDate.toISOString().split('T')[0]);
+        // Sempre enviar os campos, mesmo se vazios
+        formData.append('chronic_diseases', chronicDiseases ? chronicDiseases.trim() : '');
+        formData.append('allergies', allergies ? allergies.trim() : '');
 
         const filename = newPhoto.split('/').pop();
         const match = /\.(\w+)$/.exec(filename);
@@ -136,6 +147,8 @@ const EditPatientDataScreen = ({ route, navigation }) => {
         });
 
         console.log('📤 Enviando dados com foto do paciente...');
+        console.log('📋 Doenças crônicas enviadas:', chronicDiseases ? chronicDiseases.trim() : '(vazio)');
+        console.log('📋 Alergias enviadas:', allergies ? allergies.trim() : '(vazio)');
         const response = await apiService.put(`/users/${patientUserId}`, formData);
 
         if (response) {
@@ -155,9 +168,13 @@ const EditPatientDataScreen = ({ route, navigation }) => {
           gender: gender,
           blood_type: bloodType.trim(),
           birth_date: birthDate.toISOString().split('T')[0],
+          chronic_diseases: chronicDiseases ? chronicDiseases.trim() : '',
+          allergies: allergies ? allergies.trim() : '',
         };
 
         console.log('💾 Atualizando usuário:', patientUserId, userData);
+        console.log('📋 Doenças crônicas enviadas:', chronicDiseases ? chronicDiseases.trim() : '(vazio)');
+        console.log('📋 Alergias enviadas:', allergies ? allergies.trim() : '(vazio)');
         
         const response = await apiService.put(`/users/${patientUserId}`, userData);
 
@@ -437,6 +454,32 @@ const EditPatientDataScreen = ({ route, navigation }) => {
               autoCapitalize="characters"
             />
           </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Doenças Crônicas</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={chronicDiseases}
+              onChangeText={setChronicDiseases}
+              placeholder="Ex: Hipertensão, Diabetes tipo 2, Artrite reumatoide"
+              placeholderTextColor={colors.gray400}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Alergias</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={allergies}
+              onChangeText={setAllergies}
+              placeholder="Ex: Penicilina, Dipirona, Amendoim"
+              placeholderTextColor={colors.gray400}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
         </View>
 
         {/* Contato */}
@@ -567,6 +610,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
+    color: colors.text,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+    paddingTop: 14,
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,

@@ -4,12 +4,13 @@ import apiService from './apiService';
  * Serviço para buscar medicamentos em APIs públicas
  * 
  * Fontes disponíveis:
- * 1. Lista local expandida (fallback)
- * 2. API pública (quando disponível)
+ * 1. Lista completa de 7901 medicamentos (JSON)
+ * 2. Lista local reduzida (fallback)
+ * 3. API pública (quando disponível)
  */
 
-// Lista expandida de medicamentos comuns no Brasil (fallback)
-const COMMON_MEDICATIONS_LIST = [
+// Lista reduzida de medicamentos comuns no Brasil (fallback rápido)
+const FALLBACK_MEDICATIONS_LIST = [
   // Anti-hipertensivos
   'Losartana', 'Enalapril', 'Captopril', 'Atenolol', 'Propranolol',
   'Amlodipina', 'Hidroclorotiazida', 'Furosemida', 'Espironolactona',
@@ -106,6 +107,61 @@ const FARMACIA_POPULAR_MEDICATIONS = [
 ];
 
 class MedicationSearchService {
+  constructor() {
+    // Cache para a lista completa de medicamentos
+    this.fullMedicationsList = null;
+    this.loadingPromise = null;
+  }
+
+  /**
+   * Carregar lista completa de medicamentos do JSON (lazy loading)
+   * @returns {Promise<Array>} Lista completa de medicamentos
+   */
+  async loadFullMedicationsList() {
+    // Se já está carregando, retornar a mesma promise
+    if (this.loadingPromise) {
+      return this.loadingPromise;
+    }
+
+    // Se já está em cache, retornar imediatamente
+    if (this.fullMedicationsList) {
+      return this.fullMedicationsList;
+    }
+
+    // Iniciar carregamento
+    this.loadingPromise = (async () => {
+      try {
+        // Tentar carregar do arquivo JSON
+        const medicationsData = require('../data/medications.json');
+        
+        // Verificar se é array ou objeto com array
+        const medications = Array.isArray(medicationsData) 
+          ? medicationsData 
+          : (medicationsData.medications || medicationsData.list || []);
+        
+        if (medications.length > 0) {
+          console.log(`✅ Lista completa carregada: ${medications.length} medicamentos`);
+          this.fullMedicationsList = medications;
+          return medications;
+        } else {
+          console.warn('⚠️ Arquivo JSON vazio, usando lista fallback');
+          this.fullMedicationsList = FALLBACK_MEDICATIONS_LIST;
+          return FALLBACK_MEDICATIONS_LIST;
+        }
+      } catch (error) {
+        console.warn('⚠️ Erro ao carregar lista completa, usando fallback:', error.message);
+        // Usar lista fallback em caso de erro
+        this.fullMedicationsList = FALLBACK_MEDICATIONS_LIST;
+        return FALLBACK_MEDICATIONS_LIST;
+      } finally {
+        // Limpar promise de carregamento
+        this.loadingPromise = null;
+      }
+    })();
+
+    return this.loadingPromise;
+  }
+
   /**
    * Buscar medicamentos por nome (autocomplete)
    * @param {string} query - Termo de busca
@@ -120,21 +176,42 @@ class MedicationSearchService {
 
       const searchTerm = query.toLowerCase().trim();
 
-      // Por enquanto, usar lista local
-      // TODO: Integrar com API pública quando disponível
-      const results = COMMON_MEDICATIONS_LIST
-        .filter(med => med.toLowerCase().includes(searchTerm))
+      // Carregar lista completa (com cache)
+      const medicationsList = await this.loadFullMedicationsList();
+
+      // Filtrar medicamentos que contêm o termo de busca
+      const results = medicationsList
+        .filter(med => {
+          const medName = typeof med === 'string' ? med : (med.name || med.nome || '');
+          return medName.toLowerCase().includes(searchTerm);
+        })
         .slice(0, limit)
-        .map(med => ({
-          name: med,
-          displayName: med,
-          source: 'local',
-        }));
+        .map(med => {
+          const medName = typeof med === 'string' ? med : (med.name || med.nome || '');
+          return {
+            name: medName,
+            displayName: medName,
+            source: 'local',
+          };
+        });
 
       return results;
     } catch (error) {
       console.error('Erro ao buscar medicamentos:', error);
-      return [];
+      // Em caso de erro, tentar com lista fallback
+      try {
+        const searchTerm = query.toLowerCase().trim();
+        return FALLBACK_MEDICATIONS_LIST
+          .filter(med => med.toLowerCase().includes(searchTerm))
+          .slice(0, limit)
+          .map(med => ({
+            name: med,
+            displayName: med,
+            source: 'fallback',
+          }));
+      } catch (fallbackError) {
+        return [];
+      }
     }
   }
 
@@ -173,13 +250,17 @@ class MedicationSearchService {
 
   /**
    * Obter lista completa de medicamentos comuns
-   * @returns {Array} Lista de medicamentos
+   * @returns {Promise<Array>} Lista de medicamentos
    */
-  getCommonMedications() {
-    return COMMON_MEDICATIONS_LIST.map(med => ({
-      name: med,
-      displayName: med,
-    }));
+  async getCommonMedications() {
+    const medicationsList = await this.loadFullMedicationsList();
+    return medicationsList.map(med => {
+      const medName = typeof med === 'string' ? med : (med.name || med.nome || '');
+      return {
+        name: medName,
+        displayName: medName,
+      };
+    });
   }
 
   /**

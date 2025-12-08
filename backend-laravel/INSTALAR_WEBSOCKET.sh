@@ -28,3 +28,8 @@ echo "4. Teste a conexão abrindo o app do paciente e cuidador"
 echo ""
 
 
+
+
+
+
+

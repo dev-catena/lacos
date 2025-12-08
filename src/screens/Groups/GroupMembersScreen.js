@@ -338,8 +338,8 @@ const GroupMembersScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         ) : null}
 
-        {/* Trocar Paciente */}
-        {member.role !== 'patient' && (
+        {/* Trocar Paciente - Não mostrar para cuidador profissional */}
+        {member.role !== 'patient' && member.user?.profile !== 'professional_caregiver' && (
           <TouchableOpacity
             style={[styles.actionButton, styles.changePatientButton]}
             onPress={() => handleChangePatient(member)}
@@ -367,7 +367,10 @@ const GroupMembersScreen = ({ route, navigation }) => {
     );
   };
 
-  const getRoleBadge = (role) => {
+  const getRoleBadge = (member) => {
+    const role = member.role;
+    const userProfile = member.user?.profile;
+    
     if (role === 'admin') {
       return (
         <View style={styles.adminBadge}>
@@ -380,6 +383,13 @@ const GroupMembersScreen = ({ route, navigation }) => {
         <View style={styles.patientBadge}>
           <Ionicons name="medkit" size={14} color={colors.secondary} />
           <Text style={styles.patientBadgeText}>Paciente</Text>
+        </View>
+      );
+    } else if (userProfile === 'professional_caregiver') {
+      return (
+        <View style={styles.professionalCaregiverBadge}>
+          <Ionicons name="medical" size={14} color={colors.success} />
+          <Text style={styles.professionalCaregiverBadgeText}>Cuidador profissional</Text>
         </View>
       );
     } else {
@@ -479,7 +489,7 @@ const GroupMembersScreen = ({ route, navigation }) => {
                             <Text style={styles.youText}> (Você)</Text>
                           )}
                         </Text>
-                        {getRoleBadge(member.role)}
+                        {getRoleBadge(member)}
                       </View>
                       {member.user?.email && (
                         <View style={styles.memberDetail}>
@@ -712,6 +722,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: colors.info,
+  },
+  professionalCaregiverBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.success + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  professionalCaregiverBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.success,
   },
   memberActions: {
     flexDirection: 'row',

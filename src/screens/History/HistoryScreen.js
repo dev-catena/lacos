@@ -47,7 +47,7 @@ const HistoryScreen = ({ route, navigation }) => {
           description: 'Dr. João Silva - Check-up regular',
           date: '2025-11-25T10:00:00',
           icon: 'medical',
-          color: colors.info,
+          color: '#B8D4F0', // Pastel azul
         },
         {
           id: 2,
@@ -56,7 +56,7 @@ const HistoryScreen = ({ route, navigation }) => {
           description: 'PA: 120/80 | Glicose: 95 mg/dL',
           date: '2025-11-24T08:30:00',
           icon: 'pulse',
-          color: colors.success,
+          color: '#B8E6B8', // Pastel verde
         },
         {
           id: 3,
@@ -65,7 +65,7 @@ const HistoryScreen = ({ route, navigation }) => {
           description: 'Losartana 50mg - 1x ao dia',
           date: '2025-11-23T14:15:00',
           icon: 'medical',
-          color: colors.secondary,
+          color: '#C8A8E9', // Pastel roxo
         },
         {
           id: 4,
@@ -74,7 +74,7 @@ const HistoryScreen = ({ route, navigation }) => {
           description: 'Localização: Rua ABC, 123',
           date: '2025-11-22T16:45:00',
           icon: 'alert-circle',
-          color: colors.error,
+          color: '#F5A5A5', // Pastel vermelho
         },
         {
           id: 5,
@@ -83,7 +83,7 @@ const HistoryScreen = ({ route, navigation }) => {
           description: 'Queda leve sem ferimentos',
           date: '2025-11-21T11:20:00',
           icon: 'warning',
-          color: colors.warning,
+          color: '#FFD4A3', // Pastel laranja
         },
       ];
 
@@ -181,7 +181,7 @@ const HistoryScreen = ({ route, navigation }) => {
       {/* Timeline */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color="#C8A8E9" />
           <Text style={styles.loadingText}>Carregando histórico...</Text>
         </View>
       ) : filteredEvents.length === 0 ? (
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   filterChipActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#C8A8E9', // Pastel roxo
   },
   filterChipText: {
     fontSize: 14,
@@ -371,7 +371,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 0,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    overflow: 'hidden',
   },
   eventHeader: {
     flexDirection: 'row',
@@ -402,7 +405,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: colors.warning,
+    backgroundColor: '#FFD4A3', // Pastel laranja
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',

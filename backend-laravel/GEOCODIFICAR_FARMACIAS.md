@@ -152,3 +152,8 @@ App\Models\PopularPharmacy::whereNull('latitude')->count();
 3. **Verifique periodicamente** quantas ainda faltam
 4. **Farmácias sem endereço** não podem ser geocodificadas - serão puladas
 
+
+
+
+
+

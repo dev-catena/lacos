@@ -145,3 +145,8 @@ Resposta:
 
 4. **Permissões**: O app solicita permissão de localização para buscar farmácias próximas.
 
+
+
+
+
+

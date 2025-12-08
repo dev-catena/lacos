@@ -53,6 +53,8 @@ const AddMedicationScreen = ({ route, navigation }) => {
   const [form, setForm] = useState('');
   const [dosage, setDosage] = useState('');
   const [unit, setUnit] = useState('mg');
+  const [doseQuantity, setDoseQuantity] = useState('');
+  const [doseQuantityUnit, setDoseQuantityUnit] = useState('mg');
   const [administrationRoute, setAdministrationRoute] = useState('Oral');
   const [frequency, setFrequency] = useState('24');
   const [firstDoseTime, setFirstDoseTime] = useState('08:00');
@@ -246,7 +248,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
       return;
     }
     if (!dosage.trim()) {
-      Alert.alert('Erro', 'Digite a dosagem');
+      Alert.alert('Erro', 'Digite a concentração');
       return;
     }
 
@@ -256,6 +258,25 @@ const AddMedicationScreen = ({ route, navigation }) => {
       // Gerar horários baseado na frequência
       const schedule = generateSchedule(firstDoseTime, frequency);
 
+      // Calcular end_date e start_date se for dias intercalados
+      let calculatedEndDate = null;
+      let calculatedStartDate = null;
+      if (frequency === 'advanced' && advancedFrequency && advancedFrequency.type === 'alternating' && advancedFrequency.doseCount) {
+        const startDate = new Date(advancedFrequency.startDate);
+        calculatedStartDate = advancedFrequency.startDate; // Usar a data inicial do advancedFrequency
+        const doseCount = parseInt(advancedFrequency.doseCount);
+        if (doseCount > 0) {
+          // Para dias intercalados: data final = data inicial + (quantidade de doses - 1) * 2 dias
+          // Exemplo: se começar no dia 1 e tiver 5 doses:
+          // Dose 1: dia 1, Dose 2: dia 3, Dose 3: dia 5, Dose 4: dia 7, Dose 5: dia 9
+          // Fórmula: data final = data inicial + (quantidade de doses - 1) * 2 dias
+          const daysToAdd = (doseCount - 1) * 2;
+          const endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + daysToAdd);
+          calculatedEndDate = endDate.toISOString().split('T')[0];
+        }
+      }
+
       // Preparar dados para API
       const medicationData = {
         groupId: groupId,
@@ -264,6 +285,8 @@ const AddMedicationScreen = ({ route, navigation }) => {
         form: form.trim(),
         dosage: dosage.trim(),
         unit: unit,
+        doseQuantity: doseQuantity.trim() || null,
+        doseQuantityUnit: doseQuantityUnit,
         administrationRoute: administrationRoute,
         frequencyType: frequency === 'advanced' ? 'advanced' : 'simple',
         frequencyDetails: frequency === 'advanced' 
@@ -274,6 +297,8 @@ const AddMedicationScreen = ({ route, navigation }) => {
         durationValue: durationType === 'temporario' ? parseInt(durationDays) : null,
         notes: instructions.trim() || null,
         isActive: true,
+        startDate: calculatedStartDate, // Data inicial para dias intercalados
+        endDate: calculatedEndDate, // Data final calculada para dias intercalados
       };
 
       const result = await medicationService.createMedication(medicationData);
@@ -326,6 +351,8 @@ const AddMedicationScreen = ({ route, navigation }) => {
                   setForm('');
                   setDosage('');
                   setUnit('mg');
+                  setDoseQuantity('');
+                  setDoseQuantityUnit('mg');
                   setAdministrationRoute('Oral');
                   setFrequency('24');
                   setFirstDoseTime('08:00');
@@ -447,10 +474,10 @@ const AddMedicationScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-          {/* Dosagem */}
+          {/* Concentração */}
           <View style={styles.row}>
             <View style={[styles.field, { flex: 2 }]}>
-              <Text style={styles.label}>Dosagem *</Text>
+              <Text style={styles.label}>Concentração *</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Ex: 50"
@@ -469,6 +496,36 @@ const AddMedicationScreen = ({ route, navigation }) => {
                     onPress={() => setUnit(item)}
                   >
                     <Text style={[styles.chipText, unit === item && styles.chipTextActive]}>
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Quantidade da Dose */}
+          <View style={styles.row}>
+            <View style={[styles.field, { flex: 2 }]}>
+              <Text style={styles.label}>Quantidade da dose</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 1, 2, 0.5"
+                value={doseQuantity}
+                onChangeText={setDoseQuantity}
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={[styles.field, { flex: 1 }]}>
+              <Text style={styles.label}>Unidade</Text>
+              <View style={styles.chipContainer}>
+                {UNITS.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={[styles.chip, styles.chipSmall, doseQuantityUnit === item && styles.chipActive]}
+                    onPress={() => setDoseQuantityUnit(item)}
+                  >
+                    <Text style={[styles.chipText, doseQuantityUnit === item && styles.chipTextActive]}>
                       {item}
                     </Text>
                   </TouchableOpacity>
@@ -638,9 +695,15 @@ const AddMedicationScreen = ({ route, navigation }) => {
               {name || '—'}
             </Text>
             <Text style={styles.previewText}>
-              <Text style={styles.previewLabel}>Dosagem: </Text>
+              <Text style={styles.previewLabel}>Concentração: </Text>
               {dosage} {unit} - {form}
             </Text>
+            {doseQuantity && (
+              <Text style={styles.previewText}>
+                <Text style={styles.previewLabel}>Quantidade da dose: </Text>
+                {doseQuantity} {doseQuantityUnit}
+              </Text>
+            )}
             <Text style={styles.previewText}>
               <Text style={styles.previewLabel}>Frequência: </Text>
               A cada {frequency} horas

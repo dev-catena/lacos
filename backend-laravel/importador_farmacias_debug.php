@@ -187,3 +187,8 @@ if ($validCount === 0) {
     echo "4. Execute: head -10 farmacias_populares.csv\n";
 }
 
+
+
+
+
+

@@ -252,3 +252,8 @@ if ($stats['imported'] === 0) {
     echo "4. Execute novamente\n";
 }
 
+
+
+
+
+

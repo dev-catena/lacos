@@ -44,3 +44,8 @@ echo -e "${GREEN}✅ Arquivos copiados para ~/ no servidor${NC}"
 echo -e "${YELLOW}Execute os comandos acima no servidor para completar a instalação${NC}"
 
 
+
+
+
+
+

@@ -35,6 +35,7 @@ const AdvancedFrequencyModal = ({ visible, onClose, onConfirm }) => {
   
   // Para dias intercalados
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [doseCount, setDoseCount] = useState('');
   
   // Para dias específicos
   const [selectedWeekdays, setSelectedWeekdays] = useState([]);
@@ -63,6 +64,9 @@ const AdvancedFrequencyModal = ({ visible, onClose, onConfirm }) => {
     switch (selectedType) {
       case 'alternating':
         config.startDate = startDate;
+        if (doseCount) {
+          config.doseCount = parseInt(doseCount);
+        }
         break;
       
       case 'specific_days':
@@ -100,7 +104,7 @@ const AdvancedFrequencyModal = ({ visible, onClose, onConfirm }) => {
   const isValid = () => {
     switch (selectedType) {
       case 'alternating':
-        return startDate !== '';
+        return startDate !== '' && doseCount !== '' && parseInt(doseCount) > 0;
       case 'specific_days':
         return selectedWeekdays.length > 0;
       case 'cycles':
@@ -117,23 +121,68 @@ const AdvancedFrequencyModal = ({ visible, onClose, onConfirm }) => {
   const renderConfiguration = () => {
     switch (selectedType) {
       case 'alternating':
+        // Calcular data final
+        const calculateEndDate = () => {
+          if (!startDate || !doseCount || parseInt(doseCount) <= 0) {
+            return null;
+          }
+          const start = new Date(startDate);
+          const doses = parseInt(doseCount);
+          // Para dias intercalados: dia sim, dia não
+          // Se começar no dia 1, a dose 2 será no dia 3 (dia 1 + 2), dose 3 no dia 5 (dia 1 + 4), etc.
+          // Fórmula: data final = data inicial + (quantidade de doses - 1) * 2 dias
+          const daysToAdd = (doses - 1) * 2;
+          const endDate = new Date(start);
+          endDate.setDate(endDate.getDate() + daysToAdd);
+          return endDate;
+        };
+
+        const endDate = calculateEndDate();
+
         return (
           <View style={styles.configSection}>
-            <Text style={styles.configTitle}>📅 Data de Início</Text>
+            <Text style={styles.configTitle}>📅 Dias Intercalados</Text>
             <Text style={styles.configDescription}>
-              A medicação será tomada em dias alternados a partir desta data
+              A medicação será tomada em dias alternados (dia sim, dia não)
             </Text>
-            <TextInput
-              style={styles.input}
-              value={startDate}
-              onChangeText={setStartDate}
-              placeholder="YYYY-MM-DD"
-            />
-            <View style={styles.preview}>
-              <Text style={styles.previewText}>
-                Padrão: Dia sim, dia não, iniciando em {new Date(startDate).toLocaleDateString('pt-BR')}
-              </Text>
+            
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Data de Início</Text>
+              <TextInput
+                style={styles.input}
+                value={startDate}
+                onChangeText={setStartDate}
+                placeholder="YYYY-MM-DD"
+              />
             </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Quantidade de Doses</Text>
+              <TextInput
+                style={styles.input}
+                value={doseCount}
+                onChangeText={setDoseCount}
+                placeholder="Ex: 10"
+                keyboardType="numeric"
+              />
+            </View>
+
+            {startDate && doseCount && parseInt(doseCount) > 0 && endDate && (
+              <View style={styles.preview}>
+                <Text style={styles.previewText}>
+                  <Text style={styles.previewLabel}>Data inicial:</Text> {new Date(startDate).toLocaleDateString('pt-BR')}
+                </Text>
+                <Text style={styles.previewText}>
+                  <Text style={styles.previewLabel}>Quantidade de doses:</Text> {doseCount}
+                </Text>
+                <Text style={styles.previewText}>
+                  <Text style={styles.previewLabel}>Data final calculada:</Text> {endDate.toLocaleDateString('pt-BR')}
+                </Text>
+                <Text style={[styles.previewText, { marginTop: 8, fontStyle: 'italic' }]}>
+                  Total de dias: {((parseInt(doseCount) - 1) * 2) + 1} dias
+                </Text>
+              </View>
+            )}
           </View>
         );
 
@@ -567,6 +616,11 @@ const styles = StyleSheet.create({
   },
   previewText: {
     fontSize: 14,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  previewLabel: {
+    fontWeight: '600',
     color: colors.text,
   },
   confirmButton: {

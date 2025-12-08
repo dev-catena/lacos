@@ -28,6 +28,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
           iconName = isFocused ? 'notifications' : 'notifications-outline';
         } else if (route.name === 'Profile') {
           iconName = isFocused ? 'person' : 'person-outline';
+        } else if (route.name === 'Clients') {
+          iconName = isFocused ? 'business' : 'business-outline';
         }
 
         const onPress = () => {
