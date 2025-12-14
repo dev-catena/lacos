@@ -52,6 +52,9 @@ class ApiService {
           if (userDataStr) {
             const userData = JSON.parse(userDataStr);
             console.log(`📱 REQUEST [${method}] ${endpoint} - Usuário: ${userData.name} | Telefone: ${userData.phone || 'N/A'}`);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiService.js:54',message:'Request with auth',data:{method:method,endpoint:endpoint,hasToken:!!token,userId:userData?.id,userRole:userData?.role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+            // #endregion
           }
         } catch (e) {
           // Ignore se não conseguir pegar dados do usuário
@@ -92,6 +95,9 @@ class ApiService {
 
       // Check for errors first
       if (!response.ok) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiService.js:94',message:'HTTP error detected',data:{status:response.status,statusText:response.statusText,endpoint:endpoint,contentType:response.headers.get('content-type')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+        // #endregion
         let errorData = {};
         const contentType = response.headers.get('content-type');
         
@@ -101,11 +107,40 @@ class ApiService {
         // Tentar fazer parse do JSON de erro se houver conteúdo
         if (contentType && contentType.includes('application/json')) {
           try {
-            errorData = await response.json();
+            const responseText = await response.text();
+            // #region agent log
+            const responseTextLog = {
+              location: 'apiService.js:105',
+              message: 'Error response text',
+              data: {
+                responseText: responseText.substring(0,1000),
+                textLength: responseText.length,
+                endpoint: endpoint,
+                status: response.status
+              },
+              timestamp: Date.now(),
+              sessionId: 'debug-session',
+              runId: 'run1',
+              hypothesisId: 'I'
+            };
+            console.log('🔍 DEBUG RESPONSE TEXT:', JSON.stringify(responseTextLog, null, 2));
+            fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(responseTextLog)}).catch(()=>{});
+            // #endregion
+            errorData = JSON.parse(responseText);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiService.js:108',message:'Error data parsed',data:{errorData:errorData,errorKeys:Object.keys(errorData)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'})}).catch(()=>{});
+            // #endregion
           } catch (e) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiService.js:111',message:'Error parsing JSON',data:{parseError:e?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
+            // #endregion
             // Se falhar, usar mensagem genérica
             errorData = { message: `Erro HTTP ${response.status}` };
           }
+        } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiService.js:116',message:'Non-JSON error response',data:{contentType:contentType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'})}).catch(()=>{});
+          // #endregion
         }
         
         // Para erros 500 em endpoints não críticos (como alertas), não logar como erro crítico
@@ -120,11 +155,42 @@ class ApiService {
           errors: errorData.errors || {},
         };
         
+        // #region agent log
+        const errorObjLog = {
+          location: 'apiService.js:128',
+          message: 'Error object created',
+          data: {
+            errorObj: errorObj,
+            isNonCritical: isNonCriticalEndpoint,
+            isPharmacy404: isPharmacyPrice404,
+            errorData: errorData,
+            endpoint: endpoint,
+            status: response.status
+          },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'M'
+        };
+        console.log('🔍 DEBUG ERROR OBJ:', JSON.stringify(errorObjLog, null, 2));
+        fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(errorObjLog)}).catch(()=>{});
+        // #endregion
+        
         // Não logar 404 de preços de farmácia como erro (é esperado quando não há preço informado)
         // Não logar 500 em endpoints não críticos
         const shouldLogError = !isPharmacyPrice404 && (!isNonCriticalEndpoint || response.status !== 500);
         if (shouldLogError) {
           console.error(`❌ API Error:`, errorMessage);
+          // Log detalhado para debug
+          if (response.status === 500) {
+            console.error('🔍 DEBUG 500 Error Details:', {
+              endpoint: endpoint,
+              status: response.status,
+              errorData: errorData,
+              errorObj: errorObj,
+              fullErrorData: JSON.stringify(errorData, null, 2)
+            });
+          }
         }
         // Para endpoints não críticos com erro 500, não logar nada aqui
         // O serviço específico vai tratar e logar como warning se necessário

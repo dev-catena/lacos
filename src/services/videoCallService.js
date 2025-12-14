@@ -2,32 +2,63 @@
  * Serviço de Chamada de Vídeo
  * 
  * Suporta múltiplas implementações:
- * 1. Agora.io (recomendado)
- * 2. react-native-webrtc
- * 3. Twilio Video
+ * 1. Agora.io (recomendado) - Requer expo-dev-client
+ * 2. react-native-webrtc - Requer expo-dev-client
+ * 3. Mock (para desenvolvimento no Expo Go)
  */
 
 // ============================================
-// OPÇÃO 1: AGORA.IO (Recomendado)
+// MODO: Verificar se Agora.io está disponível
 // ============================================
 
-import { RtcEngine, ChannelProfileType, ClientRoleType } from 'react-native-agora';
+let RtcEngine = null;
+let ChannelProfileType = null;
+let ClientRoleType = null;
+let isAgoraAvailable = false;
+
+try {
+  // Tentar importar Agora.io (só funciona com expo-dev-client)
+  const agoraModule = require('react-native-agora');
+  RtcEngine = agoraModule.RtcEngine;
+  ChannelProfileType = agoraModule.ChannelProfileType;
+  ClientRoleType = agoraModule.ClientRoleType;
+  isAgoraAvailable = true;
+  console.log('✅ Agora.io disponível (expo-dev-client)');
+} catch (error) {
+  // Agora.io não está disponível (Expo Go)
+  console.log('⚠️ Agora.io não disponível - usando modo mock (Expo Go)');
+  isAgoraAvailable = false;
+}
+
+// ============================================
+// CLASSE: VideoCallService
+// ============================================
 
 class VideoCallService {
   constructor() {
     this.engine = null;
     this.appId = process.env.AGORA_APP_ID || '75ae244af79944a18a059d2fcb18c1dc';
     this.isInitialized = false;
+    this.isMockMode = !isAgoraAvailable;
   }
 
   /**
-   * Inicializar o engine do Agora
+   * Inicializar o engine do Agora (ou modo mock)
    */
   async initialize() {
     if (this.isInitialized) {
       return { success: true };
     }
 
+    // Se Agora.io não está disponível, usar modo mock
+    if (this.isMockMode) {
+      console.log('📹 Modo MOCK: Simulando inicialização de vídeo');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular delay
+      this.isInitialized = true;
+      return { success: true, mock: true };
+    }
+
+    // Modo real com Agora.io
     try {
       this.engine = await RtcEngine.create(this.appId);
       
@@ -65,6 +96,14 @@ class VideoCallService {
         await this.initialize();
       }
 
+      // Modo mock (Expo Go)
+      if (this.isMockMode) {
+        console.log('📹 Modo MOCK: Simulando entrada no canal:', channelName);
+        await new Promise(resolve => setTimeout(resolve, 500)); // Simular delay
+        return { success: true, mock: true };
+      }
+
+      // Modo real com Agora.io
       // Habilitar vídeo
       await this.engine.enableVideo();
       await this.engine.startPreview();
@@ -89,6 +128,13 @@ class VideoCallService {
    */
   async leaveChannel() {
     try {
+      // Modo mock
+      if (this.isMockMode) {
+        console.log('📹 Modo MOCK: Simulando saída do canal');
+        return { success: true, mock: true };
+      }
+
+      // Modo real
       if (this.engine) {
         await this.engine.leaveChannel();
         await this.engine.stopPreview();
@@ -106,6 +152,13 @@ class VideoCallService {
    */
   async toggleMute(mute) {
     try {
+      // Modo mock
+      if (this.isMockMode) {
+        console.log('📹 Modo MOCK: Simulando mute/unmute:', mute);
+        return { success: true, muted: mute, mock: true };
+      }
+
+      // Modo real
       if (this.engine) {
         await this.engine.muteLocalAudioStream(mute);
         return { success: true, muted: mute };
@@ -122,6 +175,13 @@ class VideoCallService {
    */
   async toggleVideo(enable) {
     try {
+      // Modo mock
+      if (this.isMockMode) {
+        console.log('📹 Modo MOCK: Simulando ligar/desligar vídeo:', enable);
+        return { success: true, enabled: enable, mock: true };
+      }
+
+      // Modo real
       if (this.engine) {
         await this.engine.enableLocalVideo(enable);
         return { success: true, enabled: enable };
@@ -154,6 +214,14 @@ class VideoCallService {
    */
   async destroy() {
     try {
+      // Modo mock
+      if (this.isMockMode) {
+        console.log('📹 Modo MOCK: Simulando destruição do engine');
+        this.isInitialized = false;
+        return { success: true, mock: true };
+      }
+
+      // Modo real
       if (this.engine) {
         await this.leaveChannel();
         await RtcEngine.destroy();

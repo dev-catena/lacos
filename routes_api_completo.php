@@ -73,6 +73,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Doctors & Medical
     Route::apiResource('doctors', DoctorController::class);
+    Route::get('doctors/{doctorId}/availability', [DoctorController::class, 'getAvailability']);
     Route::get('medical-specialties', [MedicalSpecialtyController::class, 'index']);
     Route::get('medical-specialties/{id}', [MedicalSpecialtyController::class, 'show']);
     

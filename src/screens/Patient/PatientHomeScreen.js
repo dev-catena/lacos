@@ -266,8 +266,8 @@ const PatientHomeScreen = ({ navigation }) => {
             description: appointment.description || appointment.type || '',
             time: `${hours}:${minutes}`,
             date: dateLabel,
-            icon: 'calendar',
-            color: colors.warning,
+            icon: appointment.is_teleconsultation ? 'videocam' : 'calendar',
+            color: appointment.is_teleconsultation ? colors.primary : colors.warning,
             appointmentTime: appointmentDate.toISOString(),
             data: appointment,
           });
@@ -686,10 +686,45 @@ const PatientHomeScreen = ({ navigation }) => {
 
   const handleNotificationPress = async (notification) => {
     if (notification.type === 'appointment') {
-      // Navegar para tela de detalhes da consulta
-      navigation.navigate('AppointmentDetails', {
-        appointment: notification,
-      });
+      const appointment = notification.data;
+      
+      // Verificar se é teleconsulta
+      if (appointment?.is_teleconsultation) {
+        const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at || notification.appointmentTime);
+        const now = new Date();
+        const minutesUntilAppointment = (appointmentDate - now) / (1000 * 60);
+        
+        // Permitir entrada 15 minutos antes da consulta
+        if (minutesUntilAppointment <= 15 && minutesUntilAppointment >= -60) {
+          // Dentro do período permitido (15 min antes até 1 hora depois)
+          navigation.navigate('PatientVideoCall', {
+            appointment: appointment,
+            doctorInfo: appointment.doctorUser || appointment.doctor || {
+              name: appointment.doctor_name || 'Médico',
+            },
+          });
+        } else if (minutesUntilAppointment > 15) {
+          // Ainda não é hora (mais de 15 minutos antes)
+          const minutes = Math.ceil(minutesUntilAppointment - 15);
+          Alert.alert(
+            'Aguarde',
+            `Você poderá entrar na videochamada em ${minutes} minuto(s).\n\nA entrada é permitida 15 minutos antes do horário da consulta.`,
+            [{ text: 'OK' }]
+          );
+        } else {
+          // Consulta já passou (mais de 1 hora depois)
+          Alert.alert(
+            'Consulta Encerrada',
+            'O horário para entrar nesta consulta já passou.',
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        // Não é teleconsulta, navegar para detalhes normalmente
+        navigation.navigate('AppointmentDetails', {
+          appointment: notification,
+        });
+      }
     } else if (notification.type === 'medication') {
       Alert.alert(
         notification.title,

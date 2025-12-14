@@ -34,23 +34,64 @@ const ClientsListScreen = ({ navigation }) => {
   );
 
   const loadClients = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClientsListScreen.js:36',message:'loadClients entry',data:{userId:user?.id,userRole:user?.role,userName:user?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     try {
       setLoading(true);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClientsListScreen.js:39',message:'Before API call',data:{endpoint:'/caregivers/clients'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       const response = await apiService.get('/caregivers/clients');
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClientsListScreen.js:42',message:'After API call',data:{hasResponse:!!response,responseType:typeof response,hasSuccess:response?.success,hasData:!!response?.data,responseKeys:response?Object.keys(response):[],message:response?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       
       if (response && response.success && response.data) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClientsListScreen.js:45',message:'Success path',data:{clientsCount:Array.isArray(response.data)?response.data.length:'not-array',firstClient:Array.isArray(response.data)&&response.data.length>0?response.data[0]:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
         setClients(response.data);
       } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClientsListScreen.js:48',message:'Response validation failed',data:{hasResponse:!!response,responseSuccess:response?.success,responseMessage:response?.message,fullResponse:JSON.stringify(response)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
         throw new Error(response?.message || 'Erro ao carregar clientes');
       }
     } catch (error) {
+      // #region agent log
+      const errorLogData = {
+        location: 'ClientsListScreen.js:51',
+        message: 'Error caught',
+        data: {
+          errorMessage: error?.message,
+          errorStatus: error?.status,
+          errorErrors: error?.errors,
+          fullError: JSON.stringify(error),
+          errorType: typeof error,
+          errorKeys: error ? Object.keys(error) : [],
+          errorStack: error?.stack,
+          errorString: String(error),
+        },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'F'
+      };
+      console.log('🔍 DEBUG ERROR:', JSON.stringify(errorLogData, null, 2));
+      fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(errorLogData)}).catch(()=>{});
+      // #endregion
       console.error('Erro ao carregar clientes:', error);
+      console.error('Erro completo (stringified):', JSON.stringify(error, null, 2));
       Toast.show({
         type: 'error',
         text1: 'Erro',
         text2: error.message || 'Não foi possível carregar a lista de clientes',
       });
     } finally {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClientsListScreen.js:59',message:'loadClients finally',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+      // #endregion
       setLoading(false);
       setRefreshing(false);
     }
@@ -165,11 +206,15 @@ const ClientsListScreen = ({ navigation }) => {
       <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
         <StatusBar style="dark" />
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Meus Clientes</Text>
+          <Text style={styles.headerTitle}>
+          {user?.profile === 'doctor' ? 'Meus Pacientes' : 'Meus Clientes'}
+        </Text>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Carregando clientes...</Text>
+          <Text style={styles.loadingText}>
+            {user?.profile === 'doctor' ? 'Carregando pacientes...' : 'Carregando clientes...'}
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -181,7 +226,9 @@ const ClientsListScreen = ({ navigation }) => {
       
       {/* Header */}
       <View style={[styles.header, { paddingTop: Platform.OS === 'android' ? insets.top + 16 : 16 }]}>
-        <Text style={styles.headerTitle}>Meus Clientes</Text>
+        <Text style={styles.headerTitle}>
+          {user?.profile === 'doctor' ? 'Meus Pacientes' : 'Meus Clientes'}
+        </Text>
         <Text style={styles.headerSubtitle}>
           Admins dos grupos em que você participa
         </Text>
@@ -202,9 +249,13 @@ const ClientsListScreen = ({ navigation }) => {
         {clients.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="people-outline" size={64} color={colors.gray400} />
-            <Text style={styles.emptyText}>Nenhum cliente encontrado</Text>
+            <Text style={styles.emptyText}>
+              {user?.profile === 'doctor' ? 'Nenhum paciente encontrado' : 'Nenhum cliente encontrado'}
+            </Text>
             <Text style={styles.emptySubtext}>
-              Você ainda não foi adicionado a nenhum grupo
+              {user?.profile === 'doctor' 
+                ? 'Você ainda não tem pacientes cadastrados'
+                : 'Você ainda não foi adicionado a nenhum grupo'}
             </Text>
           </View>
         ) : (

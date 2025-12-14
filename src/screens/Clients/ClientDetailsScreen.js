@@ -206,7 +206,9 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Detalhes do Cliente</Text>
+          <Text style={styles.headerTitle}>
+          {user?.profile === 'doctor' ? 'Detalhes do Paciente' : 'Detalhes do Cliente'}
+        </Text>
           <View style={styles.headerRight} />
         </View>
         <View style={styles.loadingContainer}>
@@ -237,7 +239,9 @@ const ClientDetailsScreen = ({ route, navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Detalhes do Cliente</Text>
+        <Text style={styles.headerTitle}>
+          {user?.profile === 'doctor' ? 'Detalhes do Paciente' : 'Detalhes do Cliente'}
+        </Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -458,7 +462,9 @@ const ClientDetailsScreen = ({ route, navigation }) => {
         activeOpacity={0.8}
       >
         <Ionicons name="chatbubble-ellipses" size={24} color="#2D1B3D" />
-        <Text style={styles.contactButtonText}>Contatar Cliente</Text>
+        <Text style={styles.contactButtonText}>
+          {user?.profile === 'doctor' ? 'Contatar Paciente' : 'Contatar Cliente'}
+        </Text>
       </TouchableOpacity>
     </SafeAreaView>
   );

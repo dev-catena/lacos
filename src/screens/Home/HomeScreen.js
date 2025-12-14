@@ -390,8 +390,8 @@ const HomeScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* Buscar Cuidadores - Apenas para cuidadores/amigos */}
-        {user?.profile === 'caregiver' && (
+        {/* Buscar Cuidadores - Apenas para cuidadores/amigos (NÃO para cuidador profissional) */}
+        {user?.profile === 'caregiver' && user?.profile !== 'professional_caregiver' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Buscar Cuidadores</Text>
             <TouchableOpacity
@@ -418,12 +418,18 @@ const HomeScreen = ({ navigation }) => {
           const currentGroups = selectedTab === 'myGroups' ? myGroups : participatingGroups;
           const hasGroups = currentGroups.length > 0;
           
-          // Filtrar atividades apenas dos grupos da aba atual
+          // Filtrar atividades de TODOS os grupos do usuário (tanto "Meus Grupos" quanto "Participo")
+          // Isso garante que atividades não sejam perdidas se o usuário estiver na aba errada
+          const allUserGroups = [...myGroups, ...participatingGroups];
+          const allUserGroupIds = allUserGroups.map(g => g.id).filter(id => id != null);
+          
           // Usar IDs dos grupos para comparação (mais confiável que nomes)
           const currentGroupIds = currentGroups.map(g => g.id).filter(id => id != null);
           
           console.log(`📊 HomeScreen - DEBUG: Total de atividades recebidas: ${recentActivities.length}`);
+          console.log(`📊 HomeScreen - DEBUG: Meus Grupos: ${myGroups.length}, Participo: ${participatingGroups.length}`);
           console.log(`📊 HomeScreen - DEBUG: Grupos atuais (IDs):`, currentGroupIds);
+          console.log(`📊 HomeScreen - DEBUG: TODOS os grupos do usuário (IDs):`, allUserGroupIds);
           console.log(`📊 HomeScreen - DEBUG: Grupos atuais (nomes):`, currentGroups.map(g => ({ id: g.id, name: g.name })));
           console.log(`📊 HomeScreen - DEBUG: Todas as atividades:`, recentActivities.map(a => ({ 
             id: a.id, 
@@ -433,15 +439,25 @@ const HomeScreen = ({ navigation }) => {
           })));
           
           const filteredActivities = recentActivities.filter(activity => {
-            // Se a atividade tem groupId, comparar diretamente
+            // Se a atividade tem groupId, comparar diretamente com TODOS os grupos do usuário
             if (activity.groupId) {
-              const matches = currentGroupIds.includes(activity.groupId);
-              if (matches) {
-                console.log(`✅ HomeScreen - Atividade "${activity.title}" corresponde ao grupo ID ${activity.groupId}`);
+              // Primeiro verificar se está nos grupos da aba atual
+              const matchesCurrentTab = currentGroupIds.includes(activity.groupId);
+              // Se não estiver, verificar se está em qualquer grupo do usuário
+              const matchesAnyGroup = allUserGroupIds.includes(activity.groupId);
+              
+              if (matchesCurrentTab) {
+                console.log(`✅ HomeScreen - Atividade "${activity.title}" corresponde ao grupo ID ${activity.groupId} (aba atual)`);
+                return true;
+              } else if (matchesAnyGroup) {
+                // Atividade pertence a um grupo do usuário, mas não está na aba atual
+                // Ainda assim mostrar, pois é uma atividade válida
+                console.log(`✅ HomeScreen - Atividade "${activity.title}" corresponde ao grupo ID ${activity.groupId} (outra aba)`);
+                return true;
               } else {
-                console.log(`❌ HomeScreen - Atividade "${activity.title}" NÃO corresponde: groupId ${activity.groupId} não está em [${currentGroupIds.join(', ')}]`);
+                console.log(`❌ HomeScreen - Atividade "${activity.title}" NÃO corresponde: groupId ${activity.groupId} não está em [${allUserGroupIds.join(', ')}]`);
+                return false;
               }
-              return matches;
             }
             
             // Se não tem groupId, tentar comparar por nome

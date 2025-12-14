@@ -127,6 +127,45 @@ class UserService {
       };
     }
   }
+
+  /**
+   * Obter dados de um usuário específico por ID
+   */
+  async getUser(userId) {
+    try {
+      console.log('👤 UserService - Buscando usuário ID:', userId);
+      
+      const response = await apiService.request(`/users/${userId}`, {
+        method: 'GET',
+      });
+
+      // A API pode retornar diretamente o objeto ou dentro de uma estrutura
+      if (response && response.id) {
+        return {
+          success: true,
+          data: response,
+        };
+      } else if (response && response.user) {
+        return {
+          success: true,
+          data: response.user,
+        };
+      } else if (response && response.success) {
+        return response;
+      }
+
+      return {
+        success: false,
+        error: 'Resposta inválida da API',
+      };
+    } catch (error) {
+      console.error('❌ UserService - Erro ao buscar usuário:', error);
+      return {
+        success: false,
+        error: error.message || 'Erro ao buscar usuário',
+      };
+    }
+  }
 }
 
 export default new UserService();

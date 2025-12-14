@@ -74,6 +74,9 @@ import DocumentDetailsScreen from '../screens/Documents/DocumentDetailsScreen';
 // Importa as telas de Mídias
 import MediaScreen from '../screens/Media/MediaScreen';
 
+// Importa telas de Pagamento
+import PaymentScreen from '../screens/Payment/PaymentScreen';
+
 // Importa telas de Debug
 import ShowGroupCodesScreen from '../screens/Debug/ShowGroupCodesScreen';
 
@@ -171,6 +174,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="AppointmentDetails" 
         component={AppointmentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PaymentScreen" 
+        component={PaymentScreen}
         options={{ 
           headerShown: false 
         }}
@@ -438,6 +448,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="AppointmentDetails" 
         component={AppointmentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PaymentScreen" 
+        component={PaymentScreen}
         options={{ 
           headerShown: false 
         }}

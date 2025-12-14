@@ -1,0 +1,44 @@
+/* Estilos globais para botões lado a lado */
+
+/* Botões em containers flex com gap de 8px */
+.filters,
+.doctor-actions,
+.action-buttons {
+  gap: 0.5rem; /* 8px */
+}
+
+/* Garantir margem de 8px entre botões */
+button + button {
+  margin-left: 0.5rem; /* 8px */
+}
+
+/* Garantir margem de 8px entre botão e texto */
+p + button,
+span + button,
+div + button,
+label + button,
+button + p,
+button + span,
+button + div {
+  margin-left: 0.5rem; /* 8px */
+  margin-right: 0.5rem; /* 8px */
+}
+
+/* Quando não usar gap, adicionar margem manual de 8px */
+.action-btn:not(:last-child),
+.filter-btn:not(:last-child),
+.cancel-button:not(:last-child),
+.save-button:not(:last-child),
+.refresh-button:not(:last-child),
+.edit-button:not(:last-child),
+.login-button:not(:last-child) {
+  margin-right: 0.5rem; /* 8px */
+}
+
+/* Garantir margem em botões dentro de tabelas */
+td button + button,
+td button + span,
+td span + button {
+  margin-left: 0.5rem; /* 8px */
+}
+

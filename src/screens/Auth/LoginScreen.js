@@ -34,7 +34,11 @@ const LoginScreen = ({ navigation }) => {
     setLoading(false);
 
     if (!result.success) {
-      Alert.alert('Erro', result.error || 'Não foi possível fazer login');
+      Alert.alert(
+        result.requiresApproval ? 'Aguardando Aprovação' : 
+        result.requiresActivation ? 'Ativação Pendente' : 'Erro',
+        result.error || 'Não foi possível fazer login'
+      );
     }
   };
 

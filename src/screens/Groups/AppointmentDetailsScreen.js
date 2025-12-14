@@ -389,18 +389,18 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
         </View>
 
         {/* Médico */}
-        {appointment.doctor && (
+        {(appointment.doctorUser || appointment.doctor) && (
           <View style={styles.card}>
             <View style={styles.sectionHeader}>
               <Ionicons name="person-outline" size={20} color={colors.primary} />
               <Text style={styles.sectionTitle}>Médico</Text>
             </View>
             <Text style={styles.doctorName}>
-              {appointment.doctor.name || appointment.doctor}
+              {appointment.doctorUser?.name || appointment.doctor?.name || appointment.doctor || 'Médico não informado'}
             </Text>
-            {appointment.doctor.specialty && (
+            {(appointment.doctorUser?.medicalSpecialty?.name || appointment.doctor?.specialty) && (
               <Text style={styles.doctorSpecialty}>
-                {appointment.doctor.specialty}
+                {appointment.doctorUser?.medicalSpecialty?.name || appointment.doctor?.specialty}
               </Text>
             )}
           </View>

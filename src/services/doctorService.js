@@ -65,6 +65,32 @@ const doctorService = {
       throw error;
     }
   },
+
+  /**
+   * Busca a agenda disponível de um médico
+   */
+  async getDoctorAvailability(doctorId) {
+    try {
+      const response = await apiService.get(`/doctors/${doctorId}/availability`);
+      return response;
+    } catch (error) {
+      console.error('Erro ao buscar agenda do médico:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Salva a agenda disponível de um médico
+   */
+  async saveAvailability(doctorId, availabilityData) {
+    try {
+      const response = await apiService.post(`/doctors/${doctorId}/availability`, availabilityData);
+      return response;
+    } catch (error) {
+      console.error('Erro ao salvar agenda do médico:', error);
+      throw error;
+    }
+  },
 };
 
 export default doctorService;

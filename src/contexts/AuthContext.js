@@ -70,18 +70,46 @@ export const AuthProvider = ({ children }) => {
 
       console.log('🔑 AuthContext - Login bem-sucedido:', response.user.name);
 
-      // Salva no AsyncStorage
-      await AsyncStorage.setItem('@lacos:user', JSON.stringify(response.user));
-      await AsyncStorage.setItem('@lacos:token', response.token);
+      // Salva no AsyncStorage apenas se tiver token e user
+      if (response.token && response.user) {
+        await AsyncStorage.setItem('@lacos:user', JSON.stringify(response.user));
+        await AsyncStorage.setItem('@lacos:token', response.token);
+        setUser(response.user);
+        console.log('🔑 AuthContext - User setado, signed agora é true');
+      } else {
+        // Se não tiver token, remover do storage
+        await AsyncStorage.removeItem('@lacos:user');
+        await AsyncStorage.removeItem('@lacos:token');
+        setUser(null);
+        console.log('🔑 AuthContext - Token não recebido, dados removidos');
+      }
 
-      setUser(response.user);
-      console.log('🔑 AuthContext - User setado, signed agora é true');
       return { success: true };
     } catch (error) {
       console.error('🔑 AuthContext - Erro no login:', error);
+      
+      // Tratar erros específicos de médico
+      const errorMessage = error.message || 'Erro ao fazer login. Verifique suas credenciais.';
+      
+      if (error.error === 'doctor_pending_approval' || error.status === 'pending_approval') {
+        return { 
+          success: false, 
+          error: 'Seu processo está em análise. Acompanhe pelo seu email.',
+          requiresApproval: true
+        };
+      }
+      
+      if (error.error === 'doctor_pending_activation' || error.status === 'pending_activation') {
+        return { 
+          success: false, 
+          error: 'Por favor, ative sua conta clicando no link enviado por email.',
+          requiresActivation: true
+        };
+      }
+      
       return { 
         success: false, 
-        error: error.message || 'Erro ao fazer login. Verifique suas credenciais.' 
+        error: errorMessage
       };
     } finally {
       setLoading(false);
@@ -134,15 +162,69 @@ export const AuthProvider = ({ children }) => {
 
       console.log('🔑 AuthContext - Cadastro bem-sucedido:', response.user.name);
 
-      // Salva no AsyncStorage
-      await AsyncStorage.setItem('@lacos:user', JSON.stringify(response.user));
-      await AsyncStorage.setItem('@lacos:token', response.token);
+      // Se for médico, não salvar token (precisa aprovação)
+      if (response.requires_approval || response.status === 'pending_approval') {
+        return { 
+          success: true, 
+          requiresApproval: true,
+          message: response.message || 'Seu processo está em análise. Acompanhe pelo seu email.'
+        };
+      }
 
-      setUser(response.user);
-      console.log('🔑 AuthContext - User setado após cadastro, signed agora é true');
+      // Salva no AsyncStorage apenas se tiver token e user
+      if (response.token && response.user) {
+        await AsyncStorage.setItem('@lacos:user', JSON.stringify(response.user));
+        await AsyncStorage.setItem('@lacos:token', response.token);
+        setUser(response.user);
+        console.log('🔑 AuthContext - User setado após cadastro, signed agora é true');
+      } else {
+        // Se não tiver token (ex: médico pendente), garantir que storage está limpo
+        await AsyncStorage.removeItem('@lacos:user');
+        await AsyncStorage.removeItem('@lacos:token');
+        setUser(null);
+        console.log('🔑 AuthContext - Token não recebido (aprovação pendente), storage limpo');
+      }
+
       return { success: true };
     } catch (error) {
       console.error('🔑 AuthContext - Erro no cadastro:', error);
+      
+      // Tratar erros de validação (422) com mensagens específicas
+      if (error.status === 422 && error.errors) {
+        // Extrair todas as mensagens de erro de validação
+        const errorMessages = [];
+        Object.keys(error.errors).forEach(field => {
+          if (Array.isArray(error.errors[field])) {
+            error.errors[field].forEach(msg => {
+              // Traduzir mensagens do Laravel para português
+              let translatedMsg = msg;
+              if (msg.includes('email has already been taken') || msg.includes('email já está em uso')) {
+                translatedMsg = 'Este email já está cadastrado. Use outro email ou faça login.';
+              } else if (msg.includes('password')) {
+                translatedMsg = 'A senha deve ter pelo menos 6 caracteres.';
+              } else if (msg.includes('required')) {
+                translatedMsg = `O campo ${field} é obrigatório.`;
+              } else if (msg.includes('invalid')) {
+                translatedMsg = `O campo ${field} é inválido.`;
+              }
+              errorMessages.push(translatedMsg);
+            });
+          } else if (error.errors[field]) {
+            errorMessages.push(error.errors[field]);
+          }
+        });
+        
+        // Retornar primeira mensagem ou mensagem genérica
+        const finalMessage = errorMessages.length > 0 
+          ? errorMessages[0] 
+          : (error.message || 'Erro ao criar conta. Verifique os dados e tente novamente.');
+        
+        return { 
+          success: false, 
+          error: finalMessage
+        };
+      }
+      
       return { 
         success: false, 
         error: error.message || 'Erro ao criar conta. Tente novamente.' 
@@ -211,10 +293,20 @@ export const AuthProvider = ({ children }) => {
       // Atualizar no servidor (se necessário)
       // TODO: Implementar endpoint de atualização de perfil
       
+      if (!user) {
+        return { success: false, error: 'Usuário não encontrado' };
+      }
+      
       const updatedUser = { ...user, ...updatedData };
-      await AsyncStorage.setItem('@lacos:user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      return { success: true };
+      
+      // Verificar se updatedUser é válido antes de salvar
+      if (updatedUser && typeof updatedUser === 'object') {
+        await AsyncStorage.setItem('@lacos:user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        return { success: true };
+      } else {
+        return { success: false, error: 'Dados inválidos' };
+      }
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error);
       return { success: false, error: error.message };

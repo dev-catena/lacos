@@ -87,12 +87,26 @@ const RegisterScreen = ({ navigation }) => {
       }
       
       console.log('📋 Especialidades processadas:', specialtiesData.length);
-      if (specialtiesData.length > 0) {
-        console.log('📋 Primeira especialidade:', JSON.stringify(specialtiesData[0], null, 2));
+      
+      // Remover duplicatas por nome (caso o backend ainda retorne)
+      const uniqueSpecialties = specialtiesData.reduce((acc, current) => {
+        const existing = acc.find(item => item.name === current.name);
+        if (!existing) {
+          acc.push(current);
+        }
+        return acc;
+      }, []);
+      
+      // Ordenar por nome
+      uniqueSpecialties.sort((a, b) => a.name.localeCompare(b.name));
+      
+      if (uniqueSpecialties.length > 0) {
+        console.log('📋 Primeira especialidade:', JSON.stringify(uniqueSpecialties[0], null, 2));
+        console.log(`✅ Especialidades únicas: ${uniqueSpecialties.length} (após remover duplicatas)`);
       } else {
         console.log('❌ Nenhuma especialidade foi carregada!');
       }
-      setSpecialties(specialtiesData);
+      setSpecialties(uniqueSpecialties);
     } catch (error) {
       console.error('❌ Erro ao carregar especialidades:', error);
       setSpecialties([]);
@@ -173,6 +187,26 @@ const RegisterScreen = ({ navigation }) => {
 
     if (!result.success) {
       Alert.alert('Erro', result.error || 'Não foi possível criar a conta');
+    } else if (result.requiresApproval) {
+      // Médico precisa de aprovação
+      Alert.alert(
+        'Cadastro Realizado',
+        result.message || 'Seu processo está em análise. Acompanhe pelo seu email.',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Login'),
+          },
+        ]
+      );
+    } else {
+      // Cadastro bem-sucedido (outros perfis)
+      Alert.alert('Sucesso', 'Conta criada com sucesso!', [
+        {
+          text: 'OK',
+          onPress: () => navigation.navigate('Login'),
+        },
+      ]);
     }
   };
 

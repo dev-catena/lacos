@@ -42,7 +42,6 @@
       "softwareKeyboardLayoutMode": "pan"
     },
     "plugins": [
-      "expo-dev-client",
       "expo-asset",
       "expo-font",
       [
@@ -71,6 +70,12 @@
           "color": "#6366f1"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    },
+    "scheme": "lacos"
   }
 }

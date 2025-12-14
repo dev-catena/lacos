@@ -1,0 +1,82 @@
+{
+  "expo": {
+    "name": "Laços",
+    "slug": "lacos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#6366f1"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lacos.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Este app precisa acessar o microfone para gravar anotações de áudio sobre consultas.",
+        "NSContactsUsageDescription": "Este app precisa acessar seus contatos para facilitar as ligações.",
+        "NSLocationWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
+        "NSLocationAlwaysUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
+        "NSPhotoLibraryUsageDescription": "Este app precisa acessar suas fotos e vídeos para compartilhar momentos com o grupo de cuidados.",
+        "NSPhotoLibraryAddUsageDescription": "Este app precisa salvar fotos e vídeos na galeria para compartilhar momentos com o grupo de cuidados.",
+        "NSCameraUsageDescription": "Este app precisa acessar a câmera para consultas de vídeo com pacientes."
+      }
+    },
+    "android": {
+      "package": "com.lacos.app",
+      "permissions": [
+        "RECORD_AUDIO",
+        "CALL_PHONE",
+        "READ_CONTACTS",
+        "WRITE_CONTACTS",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM",
+        "CAMERA"
+      ],
+      "softwareKeyboardLayoutMode": "pan"
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Este app precisa acessar suas fotos e vídeos para compartilhar momentos com o grupo de cuidados."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Permitir que $(PRODUCT_NAME) acesse seu microfone para gravar anotações de áudio."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permitir que $(PRODUCT_NAME) use sua localização para encontrar farmácias próximas.",
+          "locationAlwaysPermission": "Permitir que $(PRODUCT_NAME) use sua localização para encontrar farmácias próximas.",
+          "locationWhenInUsePermission": "Permitir que $(PRODUCT_NAME) use sua localização para encontrar farmácias próximas."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#6366f1"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    },
+    "scheme": "lacos"
+  }
+}

@@ -12,6 +12,7 @@ import AppointmentDetailsScreen from '../screens/Patient/AppointmentDetailsScree
 import RecordingScreen from '../screens/Patient/RecordingScreen';
 import PatientProfileScreen from '../screens/Patient/PatientProfileScreen';
 import PatientJoinGroupScreen from '../screens/Patient/PatientJoinGroupScreen';
+import PatientVideoCallScreen from '../screens/Patient/PatientVideoCallScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -143,6 +144,14 @@ const PatientNavigator = () => {
       <Stack.Screen 
         name="AppointmentDetails" 
         component={AppointmentDetailsScreen} 
+      />
+      <Stack.Screen 
+        name="PatientVideoCall" 
+        component={PatientVideoCallScreen} 
+        options={{ 
+          headerShown: false,
+          gestureEnabled: false,
+        }}
       />
       <Stack.Screen 
         name="RecordingScreen" 

@@ -1,0 +1,19 @@
+# Execute estes comandos no servidor (como root):
+
+# Mover os arquivos do home do usuário darley
+mv /home/darley/create_plans_table.php /var/www/lacos-backend/
+mv /home/darley/create_user_plans_table.php /var/www/lacos-backend/
+mv /home/darley/Plan.php /var/www/lacos-backend/app/Models/
+mv /home/darley/PlanController.php /var/www/lacos-backend/app/Http/Controllers/Api/
+
+# Ajustar permissões
+chown www-data:www-data /var/www/lacos-backend/create_plans_table.php
+chown www-data:www-data /var/www/lacos-backend/create_user_plans_table.php
+chown www-data:www-data /var/www/lacos-backend/app/Models/Plan.php
+chown www-data:www-data /var/www/lacos-backend/app/Http/Controllers/Api/PlanController.php
+
+# Executar migrations
+cd /var/www/lacos-backend
+php artisan migrate --path=create_plans_table.php
+php artisan migrate --path=create_user_plans_table.php
+
