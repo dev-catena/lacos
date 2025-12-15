@@ -61,7 +61,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
       const result = await planService.getUserPlan();
       if (result.success && result.plan) {
         setUserPlan(result.plan);
-        console.log('📦 GroupDetail - Plano carregado:', result.plan.name, result.plan.features);
+        console.log('📦 GroupDetail - Plano carregado:', result.plan.name);
       } else {
         console.warn('⚠️ GroupDetail - Não foi possível carregar o plano do usuário');
       }
@@ -180,6 +180,20 @@ const GroupDetailScreen = ({ route, navigation }) => {
       color: colors.primary,
       backgroundColor: colors.primary + '20',
       onPress: () => navigation.navigate('GroupSettings', { 
+        groupId, 
+        groupName 
+      }),
+    },
+    {
+      id: 'fallSensor',
+      featureKey: 'sensorQuedas',
+      title: 'Sensor de Queda',
+      subtitle: 'Monitoramento de postura e quedas',
+      icon: 'warning',
+      IconComponent: null,
+      color: '#FF6B6B',
+      backgroundColor: '#FF6B6B20',
+      onPress: () => navigation.navigate('FallSensor', { 
         groupId, 
         groupName 
       }),

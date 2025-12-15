@@ -1,0 +1,34 @@
+# ============================================================================
+# SCRIPT PARA LISTAR GRUPOS E OBTER GROUP_ID
+# COPIAR E COLAR NO TERMINAL DO SERVIDOR
+# ============================================================================
+
+cd /var/www/lacos-backend
+
+# Descobrir nome do banco
+DB_NAME=$(sudo grep "^DB_DATABASE=" .env 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'" | tr -d ' ' | head -1)
+if [ -z "$DB_NAME" ]; then
+    DB_NAME="lacos"
+fi
+
+echo "📊 Banco de dados: $DB_NAME"
+echo ""
+echo "📋 Grupos disponíveis:"
+echo ""
+
+# Listar grupos (usando backticks porque 'groups' é palavra reservada)
+sudo mysql $DB_NAME -e "
+SELECT 
+    id as group_id,
+    name as nome_grupo,
+    created_by as criado_por,
+    created_at as criado_em
+FROM \`groups\`
+ORDER BY created_at DESC
+LIMIT 10;
+"
+
+echo ""
+echo "💡 Use o 'group_id' da primeira coluna nos testes da API"
+echo ""
+

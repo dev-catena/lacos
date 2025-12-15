@@ -25,6 +25,7 @@ import GroupContactsScreen from '../screens/Groups/GroupContactsScreen';
 import EditPatientDataScreen from '../screens/Groups/EditPatientDataScreen';
 import PanicSettingsScreen from '../screens/Groups/PanicSettingsScreen';
 import AddVitalSignsScreen from '../screens/Groups/AddVitalSignsScreen';
+import FallSensorScreen from '../screens/Groups/FallSensorScreen';
 import AgendaScreen from '../screens/Groups/AgendaScreen';
 import AddAppointmentScreen from '../screens/Groups/AddAppointmentScreen';
 import AppointmentDetailsScreen from '../screens/Groups/AppointmentDetailsScreen';
@@ -153,6 +154,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="AddVitalSigns" 
         component={AddVitalSignsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="FallSensor" 
+        component={FallSensorScreen}
         options={{ 
           headerShown: false 
         }}
@@ -427,6 +435,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="AddVitalSigns" 
         component={AddVitalSignsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="FallSensor" 
+        component={FallSensorScreen}
         options={{ 
           headerShown: false 
         }}

@@ -212,6 +212,22 @@ class PlanController extends Controller
 
             $plan = Plan::find($userPlan->plan_id);
 
+            // Garantir que features seja um array (não string JSON)
+            if ($plan && $plan->features) {
+                // Se features já é array (via cast), manter; se for string, fazer decode
+                if (is_string($plan->features)) {
+                    $plan->features = json_decode($plan->features, true);
+                }
+            }
+
+            \Log::info('PlanController::getUserPlan', [
+                'user_id' => $user->id,
+                'plan_id' => $plan->id ?? null,
+                'plan_name' => $plan->name ?? null,
+                'features' => $plan->features ?? null,
+                'sensorQuedas' => $plan->features['sensorQuedas'] ?? null,
+            ]);
+
             return response()->json([
                 'plan' => $plan,
                 'user_plan' => $userPlan,

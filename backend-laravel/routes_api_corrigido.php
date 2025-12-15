@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AdminDoctorController;
 use App\Http\Controllers\Api\AdminAuthController;
+use App\Http\Controllers\Api\FallSensorController;
 
 // ==================== ROTAS PÚBLICAS ====================
 
@@ -124,6 +125,12 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Vital Signs
     Route::apiResource('vital-signs', VitalSignController::class);
+    
+    // Fall Sensor (Sensor de Queda)
+    Route::post('/groups/{groupId}/fall-sensor/data', [FallSensorController::class, 'store']);
+    Route::get('/groups/{groupId}/fall-sensor/history', [FallSensorController::class, 'index']);
+    Route::get('/groups/{groupId}/fall-sensor/latest', [FallSensorController::class, 'getLatest']);
+    Route::get('/groups/{groupId}/fall-sensor/alerts', [FallSensorController::class, 'getFallAlerts']);
     
     // Documents (Documentos)
     Route::apiResource('documents', DocumentController::class);
