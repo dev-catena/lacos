@@ -22,23 +22,37 @@ function App() {
     usersService.setAccountBlockedCallback(() => {
       handleLogout();
     });
-    
-    // Verificar autenticação periodicamente (a cada 30 segundos)
-    // Isso garante que se o usuário for bloqueado, será desconectado
-    const interval = setInterval(() => {
-      checkAuth();
-    }, 30000); // 30 segundos
-
-    return () => clearInterval(interval);
   }, []);
 
   const checkAuth = async () => {
     try {
       const authenticated = await authService.checkAuth();
-      setIsAuthenticated(authenticated);
-      setUser(authService.getUser());
+      
+      // Se checkAuth retornou false mas ainda temos token no localStorage,
+      // pode ser erro temporário de rede. Manter autenticado se houver token.
+      if (!authenticated && authService.getToken()) {
+        // Verificar se temos usuário salvo no localStorage
+        const storedUser = authService.getUser();
+        if (storedUser) {
+          // Manter autenticado mesmo com erro temporário
+          setIsAuthenticated(true);
+          setUser(storedUser);
+        } else {
+          setIsAuthenticated(false);
+        }
+      } else {
+        setIsAuthenticated(authenticated);
+        setUser(authService.getUser());
+      }
     } catch (error) {
-      setIsAuthenticated(false);
+      // Em caso de erro, verificar se ainda temos token
+      if (authService.getToken() && authService.getUser()) {
+        // Manter autenticado se houver token e usuário salvos
+        setIsAuthenticated(true);
+        setUser(authService.getUser());
+      } else {
+        setIsAuthenticated(false);
+      }
     } finally {
       setLoading(false);
     }

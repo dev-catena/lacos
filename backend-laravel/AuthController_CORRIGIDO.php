@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use App\Services\WhatsAppService;
 
 class AuthController extends Controller
 {
@@ -241,6 +242,38 @@ class AuthController extends Controller
                 ], 401);
             }
 
+            // ==================== 2FA (Somente WhatsApp) ====================
+            // Se 2FA estiver ativo, não gerar token aqui. Envia código via WhatsApp e exige verificação.
+            if ($user->two_factor_enabled && $user->two_factor_method === 'whatsapp') {
+                // Gerar código de 6 dígitos
+                $code = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+
+                // Salvar código no banco com expiração (5 minutos)
+                $user->two_factor_code = Hash::make($code);
+                $user->two_factor_expires_at = now()->addMinutes(5);
+                $user->save();
+
+                // Enviar via WhatsApp
+                $whatsapp = new WhatsAppService();
+                $destPhone = $user->two_factor_phone ?? $user->phone;
+                $result = $whatsapp->sendVerificationCode($destPhone, $code);
+
+                if (!$result['success']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Erro ao enviar código via WhatsApp',
+                        'error' => $result['error'] ?? 'Erro desconhecido'
+                    ], 500);
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'requires_2fa' => true,
+                    'two_factor_method' => 'whatsapp',
+                    'message' => 'Código enviado via WhatsApp'
+                ]);
+            }
+
             // Criar token
             $token = $user->createToken('mobile-token')->plainTextToken;
 
@@ -255,6 +288,85 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erro ao fazer login',
+                'error' => config('app.debug') ? $e->getMessage() : 'Server Error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Verificar código 2FA durante login (rota pública)
+     * Body: { email, code }
+     */
+    public function verify2FALogin(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'email' => 'required|email',
+                'code' => 'required|string|size:6',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dados inválidos',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $user = User::where('email', $request->email)->first();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não encontrado',
+                ], 404);
+            }
+
+            if (!$user->two_factor_enabled || $user->two_factor_method !== 'whatsapp') {
+                return response()->json([
+                    'success' => false,
+                    'message' => '2FA não está habilitado para este usuário',
+                ], 400);
+            }
+
+            if (!$user->two_factor_code || !$user->two_factor_expires_at) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Código não encontrado ou expirado. Solicite um novo código.',
+                ], 400);
+            }
+
+            if (now()->greaterThan($user->two_factor_expires_at)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Código expirado. Solicite um novo código.',
+                ], 400);
+            }
+
+            if (!Hash::check($request->code, $user->two_factor_code)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Código inválido',
+                ], 400);
+            }
+
+            // Código válido - limpar código usado
+            $user->two_factor_code = null;
+            $user->two_factor_expires_at = null;
+            $user->save();
+
+            // Criar token e finalizar login
+            $token = $user->createToken('mobile-token')->plainTextToken;
+            return response()->json([
+                'success' => true,
+                'user' => $user,
+                'token' => $token,
+                'message' => 'Login realizado com sucesso',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Erro ao verificar 2FA no login: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao verificar código',
                 'error' => config('app.debug') ? $e->getMessage() : 'Server Error'
             ], 500);
         }
@@ -389,6 +501,318 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erro ao criar conta',
+                'error' => config('app.debug') ? $e->getMessage() : 'Server Error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Alterar senha do usuário autenticado
+     */
+    public function changePassword(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'current_password' => 'required|string',
+                'new_password' => 'required|string|min:6',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dados inválidos',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado'
+                ], 401);
+            }
+
+            // Verificar senha atual
+            if (!Hash::check($request->current_password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Senha atual incorreta',
+                    'error' => 'invalid_current_password'
+                ], 400);
+            }
+
+            // Verificar se a nova senha é diferente da atual
+            if (Hash::check($request->new_password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A nova senha deve ser diferente da senha atual',
+                    'error' => 'same_password'
+                ], 400);
+            }
+
+            // Atualizar senha
+            $user->password = Hash::make($request->new_password);
+            $user->save();
+
+            \Log::info('Senha alterada com sucesso', [
+                'user_id' => $user->id,
+                'email' => $user->email
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Senha alterada com sucesso'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Erro ao alterar senha: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao alterar senha',
+                'error' => config('app.debug') ? $e->getMessage() : 'Server Error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Ativar autenticação de dois fatores
+     */
+    public function enable2FA(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                // App agora suporta apenas WhatsApp
+                'method' => 'required|in:whatsapp',
+                'phone' => 'required|string|max:20',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dados inválidos',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado'
+                ], 401);
+            }
+
+            // Atualizar dados de 2FA
+            $user->two_factor_enabled = true;
+            $user->two_factor_method = 'whatsapp';
+            $user->two_factor_phone = $request->phone;
+
+            $user->save();
+
+            \Log::info('2FA ativado', [
+                'user_id' => $user->id,
+                'method' => $request->method,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Autenticação de dois fatores ativada',
+                'method' => $request->method,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Erro ao ativar 2FA: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao ativar autenticação de dois fatores',
+                'error' => config('app.debug') ? $e->getMessage() : 'Server Error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Desativar autenticação de dois fatores
+     */
+    public function disable2FA(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado'
+                ], 401);
+            }
+
+            // Desativar 2FA
+            $user->two_factor_enabled = false;
+            $user->two_factor_method = null;
+            $user->two_factor_phone = null;
+            $user->two_factor_code = null;
+            $user->two_factor_expires_at = null;
+            $user->two_factor_secret = null;
+            $user->save();
+
+            \Log::info('2FA desativado', [
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Autenticação de dois fatores desativada',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Erro ao desativar 2FA: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao desativar autenticação de dois fatores',
+                'error' => config('app.debug') ? $e->getMessage() : 'Server Error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Enviar código de verificação 2FA
+     */
+    public function send2FACode(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado'
+                ], 401);
+            }
+
+            if (!$user->two_factor_enabled) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Autenticação de dois fatores não está ativada'
+                ], 400);
+            }
+
+            // Gerar código de 6 dígitos
+            $code = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+
+            // Salvar código no banco com expiração (5 minutos)
+            $user->two_factor_code = Hash::make($code);
+            $user->two_factor_expires_at = now()->addMinutes(5);
+            $user->save();
+
+            // Enviar código via método configurado
+            if ($user->two_factor_method === 'whatsapp') {
+                $whatsappService = new \App\Services\WhatsAppService();
+                $result = $whatsappService->sendVerificationCode(
+                    $user->two_factor_phone ?? $user->phone,
+                    $code
+                );
+
+                if (!$result['success']) {
+                    \Log::error('Erro ao enviar código WhatsApp', [
+                        'user_id' => $user->id,
+                        'error' => $result['error'],
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Erro ao enviar código via WhatsApp',
+                        'error' => $result['error'],
+                    ], 500);
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Código enviado via WhatsApp',
+                ]);
+            } else {
+                // App autenticador não precisa enviar código
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Método de autenticação inválido',
+                ], 400);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Erro ao enviar código 2FA: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao enviar código de verificação',
+                'error' => config('app.debug') ? $e->getMessage() : 'Server Error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Verificar código 2FA
+     */
+    public function verify2FACode(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'code' => 'required|string|size:6',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Código inválido',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado'
+                ], 401);
+            }
+
+            // Verificar se código existe e não expirou
+            if (!$user->two_factor_code || !$user->two_factor_expires_at) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Código não encontrado ou expirado. Solicite um novo código.',
+                ], 400);
+            }
+
+            if (now()->greaterThan($user->two_factor_expires_at)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Código expirado. Solicite um novo código.',
+                ], 400);
+            }
+
+            // Verificar código
+            if (!Hash::check($request->code, $user->two_factor_code)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Código inválido',
+                ], 400);
+            }
+
+            // Código válido - limpar código usado
+            $user->two_factor_code = null;
+            $user->two_factor_expires_at = null;
+            $user->save();
+
+            \Log::info('Código 2FA verificado com sucesso', [
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Código verificado com sucesso',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Erro ao verificar código 2FA: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao verificar código',
                 'error' => config('app.debug') ? $e->getMessage() : 'Server Error'
             ], 500);
         }

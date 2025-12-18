@@ -9,12 +9,25 @@ import Toast from 'react-native-toast-message';
 import { AuthProvider } from './src/contexts/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
 
+// Criar navigationRef para preservar estado de navegação
+export const navigationRef = React.createRef();
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <AuthProvider>
-          <NavigationContainer>
+          <NavigationContainer 
+            ref={navigationRef}
+            onReady={() => {
+              console.log('🧭 NavigationContainer pronto');
+            }}
+            onStateChange={(state) => {
+              // Preservar estado de navegação
+              const currentRoute = state?.routes[state?.index]?.name;
+              console.log('🧭 NavigationContainer - Rota atual:', currentRoute);
+            }}
+          >
             <RootNavigator />
             <Toast />
           </NavigationContainer>

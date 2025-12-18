@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiService from '../services/apiService';
 
@@ -9,6 +9,8 @@ export const AuthContext = createContext({});
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isRegistering, setIsRegistering] = useState(false); // Flag para indicar que estamos em processo de registro
+  const [savedFormData, setSavedFormData] = useState(null); // Salvar dados do formulário quando há erro de email
 
   // Carrega os dados do usuário ao iniciar o app
   useEffect(() => {
@@ -29,7 +31,7 @@ export const AuthProvider = ({ children }) => {
         console.log('🔑 AuthContext - Token encontrado, validando com servidor...');
         const parsedUser = JSON.parse(storedUser);
         console.log('🔑 AuthContext - User do storage:', parsedUser.name);
-        
+         
         // Validar token com o servidor
         try {
           const response = await apiService.get('/user');
@@ -60,13 +62,26 @@ export const AuthProvider = ({ children }) => {
   const signIn = async (email, password) => {
     try {
       console.log('🔑 AuthContext - Iniciando login...');
-      setLoading(true);
       
       // Chamada à API real
       const response = await apiService.post('/login', 
         { email, password },
         { requiresAuth: false }
       );
+
+      // Fluxo 2FA: backend pode responder com requires_2fa=true e NÃO retornar token
+      if (response && response.requires_2fa) {
+        console.log('🔐 AuthContext - Login requer 2FA (WhatsApp)');
+        // Garantir que não persistimos sessão parcial
+        await AsyncStorage.removeItem('@lacos:user');
+        await AsyncStorage.removeItem('@lacos:token');
+        setUser(null);
+        return {
+          success: false,
+          requires2FA: true,
+          message: response.message || 'Código enviado via WhatsApp',
+        };
+      }
 
       console.log('🔑 AuthContext - Login bem-sucedido:', response.user.name);
 
@@ -111,8 +126,34 @@ export const AuthProvider = ({ children }) => {
         success: false, 
         error: errorMessage
       };
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  // Concluir login com 2FA (código enviado via WhatsApp)
+  const completeTwoFactorLogin = async (email, code) => {
+    try {
+      const response = await apiService.post(
+        '/2fa/login/verify',
+        { email, code },
+        { requiresAuth: false }
+      );
+
+      if (response && response.token && response.user) {
+        await AsyncStorage.setItem('@lacos:user', JSON.stringify(response.user));
+        await AsyncStorage.setItem('@lacos:token', response.token);
+        setUser(response.user);
+        return { success: true };
+      }
+
+      return {
+        success: false,
+        error: response?.message || response?.error || 'Não foi possível validar o código',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error?.message || 'Erro ao validar código',
+      };
     }
   };
 
@@ -120,15 +161,26 @@ export const AuthProvider = ({ children }) => {
   const signUp = async (userData) => {
     try {
       console.log('🔑 AuthContext - Iniciando cadastro...');
-      setLoading(true);
+      setIsRegistering(true); // IMPORTANTE: Setar flag ANTES de fazer a chamada
+      console.log('🔑 AuthContext - isRegistering setado para TRUE');
       
       // Preparar dados para API
+      // Processar telefone: remover formatação e manter apenas +55 + dígitos
+      let phoneValue = null;
+      if (userData.phone && userData.phone.trim() && userData.phone !== '+55') {
+        // Garantir que começa com +55 e extrair apenas os dígitos após +55
+        const digits = userData.phone.replace(/\+55/g, '').replace(/\D/g, '');
+        if (digits.length > 0) {
+          phoneValue = `+55${digits}`;
+        }
+      }
+
       const registerData = {
         name: `${userData.name} ${userData.lastName || ''}`.trim(),
         email: userData.email,
         password: userData.password,
         password_confirmation: userData.password,
-        phone: userData.phone,
+        phone: phoneValue,
         birth_date: userData.birthDate,
         gender: userData.gender,
         profile: userData.profile || 'caregiver', // Novo: Perfil do usuário
@@ -191,15 +243,28 @@ export const AuthProvider = ({ children }) => {
       
       // Tratar erros de validação (422) com mensagens específicas
       if (error.status === 422 && error.errors) {
+        console.log('🔑 AuthContext - Erro 422 detectado, errors:', error.errors);
+        
         // Extrair todas as mensagens de erro de validação
         const errorMessages = [];
+        let isEmailFieldError = false;
+        
         Object.keys(error.errors).forEach(field => {
+          // Verificar se é erro no campo email
+          if (field === 'email' || field.toLowerCase().includes('email')) {
+            isEmailFieldError = true;
+          }
+          
           if (Array.isArray(error.errors[field])) {
             error.errors[field].forEach(msg => {
               // Traduzir mensagens do Laravel para português
               let translatedMsg = msg;
-              if (msg.includes('email has already been taken') || msg.includes('email já está em uso')) {
+              if (msg.includes('email has already been taken') || 
+                  msg.includes('email já está em uso') ||
+                  msg.includes('has already been taken') ||
+                  msg.toLowerCase().includes('already been taken')) {
                 translatedMsg = 'Este email já está cadastrado. Use outro email ou faça login.';
+                isEmailFieldError = true;
               } else if (msg.includes('password')) {
                 translatedMsg = 'A senha deve ter pelo menos 6 caracteres.';
               } else if (msg.includes('required')) {
@@ -219,19 +284,70 @@ export const AuthProvider = ({ children }) => {
           ? errorMessages[0] 
           : (error.message || 'Erro ao criar conta. Verifique os dados e tente novamente.');
         
+        console.log('🔑 AuthContext - Mensagem final:', finalMessage, 'É erro de email?', isEmailFieldError);
+        
+        // Se for erro de email, MANTER isRegistering=true explicitamente E salvar dados do formulário
+        if (isEmailFieldError) {
+          console.log('🔑 AuthContext - ✅ ERRO DE EMAIL - Mantendo isRegistering=TRUE para preservar navegação');
+          setIsRegistering(true); // Garantir que está true
+          // Salvar TODOS os dados do formulário para restaurar depois (caso componente seja remontado)
+          if (userData) {
+            // Criar cópia completa de todos os campos do formulário
+            const fullFormData = {
+              name: userData.name || '',
+              lastName: userData.lastName || '',
+              email: userData.email || '',
+              phone: userData.phone || '+55',
+              password: '', // Não salvar senha por segurança
+              confirmPassword: '', // Não salvar senha por segurança
+              profile: userData.profile || 'caregiver',
+              // Campos específicos de cuidador profissional e médico
+              gender: userData.gender || '',
+              city: userData.city || '',
+              neighborhood: userData.neighborhood || '',
+              formation_details: userData.formation_details || '',
+              hourly_rate: userData.hourly_rate || '',
+              availability: userData.availability || '',
+              // Campos específicos de médico
+              crm: userData.crm || '',
+              medical_specialty_id: userData.medical_specialty_id || null,
+            };
+            console.log('🔑 AuthContext - Salvando formData COMPLETO para restaurar depois:', fullFormData);
+            setSavedFormData(fullFormData);
+          }
+        } else {
+          console.log('🔑 AuthContext - ⚠️ Erro não é de email - Limpando isRegistering');
+          setIsRegistering(false); // Só limpar se não for erro de email
+          setSavedFormData(null); // Limpar dados salvos
+        }
+        
         return { 
           success: false, 
-          error: finalMessage
+          error: finalMessage,
+          isEmailError: isEmailFieldError // Adicionar flag para facilitar detecção
         };
       }
       
+      setIsRegistering(false); // Outros erros, limpar flag
       return { 
         success: false, 
         error: error.message || 'Erro ao criar conta. Tente novamente.' 
       };
     } finally {
-      setLoading(false);
+      // NÃO limpar isRegistering aqui - deixar a tela de registro limpar quando necessário
     }
+  };
+
+  // Função para limpar flag de registro (chamada pela tela de registro quando necessário)
+  const clearRegistering = () => {
+    console.log('🔑 AuthContext - Limpando flag isRegistering');
+    setIsRegistering(false);
+    setSavedFormData(null); // Limpar dados salvos também
+  };
+  
+  // Função para obter dados salvos do formulário
+  const getSavedFormData = () => {
+    return savedFormData;
   };
 
   // Função de logout
@@ -319,11 +435,16 @@ export const AuthProvider = ({ children }) => {
         signed: !!user,
         user,
         loading,
+        isRegistering, // Adicionar flag de registro
+        savedFormData, // Dados salvos do formulário
         signIn,
+        completeTwoFactorLogin,
         signUp,
         signOut,
         updateUser,
         forceLogout,
+        clearRegistering, // Função para limpar flag
+        getSavedFormData, // Função para obter dados salvos
       }}
     >
       {children}

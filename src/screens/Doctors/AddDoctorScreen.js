@@ -29,11 +29,56 @@ const AddDoctorScreen = ({ route, navigation }) => {
   const { groupId, groupName, doctor, isEditing = false } = route.params;
   const googlePlacesRef = useRef(null);
 
+  // Função para formatar telefone: +55(00)00000-0000 (definida antes do useState)
+  const formatPhone = (text) => {
+    // Se o texto não começar com +55, garantir que comece
+    let cleanText = text;
+    if (!text || !text.startsWith('+55')) {
+      // Se não começar com +55, adicionar
+      const digits = text ? text.replace(/\D/g, '') : '';
+      cleanText = '+55' + digits;
+    }
+    
+    // Remove o +55 temporariamente para processar apenas os dígitos
+    const digitsOnly = cleanText.replace(/\+55/g, '').replace(/\D/g, '');
+    
+    // Limita a 11 dígitos (DDD + número)
+    const limitedDigits = digitsOnly.slice(0, 11);
+    
+    // Sempre começa com +55
+    let formatted = '+55';
+    
+    if (limitedDigits.length > 0) {
+      formatted += `(${limitedDigits.slice(0, 2)}`;
+    }
+    
+    if (limitedDigits.length > 2) {
+      formatted += `)${limitedDigits.slice(2, 7)}`;
+    }
+    
+    if (limitedDigits.length > 7) {
+      formatted += `-${limitedDigits.slice(7, 11)}`;
+    }
+    
+    return formatted;
+  };
+
+  // Função auxiliar para formatar telefone existente ao carregar
+  const formatExistingPhone = (phone) => {
+    if (!phone) return '+55';
+    // Se já começa com +55, formatar
+    if (phone.startsWith('+55')) {
+      return formatPhone(phone);
+    }
+    // Se não começa com +55, adicionar e formatar
+    return formatPhone('+55' + phone.replace(/\D/g, ''));
+  };
+
   const [formData, setFormData] = useState({
     name: doctor?.name || '',
     medicalSpecialtyId: doctor?.medical_specialty_id || null,
     crm: doctor?.crm || '',
-    phone: doctor?.phone || '',
+    phone: formatExistingPhone(doctor?.phone),
     email: doctor?.email || '',
     address: doctor?.address || '',
     notes: doctor?.notes || '',
@@ -81,6 +126,34 @@ const AddDoctorScreen = ({ route, navigation }) => {
 
   const updateField = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Função para extrair apenas os dígitos do telefone (sem +55)
+  const extractPhoneDigits = (formattedPhone) => {
+    // Remove +55 e todos os caracteres não numéricos
+    return formattedPhone.replace(/\+55/g, '').replace(/\D/g, '');
+  };
+
+  // Handler para mudança do campo telefone
+  const handlePhoneChange = (text) => {
+    // Se o texto estiver vazio ou não começar com +55, garantir +55
+    if (!text || text.length === 0) {
+      updateField('phone', '+55');
+      return;
+    }
+    
+    // Se o usuário tentar apagar o +55, restaurar
+    if (!text.startsWith('+55')) {
+      // Se não começar com +55, adicionar +55 e formatar
+      const digits = text.replace(/\D/g, '');
+      const formatted = formatPhone('+55' + digits);
+      updateField('phone', formatted);
+      return;
+    }
+    
+    // Formatar o telefone mantendo o +55
+    const formatted = formatPhone(text);
+    updateField('phone', formatted);
   };
 
   const checkDuplicateDoctor = async (name, crm) => {
@@ -164,12 +237,22 @@ const AddDoctorScreen = ({ route, navigation }) => {
 
   const proceedWithSave = async () => {
     try {
+      // Preparar telefone: remover formatação e manter apenas +55 + dígitos
+      let phoneValue = null;
+      if (formData.phone && formData.phone.trim()) {
+        // Garantir que começa com +55 e extrair apenas os dígitos após +55
+        const digits = extractPhoneDigits(formData.phone);
+        if (digits.length > 0) {
+          phoneValue = `+55${digits}`;
+        }
+      }
+
       const doctorData = {
         group_id: groupId,
         name: formData.name.trim(),
         medical_specialty_id: formData.medicalSpecialtyId,
         crm: formData.crm.trim() || null,
-        phone: formData.phone.trim() || null,
+        phone: phoneValue,
         email: formData.email.trim() || null,
         address: formData.address.trim() || null,
         notes: formData.notes.trim() || null,
@@ -383,12 +466,16 @@ const AddDoctorScreen = ({ route, navigation }) => {
               <TextInput
                 style={styles.input}
                 value={formData.phone}
-                onChangeText={(text) => updateField('phone', text)}
-                placeholder="(11) 98765-4321"
+                onChangeText={handlePhoneChange}
+                placeholder="+55(00)00000-0000"
                 placeholderTextColor={colors.gray400}
                 keyboardType="phone-pad"
+                // Não usar maxLength - a função formatPhone já limita a 11 dígitos
               />
             </View>
+            <Text style={styles.hint}>
+              Formato: +55(DDD)XXXXX-XXXX (11 dígitos)
+            </Text>
           </View>
 
           {/* Email */}

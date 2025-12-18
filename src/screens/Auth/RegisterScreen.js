@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -15,18 +16,22 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import { LacosLogoFull } from '../../components/LacosLogo';
 import medicalSpecialtyService from '../../services/medicalSpecialtyService';
+import { navigationRef } from '../../../App';
 
 const RegisterScreen = ({ navigation }) => {
-  const { signUp } = useAuth();
+  const { signUp, clearRegistering, savedFormData, getSavedFormData, isRegistering } = useAuth();
+  const scrollViewRef = React.useRef(null);
+  const emailInputRef = React.useRef(null);
   const [formData, setFormData] = useState({
     name: '',
     lastName: '',
     email: '',
-    phone: '',
+    phone: '+55', // Inicializar com +55
     password: '',
     confirmPassword: '',
     profile: 'caregiver', // Padrão: Cuidador
@@ -48,9 +53,133 @@ const RegisterScreen = ({ navigation }) => {
   const [specialtyModalVisible, setSpecialtyModalVisible] = useState(false);
   const [loadingSpecialties, setLoadingSpecialties] = useState(false);
   const [selectedSpecialtyName, setSelectedSpecialtyName] = useState('');
+  const [emailError, setEmailError] = useState('');
+
+  // Restaurar dados salvos quando a tela recebe foco e há dados salvos
+  useFocusEffect(
+    useCallback(() => {
+      const saved = getSavedFormData();
+      if (saved && isRegistering) {
+        console.log('📝 RegisterScreen - Restaurando dados salvos do formulário:', saved);
+        // Restaurar TODOS os campos salvos, mantendo apenas senhas vazias
+        setFormData(saved);
+        setEmailError('Este email já está cadastrado. Use outro email ou faça login.');
+        
+        // Carregar especialidades se for médico (para restaurar o nome depois)
+        if (saved.profile === 'doctor') {
+          loadSpecialties();
+        }
+        
+        // Focar no campo de email após restaurar
+        setTimeout(() => {
+          if (emailInputRef.current) {
+            emailInputRef.current.focus();
+          }
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({ y: 250, animated: true });
+          }
+        }, 300);
+        
+        // Mostrar Toast
+        Toast.show({
+          type: 'error',
+          text1: 'Email já cadastrado',
+          text2: 'Este email já está cadastrado. Use outro email ou faça login.',
+          position: 'top',
+          visibilityTime: 4000,
+        });
+      }
+    }, [getSavedFormData, isRegistering])
+  );
+
+  // Debug: Monitorar mudanças no emailError
+  useEffect(() => {
+    console.log('📝 RegisterScreen - emailError mudou:', emailError);
+    if (emailError) {
+      console.log('📝 RegisterScreen - ✅ emailError está DEFINIDO, deve aparecer na tela');
+    } else {
+      console.log('📝 RegisterScreen - ⚠️ emailError está VAZIO');
+    }
+  }, [emailError]);
+
+  // Limpar flag de registro quando sair da tela (mas NÃO quando há erro de email)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📝 RegisterScreen - Tela recebeu foco');
+      
+      // Cleanup: limpar flag quando sair da tela
+      // IMPORTANTE: Só limpar se não houver erro de email ativo
+      return () => {
+        console.log('📝 RegisterScreen - Tela perdeu foco');
+        // Só limpar se não houver erro de email ativo
+        if (!emailError) {
+          console.log('📝 RegisterScreen - Sem erro de email, limpando isRegistering');
+          clearRegistering();
+        } else {
+          console.log('📝 RegisterScreen - Erro de email ativo, MANTENDO isRegistering');
+        }
+      };
+    }, [clearRegistering, emailError])
+  );
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Função para formatar telefone: +55(00)00000-0000
+  const formatPhone = (text) => {
+    // Se o texto não começar com +55, garantir que comece
+    let cleanText = text;
+    if (!text || !text.startsWith('+55')) {
+      // Se não começar com +55, adicionar
+      const digits = text ? text.replace(/\D/g, '') : '';
+      cleanText = '+55' + digits;
+    }
+    
+    // Remove o +55 temporariamente para processar apenas os dígitos
+    const digitsOnly = cleanText.replace(/\+55/g, '').replace(/\D/g, '');
+    
+    // Limita a 11 dígitos (DDD + número)
+    const limitedDigits = digitsOnly.slice(0, 11);
+    
+    // Sempre começa com +55
+    let formatted = '+55';
+    
+    if (limitedDigits.length > 0) {
+      formatted += `(${limitedDigits.slice(0, 2)}`;
+    }
+    
+    if (limitedDigits.length > 2) {
+      formatted += `)${limitedDigits.slice(2, 7)}`;
+    }
+    
+    if (limitedDigits.length > 7) {
+      formatted += `-${limitedDigits.slice(7, 11)}`;
+    }
+    
+    return formatted;
+  };
+
+  // Handler para mudança do campo telefone
+  const handlePhoneChange = (text) => {
+    // Se o texto estiver vazio ou não começar com +55, garantir +55
+    if (!text || text.length === 0) {
+      updateFormData('phone', '+55');
+      return;
+    }
+    
+    // Se o usuário tentar apagar o +55, restaurar
+    if (!text.startsWith('+55')) {
+      // Se não começar com +55, adicionar +55 e formatar
+      const digits = text.replace(/\D/g, '');
+      const formatted = formatPhone('+55' + digits);
+      updateFormData('phone', formatted);
+      return;
+    }
+    
+    // Formatar o telefone mantendo o +55
+    const formatted = formatPhone(text);
+    updateFormData('phone', formatted);
   };
 
   // Carregar especialidades quando o perfil for médico
@@ -147,6 +276,10 @@ const RegisterScreen = ({ navigation }) => {
   }, [formData.medical_specialty_id, specialties]);
 
   const handleRegister = async () => {
+    // 🧪 TESTE: Log bem visível para verificar se o código está sendo executado
+    console.log('🧪🧪🧪 TESTE - handleRegister foi chamado! 🧪🧪🧪');
+    console.log('🧪 TESTE - Dados do formulário:', { email: formData.email, profile: formData.profile });
+    
     // Validações básicas
     if (!formData.name || !formData.lastName || !formData.email || !formData.password) {
       Alert.alert('Atenção', 'Por favor, preencha todos os campos obrigatórios');
@@ -182,31 +315,146 @@ const RegisterScreen = ({ navigation }) => {
     }
 
     setLoading(true);
+    setEmailError(''); // Limpar erro anterior
+    
+    console.log('📝 RegisterScreen - Iniciando signUp com email:', formData.email);
     const result = await signUp(formData);
     setLoading(false);
 
+    console.log('📝 RegisterScreen - Resultado completo do signUp:', JSON.stringify(result, null, 2));
+    console.log('📝 RegisterScreen - result.success:', result.success);
+    console.log('📝 RegisterScreen - result.error:', result.error);
+    console.log('📝 RegisterScreen - result.isEmailError:', result.isEmailError);
+
+    // TESTE: Verificar TODOS os casos de erro
+    if (!result) {
+      console.log('📝 RegisterScreen - ❌ RESULT É NULL/UNDEFINED');
+      setEmailError('Erro desconhecido. Tente novamente.');
+      return;
+    }
+
     if (!result.success) {
-      Alert.alert('Erro', result.error || 'Não foi possível criar a conta');
-    } else if (result.requiresApproval) {
-      // Médico precisa de aprovação
-      Alert.alert(
-        'Cadastro Realizado',
-        result.message || 'Seu processo está em análise. Acompanhe pelo seu email.',
-        [
+      console.log('📝 RegisterScreen - ⚠️ ERRO DETECTADO - result.success é false');
+      console.log('📝 RegisterScreen - result completo:', JSON.stringify(result, null, 2));
+      
+      // Verificar se é erro de email duplicado - usar flag do AuthContext ou detectar pela mensagem
+      const errorText = (result?.error || result?.message || '').toLowerCase();
+      console.log('📝 RegisterScreen - errorText extraído:', errorText);
+      
+      const isEmailError = result?.isEmailError === true || (
+        errorText && (
+          errorText.includes('email já está cadastrado') ||
+          errorText.includes('email has already been taken') ||
+          errorText.includes('email já existe') ||
+          errorText.includes('the email has already been taken') ||
+          errorText.includes('already been taken') ||
+          (errorText.includes('email') && (errorText.includes('cadastrado') || errorText.includes('taken') || errorText.includes('já')))
+        )
+      );
+      
+      console.log('📝 RegisterScreen - É erro de email?', isEmailError);
+      console.log('📝 RegisterScreen - errorText:', errorText);
+      console.log('📝 RegisterScreen - isEmailError flag do result:', result?.isEmailError);
+      console.log('📝 RegisterScreen - result.error:', result?.error);
+      console.log('📝 RegisterScreen - result.message:', result?.message);
+      
+      if (isEmailError) {
+        // Para erro de email, mostrar mensagem no campo e manter no formulário
+        // NÃO mostrar Alert - apenas mensagem no campo para evitar qualquer redirecionamento
+        const errorMessage = result.error || 'Este email já está cadastrado. Use outro email ou faça login.';
+        
+        console.log('📝 RegisterScreen - ✅ ERRO DE EMAIL DETECTADO!');
+        console.log('📝 RegisterScreen - Definindo emailError:', errorMessage);
+        
+        setEmailError(errorMessage);
+        
+        console.log('📝 RegisterScreen - EmailError definido no estado:', errorMessage);
+        console.log('📝 RegisterScreen - NÃO VAI REDIRECIONAR - retornando AGORA');
+        console.log('📝 RegisterScreen - Usuário permanece no formulário para corrigir o email');
+        console.log('📝 RegisterScreen - isRegistering será mantido no AuthContext para preservar navegação');
+        console.log('📝 RegisterScreen - formData preservado:', { 
+          name: formData.name, 
+          email: formData.email,
+          phone: formData.phone,
+          profile: formData.profile 
+        });
+        
+        // Mostrar Toast com a mensagem de erro
+        Toast.show({
+          type: 'error',
+          text1: 'Email já cadastrado',
+          text2: errorMessage,
+          position: 'top',
+          visibilityTime: 4000,
+        });
+        
+        // NÃO fazer navegação forçada - isso causa remontagem e perde os dados!
+        // O isRegistering já está mantendo o AuthNavigator, então não precisa navegar
+        
+        // Focar no campo de email e rolar até ele após um pequeno delay
+        // Usar múltiplos timeouts para garantir que o componente está renderizado
+        setTimeout(() => {
+          console.log('📝 RegisterScreen - Tentativa 1: Focando no campo de email');
+          if (emailInputRef.current) {
+            emailInputRef.current.focus();
+            console.log('📝 RegisterScreen - ✅ Campo de email recebeu foco (tentativa 1)');
+          } else {
+            console.log('📝 RegisterScreen - ⚠️ emailInputRef ainda não disponível (tentativa 1)');
+          }
+          
+          // Rolar até o campo de email
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({ y: 250, animated: true });
+            console.log('📝 RegisterScreen - Scroll executado para campo de email');
+          }
+        }, 500);
+        
+        // Segunda tentativa de foco (caso a primeira não funcione)
+        setTimeout(() => {
+          console.log('📝 RegisterScreen - Tentativa 2: Focando no campo de email');
+          if (emailInputRef.current) {
+            emailInputRef.current.focus();
+            console.log('📝 RegisterScreen - ✅ Campo de email recebeu foco (tentativa 2)');
+          }
+        }, 1000);
+        
+        // IMPORTANTE: NÃO mostrar Alert para evitar qualquer interação que possa causar redirecionamento
+        // A mensagem de erro já está sendo exibida abaixo do campo de email
+        // Retornar IMEDIATAMENTE para não continuar o fluxo
+        console.log('📝 RegisterScreen - ⛔ RETORNANDO AGORA - NÃO DEVE CONTINUAR');
+        return; // Este return DEVE parar a execução aqui - usuário fica no formulário
+      } else {
+        // Para outros erros, mostrar alerta genérico
+        console.log('📝 RegisterScreen - Erro não é de email, mostrando alerta genérico');
+        Alert.alert('Erro', result.error || 'Não foi possível criar a conta');
+        return; // Também retornar aqui para não continuar
+      }
+    } else if (result.success || result.requiresApproval) {
+      // Cadastro bem-sucedido ou requer aprovação
+      console.log('📝 RegisterScreen - Cadastro bem-sucedido ou requer aprovação');
+      clearRegistering(); // Limpar flag de registro
+      
+      if (result.requiresApproval) {
+        // Médico precisa de aprovação
+        Alert.alert(
+          'Cadastro Realizado',
+          result.message || 'Seu processo está em análise. Acompanhe pelo seu email.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('Login'),
+            },
+          ]
+        );
+      } else {
+        // Cadastro bem-sucedido (outros perfis)
+        Alert.alert('Sucesso', 'Conta criada com sucesso!', [
           {
             text: 'OK',
             onPress: () => navigation.navigate('Login'),
           },
-        ]
-      );
-    } else {
-      // Cadastro bem-sucedido (outros perfis)
-      Alert.alert('Sucesso', 'Conta criada com sucesso!', [
-        {
-          text: 'OK',
-          onPress: () => navigation.navigate('Login'),
-        },
-      ]);
+        ]);
+      }
     }
   };
 
@@ -218,6 +466,7 @@ const RegisterScreen = ({ navigation }) => {
         style={styles.keyboardView}
       >
         <ScrollView
+          ref={scrollViewRef}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
@@ -268,27 +517,47 @@ const RegisterScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>E-mail *</Text>
               <TextInput
-                style={styles.input}
+                ref={emailInputRef}
+                style={[styles.input, emailError && styles.inputError]}
                 placeholder="seu@email.com"
                 placeholderTextColor={colors.placeholder}
                 value={formData.email}
-                onChangeText={(value) => updateFormData('email', value)}
+                onChangeText={(value) => {
+                  updateFormData('email', value);
+                  // Limpar erro quando o usuário começar a digitar
+                  if (emailError) {
+                    setEmailError('');
+                    // Limpar flag de registro quando o usuário corrigir o email
+                    // Isso permite que o RootNavigator funcione normalmente
+                    console.log('📝 RegisterScreen - Email corrigido, limpando isRegistering');
+                    clearRegistering();
+                  }
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
               />
+              {emailError ? (
+                <View style={{ marginTop: 4 }}>
+                  <Text style={styles.errorText}>{emailError}</Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Celular (opcional)</Text>
               <TextInput
                 style={styles.input}
-                placeholder="(00) 00000-0000"
+                placeholder="+55(00)00000-0000"
                 placeholderTextColor={colors.placeholder}
-                value={formData.phone}
-                onChangeText={(value) => updateFormData('phone', value)}
+                value={formData.phone || '+55'}
+                onChangeText={handlePhoneChange}
                 keyboardType="phone-pad"
+                // Não usar maxLength - a função formatPhone já limita a 11 dígitos
               />
+              <Text style={styles.hint}>
+                Formato: +55(DDD)XXXXX-XXXX (11 dígitos)
+              </Text>
             </View>
 
             {/* Seletor de Perfil */}
@@ -830,6 +1099,23 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: colors.text,
+  },
+  hint: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  inputError: {
+    borderColor: colors.error,
+    borderWidth: 2,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+    fontWeight: '500',
   },
   passwordContainer: {
     flexDirection: 'row',

@@ -89,6 +89,14 @@ class AuthService {
       });
 
       if (!response.ok) {
+        // Só fazer logout em casos específicos de autenticação inválida
+        if (response.status === 401) {
+          // Token inválido ou expirado
+          console.warn('Token inválido ou expirado, fazendo logout');
+          this.logout();
+          return false;
+        }
+        
         // Se for erro 403 com account_blocked, o usuário foi bloqueado
         if (response.status === 403) {
           const errorData = await response.json().catch(() => ({}));
@@ -98,7 +106,10 @@ class AuthService {
             return false;
           }
         }
-        this.logout();
+        
+        // Para outros erros (500, 503, etc), não fazer logout
+        // Apenas retornar false e manter a sessão
+        console.warn('Erro ao verificar autenticação (status:', response.status, '), mantendo sessão');
         return false;
       }
 
@@ -115,8 +126,9 @@ class AuthService {
       localStorage.setItem('@lacos:user', JSON.stringify(user));
       return true;
     } catch (error) {
-      console.error('Erro ao verificar autenticação:', error);
-      this.logout();
+      // Erros de rede (timeout, conexão perdida, etc) não devem fazer logout
+      // Apenas retornar false e manter a sessão
+      console.warn('Erro de rede ao verificar autenticação, mantendo sessão:', error.message);
       return false;
     }
   }

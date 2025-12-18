@@ -77,3 +77,6 @@ echo "   - Desinstale e reinstale o Expo Go"
 echo "   - Certifique-se de estar usando Expo Go SDK 54"
 echo "   - Verifique se o dispositivo está na mesma rede"
 
+
+
+

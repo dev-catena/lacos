@@ -52,3 +52,6 @@ echo "   2. Limpe o cache do Expo Go (Configurações > Apps > Expo Go > Limpar 
 echo "   3. Abra o Expo Go novamente"
 echo "   4. Escaneie o QR code novamente"
 
+
+
+

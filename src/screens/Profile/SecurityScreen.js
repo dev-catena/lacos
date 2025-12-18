@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,8 +14,11 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
+import userService from '../../services/userService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const SecurityScreen = ({ navigation }) => {
+  const { user, updateUser } = useAuth();
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [show2FA, setShow2FA] = useState(false);
   
@@ -30,9 +33,20 @@ const SecurityScreen = ({ navigation }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [twoFactorMethod, setTwoFactorMethod] = useState('sms'); // 'sms' ou 'app'
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Sincronizar UI com o usuário logado (quando disponível)
+    if (!user) return;
+
+    const enabled = !!user.two_factor_enabled;
+    setTwoFactorEnabled(enabled);
+
+    // Se existir telefone específico do 2FA, preferir; senão usar telefone do perfil
+    const phone = user.two_factor_phone || user.phone || '';
+    setPhoneNumber(phone);
+  }, [user]);
 
   const handleChangePassword = async () => {
     if (!passwordData.currentPassword) {
@@ -58,55 +72,73 @@ const SecurityScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // TODO: Integrar com API
-      // await changePassword(passwordData);
-      
-      Toast.show({
-        type: 'success',
-        text1: '✅ Senha alterada',
-        text2: 'Sua senha foi atualizada com sucesso',
-        position: 'bottom',
-      });
+      const result = await userService.changePassword(
+        passwordData.currentPassword,
+        passwordData.newPassword
+      );
 
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      });
-      setShowChangePassword(false);
+      if (result.success) {
+        Toast.show({
+          type: 'success',
+          text1: '✅ Senha alterada',
+          text2: result.message || 'Sua senha foi atualizada com sucesso',
+          position: 'bottom',
+        });
+
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+        setShowChangePassword(false);
+      } else {
+        // Exibir mensagem de erro específica
+        const errorMessage = result.error || 'Não foi possível alterar a senha';
+        Alert.alert('Erro', errorMessage);
+      }
     } catch (error) {
       console.error('Erro ao alterar senha:', error);
-      Alert.alert('Erro', 'Não foi possível alterar a senha');
+      const errorMessage = error.message || error.error || 'Não foi possível alterar a senha';
+      Alert.alert('Erro', errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   const handleEnable2FA = async () => {
-    if (twoFactorMethod === 'sms' && !phoneNumber) {
+    if (!phoneNumber) {
       Alert.alert('Erro', 'Digite um número de telefone');
       return;
     }
-
     setLoading(true);
 
     try {
-      // TODO: Integrar com API
-      // await enable2FA({ method: twoFactorMethod, phone: phoneNumber });
+      const result = await userService.enable2FA('whatsapp', phoneNumber);
       
-      setTwoFactorEnabled(true);
-      
-      Toast.show({
-        type: 'success',
-        text1: '✅ 2FA ativado',
-        text2: 'Autenticação de dois fatores configurada',
-        position: 'bottom',
-      });
+      if (result.success) {
+        setTwoFactorEnabled(true);
+        
+        Toast.show({
+          type: 'success',
+          text1: '✅ 2FA ativado',
+          text2: result.message || 'Autenticação de dois fatores via WhatsApp configurada',
+          position: 'bottom',
+        });
 
-      setShow2FA(false);
+        setShow2FA(false);
+
+        // Atualizar usuário em memória (para refletir o toggle imediatamente)
+        updateUser({
+          two_factor_enabled: true,
+          two_factor_method: 'whatsapp',
+          two_factor_phone: phoneNumber,
+        });
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível ativar a autenticação de dois fatores');
+      }
     } catch (error) {
       console.error('Erro ao ativar 2FA:', error);
-      Alert.alert('Erro', 'Não foi possível ativar a autenticação de dois fatores');
+      Alert.alert('Erro', error.message || 'Não foi possível ativar a autenticação de dois fatores');
     } finally {
       setLoading(false);
     }
@@ -123,19 +155,29 @@ const SecurityScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // TODO: Integrar com API
-              // await disable2FA();
+              const result = await userService.disable2FA();
               
-              setTwoFactorEnabled(false);
-              
-              Toast.show({
-                type: 'info',
-                text1: '2FA desativado',
-                text2: 'Autenticação de dois fatores removida',
-                position: 'bottom',
-              });
+              if (result.success) {
+                setTwoFactorEnabled(false);
+                
+                Toast.show({
+                  type: 'info',
+                  text1: '2FA desativado',
+                  text2: result.message || 'Autenticação de dois fatores removida',
+                  position: 'bottom',
+                });
+
+                updateUser({
+                  two_factor_enabled: false,
+                  two_factor_method: null,
+                  two_factor_phone: null,
+                });
+              } else {
+                Alert.alert('Erro', result.error || 'Não foi possível desativar o 2FA');
+              }
             } catch (error) {
-              Alert.alert('Erro', 'Não foi possível desativar o 2FA');
+              console.error('Erro ao desativar 2FA:', error);
+              Alert.alert('Erro', error.message || 'Não foi possível desativar o 2FA');
             }
           },
         },
@@ -268,7 +310,7 @@ const SecurityScreen = ({ navigation }) => {
           <View style={styles.section}>
             <TouchableOpacity
               style={styles.sectionHeader}
-              onPress={() => !twoFactorEnabled && setShow2FA(!show2FA)}
+              onPress={() => setShow2FA(!show2FA)}
               activeOpacity={0.7}
             >
               <View style={styles.sectionHeaderLeft}>
@@ -282,100 +324,53 @@ const SecurityScreen = ({ navigation }) => {
                   </Text>
                 </View>
               </View>
-              {twoFactorEnabled ? (
-                <Switch
-                  value={twoFactorEnabled}
-                  onValueChange={handleDisable2FA}
-                  trackColor={{ false: colors.gray300, true: colors.success }}
-                  thumbColor={colors.textWhite}
-                />
-              ) : (
-                <Ionicons 
-                  name={show2FA ? 'chevron-up' : 'chevron-down'} 
-                  size={24} 
-                  color={colors.gray400} 
-                />
-              )}
+              <Switch
+                value={twoFactorEnabled}
+                onValueChange={(v) => {
+                  if (v) {
+                    setShow2FA(true);
+                  } else {
+                    handleDisable2FA();
+                  }
+                }}
+                trackColor={{ false: colors.gray300, true: colors.success }}
+                thumbColor={colors.textWhite}
+              />
             </TouchableOpacity>
 
             {show2FA && !twoFactorEnabled && (
               <View style={styles.expandedContent}>
                 <Text style={styles.helpText}>
-                  Escolha como deseja receber o código de verificação:
+                  Ative para receber um código de verificação via WhatsApp ao fazer login.
                 </Text>
 
-                {/* Método SMS */}
-                <TouchableOpacity
-                  style={[
-                    styles.methodCard,
-                    twoFactorMethod === 'sms' && styles.methodCardActive,
-                  ]}
-                  onPress={() => setTwoFactorMethod('sms')}
-                >
+                <View style={[styles.methodCard, styles.methodCardActive]}>
                   <View style={styles.methodIcon}>
-                    <Ionicons 
-                      name="chatbubble" 
-                      size={24} 
-                      color={twoFactorMethod === 'sms' ? colors.primary : colors.gray400} 
-                    />
+                    <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
                   </View>
                   <View style={styles.methodContent}>
-                    <Text style={styles.methodTitle}>SMS</Text>
-                    <Text style={styles.methodSubtitle}>Receber código por SMS</Text>
+                    <Text style={styles.methodTitle}>WhatsApp</Text>
+                    <Text style={styles.methodSubtitle}>Receber código por WhatsApp</Text>
                   </View>
-                  {twoFactorMethod === 'sms' && (
-                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
+                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                </View>
 
-                {twoFactorMethod === 'sms' && (
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Número de Telefone *</Text>
-                    <View style={styles.inputWrapper}>
-                      <Ionicons name="call-outline" size={20} color={colors.gray400} />
-                      <TextInput
-                        style={styles.input}
-                        placeholder="(11) 99999-9999"
-                        value={phoneNumber}
-                        onChangeText={setPhoneNumber}
-                        keyboardType="phone-pad"
-                      />
-                    </View>
-                  </View>
-                )}
-
-                {/* Método Aplicativo */}
-                <TouchableOpacity
-                  style={[
-                    styles.methodCard,
-                    twoFactorMethod === 'app' && styles.methodCardActive,
-                  ]}
-                  onPress={() => setTwoFactorMethod('app')}
-                >
-                  <View style={styles.methodIcon}>
-                    <Ionicons 
-                      name="phone-portrait" 
-                      size={24} 
-                      color={twoFactorMethod === 'app' ? colors.primary : colors.gray400} 
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Número de Telefone *</Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="call-outline" size={20} color={colors.gray400} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="+55(00)00000-0000"
+                      value={phoneNumber}
+                      onChangeText={setPhoneNumber}
+                      keyboardType="phone-pad"
                     />
                   </View>
-                  <View style={styles.methodContent}>
-                    <Text style={styles.methodTitle}>Aplicativo Autenticador</Text>
-                    <Text style={styles.methodSubtitle}>Google Authenticator, Authy, etc</Text>
-                  </View>
-                  {twoFactorMethod === 'app' && (
-                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
-
-                {twoFactorMethod === 'app' && (
-                  <View style={styles.infoCard}>
-                    <Ionicons name="information-circle" size={20} color={colors.info} />
-                    <Text style={styles.infoText}>
-                      Você precisará escanear um QR Code com seu aplicativo autenticador na próxima etapa.
-                    </Text>
-                  </View>
-                )}
+                  <Text style={styles.hint}>
+                    Use o mesmo número do seu WhatsApp
+                  </Text>
+                </View>
 
                 <TouchableOpacity
                   style={[styles.actionButton, loading && styles.actionButtonDisabled]}
@@ -389,7 +384,7 @@ const SecurityScreen = ({ navigation }) => {
               </View>
             )}
 
-            {twoFactorEnabled && (
+            {twoFactorEnabled && show2FA && (
               <View style={styles.expandedContent}>
                 <View style={styles.successCard}>
                   <Ionicons name="checkmark-circle" size={32} color={colors.success} />
@@ -397,7 +392,7 @@ const SecurityScreen = ({ navigation }) => {
                     Autenticação de dois fatores está ativa
                   </Text>
                   <Text style={styles.successSubtext}>
-                    Método: {twoFactorMethod === 'sms' ? 'SMS' : 'Aplicativo Autenticador'}
+                    Método: WhatsApp
                   </Text>
                 </View>
               </View>
@@ -592,6 +587,12 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginTop: 4,
     textAlign: 'center',
+  },
+  hint: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
 

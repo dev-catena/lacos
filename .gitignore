@@ -24,3 +24,12 @@ web-build/
 .vscode/
 .idea/
 
+# Vim swap files
+*.swp
+*.swo
+*.swk
+*.swl
+*.swm
+*.swn
+*.swr
+

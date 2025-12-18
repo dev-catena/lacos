@@ -33,6 +33,11 @@ const LoginScreen = ({ navigation }) => {
     const result = await signIn(email, password);
     setLoading(false);
 
+    if (result.requires2FA) {
+      navigation.navigate('TwoFactor', { email, password });
+      return;
+    }
+
     if (!result.success) {
       Alert.alert(
         result.requiresApproval ? 'Aguardando Aprovação' : 

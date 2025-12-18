@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\FallSensorController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/2fa/login/verify', [AuthController::class, 'verify2FALogin']);
 
 // Login Admin/Root
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
@@ -66,6 +67,14 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json($user);
     });
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/change-password', [AuthController::class, 'changePassword']);
+    
+    // 2FA (Autenticação de Dois Fatores)
+    Route::post('/2fa/enable', [AuthController::class, 'enable2FA']);
+    Route::post('/2fa/disable', [AuthController::class, 'disable2FA']);
+    Route::post('/2fa/send-code', [AuthController::class, 'send2FACode']);
+    Route::post('/2fa/verify-code', [AuthController::class, 'verify2FACode']);
+    
     Route::put('/users/{id}', [App\Http\Controllers\Api\UserController::class, 'update']);
     Route::get('/user/plan', [PlanController::class, 'getUserPlan']);
     
