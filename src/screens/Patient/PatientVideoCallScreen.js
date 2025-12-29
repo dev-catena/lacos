@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,18 +13,32 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import colors from '../../constants/colors';
 import videoCallService from '../../services/videoCallService';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  AlertCircleIcon,
+  VideoCamIcon,
+  PersonIcon,
+  MicIcon,
+  VideoCamOffIcon,
+  ChatIcon,
+  CallIcon,
+  CloseIcon,
+  ImageIcon,
+  DocumentAttachIcon,
+  SendIcon,
+  DocumentIcon,
+} from '../../components/CustomIcons';
 
 const PatientVideoCallScreen = ({ route, navigation }) => {
   const { appointment, doctorInfo } = route.params || {};
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [isCallActive, setIsCallActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
@@ -41,32 +55,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
   const durationIntervalRef = useRef(null);
   const chatFlatListRef = useRef(null);
 
-  useEffect(() => {
-    initializeCall();
-    
-    return () => {
-      // Cleanup ao sair da tela
-      endCall();
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isCallActive) {
-      // Iniciar contador de duração
-      durationIntervalRef.current = setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-      }
-    }
-  }, [isCallActive]);
-
-  const initializeCall = async () => {
+  const initializeCall = useCallback(async () => {
     try {
       setIsInitializing(true);
       setCallError(null);
@@ -110,9 +99,9 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
         ]
       );
     }
-  };
+  }, [appointment?.id, appointment?.group_id, navigation]);
 
-  const endCall = async () => {
+  const endCall = useCallback(async () => {
     try {
       await videoCallService.leaveChannel();
       await videoCallService.destroy();
@@ -124,7 +113,31 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
     } catch (error) {
       console.error('❌ Erro ao encerrar chamada:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    initializeCall();
+    
+    return () => {
+      // Cleanup ao sair da tela
+      endCall();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (isCallActive) {
+      // Iniciar contador de duração
+      durationIntervalRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+      }
+    }
+  }, [isCallActive]);
+
 
   const handleEndCall = () => {
     Alert.alert(
@@ -149,25 +162,34 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
 
   const toggleMute = async () => {
     try {
-      const result = await videoCallService.muteLocalAudio(!isMuted);
+      const newMutedState = !isMuted;
+      const result = await videoCallService.toggleMute(newMutedState);
       if (result.success) {
-        setIsMuted(!isMuted);
+        setIsMuted(newMutedState);
+      } else {
+        Alert.alert('Erro', 'Não foi possível alterar o áudio');
       }
     } catch (error) {
       console.error('❌ Erro ao alternar áudio:', error);
+      Alert.alert('Erro', 'Não foi possível alterar o áudio');
     }
   };
 
   const toggleVideo = async () => {
     try {
-      const result = await videoCallService.muteLocalVideo(!isVideoOff);
+      const newVideoState = !isVideoOff;
+      const result = await videoCallService.toggleVideo(!newVideoState);
       if (result.success) {
-        setIsVideoOff(!isVideoOff);
+        setIsVideoOff(newVideoState);
+      } else {
+        Alert.alert('Erro', 'Não foi possível alterar o vídeo');
       }
     } catch (error) {
       console.error('❌ Erro ao alternar vídeo:', error);
+      Alert.alert('Erro', 'Não foi possível alterar o vídeo');
     }
   };
+
 
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -175,46 +197,220 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const showImagePickerOptions = () => {
+    Alert.alert(
+      'Enviar Imagem',
+      'Escolha uma opção',
+      [
+        {
+          text: 'Galeria',
+          onPress: handlePickImage,
+        },
+        {
+          text: 'Câmera',
+          onPress: handleTakePhoto,
+        },
+        { text: 'Cancelar', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        const newMessage = {
+          id: Date.now().toString(),
+          type: 'image',
+          imageUri,
+          isOwn: true,
+          timestamp: new Date(),
+        };
+        setChatMessages(prev => [...prev, newMessage]);
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permissão Necessária', 'Precisamos de permissão para usar a câmera.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        const newMessage = {
+          id: Date.now().toString(),
+          type: 'image',
+          imageUri,
+          isOwn: true,
+          timestamp: new Date(),
+        };
+        setChatMessages(prev => [...prev, newMessage]);
+      }
+    } catch (error) {
+      console.error('Erro ao tirar foto:', error);
+      Alert.alert('Erro', 'Não foi possível tirar a foto.');
+    }
+  };
+
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const document = result.assets[0];
+        const newMessage = {
+          id: Date.now().toString(),
+          type: 'document',
+          documentName: document.name,
+          documentSize: document.size,
+          documentUri: document.uri,
+          isOwn: true,
+          timestamp: new Date(),
+        };
+        setChatMessages(prev => [...prev, newMessage]);
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar documento:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar o documento.');
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (!messageText.trim() || sendingMessage) return;
+
+    setSendingMessage(true);
+    const newMessage = {
+      id: Date.now().toString(),
+      type: 'text',
+      text: messageText.trim(),
+      isOwn: true,
+      timestamp: new Date(),
+    };
+    setChatMessages(prev => [...prev, newMessage]);
+    setMessageText('');
+    setSendingMessage(false);
+
+    // Scroll para o final
+    setTimeout(() => {
+      if (chatFlatListRef.current) {
+        chatFlatListRef.current.scrollToEnd({ animated: true });
+      }
+    }, 100);
+  };
+
+  const renderChatMessage = ({ item }) => {
+    return (
+      <View style={[
+        styles.chatMessageContainer,
+        item.isOwn ? styles.chatMessageOwn : styles.chatMessageOther
+      ]}>
+        {!item.isOwn && (
+          <Text style={styles.chatMessageSender}>{item.senderName || 'Médico'}</Text>
+        )}
+        {item.type === 'text' && (
+          <Text style={[
+            styles.chatMessageText,
+            item.isOwn ? styles.chatMessageTextOwn : styles.chatMessageTextOther
+          ]}>
+            {item.text}
+          </Text>
+        )}
+        {item.type === 'image' && item.imageUri && (
+          <Image source={{ uri: item.imageUri }} style={styles.chatMessageImage} />
+        )}
+        {item.type === 'document' && (
+          <View style={styles.chatMessageDocument}>
+            <DocumentIcon size={24} color={item.isOwn ? colors.textWhite : colors.primary} />
+            <View style={styles.chatMessageDocumentInfo}>
+              <Text style={[
+                styles.chatMessageDocumentName,
+                item.isOwn ? styles.chatMessageTextOwn : styles.chatMessageTextOther
+              ]}>
+                {item.documentName}
+              </Text>
+              {item.documentSize && (
+                <Text style={[
+                  styles.chatMessageDocumentSize,
+                  item.isOwn ? styles.chatMessageTextOwn : styles.chatMessageTextOther
+                ]}>
+                  {(item.documentSize / 1024).toFixed(1)} KB
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+        <Text style={styles.chatMessageTime}>
+          {new Date(item.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+      </View>
+    );
+  };
+
   if (isInitializing) {
     return (
-      <SafeAreaView style={styles.container} edges={[]}>
+      <View style={styles.container}>
         <StatusBar style="light" />
-        <View style={styles.connectingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.connectingText}>Conectando...</Text>
-          <Text style={styles.connectingSubtext}>
-            Aguarde enquanto conectamos você à consulta
-          </Text>
-        </View>
-      </SafeAreaView>
+        <SafeAreaView style={styles.safeAreaTop} edges={['top']}>
+          <View style={styles.connectingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.connectingText}>Conectando...</Text>
+            <Text style={styles.connectingSubtext}>
+              Aguarde enquanto conectamos você à consulta
+            </Text>
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
   if (callError && !isCallActive) {
     return (
-      <SafeAreaView style={styles.container} edges={[]}>
+      <View style={styles.container}>
         <StatusBar style="light" />
-        <View style={styles.connectingContainer}>
-          <Ionicons name="alert-circle" size={64} color={colors.error} />
-          <Text style={styles.connectingText}>Erro na Conexão</Text>
-          <Text style={styles.connectingSubtext}>{callError}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => {
-              setCallError(null);
-              initializeCall();
-            }}
-          >
-            <Text style={styles.retryButtonText}>Tentar Novamente</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>Voltar</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+        <SafeAreaView style={styles.safeAreaTop} edges={['top']}>
+          <View style={styles.connectingContainer}>
+            <AlertCircleIcon size={64} color={colors.error} />
+            <Text style={styles.connectingText}>Erro na Conexão</Text>
+            <Text style={styles.connectingSubtext}>{callError}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => {
+                setCallError(null);
+                initializeCall();
+              }}
+            >
+              <Text style={styles.retryButtonText}>Tentar Novamente</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.backButtonText}>Voltar</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
@@ -223,16 +419,16 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={[]}>
+    <View style={styles.container}>
       <StatusBar style="light" />
-      
-      {/* Área de Vídeo */}
-      <View style={styles.videoContainer}>
+      <SafeAreaView style={styles.safeAreaTop} edges={['top']}>
+        {/* Área de Vídeo */}
+        <View style={styles.videoContainer}>
         {/* Vídeo do Médico (tela principal) */}
         <View style={styles.mainVideo}>
           {remoteUid ? (
             <View style={styles.videoPlaceholder}>
-              <Ionicons name="videocam" size={80} color={colors.primary} />
+              <VideoCamIcon size={80} color={colors.primary} />
               <Text style={styles.videoPlaceholderText}>Vídeo do Médico</Text>
               <Text style={styles.videoNote}>
                 {callError ? 'Erro ao conectar' : 'Aguardando médico entrar na chamada...'}
@@ -245,7 +441,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
             </View>
           ) : (
             <View style={styles.videoPlaceholder}>
-              <Ionicons name="person" size={80} color={colors.textLight} />
+              <PersonIcon size={80} color={colors.textLight} />
               <Text style={styles.videoPlaceholderText}>
                 {doctorInfo?.name || 'Dr(a). Médico'}
               </Text>
@@ -260,7 +456,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
         <View style={styles.pipVideo}>
           {isVideoOff ? (
             <View style={styles.pipPlaceholder}>
-              <Ionicons name="person" size={24} color={colors.textLight} />
+              <PersonIcon size={24} color={colors.textLight} />
             </View>
           ) : (
             <View style={styles.pipPlaceholder}>
@@ -281,53 +477,67 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
           )}
         </View>
       </View>
+      </SafeAreaView>
 
-      {/* Controles */}
-      <View style={styles.controlsContainer}>
-        <TouchableOpacity
-          style={[styles.controlButton, isMuted && styles.controlButtonActive]}
-          onPress={toggleMute}
-        >
-          <Ionicons
-            name={isMuted ? 'mic-off' : 'mic'}
-            size={24}
-            color={isMuted ? colors.error : colors.textWhite}
-          />
-        </TouchableOpacity>
+      {/* Controles Flutuantes - Fixos na parte inferior */}
+      <View style={[styles.controlsFloatingWrapper, { paddingBottom: Math.max(insets.bottom, 0) + 10 }]}>
+        <View style={styles.controlsFloating}>
+          {/* Botões de controle */}
+          <View style={styles.controlsRow}>
+            <TouchableOpacity
+              style={[styles.controlButton, isMuted && styles.controlButtonActive]}
+              onPress={toggleMute}
+            >
+              <View style={styles.iconContainer}>
+                <MicIcon
+                  size={24}
+                  color={isMuted ? colors.error : colors.textWhite}
+                  muted={isMuted}
+                />
+              </View>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.controlButton, isVideoOff && styles.controlButtonActive]}
-          onPress={toggleVideo}
-        >
-          <Ionicons
-            name={isVideoOff ? 'videocam-off' : 'videocam'}
-            size={24}
-            color={isVideoOff ? colors.error : colors.textWhite}
-          />
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlButton, isVideoOff && styles.controlButtonActive]}
+              onPress={toggleVideo}
+            >
+              <View style={styles.iconContainer}>
+                {isVideoOff ? (
+                  <VideoCamOffIcon size={24} color={colors.error} />
+                ) : (
+                  <VideoCamIcon size={24} color={colors.textWhite} />
+                )}
+              </View>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.controlButton, showChat && styles.controlButtonActive]}
-          onPress={() => setShowChat(!showChat)}
-        >
-          <Ionicons
-            name="chatbubbles"
-            size={24}
-            color={showChat ? colors.primary : colors.textWhite}
-          />
-          {chatMessages.length > 0 && (
-            <View style={styles.chatBadge}>
-              <Text style={styles.chatBadgeText}>{chatMessages.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlButton, showChat && styles.controlButtonActive]}
+              onPress={() => setShowChat(!showChat)}
+            >
+              <View style={styles.iconContainer}>
+                <ChatIcon
+                  size={24}
+                  color={showChat ? colors.primary : colors.textWhite}
+                />
+                {chatMessages.length > 0 && (
+                  <View style={styles.chatBadge}>
+                    <Text style={styles.chatBadgeText}>{chatMessages.length}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.controlButton, styles.endCallButton]}
-          onPress={handleEndCall}
-        >
-          <Ionicons name="call" size={24} color={colors.textWhite} />
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlButton, styles.endCallButton]}
+              onPress={handleEndCall}
+            >
+              <View style={styles.iconContainer}>
+                <CallIcon size={24} color={colors.textWhite} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+        </View>
       </View>
 
       {/* Modal de Chat */}
@@ -349,7 +559,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
                 onPress={() => setShowChat(false)}
                 style={styles.chatCloseButton}
               >
-                <Ionicons name="close" size={24} color={colors.text} />
+                <CloseIcon size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -374,13 +584,13 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
                 style={styles.chatInputButton}
                 onPress={showImagePickerOptions}
               >
-                <Ionicons name="image" size={24} color={colors.primary} />
+                <ImageIcon size={24} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.chatInputButton}
                 onPress={handlePickDocument}
               >
-                <Ionicons name="document-attach" size={24} color={colors.primary} />
+                <DocumentAttachIcon size={24} color={colors.primary} />
               </TouchableOpacity>
               <TextInput
                 style={styles.chatInput}
@@ -396,8 +606,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
                 onPress={handleSendMessage}
                 disabled={!messageText.trim() || sendingMessage}
               >
-                <Ionicons
-                  name="send"
+                <SendIcon
                   size={20}
                   color={messageText.trim() ? colors.textWhite : colors.gray400}
                 />
@@ -406,7 +615,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -455,9 +664,13 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     fontSize: 14,
   },
+  safeAreaTop: {
+    flex: 1,
+  },
   videoContainer: {
     flex: 1,
     position: 'relative',
+    paddingBottom: 90, // Espaço para os botões flutuantes (1 linha + padding)
   },
   mainVideo: {
     flex: 1,
@@ -522,20 +735,37 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginTop: 4,
   },
-  controlsContainer: {
+  controlsFloatingWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  controlsFloating: {
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    paddingTop: 15,
+    paddingBottom: 15,
+    paddingHorizontal: 10,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  controlsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    gap: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    gap: 12,
+    marginBottom: 8,
   },
   controlButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconContainer: {
     justifyContent: 'center',
     alignItems: 'center',
   },

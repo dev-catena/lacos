@@ -13,12 +13,22 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import apiService from '../../services/apiService';
 import Toast from 'react-native-toast-message';
+import API_CONFIG from '../../config/api';
+import {
+  PersonIcon,
+  LocationIcon,
+  PeopleIcon,
+  CallIcon,
+  MailIcon,
+  StarIcon,
+  MaleIcon,
+  FemaleIcon,
+} from '../../components/CustomIcons';
 
 const ClientsListScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -111,20 +121,20 @@ const ClientsListScreen = ({ navigation }) => {
 
     for (let i = 0; i < fullStars; i++) {
       stars.push(
-        <Ionicons key={i} name="star" size={14} color="#FFD4A3" />
+        <StarIcon key={i} size={14} color="#FFD4A3" filled={true} />
       );
     }
 
     if (hasHalfStar) {
       stars.push(
-        <Ionicons key="half" name="star-half" size={14} color="#FFD4A3" />
+        <StarIcon key="half" size={14} color="#FFD4A3" filled={false} />
       );
     }
 
     const emptyStars = 5 - Math.ceil(rating);
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
-        <Ionicons key={`empty-${i}`} name="star-outline" size={14} color="#E5E5E5" />
+        <StarIcon key={`empty-${i}`} size={14} color="#E5E5E5" filled={false} />
       );
     }
 
@@ -140,30 +150,61 @@ const ClientsListScreen = ({ navigation }) => {
     >
       <View style={styles.clientHeader}>
         <View style={styles.clientAvatar}>
-          {client.photo_url || client.photo ? (
-            <Image
-              source={{ uri: client.photo_url || client.photo }}
-              style={styles.clientAvatarImage}
-            />
-          ) : (
-            <Ionicons
-              name="person"
-              size={32}
-              color={colors.primary}
-            />
-          )}
+          {(() => {
+            const photoUrl = client.photo_url || client.photo;
+            
+            if (photoUrl) {
+              // Construir URL completa
+              let fullPhotoUrl = photoUrl;
+              
+              // Se não é URL completa, construir
+              if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+                const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+                fullPhotoUrl = photoUrl.startsWith('/') 
+                  ? `${baseUrl}${photoUrl}` 
+                  : `${baseUrl}/${photoUrl}`;
+              }
+              
+              return (
+                <Image
+                  source={{ uri: fullPhotoUrl }}
+                  style={styles.clientAvatarImage}
+                  onError={(error) => {
+                    console.log('❌ ClientsListScreen - Erro ao carregar foto:', error);
+                  }}
+                  resizeMode="cover"
+                />
+              );
+            }
+            
+            // Se não há foto, mostrar placeholder com iniciais
+            const initials = client.name
+              ? client.name
+                  .split(' ')
+                  .map(n => n[0])
+                  .join('')
+                  .toUpperCase()
+                  .substring(0, 2)
+              : '?';
+            
+            return (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarInitials}>{initials}</Text>
+              </View>
+            );
+          })()}
         </View>
         <View style={styles.clientInfo}>
           <Text style={styles.clientName}>{client.name}</Text>
           <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={14} color={colors.textLight} />
+            <LocationIcon size={14} color={colors.textLight} />
             <Text style={styles.locationText}>
               {client.city ? `${client.neighborhood || ''}, ${client.city}` : 'Localização não informada'}
             </Text>
           </View>
           {client.group_name && (
             <View style={styles.groupRow}>
-              <Ionicons name="people-outline" size={14} color={colors.textLight} />
+              <PeopleIcon size={14} color={colors.textLight} />
               <Text style={styles.groupText}>{client.group_name}</Text>
             </View>
           )}
@@ -187,14 +228,14 @@ const ClientsListScreen = ({ navigation }) => {
 
       {client.phone && (
         <View style={styles.contactRow}>
-          <Ionicons name="call-outline" size={16} color={colors.textLight} />
+          <CallIcon size={16} color={colors.textLight} />
           <Text style={styles.contactText}>{client.phone}</Text>
         </View>
       )}
 
       {client.email && (
         <View style={styles.contactRow}>
-          <Ionicons name="mail-outline" size={16} color={colors.textLight} />
+          <MailIcon size={16} color={colors.textLight} />
           <Text style={styles.contactText}>{client.email}</Text>
         </View>
       )}
@@ -248,7 +289,7 @@ const ClientsListScreen = ({ navigation }) => {
       >
         {clients.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={64} color={colors.gray400} />
+            <PeopleIcon size={64} color={colors.gray400} />
             <Text style={styles.emptyText}>
               {user?.profile === 'doctor' ? 'Nenhum paciente encontrado' : 'Nenhum cliente encontrado'}
             </Text>
@@ -361,6 +402,19 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
+  },
+  avatarPlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitials: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   clientInfo: {
     flex: 1,

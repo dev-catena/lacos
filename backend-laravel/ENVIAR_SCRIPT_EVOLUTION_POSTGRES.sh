@@ -27,3 +27,4 @@ echo "   export WHATSAPP_INSTANCE_NAME=lacos-2fa"
 echo "   sudo -E bash /tmp/CRIAR_INSTANCIA_WHATSAPP.sh"
 
 
+

@@ -131,12 +131,23 @@ class UserService {
   /**
    * Obter dados de um usuário específico por ID
    */
-  async getUser(userId) {
+  async getUser(userId = null) {
     try {
-      console.log('👤 UserService - Buscando usuário ID:', userId);
+      // Usar /user (sem ID) que retorna o usuário autenticado
+      // Isso é mais seguro e não requer permissões especiais
+      // O parâmetro userId é ignorado, mas mantido para compatibilidade
+      console.log('👤 UserService - Buscando usuário autenticado via /user');
       
-      const response = await apiService.request(`/users/${userId}`, {
+      const response = await apiService.request('/user', {
         method: 'GET',
+      });
+
+      console.log('📥 UserService - Resposta completa do /user:', JSON.stringify(response, null, 2));
+      console.log('📥 UserService - Campos do certificado na resposta:', {
+        has_certificate: response?.has_certificate,
+        certificate_path: response?.certificate_path,
+        certificate_type: response?.certificate_type,
+        certificate_uploaded_at: response?.certificate_uploaded_at,
       });
 
       // A API pode retornar diretamente o objeto ou dentro de uma estrutura
@@ -307,6 +318,212 @@ class UserService {
       return {
         success: false,
         error: error.message || 'Erro ao verificar código',
+      };
+    }
+  }
+
+  /**
+   * Fazer upload de arquivo .pfx com senha para assinatura digital
+   */
+  async uploadCertificateFile(userId, formData) {
+    try {
+      console.log('📤 UserService - Fazendo upload do arquivo .pfx com senha');
+      console.log('📤 UserService - User ID:', userId);
+      console.log('📤 UserService - Endpoint: /users/' + userId + '/certificate');
+      
+      // NÃO definir Content-Type manualmente para FormData
+      // O React Native define automaticamente com o boundary correto
+      const response = await apiService.request(`/users/${userId}/certificate`, {
+        method: 'POST',
+        body: formData,
+        // Não passar headers - o apiService já remove Content-Type para FormData
+      });
+
+      console.log('📥 UserService - Resposta completa do upload:', JSON.stringify(response, null, 2));
+
+      if (response && response.success) {
+        console.log('✅ UserService - Upload bem-sucedido!', response.data);
+        return {
+          success: true,
+          data: response.data || response,
+        };
+      } else if (response && response.id) {
+        // API retorna diretamente o objeto do usuário
+        console.log('✅ UserService - Upload bem-sucedido (resposta direta)!');
+        return {
+          success: true,
+          data: response,
+        };
+      }
+
+      console.warn('⚠️ UserService - Resposta sem sucesso:', response);
+      return {
+        success: false,
+        error: response?.message || response?.error || 'Erro ao fazer upload do certificado',
+      };
+    } catch (error) {
+      console.error('❌ UserService - Erro completo ao fazer upload do certificado:', error);
+      console.error('❌ UserService - Erro response:', error.response);
+      console.error('❌ UserService - Erro data:', error.response?.data);
+      console.error('❌ UserService - Erro status:', error.response?.status);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          error.message || 
+                          'Erro ao fazer upload do certificado';
+      
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Fazer upload do certificado digital ICP-Brasil A1
+   */
+  async uploadCertificate(certificateData) {
+    try {
+      console.log('🔐 UserService - Fazendo upload do certificado digital');
+      
+      const formData = new FormData();
+      
+      // Adicionar arquivo do certificado
+      if (certificateData.certificateFile) {
+        const fileName = certificateData.certificateFile.name || '';
+        const isApx = fileName.toLowerCase().endsWith('.apx');
+        const defaultName = isApx ? 'certificado.apx' : 'certificado.pfx';
+        const defaultType = isApx ? 'application/apx' : 'application/x-pkcs12';
+        
+        formData.append('certificate_file', {
+          uri: certificateData.certificateFile.uri,
+          type: certificateData.certificateFile.mimeType || defaultType,
+          name: certificateData.certificateFile.name || defaultName,
+        });
+      }
+      
+      // Adicionar tipo de certificado
+      if (certificateData.certificateType) {
+        formData.append('certificate_type', certificateData.certificateType);
+      }
+      
+      // Adicionar usuário (opcional para .apx)
+      if (certificateData.username) {
+        formData.append('certificate_username', certificateData.username);
+      }
+      
+      // Adicionar senha
+      formData.append('certificate_password', certificateData.password);
+      
+      console.log('📤 UserService - Enviando certificado para o servidor...', {
+        fileName: certificateData.certificateFile?.name,
+        fileSize: certificateData.certificateFile?.size,
+        certificateType: certificateData.certificateType,
+        hasPassword: !!certificateData.password,
+      });
+
+      console.log('📤 UserService - Enviando requisição POST para /certificate/upload...');
+      
+      let response;
+      try {
+        response = await apiService.post('/certificate/upload', formData);
+        console.log('📥 UserService - Resposta recebida do servidor:', {
+          success: response?.success,
+          message: response?.message,
+          data: response?.data,
+          error: response?.error,
+          status: response?.status,
+          fullResponse: response,
+        });
+      } catch (apiError) {
+        console.error('❌ UserService - Erro na requisição API:', {
+          message: apiError.message,
+          status: apiError.status,
+          errors: apiError.errors,
+          response: apiError.response,
+          rawError: apiError,
+        });
+        
+        // Se o erro tem status, retornar como resposta de erro
+        if (apiError.status) {
+          return {
+            success: false,
+            error: apiError.message || 'Erro ao configurar certificado',
+            status: apiError.status,
+            errors: apiError.errors,
+          };
+        }
+        
+        // Se não tem status, lançar novamente para ser capturado pelo catch externo
+        throw apiError;
+      }
+
+      if (response && response.success) {
+        console.log('✅ UserService - Certificado configurado com sucesso');
+        console.log('📋 Dados retornados:', response.data);
+        return {
+          success: true,
+          message: response.message || 'Certificado configurado com sucesso',
+          data: response.data || {
+            has_certificate: true,
+            certificate_type: certificateData.certificateType || 'pfx',
+          },
+        };
+      }
+
+      console.error('❌ UserService - Upload falhou:', {
+        error: response?.error,
+        message: response?.message,
+        response: response,
+      });
+
+      return {
+        success: false,
+        error: response?.error || response?.message || 'Erro ao configurar certificado',
+      };
+    } catch (error) {
+      console.error('❌ UserService - Erro ao fazer upload do certificado (catch externo):', error);
+      console.error('❌ Detalhes do erro:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        fullError: JSON.stringify(error, null, 2),
+      });
+      
+      return {
+        success: false,
+        error: error.message || 'Erro ao configurar certificado digital',
+      };
+    }
+  }
+
+  /**
+   * Remover certificado digital
+   */
+  async removeCertificate() {
+    try {
+      console.log('🔐 UserService - Removendo certificado digital');
+      
+      const response = await apiService.delete('/certificate/remove');
+
+      if (response && response.success) {
+        console.log('✅ UserService - Certificado removido com sucesso');
+        return {
+          success: true,
+          message: response.message || 'Certificado removido com sucesso',
+        };
+      }
+
+      return {
+        success: false,
+        error: response.error || response.message || 'Erro ao remover certificado',
+      };
+    } catch (error) {
+      console.error('❌ UserService - Erro ao remover certificado:', error);
+      
+      return {
+        success: false,
+        error: error.message || 'Erro ao remover certificado digital',
       };
     }
   }

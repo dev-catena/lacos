@@ -215,6 +215,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/doctors/{id}/approve', [AdminDoctorController::class, 'approve']);
         Route::post('/doctors/{id}/reject', [AdminDoctorController::class, 'reject']);
         Route::post('/doctors/{id}/block', [AdminDoctorController::class, 'block']);
+        Route::put('/doctors/{id}', [AdminDoctorController::class, 'update']);
         Route::delete('/doctors/{id}', [AdminDoctorController::class, 'destroy']);
     });
     

@@ -18,23 +18,33 @@ import { LacosLogoFull } from '../../components/LacosLogo';
 
 const LoginScreen = ({ navigation }) => {
   const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
+  const [login, setLogin] = useState(''); // CPF ou Email
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (!login || !password) {
       Alert.alert('Atenção', 'Por favor, preencha todos os campos');
       return;
     }
 
     setLoading(true);
-    const result = await signIn(email, password);
+    const result = await signIn(login, password);
     setLoading(false);
 
+    // Se houver múltiplos perfis, navegar para tela de seleção
+    if (result.requiresProfileSelection && result.profiles) {
+      navigation.navigate('ProfileSelection', { 
+        login, 
+        password, 
+        profiles: result.profiles 
+      });
+      return;
+    }
+
     if (result.requires2FA) {
-      navigation.navigate('TwoFactor', { email, password });
+      navigation.navigate('TwoFactor', { login, password });
       return;
     }
 
@@ -75,14 +85,14 @@ const LoginScreen = ({ navigation }) => {
           {/* Formulário */}
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>E-mail ou telefone</Text>
+              <Text style={styles.label}>CPF (médico) ou E-mail</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Digite seu e-mail ou telefone"
+                placeholder="CPF ou E-mail"
                 placeholderTextColor={colors.placeholder}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
+                value={login}
+                onChangeText={setLogin}
+                keyboardType="default"
                 autoCapitalize="none"
                 autoCorrect={false}
               />

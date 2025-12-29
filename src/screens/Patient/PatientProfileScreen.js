@@ -12,7 +12,19 @@ import {
   Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  MailOutlineIcon,
+  PeopleOutlineIcon,
+  PersonOutlineIcon,
+  CalendarOutlineIcon,
+  HelpCircleOutlineIcon,
+  CallOutlineIcon,
+  LogOutOutlineIcon,
+  CameraIcon,
+  PersonIcon,
+  PeopleIcon,
+  ChevronForwardIcon,
+} from '../../components/CustomIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -209,10 +221,10 @@ const PatientProfileScreen = ({ navigation }) => {
     );
   };
 
-  const InfoCard = ({ icon, label, value, color = colors.primary }) => (
+  const InfoCard = ({ icon: IconComponent, label, value, color = colors.primary }) => (
     <View style={styles.infoCard}>
       <View style={[styles.infoIcon, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon} size={24} color={color} />
+        <IconComponent size={24} color={color} />
       </View>
       <View style={styles.infoContent}>
         <Text style={styles.infoLabel}>{label}</Text>
@@ -268,7 +280,7 @@ const PatientProfileScreen = ({ navigation }) => {
               {photoUri ? (
                 <Image source={{ uri: photoUri }} style={styles.avatarImage} />
               ) : (
-                <Ionicons name="person" size={48} color={colors.textWhite} />
+                <PersonIcon size={48} color={colors.textWhite} />
               )}
               {uploadingPhoto && (
                 <View style={styles.avatarLoading}>
@@ -277,7 +289,7 @@ const PatientProfileScreen = ({ navigation }) => {
               )}
             </View>
             <View style={styles.cameraIconContainer}>
-              <Ionicons name="camera" size={20} color={colors.textWhite} />
+              <CameraIcon size={20} color={colors.textWhite} />
             </View>
           </TouchableOpacity>
           
@@ -285,7 +297,7 @@ const PatientProfileScreen = ({ navigation }) => {
             {user?.name || patientSession?.accompaniedName || 'Paciente'}
           </Text>
           <View style={styles.groupBadge}>
-            <Ionicons name="people" size={14} color={colors.primary} />
+            <PeopleIcon size={14} color={colors.primary} />
             <Text style={styles.groupBadgeText}>
               {groupData?.name || patientSession?.groupName || 'Grupo de Cuidados'}
             </Text>
@@ -304,28 +316,28 @@ const PatientProfileScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Informações</Text>
           
           <InfoCard
-            icon="mail-outline"
+            icon={MailOutlineIcon}
             label="E-mail"
             value={user?.email || 'Não informado'}
             color={colors.secondary}
           />
 
           <InfoCard
-            icon="people-outline"
+            icon={PeopleOutlineIcon}
             label="Grupo de Cuidados"
             value={groupData?.name || patientSession?.groupName || 'Não definido'}
             color={colors.primary}
           />
 
           <InfoCard
-            icon="person-outline"
+            icon={PersonOutlineIcon}
             label="Administrador"
             value={adminName || 'Não disponível'}
             color={colors.warning}
           />
 
           <InfoCard
-            icon="calendar-outline"
+            icon={CalendarOutlineIcon}
             label="Membro desde"
             value={memberSince 
               ? new Date(memberSince).toLocaleDateString('pt-BR', {
@@ -345,24 +357,24 @@ const PatientProfileScreen = ({ navigation }) => {
           
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuIcon}>
-              <Ionicons name="help-circle-outline" size={24} color={colors.info} />
+              <HelpCircleOutlineIcon size={24} color={colors.info} />
             </View>
             <View style={styles.menuContent}>
               <Text style={styles.menuTitle}>Como Usar</Text>
               <Text style={styles.menuSubtitle}>Tutorial e instruções</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+            <ChevronForwardIcon size={20} color={colors.gray400} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuIcon}>
-              <Ionicons name="call-outline" size={24} color={colors.success} />
+              <CallOutlineIcon size={24} color={colors.success} />
             </View>
             <View style={styles.menuContent}>
               <Text style={styles.menuTitle}>Contatos de Emergência</Text>
               <Text style={styles.menuSubtitle}>Ver números importantes</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+            <ChevronForwardIcon size={20} color={colors.gray400} />
           </TouchableOpacity>
         </View>
 
@@ -374,13 +386,13 @@ const PatientProfileScreen = ({ navigation }) => {
             activeOpacity={0.7}
           >
             <View style={styles.logoutIcon}>
-              <Ionicons name="log-out-outline" size={28} color={colors.textWhite} />
+              <LogOutOutlineIcon size={28} color={colors.textWhite} />
             </View>
             <View style={styles.logoutContent}>
               <Text style={styles.logoutText}>Sair do Aplicativo</Text>
               <Text style={styles.logoutSubtext}>Voltar à tela inicial</Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.textWhite} />
+            <ChevronForwardIcon size={24} color={colors.textWhite} />
           </TouchableOpacity>
         </View>
 

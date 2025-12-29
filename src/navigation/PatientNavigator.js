@@ -3,9 +3,9 @@ import { View, ActivityIndicator, Platform } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import colors from '../constants/colors';
 import groupService from '../services/groupService';
+import { HomeIcon, PersonIcon } from '../components/CustomIcons';
 
 import PatientHomeScreen from '../screens/Patient/PatientHomeScreen';
 import AppointmentDetailsScreen from '../screens/Patient/AppointmentDetailsScreen';
@@ -58,15 +58,12 @@ const PatientTabNavigator = () => {
           gap: 2,
         },
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-
           if (route.name === 'PatientHomeTab') {
-            iconName = focused ? 'home' : 'home-outline';
+            return <HomeIcon size={size || 24} color={color} filled={focused} />;
           } else if (route.name === 'PatientProfileTab') {
-            iconName = focused ? 'person' : 'person-outline';
+            return <PersonIcon size={size || 24} color={color} filled={focused} />;
           }
-
-          return <Ionicons name={iconName} size={24} color={color} />;
+          return null;
         },
       })}
     >

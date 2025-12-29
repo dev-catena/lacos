@@ -6,21 +6,37 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Image,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import Toast from 'react-native-toast-message';
 import apiService from '../../services/apiService';
+import {
+  ArrowBackIcon,
+  StarIcon,
+  LocationIcon,
+  PersonIcon,
+  MedicalIcon,
+  TimeIcon,
+  FilterIcon,
+  SearchIcon,
+  CloseIcon,
+  CheckIcon,
+  PeopleIcon,
+  MoneyIcon,
+} from '../../components/CustomIcons';
 
 const CaregiversListScreen = ({ navigation }) => {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [caregivers, setCaregivers] = useState([]);
@@ -248,20 +264,20 @@ const CaregiversListScreen = ({ navigation }) => {
 
     for (let i = 0; i < fullStars; i++) {
       stars.push(
-        <Ionicons key={i} name="star" size={16} color={colors.warning} />
+        <StarIcon key={i} size={16} color={colors.warning} filled={true} />
       );
     }
 
     if (hasHalfStar) {
       stars.push(
-        <Ionicons key="half" name="star-half" size={16} color={colors.warning} />
+        <StarIcon key="half" size={16} color={colors.warning} filled={false} />
       );
     }
 
     const emptyStars = 5 - Math.ceil(rating);
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
-        <Ionicons key={`empty-${i}`} name="star-outline" size={16} color={colors.gray400} />
+        <StarIcon key={`empty-${i}`} size={16} color={colors.gray400} filled={false} />
       );
     }
 
@@ -283,8 +299,7 @@ const CaregiversListScreen = ({ navigation }) => {
               style={styles.caregiverAvatarImage}
             />
           ) : (
-            <Ionicons
-              name={caregiver.gender === 'Feminino' ? 'person' : 'person-outline'}
+            <PersonIcon
               size={32}
               color={colors.primary}
             />
@@ -293,7 +308,7 @@ const CaregiversListScreen = ({ navigation }) => {
         <View style={styles.caregiverInfo}>
           <Text style={styles.caregiverName}>{caregiver.name}</Text>
           <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={14} color={colors.textLight} />
+            <LocationIcon size={14} color={colors.textLight} />
             <Text style={styles.locationText}>
               {caregiver.neighborhood}, {caregiver.city}
             </Text>
@@ -310,23 +325,23 @@ const CaregiversListScreen = ({ navigation }) => {
       <View style={styles.caregiverDetails}>
         {caregiver.formation && (
           <View style={styles.detailRow}>
-            <Ionicons name="medical-outline" size={16} color={colors.textLight} />
+            <MedicalIcon size={16} color={colors.textLight} />
             <Text style={styles.detailText}>{caregiver.formation}</Text>
           </View>
         )}
         <View style={styles.detailRow}>
-          <Ionicons name="cash-outline" size={16} color={colors.textLight} />
+          <MoneyIcon size={16} color={colors.textLight} />
           <Text style={styles.detailText}>R$ {Number(caregiver.hourlyRate || caregiver.hourly_rate || 0).toFixed(2)}/hora</Text>
         </View>
         {caregiver.gender && (
           <View style={styles.detailRow}>
-            <Ionicons name="person-outline" size={16} color={colors.textLight} />
+            <PersonIcon size={16} color={colors.textLight} />
             <Text style={styles.detailText}>{caregiver.gender}</Text>
           </View>
         )}
         {caregiver.availability && (
           <View style={styles.detailRow}>
-            <Ionicons name="time-outline" size={16} color={colors.textLight} />
+            <TimeIcon size={16} color={colors.textLight} />
             <Text style={styles.detailText} numberOfLines={1}>{caregiver.availability}</Text>
           </View>
         )}
@@ -351,13 +366,13 @@ const CaregiversListScreen = ({ navigation }) => {
       <StatusBar style="dark" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'android' ? insets.top + 16 : 16 }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <ArrowBackIcon size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Buscar Cuidadores</Text>
@@ -370,17 +385,17 @@ const CaregiversListScreen = ({ navigation }) => {
           onPress={() => setShowFilters(!showFilters)}
           activeOpacity={0.7}
         >
-          <Ionicons
-            name={showFilters ? "filter" : "filter-outline"}
+          <FilterIcon
             size={24}
             color={colors.primary}
+            filled={showFilters}
           />
         </TouchableOpacity>
       </View>
 
       {/* Barra de busca */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={20} color={colors.textLight} />
+        <SearchIcon size={20} color={colors.textLight} />
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar por nome, cidade ou bairro..."
@@ -390,7 +405,7 @@ const CaregiversListScreen = ({ navigation }) => {
         />
         {searchText.length > 0 && (
           <TouchableOpacity onPress={() => setSearchText('')}>
-            <Ionicons name="close-circle" size={20} color={colors.textLight} />
+            <CloseIcon size={20} color={colors.textLight} />
           </TouchableOpacity>
         )}
       </View>
@@ -413,10 +428,10 @@ const CaregiversListScreen = ({ navigation }) => {
                   ]}
                   onPress={() => setMinRating(minRating === rating ? 0 : rating)}
                 >
-                  <Ionicons
-                    name={minRating >= rating ? "star" : "star-outline"}
+                  <StarIcon
                     size={20}
                     color={minRating >= rating ? colors.warning : colors.gray400}
+                    filled={minRating >= rating}
                   />
                 </TouchableOpacity>
               ))}
@@ -470,7 +485,7 @@ const CaregiversListScreen = ({ navigation }) => {
                     selectedFormations.includes(formation) && styles.checkboxChecked
                   ]}>
                     {selectedFormations.includes(formation) && (
-                      <Ionicons name="checkmark" size={16} color={colors.white} />
+                      <CheckIcon size={16} color={colors.white} />
                     )}
                   </View>
                   <Text style={styles.checkboxLabel}>{formation}</Text>
@@ -539,7 +554,7 @@ const CaregiversListScreen = ({ navigation }) => {
           filteredCaregivers.map(renderCaregiverCard)
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color={colors.gray300} />
+            <PeopleIcon size={64} color={colors.gray300} />
             <Text style={styles.emptyStateTitle}>Nenhum cuidador encontrado</Text>
             <Text style={styles.emptyStateText}>
               Tente ajustar os filtros ou a busca
@@ -571,7 +586,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.white,
@@ -765,14 +780,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 0, // Garantir que não há borda no Android
-    borderColor: 'transparent', // Garantir cor transparente
-    overflow: 'hidden', // Evitar que elementos vazem
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    overflow: 'hidden',
   },
   caregiverHeader: {
     flexDirection: 'row',

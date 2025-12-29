@@ -18,12 +18,36 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
-import { AppointmentIcon, LocationIcon } from '../../components/CustomIcons';
+import {
+  AppointmentIcon,
+  LocationIcon,
+  CloseIcon,
+  TextOutlineIcon,
+  MedicalOutlineIcon,
+  CalendarIcon,
+  ChevronDownIcon,
+  VideoCamOutlineIcon,
+  PersonIcon,
+  AlertCircleOutlineIcon,
+  TimeIcon,
+  EditIcon,
+  InformationCircleIcon,
+  NavigateIcon,
+  CheckmarkCircleIcon,
+  CheckmarkIcon,
+  StarIcon,
+  StarHalfIcon,
+  StarOutlineIcon,
+  SchoolIcon,
+  InformationCircleOutlineIcon,
+  AlertIcon,
+  FitnessOutlineIcon,
+  FlaskOutlineIcon,
+} from '../../components/CustomIcons';
 import appointmentService from '../../services/appointmentService';
 import doctorService from '../../services/doctorService';
 import medicalSpecialtyService from '../../services/medicalSpecialtyService';
@@ -31,6 +55,7 @@ import groupService from '../../services/groupService';
 import apiService from '../../services/apiService';
 import GOOGLE_MAPS_CONFIG from '../../config/maps';
 import { checkGoogleMapsConfig } from '../../utils/checkGoogleMapsConfig';
+import { formatCrmDisplay } from '../../utils/crm';
 
 const AddAppointmentScreen = ({ route, navigation }) => {
   let { groupId, groupName, appointmentId, appointment } = route.params || {};
@@ -304,10 +329,19 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   const loadDoctorAvailability = async (doctorId) => {
     try {
       setLoadingAvailability(true);
+      console.log('📞 loadDoctorAvailability - Buscando agenda para médico ID:', doctorId);
       const response = await doctorService.getDoctorAvailability(doctorId);
+      
+      console.log('📥 loadDoctorAvailability - Resposta completa do backend:', JSON.stringify(response, null, 2));
       
       // Formato esperado: { availableDays: [], daySchedules: {} }
       if (response && response.success) {
+        console.log('✅ loadDoctorAvailability - Resposta válida recebida:', {
+          availableDaysCount: response.data?.availableDays?.length || 0,
+          availableDays: response.data?.availableDays || [],
+          daySchedulesKeys: response.data?.daySchedules ? Object.keys(response.data.daySchedules) : [],
+          daySchedules: response.data?.daySchedules || {},
+        });
         // Buscar consultas agendadas para este médico para filtrar horários ocupados
         const today = new Date();
         const startDate = new Date(today);
@@ -542,11 +576,22 @@ const AddAppointmentScreen = ({ route, navigation }) => {
         } catch (appointmentsError) {
           console.warn('⚠️ Erro ao buscar consultas agendadas, usando agenda completa:', appointmentsError);
           // Se houver erro ao buscar consultas, usar agenda completa
+          console.log('📋 Usando agenda completa (sem filtrar consultas agendadas):', {
+            availableDays: response.data?.availableDays || [],
+            daySchedules: response.data?.daySchedules || {},
+          });
           setDoctorAvailability(response.data);
         }
       } else {
+        // Response não tem success: true ou estrutura diferente
+        console.error('❌ loadDoctorAvailability - Resposta inválida ou sem success:', {
+          response: response,
+          hasSuccess: response?.success,
+          hasData: !!response?.data,
+        });
+        
         // Mock data para desenvolvimento
-        console.warn('⚠️ Endpoint de agenda não implementado, usando dados mock');
+        console.warn('⚠️ Endpoint de agenda não implementado ou retornou erro, usando dados mock');
         setDoctorAvailability({
           availableDays: ['2025-12-15', '2025-12-16', '2025-12-17'],
           daySchedules: {
@@ -557,8 +602,14 @@ const AddAppointmentScreen = ({ route, navigation }) => {
         });
       }
     } catch (error) {
-      console.error('Erro ao carregar agenda do médico:', error);
+      console.error('❌ Erro ao carregar agenda do médico:', error);
+      console.error('❌ Detalhes do erro:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response,
+      });
       // Em caso de erro, usar dados mock
+      console.warn('⚠️ Usando dados mock devido ao erro');
       setDoctorAvailability({
         availableDays: ['2025-12-15', '2025-12-16', '2025-12-17'],
         daySchedules: {
@@ -979,7 +1030,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="close" size={24} color={colors.text} />
+            <CloseIcon size={24} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Novo Compromisso</Text>
@@ -1008,7 +1059,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Título *</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="text-outline" size={20} color={colors.gray400} />
+                <TextOutlineIcon size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   placeholder="Ex: Consulta com Dr. João"
@@ -1031,8 +1082,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   ]}
                   onPress={() => updateField('type', 'medical')}
                 >
-                  <Ionicons
-                    name="medical-outline"
+                  <MedicalOutlineIcon
                     size={24}
                     color={formData.type === 'medical' ? colors.secondary : colors.gray400}
                   />
@@ -1053,8 +1103,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   ]}
                   onPress={() => updateField('type', 'common')}
                 >
-                  <Ionicons
-                    name="calendar-outline"
+                  <CalendarIcon
                     size={24}
                     color={formData.type === 'common' ? colors.primary : colors.gray400}
                   />
@@ -1078,8 +1127,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   ]}
                   onPress={() => updateField('type', 'fisioterapia')}
                 >
-                  <Ionicons
-                    name="fitness-outline"
+                  <FitnessOutlineIcon
                     size={24}
                     color={formData.type === 'fisioterapia' ? colors.success : colors.gray400}
                   />
@@ -1100,8 +1148,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   ]}
                   onPress={() => updateField('type', 'exames')}
                 >
-                  <Ionicons
-                    name="flask-outline"
+                  <FlaskOutlineIcon
                     size={24}
                     color={formData.type === 'exames' ? colors.info : colors.gray400}
                   />
@@ -1126,7 +1173,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     style={styles.inputWrapper}
                     onPress={() => setSpecialtyModalVisible(true)}
                   >
-                    <Ionicons name="medical-outline" size={20} color={colors.gray400} />
+                    <MedicalOutlineIcon size={20} color={colors.gray400} />
                     <Text style={[
                       styles.input,
                       !formData.medicalSpecialtyId && styles.placeholder
@@ -1135,14 +1182,14 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                         ? specialties.find(s => s.id === formData.medicalSpecialtyId)?.name
                         : 'Selecione a especialidade...'}
                     </Text>
-                    <Ionicons name="chevron-down" size={20} color={colors.gray400} />
+                    <ChevronDownIcon size={20} color={colors.gray400} />
                   </TouchableOpacity>
                 </View>
 
                 {/* Teleconsulta */}
                 <View style={styles.switchContainer}>
                   <View style={styles.switchLabelContainer}>
-                    <Ionicons name="videocam-outline" size={20} color={colors.text} />
+                    <VideoCamOutlineIcon size={20} color={colors.text} />
                     <Text style={styles.switchLabel}>Teleconsulta</Text>
                   </View>
                   <Switch
@@ -1183,7 +1230,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                               />
                             ) : (
                               <View style={styles.doctorThumbnailPlaceholder}>
-                                <Ionicons name="person" size={20} color={colors.gray400} />
+                                <PersonIcon size={20} color={colors.gray400} />
                               </View>
                             )}
                             <Text style={styles.input} numberOfLines={1}>
@@ -1192,17 +1239,17 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                           </View>
                         ) : (
                           <>
-                            <Ionicons name="person-outline" size={20} color={colors.gray400} />
+                            <PersonIcon size={20} color={colors.gray400} />
                             <Text style={[styles.input, styles.placeholder]}>
                               Selecione o médico...
                             </Text>
                           </>
                         )}
-                        <Ionicons name="chevron-down" size={20} color={colors.gray400} />
+                        <ChevronDownIcon size={20} color={colors.gray400} />
                       </TouchableOpacity>
                     ) : (
                       <View style={styles.noDoctorsContainer}>
-                        <Ionicons name="alert-circle-outline" size={20} color={colors.warning} />
+                        <AlertCircleOutlineIcon size={20} color={colors.warning} />
                         <Text style={styles.noDoctorsText}>
                           Nenhum médico encontrado para esta especialidade
                         </Text>
@@ -1233,12 +1280,12 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     }}
                     disabled={formData.recurrenceType !== 'none'}
                   >
-                    <Ionicons name="calendar-outline" size={20} color={colors.gray400} />
+                    <CalendarIcon size={20} color={colors.gray400} />
                     <Text style={styles.dateText}>
                       {new Date(formData.date).toLocaleDateString('pt-BR')}
                     </Text>
                     {formData.recurrenceType === 'none' && (
-                      <Ionicons name="create-outline" size={20} color={colors.primary} />
+                      <EditIcon size={20} color={colors.primary} />
                     )}
                   </TouchableOpacity>
 
@@ -1256,7 +1303,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     }}
                     disabled={formData.recurrenceType !== 'none'}
                   >
-                    <Ionicons name="time-outline" size={20} color={colors.gray400} />
+                    <TimeIcon size={20} color={colors.gray400} />
                     <Text style={styles.dateText}>
                       {new Date(formData.date).toLocaleTimeString('pt-BR', { 
                         hour: '2-digit', 
@@ -1264,7 +1311,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                       })}
                     </Text>
                     {formData.recurrenceType === 'none' && (
-                      <Ionicons name="create-outline" size={20} color={colors.primary} />
+                      <EditIcon size={20} color={colors.primary} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -1323,13 +1370,13 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     style={styles.inputWrapper}
                     onPress={() => setShowRecurrenceEndPicker(true)}
                   >
-                    <Ionicons name="calendar-outline" size={20} color={colors.gray400} />
+                    <CalendarIcon size={20} color={colors.gray400} />
                     <Text style={styles.dateText}>
                       {formData.recurrenceEnd 
                         ? new Date(formData.recurrenceEnd).toLocaleDateString('pt-BR')
                         : 'Selecione a data final'}
                     </Text>
-                    <Ionicons name="create-outline" size={20} color={colors.primary} />
+                    <EditIcon size={20} color={colors.primary} />
                   </TouchableOpacity>
                   {showRecurrenceEndPicker && (
                     <DateTimePicker
@@ -1402,7 +1449,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     onPress={checkGoogleMapsConfig}
                     style={styles.helpButton}
                   >
-                    <Ionicons name="information-circle" size={20} color={colors.warning} />
+                    <InformationCircleIcon size={20} color={colors.warning} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -1519,14 +1566,14 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     style={styles.mapButton}
                     onPress={openGoogleMaps}
                   >
-                    <Ionicons name="navigate-outline" size={16} color={colors.info} />
+                    <NavigateIcon size={16} color={colors.info} />
                     <Text style={styles.mapButtonText}>Google Maps</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={styles.mapButton}
                     onPress={openWaze}
                   >
-                    <Ionicons name="navigate-outline" size={16} color={colors.info} />
+                    <NavigateIcon size={16} color={colors.info} />
                     <Text style={styles.mapButtonText}>Waze</Text>
                   </TouchableOpacity>
                 </View>
@@ -1573,7 +1620,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
 
             {/* Info Card */}
             <View style={styles.infoCard}>
-              <Ionicons name="information-circle" size={24} color={colors.info} />
+              <InformationCircleIcon size={24} color={colors.info} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoText}>
                   Os lembretes serão enviados mesmo se o app estiver fechado. 
@@ -1592,7 +1639,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                 <Text style={styles.saveButtonText}>Salvando...</Text>
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.textWhite} />
+                  <CheckmarkCircleIcon size={20} color={colors.textWhite} />
                   <Text style={styles.saveButtonText}>
                     {isEditing ? 'Salvar Alterações' : 'Agendar Compromisso'}
                   </Text>
@@ -1619,7 +1666,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   onPress={() => setSpecialtyModalVisible(false)}
                   style={styles.modalCloseButton}
                 >
-                  <Ionicons name="close" size={24} color={colors.text} />
+                  <CloseIcon size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
               <FlatList
@@ -1645,7 +1692,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                       {item.name}
                     </Text>
                     {formData.medicalSpecialtyId === item.id && (
-                      <Ionicons name="checkmark" size={24} color={colors.primary} />
+                      <CheckmarkIcon size={24} color={colors.primary} />
                     )}
                   </TouchableOpacity>
                 )}
@@ -1670,7 +1717,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   onPress={() => setDoctorModalVisible(false)}
                   style={styles.modalCloseButton}
                 >
-                  <Ionicons name="close" size={24} color={colors.text} />
+                  <CloseIcon size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
               <FlatList
@@ -1687,20 +1734,20 @@ const AddAppointmentScreen = ({ route, navigation }) => {
 
                     for (let i = 0; i < fullStars; i++) {
                       stars.push(
-                        <Ionicons key={i} name="star" size={14} color={colors.warning} />
+                        <StarIcon key={i} size={14} color={colors.warning} />
                       );
                     }
 
                     if (hasHalfStar) {
                       stars.push(
-                        <Ionicons key="half" name="star-half" size={14} color={colors.warning} />
+                        <StarHalfIcon key="half" size={14} color={colors.warning} />
                       );
                     }
 
                     const emptyStars = 5 - Math.ceil(rating);
                     for (let i = 0; i < emptyStars; i++) {
                       stars.push(
-                        <Ionicons key={`empty-${i}`} name="star-outline" size={14} color={colors.gray400} />
+                        <StarOutlineIcon key={`empty-${i}`} size={14} color={colors.gray400} />
                       );
                     }
 
@@ -1734,7 +1781,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                             />
                           ) : (
                             <View style={styles.doctorItemThumbnailPlaceholder}>
-                              <Ionicons name="person" size={24} color={colors.gray400} />
+                              <PersonIcon size={24} color={colors.gray400} />
                             </View>
                           )}
                           <View style={styles.doctorItemInfo}>
@@ -1745,7 +1792,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                               {item.name}
                             </Text>
                             {item.crm && (
-                              <Text style={styles.doctorItemCrm}>CRM: {item.crm}</Text>
+                              <Text style={styles.doctorItemCrm}>CRM: {formatCrmDisplay(item.crm)}</Text>
                             )}
                             {item.average_rating && (
                               <View style={styles.ratingContainer}>
@@ -1758,7 +1805,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                           </View>
                         </View>
                         {formData.selectedDoctor?.id === item.id && (
-                          <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                          <CheckmarkCircleIcon size={24} color={colors.primary} />
                         )}
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -1768,7 +1815,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                           setDoctorDetailsModalVisible(true);
                         }}
                       >
-                        <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+                        <InformationCircleOutlineIcon size={20} color={colors.primary} />
                         <Text style={styles.doctorDetailsButtonText}>Ver detalhes</Text>
                       </TouchableOpacity>
                     </View>
@@ -1795,7 +1842,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   onPress={() => setDoctorDetailsModalVisible(false)}
                   style={styles.modalCloseButton}
                 >
-                  <Ionicons name="close" size={24} color={colors.text} />
+                  <CloseIcon size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
               <ScrollView 
@@ -1813,12 +1860,12 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                         />
                       ) : (
                         <View style={styles.doctorDetailsPhotoPlaceholder}>
-                          <Ionicons name="person" size={48} color={colors.gray400} />
+                          <PersonIcon size={48} color={colors.gray400} />
                         </View>
                       )}
                       <Text style={styles.doctorDetailsName}>{selectedDoctorDetails.name}</Text>
                       {selectedDoctorDetails.crm && (
-                        <Text style={styles.doctorDetailsCrm}>CRM: {selectedDoctorDetails.crm}</Text>
+                        <Text style={styles.doctorDetailsCrm}>CRM: {formatCrmDisplay(selectedDoctorDetails.crm)}</Text>
                       )}
                       {selectedDoctorDetails.average_rating && (
                         <View style={styles.doctorDetailsRating}>
@@ -1829,20 +1876,20 @@ const AddAppointmentScreen = ({ route, navigation }) => {
 
                             for (let i = 0; i < fullStars; i++) {
                               stars.push(
-                                <Ionicons key={i} name="star" size={20} color={colors.warning} />
+                                <StarIcon key={i} size={20} color={colors.warning} />
                               );
                             }
 
                             if (hasHalfStar) {
                               stars.push(
-                                <Ionicons key="half" name="star-half" size={20} color={colors.warning} />
+                                <StarHalfIcon key="half" size={20} color={colors.warning} />
                               );
                             }
 
                             const emptyStars = 5 - Math.ceil(selectedDoctorDetails.average_rating);
                             for (let i = 0; i < emptyStars; i++) {
                               stars.push(
-                                <Ionicons key={`empty-${i}`} name="star-outline" size={20} color={colors.gray400} />
+                                <StarOutlineIcon key={`empty-${i}`} size={20} color={colors.gray400} />
                               );
                             }
 
@@ -1893,7 +1940,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                         <Text style={styles.doctorDetailsLabel}>Cursos e Certificações</Text>
                         {selectedDoctorDetails.courses.map((course, index) => (
                           <View key={index} style={styles.courseItem}>
-                            <Ionicons name="school" size={16} color={colors.primary} />
+                            <SchoolIcon size={16} color={colors.primary} />
                             <Text style={styles.courseText}>
                               {course.name || course.course_name} 
                               {course.institution && ` - ${course.institution}`}
@@ -1934,7 +1981,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   onPress={() => setAvailabilityModalVisible(false)}
                   style={styles.modalCloseButton}
                 >
-                  <Ionicons name="close" size={24} color={colors.text} />
+                  <CloseIcon size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
@@ -1982,7 +2029,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                                 })}
                               </Text>
                               {isSelected && (
-                                <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                                <CheckmarkCircleIcon size={20} color={colors.primary} />
                               )}
                             </TouchableOpacity>
 
@@ -2021,7 +2068,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                       })
                     ) : (
                       <View style={styles.availabilityEmptyContainer}>
-                        <Ionicons name="calendar-outline" size={48} color={colors.gray400} />
+                        <CalendarIcon size={48} color={colors.gray400} />
                         <Text style={styles.availabilityEmptyText}>
                           Nenhuma data disponível no momento
                         </Text>
@@ -2034,7 +2081,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                 </ScrollView>
               ) : (
                 <View style={styles.availabilityEmptyContainer}>
-                  <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
+                  <AlertCircleOutlineIcon size={48} color={colors.error} />
                   <Text style={styles.availabilityEmptyText}>
                     Erro ao carregar agenda
                   </Text>

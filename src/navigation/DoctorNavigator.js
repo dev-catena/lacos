@@ -55,6 +55,8 @@ import ClientDetailsScreen from '../screens/Clients/ClientDetailsScreen';
 import ClientChatScreen from '../screens/Clients/ClientChatScreen';
 import DoctorAppointmentDetailsScreen from '../screens/Home/DoctorAppointmentDetailsScreen';
 import DoctorVideoCallScreen from '../screens/Home/DoctorVideoCallScreen';
+import RecipeFormScreen from '../screens/Teleconsultation/RecipeFormScreen';
+import MedicalCertificateFormScreen from '../screens/Teleconsultation/MedicalCertificateFormScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -169,6 +171,20 @@ const HomeStack = () => {
         options={{ 
           headerShown: false,
           gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen 
+        name="RecipeForm" 
+        component={RecipeFormScreen}
+        options={{ 
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="MedicalCertificateForm" 
+        component={MedicalCertificateFormScreen}
+        options={{ 
+          headerShown: false,
         }}
       />
       <Stack.Screen 

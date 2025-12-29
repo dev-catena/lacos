@@ -321,14 +321,18 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
           style={styles.headerButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <View style={styles.iconWrapper}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </View>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detalhes do Compromisso</Text>
         <TouchableOpacity
           style={styles.headerButton}
           onPress={handleEdit}
         >
-          <Ionicons name="create-outline" size={24} color={colors.primary} />
+          <View style={styles.iconWrapper}>
+            <Ionicons name="create-outline" size={24} color={colors.primary} />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -340,11 +344,13 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
         {/* Tipo e Título */}
         <View style={styles.card}>
           <View style={styles.iconContainer}>
-            {isMedical ? (
-              <MedicalIcon size={32} color={colors.secondary} />
-            ) : (
-              <CalendarIcon size={32} color={colors.primary} />
-            )}
+            <View style={styles.iconWrapper}>
+              {isMedical ? (
+                <MedicalIcon size={32} color={colors.secondary} />
+              ) : (
+                <CalendarIcon size={32} color={colors.primary} />
+              )}
+            </View>
           </View>
           <Text style={styles.typeLabel}>{getTypeLabel(appointment.type)}</Text>
           <Text style={styles.title}>{appointment.title || 'Sem título'}</Text>
@@ -356,8 +362,10 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
         {/* Data e Hora */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-            <Text style={styles.sectionTitle}>Data e Hora</Text>
+            <View style={styles.iconWrapper}>
+              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+            </View>
+            <Text style={[styles.sectionTitle, { marginLeft: 8 }]}>Data e Hora</Text>
           </View>
           
           <View style={styles.infoRow}>
@@ -392,8 +400,10 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
         {(appointment.doctorUser || appointment.doctor) && (
           <View style={styles.card}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="person-outline" size={20} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Médico</Text>
+              <View style={styles.iconWrapper}>
+                <Ionicons name="person-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.sectionTitle, { marginLeft: 8 }]}>Médico</Text>
             </View>
             <Text style={styles.doctorName}>
               {appointment.doctorUser?.name || appointment.doctor?.name || appointment.doctor || 'Médico não informado'}
@@ -410,8 +420,10 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
         {appointment.location && (
           <View style={styles.card}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="location-outline" size={20} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Localização</Text>
+              <View style={styles.iconWrapper}>
+                <Ionicons name="location-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.sectionTitle, { marginLeft: 8 }]}>Localização</Text>
             </View>
             <Text style={styles.locationText}>{appointment.location}</Text>
           </View>
@@ -421,8 +433,10 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
         {appointment.notes && (
           <View style={styles.card}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="document-text-outline" size={20} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Observações</Text>
+              <View style={styles.iconWrapper}>
+                <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.sectionTitle, { marginLeft: 8 }]}>Observações</Text>
             </View>
             <Text style={styles.notesText}>{appointment.notes}</Text>
           </View>
@@ -438,7 +452,9 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
             <ActivityIndicator color={colors.textWhite} />
           ) : (
             <>
-              <Ionicons name="trash-outline" size={20} color={colors.textWhite} />
+              <View style={styles.iconWrapper}>
+                <Ionicons name="trash-outline" size={20} color={colors.textWhite} />
+              </View>
               <Text style={styles.deleteButtonText}>Excluir Compromisso</Text>
             </>
           )}
@@ -468,6 +484,10 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconWrapper: {
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -560,7 +580,6 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     marginBottom: 16,
   },
   sectionTitle: {

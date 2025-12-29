@@ -11,10 +11,12 @@ import {
   ActivityIndicator,
   Platform,
   Image,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
 import groupService from '../../services/groupService';
@@ -37,11 +39,62 @@ const EditPatientDataScreen = ({ route, navigation }) => {
   const [bloodType, setBloodType] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [cpf, setCpf] = useState('');
   const [chronicDiseases, setChronicDiseases] = useState('');
   const [allergies, setAllergies] = useState('');
   const [patientUserId, setPatientUserId] = useState(null);
   const [patientPhoto, setPatientPhoto] = useState(null);
   const [newPhoto, setNewPhoto] = useState(null);
+
+  // Estado temporário para o picker customizado (Android)
+  const [tempDate, setTempDate] = useState({
+    day: new Date().getDate(),
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+  });
+
+  // Formatar telefone: +55(00)00000-0000 com limite de 11 dígitos (DDD + número)
+  const formatPhoneBR = (text) => {
+    // Garantir que sempre exista +55 no início
+    let cleanText = text || '';
+    if (!cleanText.startsWith('+55')) {
+      const digits = cleanText.replace(/\D/g, '');
+      // remove 55 duplicado se usuário colar número com 55
+      const without55 = digits.startsWith('55') ? digits.slice(2) : digits;
+      cleanText = '+55' + without55;
+    }
+
+    // Processar apenas dígitos após +55
+    const digitsOnly = cleanText.replace(/\+55/g, '').replace(/\D/g, '');
+    const limited = digitsOnly.slice(0, 11); // DDD(2) + número(9)
+
+    let formatted = '+55';
+    if (limited.length > 0) {
+      formatted += `(${limited.slice(0, 2)}`;
+    }
+    if (limited.length > 2) {
+      formatted += `)${limited.slice(2, 7)}`;
+    }
+    if (limited.length > 7) {
+      formatted += `-${limited.slice(7, 11)}`;
+    }
+    return formatted;
+  };
+
+  const handlePhoneChange = (text) => {
+    // Se tentar apagar tudo, manter +55 fixo
+    if (!text || text.length === 0) {
+      setPhone('+55');
+      return;
+    }
+    // Se o usuário tentar apagar o +55, restaura e formata
+    if (!text.startsWith('+55')) {
+      const digits = text.replace(/\D/g, '');
+      setPhone(formatPhoneBR('+55' + digits));
+      return;
+    }
+    setPhone(formatPhoneBR(text));
+  };
 
   useEffect(() => {
     loadPatientData();
@@ -75,13 +128,23 @@ const EditPatientDataScreen = ({ route, navigation }) => {
           setFirstName(first);
           setLastName(last);
           setEmail(patient.email || '');
-          setPhone(patient.phone || '');
+          // Normalizar para o padrão +55(00)00000-0000
+          setPhone(formatPhoneBR(patient.phone || '+55'));
+          setCpf(patient.cpf || '');
           setPatientPhoto(patient.photo_url || null);
           
           // Dados adicionais (se existirem na API)
           if (patient.gender) setGender(patient.gender);
           if (patient.blood_type) setBloodType(patient.blood_type);
-          if (patient.birth_date) setBirthDate(new Date(patient.birth_date));
+          if (patient.birth_date) {
+            const loadedDate = new Date(patient.birth_date);
+            setBirthDate(loadedDate);
+            setTempDate({
+              day: loadedDate.getDate(),
+              month: loadedDate.getMonth() + 1,
+              year: loadedDate.getFullYear(),
+            });
+          }
           // Sempre definir os campos, mesmo se vazios
           setChronicDiseases(patient.chronic_diseases || '');
           setAllergies(patient.allergies || '');
@@ -129,6 +192,7 @@ const EditPatientDataScreen = ({ route, navigation }) => {
         formData.append('name', `${firstName.trim()} ${lastName.trim()}`);
         formData.append('email', email.trim());
         formData.append('phone', phone.trim());
+        formData.append('cpf', cpf ? cpf.replace(/\D/g, '') : '');
         formData.append('gender', gender);
         formData.append('blood_type', bloodType.trim());
         formData.append('birth_date', birthDate.toISOString().split('T')[0]);
@@ -165,6 +229,7 @@ const EditPatientDataScreen = ({ route, navigation }) => {
           name: `${firstName.trim()} ${lastName.trim()}`,
           email: email.trim(),
           phone: phone.trim(),
+          cpf: cpf ? cpf.replace(/\D/g, '') : '',
           gender: gender,
           blood_type: bloodType.trim(),
           birth_date: birthDate.toISOString().split('T')[0],
@@ -202,10 +267,68 @@ const EditPatientDataScreen = ({ route, navigation }) => {
   };
 
   const onDateChange = (event, selectedDate) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
+    // iOS: Não fechar automaticamente ao selecionar data
+    // Só atualiza a data se houver seleção
+    if (selectedDate && Platform.OS === 'ios') {
       setBirthDate(selectedDate);
+      setTempDate({
+        day: selectedDate.getDate(),
+        month: selectedDate.getMonth() + 1,
+        year: selectedDate.getFullYear(),
+      });
     }
+  };
+
+  const handleTempDateChange = (field, value) => {
+    const newTempDate = { ...tempDate, [field]: parseInt(value) };
+    setTempDate(newTempDate);
+    
+    // Criar nova data com os valores temporários
+    const newDate = new Date(newTempDate.year, newTempDate.month - 1, newTempDate.day);
+    // Validar se a data é válida (ex: 31/02 não existe)
+    if (newDate.getDate() === newTempDate.day && 
+        newDate.getMonth() === newTempDate.month - 1 && 
+        newDate.getFullYear() === newTempDate.year) {
+      setBirthDate(newDate);
+    }
+  };
+
+  const confirmCustomDate = () => {
+    const newDate = new Date(tempDate.year, tempDate.month - 1, tempDate.day);
+    if (newDate.getDate() === tempDate.day && 
+        newDate.getMonth() === tempDate.month - 1 && 
+        newDate.getFullYear() === tempDate.year) {
+      setBirthDate(newDate);
+    }
+    setShowDatePicker(false);
+  };
+
+  // Gerar arrays de dias, meses e anos
+  const getDaysInMonth = (month, year) => {
+    return new Date(year, month, 0).getDate();
+  };
+
+  const generateDays = () => {
+    const daysInMonth = getDaysInMonth(tempDate.month, tempDate.year);
+    return Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  };
+
+  const generateMonths = () => {
+    const months = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    return months.map((name, index) => ({ label: name, value: index + 1 }));
+  };
+
+  const generateYears = () => {
+    const currentYear = new Date().getFullYear();
+    const minYear = 1900;
+    const years = [];
+    for (let year = currentYear; year >= minYear; year--) {
+      years.push(year);
+    }
+    return years;
   };
 
   const formatDate = (date) => {
@@ -375,15 +498,137 @@ const EditPatientDataScreen = ({ route, navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {showDatePicker && (
-            <DateTimePicker
-              value={birthDate}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={onDateChange}
-              maximumDate={new Date()}
-              minimumDate={new Date(1900, 0, 1)}
-            />
+          {Platform.OS === 'ios' ? (
+            // iOS: Modal para permitir fechar clicando fora
+            showDatePicker && (
+              <Modal
+                visible={showDatePicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowDatePicker(false)}
+              >
+                <TouchableOpacity
+                  style={styles.modalOverlay}
+                  activeOpacity={1}
+                  onPress={() => setShowDatePicker(false)}
+                >
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={(e) => e.stopPropagation()}
+                    style={styles.modalContent}
+                  >
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle}>Data de Nascimento</Text>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                        <Ionicons name="close" size={24} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
+                    <DateTimePicker
+                      value={birthDate}
+                      mode="date"
+                      display="spinner"
+                      onChange={onDateChange}
+                      maximumDate={new Date()}
+                      minimumDate={new Date(1900, 0, 1)}
+                      style={styles.datePickerIOS}
+                    />
+                    <TouchableOpacity
+                      style={styles.modalButton}
+                      onPress={() => setShowDatePicker(false)}
+                    >
+                      <Text style={styles.modalButtonText}>Confirmar</Text>
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              </Modal>
+            )
+          ) : (
+            // Android: Picker customizado que não fecha automaticamente
+            showDatePicker && (
+              <Modal
+                visible={showDatePicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowDatePicker(false)}
+              >
+                <TouchableOpacity
+                  style={styles.modalOverlay}
+                  activeOpacity={1}
+                  onPress={() => setShowDatePicker(false)}
+                >
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={(e) => e.stopPropagation()}
+                    style={styles.modalContentAndroid}
+                  >
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle}>Data de Nascimento</Text>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                        <Ionicons name="close" size={24} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.customPickerContainer}>
+                      {/* Picker de Dia */}
+                      <View style={styles.pickerColumn}>
+                        <Text style={styles.pickerLabel}>Dia</Text>
+                        <View style={styles.pickerWrapper}>
+                          <Picker
+                            selectedValue={tempDate.day}
+                            onValueChange={(value) => handleTempDateChange('day', value)}
+                            style={styles.picker}
+                            itemStyle={styles.pickerItem}
+                          >
+                            {generateDays().map((day) => (
+                              <Picker.Item key={day} label={day.toString()} value={day} />
+                            ))}
+                          </Picker>
+                        </View>
+                      </View>
+
+                      {/* Picker de Mês */}
+                      <View style={styles.pickerColumn}>
+                        <Text style={styles.pickerLabel}>Mês</Text>
+                        <View style={styles.pickerWrapper}>
+                          <Picker
+                            selectedValue={tempDate.month}
+                            onValueChange={(value) => handleTempDateChange('month', value)}
+                            style={styles.picker}
+                            itemStyle={styles.pickerItem}
+                          >
+                            {generateMonths().map((month) => (
+                              <Picker.Item key={month.value} label={month.label} value={month.value} />
+                            ))}
+                          </Picker>
+                        </View>
+                      </View>
+
+                      {/* Picker de Ano */}
+                      <View style={styles.pickerColumn}>
+                        <Text style={styles.pickerLabel}>Ano</Text>
+                        <View style={styles.pickerWrapper}>
+                          <Picker
+                            selectedValue={tempDate.year}
+                            onValueChange={(value) => handleTempDateChange('year', value)}
+                            style={styles.picker}
+                            itemStyle={styles.pickerItem}
+                          >
+                            {generateYears().map((year) => (
+                              <Picker.Item key={year} label={year.toString()} value={year} />
+                            ))}
+                          </Picker>
+                        </View>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.modalButton}
+                      onPress={confirmCustomDate}
+                    >
+                      <Text style={styles.modalButtonText}>Confirmar</Text>
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              </Modal>
+            )
           )}
 
           {/* Sexo */}
@@ -491,8 +736,8 @@ const EditPatientDataScreen = ({ route, navigation }) => {
             <TextInput
               style={styles.input}
               value={phone}
-              onChangeText={setPhone}
-              placeholder="(00) 00000-0000"
+              onChangeText={handlePhoneChange}
+              placeholder="+55(00)00000-0000"
               placeholderTextColor={colors.gray400}
               keyboardType="phone-pad"
             />
@@ -507,6 +752,34 @@ const EditPatientDataScreen = ({ route, navigation }) => {
               placeholder="email@exemplo.com"
               placeholderTextColor={colors.gray400}
               keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>CPF</Text>
+            <TextInput
+              style={styles.input}
+              value={cpf}
+              onChangeText={(text) => {
+                // Remove tudo que não é número
+                const numbers = text.replace(/\D/g, '');
+                // Limita a 11 dígitos
+                const limited = numbers.slice(0, 11);
+                // Formata: 000.000.000-00
+                let formatted = limited;
+                if (limited.length > 6) {
+                  formatted = `${limited.slice(0, 3)}.${limited.slice(3, 6)}.${limited.slice(6, 9)}-${limited.slice(9)}`;
+                } else if (limited.length > 3) {
+                  formatted = `${limited.slice(0, 3)}.${limited.slice(3)}`;
+                }
+                setCpf(formatted);
+              }}
+              placeholder="000.000.000-00"
+              placeholderTextColor={colors.gray400}
+              keyboardType="numeric"
+              maxLength={14}
+            />
               autoCapitalize="none"
             />
           </View>
@@ -738,6 +1011,105 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.secondary,
     marginTop: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalContentAndroid: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  datePickerIOS: {
+    width: '100%',
+    height: 200,
+  },
+  modalButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  modalButtonText: {
+    color: colors.textWhite,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  customPickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-start',
+    paddingVertical: 20,
+    gap: 8,
+    width: '100%',
+  },
+  pickerColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  pickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  pickerWrapper: {
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  picker: {
+    width: '100%',
+    height: 150,
+  },
+  pickerItem: {
+    fontSize: 16,
+    color: colors.text,
   },
 });
 

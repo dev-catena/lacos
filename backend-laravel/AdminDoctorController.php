@@ -46,6 +46,7 @@ class AdminDoctorController extends Controller
                         'id' => $doctor->id,
                         'name' => $doctor->name,
                         'email' => $doctor->email,
+                        'cpf' => $doctor->cpf ?? null,
                         'crm' => $doctor->crm ?? null,
                         'specialty' => $specialty,
                         'created_at' => $doctor->created_at,
@@ -96,6 +97,7 @@ class AdminDoctorController extends Controller
                         'id' => $doctor->id,
                         'name' => $doctor->name,
                         'email' => $doctor->email,
+                        'cpf' => $doctor->cpf ?? null,
                         'crm' => $doctor->crm ?? null,
                         'specialty' => $specialty,
                         'is_blocked' => (bool) $doctor->is_blocked,
@@ -329,6 +331,11 @@ class AdminDoctorController extends Controller
      */
     public function activate(Request $request)
     {
+        // Limpar todos os output buffers para evitar vazamento de texto
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        
         try {
             $token = $request->query('token');
             
@@ -436,12 +443,17 @@ class AdminDoctorController extends Controller
                         'name' => $doctor->name,
                         'email' => $doctor->email,
                     ]
-                ]);
+                ], 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             } else {
+                // Limpar output buffer novamente antes de retornar a view
+                while (ob_get_level()) {
+                    ob_end_clean();
+                }
+                
                 // Retornar view HTML para navegador
-                return view('doctor-activation-success', [
+                return response()->view('doctor-activation-success', [
                     'doctor' => $doctor
-                ]);
+                ])->header('Content-Type', 'text/html; charset=utf-8');
             }
         } catch (\Exception $e) {
             \Log::error('Erro ao ativar médico: ' . $e->getMessage(), [
@@ -462,6 +474,154 @@ class AdminDoctorController extends Controller
                 'message' => $errorMessage,
                 'error' => config('app.debug') ? $e->getMessage() : 'Server Error'
             ], 500);
+        }
+    }
+
+    /**
+     * Atualizar informações do médico
+     * PUT /api/admin/doctors/{id}
+     */
+    public function update(Request $request, $id)
+    {
+        // Limpar qualquer output buffer anterior
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        
+        try {
+            $doctor = User::where('id', $id)
+                ->where('profile', 'doctor')
+                ->firstOrFail();
+
+            // Validação dos dados
+            $validator = \Validator::make($request->all(), [
+                'name' => 'sometimes|string|max:255',
+                'email' => 'sometimes|nullable|email|max:255|unique:users,email,' . $id . ',id,profile,doctor',
+                'cpf' => 'sometimes|nullable|string|max:14',
+                'crm' => 'sometimes|nullable|string|max:20',
+                'medical_specialty_id' => 'sometimes|nullable|integer|exists:medical_specialties,id',
+            ]);
+
+            if ($validator->fails()) {
+                while (ob_get_level()) {
+                    ob_end_clean();
+                }
+                return response()->json([
+                    'error' => 'Dados inválidos',
+                    'errors' => $validator->errors()
+                ], 422, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+
+            // Atualizar apenas os campos fornecidos
+            $updateData = [];
+            
+            if ($request->has('name')) {
+                $updateData['name'] = $request->name;
+            }
+            
+            if ($request->has('email')) {
+                $updateData['email'] = $request->email;
+            }
+            
+            if ($request->has('cpf')) {
+                // Validar CPF se fornecido
+                $cpf = preg_replace('/[^0-9]/', '', $request->cpf);
+                if (!empty($cpf) && strlen($cpf) === 11) {
+                    // Verificar se CPF já existe para outro médico
+                    $existingDoctor = User::where('cpf', $cpf)
+                        ->where('profile', 'doctor')
+                        ->where('id', '!=', $id)
+                        ->first();
+                    
+                    if ($existingDoctor) {
+                        while (ob_get_level()) {
+                            ob_end_clean();
+                        }
+                        return response()->json([
+                            'error' => 'CPF já cadastrado para outro médico',
+                            'message' => 'Este CPF já está sendo usado por outro médico.'
+                        ], 422, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    }
+                    $updateData['cpf'] = $cpf;
+                } else if (!empty($request->cpf)) {
+                    while (ob_get_level()) {
+                        ob_end_clean();
+                    }
+                    return response()->json([
+                        'error' => 'CPF inválido',
+                        'message' => 'O CPF deve conter 11 dígitos.'
+                    ], 422, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                }
+            }
+            
+            if ($request->has('crm')) {
+                $updateData['crm'] = $request->crm;
+            }
+            
+            if ($request->has('medical_specialty_id')) {
+                $updateData['medical_specialty_id'] = $request->medical_specialty_id;
+            }
+
+            // Atualizar o médico
+            if (!empty($updateData)) {
+                $updateData['updated_at'] = now();
+                $doctor->update($updateData);
+                $doctor->refresh();
+            }
+
+            // Buscar especialidade atualizada
+            $specialty = null;
+            if ($doctor->medical_specialty_id) {
+                $specialtyData = DB::table('medical_specialties')
+                    ->where('id', $doctor->medical_specialty_id)
+                    ->select('id', 'name')
+                    ->first();
+                if ($specialtyData) {
+                    $specialty = [
+                        'id' => $specialtyData->id,
+                        'name' => $specialtyData->name,
+                    ];
+                }
+            }
+
+            $isActivated = $doctor->doctor_approved_at && 
+                           ($doctor->doctor_activation_token === null || $doctor->doctor_activation_token === '');
+
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            return response()->json([
+                'message' => 'Médico atualizado com sucesso',
+                'doctor' => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->name,
+                    'email' => $doctor->email,
+                    'cpf' => $doctor->cpf ?? null,
+                    'crm' => $doctor->crm ?? null,
+                    'specialty' => $specialty,
+                    'is_blocked' => (bool) $doctor->is_blocked,
+                    'approved_at' => $doctor->doctor_approved_at,
+                    'is_activated' => $isActivated,
+                    'created_at' => $doctor->created_at,
+                ]
+            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
+            return response()->json([
+                'error' => 'Médico não encontrado',
+                'message' => 'O médico com o ID informado não existe'
+            ], 404, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Exception $e) {
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
+            return response()->json([
+                'error' => 'Erro ao atualizar médico',
+                'message' => $e->getMessage()
+            ], 500, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
     }
 

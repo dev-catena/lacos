@@ -23,14 +23,70 @@ import MedicationAutocomplete from '../../components/MedicationAutocomplete';
 import documentService from '../../services/documentService';
 import * as FileSystem from 'expo-file-system/legacy';
 
-const PHARMACEUTICAL_FORMS = [
-  'Comprimido', 'Cápsula', 'Solução oral', 'Gotas', 'Xarope',
-  'Injetável', 'Pomada', 'Creme', 'Supositório', 'Adesivo'
-];
+// Estrutura baseada na tabela: Via de Administração -> Forma Farmacêutica -> Unidade de Dose
+const MEDICATION_STRUCTURE = {
+  'Oral': {
+    forms: [
+      { name: 'Comprimido', unit: 'comprimido(s)' },
+      { name: 'Cápsula', unit: 'cápsula(s)' },
+      { name: 'Gotas', unit: 'gota(s)' },
+      { name: 'Xarope', unit: 'mL' },
+      { name: 'Solução', unit: 'mL' },
+      { name: 'Suspensão', unit: 'mL' },
+      { name: 'Pó', unit: 'g' },
+      { name: 'Sachê', unit: 'sachê' },
+    ]
+  },
+  'Inalatória': {
+    forms: [
+      { name: 'MDI - Bombinha', unit: 'jato(s)' },
+      { name: 'DPI - Pó inalável', unit: 'inalação(ões)' },
+    ]
+  },
+  'Nebulização': {
+    forms: [
+      { name: 'Solução - Ampola', unit: 'mL' },
+      { name: 'Solução - Frasco', unit: 'mL' },
+    ]
+  },
+  'Injetável': {
+    forms: [
+      { name: 'Ampola', unit: 'mL' },
+      { name: 'Frasco-ampola', unit: 'mL' },
+    ]
+  },
+  'Tópica': {
+    forms: [
+      { name: 'Pomada', unit: 'camada' },
+      { name: 'Creme', unit: 'camada' },
+      { name: 'Gel', unit: 'camada' },
+    ]
+  },
+  'Nasal': {
+    forms: [
+      { name: 'Spray Nasal', unit: 'jato(s)' },
+    ]
+  },
+  'Ocular': {
+    forms: [
+      { name: 'Colírio', unit: 'gota(s)' },
+    ]
+  },
+  'Transdérmica': {
+    forms: [
+      { name: 'Adesivo', unit: 'adesivo' },
+    ]
+  },
+  'Retal / Vaginal': {
+    forms: [
+      { name: 'Supositório', unit: 'supositório' },
+      { name: 'Óvulo', unit: 'óvulo' },
+    ]
+  },
+};
 
-const UNITS = ['mg', 'mL', 'g', 'UI', 'mcg', '%'];
-
-const ROUTES = ['Oral', 'Sublingual', 'Nasal', 'Tópica', 'Intravenosa', 'Intramuscular'];
+// Unidades de concentração (para o campo de concentração)
+const CONCENTRATION_UNITS = ['mg', 'mL', 'g', 'UI', 'mcg', '%'];
 
 const FREQUENCIES = [
   { label: '1x ao dia', value: '24', times: 1 },
@@ -54,7 +110,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
   const [dosage, setDosage] = useState('');
   const [unit, setUnit] = useState('mg');
   const [doseQuantity, setDoseQuantity] = useState('');
-  const [doseQuantityUnit, setDoseQuantityUnit] = useState('mg');
+  const [doseQuantityUnit, setDoseQuantityUnit] = useState('');
   const [administrationRoute, setAdministrationRoute] = useState('Oral');
   const [frequency, setFrequency] = useState('24');
   const [firstDoseTime, setFirstDoseTime] = useState('08:00');
@@ -352,7 +408,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
                   setDosage('');
                   setUnit('mg');
                   setDoseQuantity('');
-                  setDoseQuantityUnit('mg');
+                  setDoseQuantityUnit('');
                   setAdministrationRoute('Oral');
                   setFrequency('24');
                   setFirstDoseTime('08:00');
@@ -456,22 +512,53 @@ const AddMedicationScreen = ({ route, navigation }) => {
             />
           </View>
 
-          {/* Forma Farmacêutica */}
+          {/* Via de Administração */}
           <View style={styles.field}>
-            <Text style={styles.label}>Forma farmacêutica *</Text>
+            <Text style={styles.label}>Via de administração *</Text>
             <View style={styles.chipContainer}>
-              {PHARMACEUTICAL_FORMS.map((item) => (
+              {Object.keys(MEDICATION_STRUCTURE).map((route) => (
                 <TouchableOpacity
-                  key={item}
-                  style={[styles.chip, form === item && styles.chipActive]}
-                  onPress={() => setForm(item)}
+                  key={route}
+                  style={[styles.chip, administrationRoute === route && styles.chipActive]}
+                  onPress={() => {
+                    setAdministrationRoute(route);
+                    // Limpar forma e unidade quando mudar a via
+                    setForm('');
+                    setDoseQuantityUnit('');
+                  }}
                 >
-                  <Text style={[styles.chipText, form === item && styles.chipTextActive]}>
-                    {item}
+                  <Text style={[styles.chipText, administrationRoute === route && styles.chipTextActive]}>
+                    {route}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+
+          {/* Forma Farmacêutica */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Forma farmacêutica *</Text>
+            {administrationRoute ? (
+              <View style={styles.chipContainer}>
+                {MEDICATION_STRUCTURE[administrationRoute]?.forms.map((formItem) => (
+                  <TouchableOpacity
+                    key={formItem.name}
+                    style={[styles.chip, form === formItem.name && styles.chipActive]}
+                    onPress={() => {
+                      setForm(formItem.name);
+                      // Definir automaticamente a unidade da dose baseada na forma
+                      setDoseQuantityUnit(formItem.unit);
+                    }}
+                  >
+                    <Text style={[styles.chipText, form === formItem.name && styles.chipTextActive]}>
+                      {formItem.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.hint}>Selecione primeiro a via de administração</Text>
+            )}
           </View>
 
           {/* Concentração */}
@@ -489,7 +576,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
             <View style={[styles.field, { flex: 1 }]}>
               <Text style={styles.label}>Unidade *</Text>
               <View style={styles.chipContainer}>
-                {UNITS.map((item) => (
+                {CONCENTRATION_UNITS.map((item) => (
                   <TouchableOpacity
                     key={item}
                     style={[styles.chip, styles.chipSmall, unit === item && styles.chipActive]}
@@ -517,38 +604,29 @@ const AddMedicationScreen = ({ route, navigation }) => {
               />
             </View>
             <View style={[styles.field, { flex: 1 }]}>
-              <Text style={styles.label}>Unidade</Text>
-              <View style={styles.chipContainer}>
-                {UNITS.map((item) => (
-                  <TouchableOpacity
-                    key={item}
-                    style={[styles.chip, styles.chipSmall, doseQuantityUnit === item && styles.chipActive]}
-                    onPress={() => setDoseQuantityUnit(item)}
-                  >
-                    <Text style={[styles.chipText, doseQuantityUnit === item && styles.chipTextActive]}>
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </View>
-
-          {/* Via de Administração */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Via de administração</Text>
-            <View style={styles.chipContainer}>
-              {ROUTES.map((item) => (
-                <TouchableOpacity
-                  key={item}
-                  style={[styles.chip, administrationRoute === item && styles.chipActive]}
-                  onPress={() => setAdministrationRoute(item)}
-                >
-                  <Text style={[styles.chipText, administrationRoute === item && styles.chipTextActive]}>
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              <Text style={styles.label}>Unidade da dose</Text>
+              {form && administrationRoute ? (
+                <View style={styles.chipContainer}>
+                  {(() => {
+                    const selectedForm = MEDICATION_STRUCTURE[administrationRoute]?.forms.find(f => f.name === form);
+                    if (selectedForm) {
+                      return (
+                        <TouchableOpacity
+                          style={[styles.chip, styles.chipSmall, styles.chipActive]}
+                          disabled={true}
+                        >
+                          <Text style={[styles.chipText, styles.chipTextActive]}>
+                            {selectedForm.unit}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    }
+                    return null;
+                  })()}
+                </View>
+              ) : (
+                <Text style={styles.hint}>Selecione forma farmacêutica</Text>
+              )}
             </View>
           </View>
 

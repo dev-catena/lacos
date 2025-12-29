@@ -10,11 +10,26 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 import groupService from '../../services/groupService';
+import documentService from '../../services/documentService';
+import {
+  ReceiptIcon,
+  CalendarIcon,
+  DocumentIcon,
+  ArrowBackIcon,
+  LocationIcon,
+  PersonIcon,
+  MedicalOutlineIcon,
+  WarningIcon,
+  PillsOutlineIcon,
+  FolderIcon,
+  ChevronForwardIcon,
+  TimeIcon,
+  VideoCamIcon,
+} from '../../components/CustomIcons';
 
 moment.locale('pt-br');
 
@@ -23,11 +38,19 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
   const [canStart, setCanStart] = useState(false);
   const [patientInfo, setPatientInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [documents, setDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
 
   useEffect(() => {
     checkCanStart();
     loadPatientInfo();
   }, [appointment]);
+
+  useEffect(() => {
+    if (appointment?.group_id) {
+      loadDocuments();
+    }
+  }, [appointment?.group_id]);
 
   const checkCanStart = () => {
     if (!appointment) return;
@@ -46,16 +69,33 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
       
       // Buscar informações do paciente da API
       const groupId = appointment.group_id || appointment.groupId;
+      console.log('🔍 DoctorAppointmentDetailsScreen - Buscando info do paciente:', { groupId, appointmentId: appointment?.id });
+      
       if (groupId) {
         // Buscar membros do grupo para encontrar o paciente
         const membersResult = await groupService.getGroupMembers(groupId);
         
         if (membersResult.success && membersResult.data) {
           const members = membersResult.data;
-          const patientMember = members.find(m => m.role === 'patient' && m.user);
+          console.log('👥 DoctorAppointmentDetailsScreen - Membros encontrados:', members.length);
+          console.log('👥 DoctorAppointmentDetailsScreen - Membros detalhes:', members.map(m => ({
+            role: m.role,
+            user_id: m.user_id,
+            userName: m.user?.name,
+            hasUser: !!m.user
+          })));
+          
+          // Buscar membro com role 'patient'
+          const patientMember = members.find(m => {
+            const hasPatientRole = m.role === 'patient';
+            const hasUser = !!m.user;
+            console.log(`🔍 Verificando membro: role="${m.role}", hasUser=${hasUser}, userName="${m.user?.name}"`);
+            return hasPatientRole && hasUser;
+          });
           
           if (patientMember && patientMember.user) {
             const patient = patientMember.user;
+            console.log('✅ DoctorAppointmentDetailsScreen - Paciente encontrado:', { id: patient.id, name: patient.name });
             
             // Calcular idade
             let age = null;
@@ -95,13 +135,16 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
             };
             
             const patientInfoData = {
+              id: patient.id, // IMPORTANTE: Incluir o ID do paciente
               name: patient.name || 'Paciente',
               age: age,
               gender: genderMap[patient.gender] || patient.gender || 'Não informado',
               comorbidities: comorbidities,
               allergies: allergiesList,
               bloodType: patient.blood_type || 'Não informado',
-              medications: [] // TODO: Buscar medicações do paciente se necessário
+              medications: [], // TODO: Buscar medicações do paciente se necessário
+              cpf: patient.cpf || '',
+              birth_date: patient.birth_date || null,
             };
             
             setPatientInfo(patientInfoData);
@@ -111,33 +154,142 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
       }
       
       // Fallback: usar dados básicos se não conseguir buscar
+      // Tentar obter ID do paciente de outras fontes
+      const fallbackPatientId = appointment?.patient_id || appointment?.user_id || appointment?.group?.user_id || null;
+      console.log('⚠️ DoctorAppointmentDetailsScreen - Usando fallback. Patient ID encontrado:', fallbackPatientId, {
+        patient_id: appointment?.patient_id,
+        user_id: appointment?.user_id,
+        group_user_id: appointment?.group?.user_id,
+        patient_name: appointment?.patient_name,
+        accompanied_name: appointment?.accompanied_name,
+        group_name: appointment?.group?.name,
+      });
+      
+      // IMPORTANTE: NÃO usar appointment.group?.name como nome do paciente no fallback
+      // Priorizar appointment.patient_name ou appointment.accompanied_name
+      const fallbackName = appointment?.patient_name || appointment?.accompanied_name || 'Paciente';
+      console.log('⚠️ DoctorAppointmentDetailsScreen - Nome do fallback (sem usar grupo):', fallbackName);
+      
       const fallbackInfo = {
-        name: appointment.patient_name || appointment.group?.name || 'Paciente',
+        id: fallbackPatientId, // Tentar obter ID do appointment
+        name: fallbackName, // NUNCA usar nome do grupo aqui
         age: null,
         gender: 'Não informado',
         comorbidities: [],
         allergies: [],
         bloodType: 'Não informado',
-        medications: []
+        medications: [],
+        cpf: '',
+        birth_date: null,
       };
       
+      console.log('⚠️ DoctorAppointmentDetailsScreen - Fallback configurado:', fallbackInfo);
       setPatientInfo(fallbackInfo);
     } catch (error) {
-      console.error('Erro ao carregar informações do paciente:', error);
+      console.error('❌ DoctorAppointmentDetailsScreen - Erro ao carregar informações do paciente:', error);
       // Em caso de erro, usar dados básicos
+      // Tentar obter ID do paciente de outras fontes
+      const fallbackPatientId = appointment?.patient_id || appointment?.user_id || appointment?.group?.user_id || null;
+      console.log('⚠️ DoctorAppointmentDetailsScreen - Erro, usando fallback. Patient ID:', fallbackPatientId);
+      
+      // IMPORTANTE: NÃO usar appointment.group?.name como nome do paciente no fallback
+      // Priorizar appointment.patient_name ou appointment.accompanied_name
+      const fallbackName = appointment?.patient_name || appointment?.accompanied_name || 'Paciente';
+      console.log('⚠️ DoctorAppointmentDetailsScreen - Nome do fallback por erro (sem usar grupo):', fallbackName);
+      
       const fallbackInfo = {
-        name: appointment.patient_name || appointment.group?.name || 'Paciente',
+        id: fallbackPatientId, // Tentar obter ID do appointment
+        name: fallbackName, // NUNCA usar nome do grupo aqui
         age: null,
         gender: 'Não informado',
         comorbidities: [],
         allergies: [],
         bloodType: 'Não informado',
-        medications: []
+        medications: [],
+        cpf: '',
+        birth_date: null,
       };
+      console.log('⚠️ DoctorAppointmentDetailsScreen - Fallback por erro configurado:', fallbackInfo);
       setPatientInfo(fallbackInfo);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadDocuments = async () => {
+    try {
+      setLoadingDocuments(true);
+      const groupId = appointment?.group_id || appointment?.groupId;
+      
+      if (!groupId) {
+        console.log('⚠️ DoctorAppointmentDetailsScreen - groupId não disponível para buscar documentos');
+        setDocuments([]);
+        return;
+      }
+
+      console.log('📂 DoctorAppointmentDetailsScreen - Carregando documentos do grupo:', groupId);
+      const docs = await documentService.getDocumentsByGroup(groupId);
+      
+      // Limitar a 5 documentos mais recentes para o card
+      const recentDocs = docs
+        .sort((a, b) => new Date(b.document_date || b.date) - new Date(a.document_date || a.date))
+        .slice(0, 5);
+      
+      setDocuments(recentDocs);
+      console.log('✅ DoctorAppointmentDetailsScreen - Documentos carregados:', recentDocs.length);
+    } catch (error) {
+      console.error('❌ DoctorAppointmentDetailsScreen - Erro ao carregar documentos:', error);
+      setDocuments([]);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const getDocumentIcon = (type) => {
+    const iconMap = {
+      exam_lab: 'flask',
+      exam_image: 'image',
+      prescription: 'document-text',
+      medical_leave: 'calendar',
+      medical_certificate: 'calendar',
+      report: 'document',
+      other: 'document-attach',
+    };
+    return iconMap[type] || 'document';
+  };
+
+  const getDocumentIconComponent = (type) => {
+    const iconMap = {
+      prescription: ReceiptIcon,
+      medical_leave: CalendarIcon,
+      medical_certificate: CalendarIcon,
+      report: DocumentIcon,
+      other: DocumentIcon,
+    };
+    return iconMap[type] || DocumentIcon;
+  };
+
+  const getDocumentColor = (type) => {
+    const colorMap = {
+      exam_lab: colors.info,
+      exam_image: colors.success,
+      prescription: '#FFB6C1', // Rosa pastel para receitas
+      medical_leave: '#B0E0E6', // Azul pastel para afastamentos
+      medical_certificate: '#B0E0E6', // Azul pastel para afastamentos
+      report: colors.warning,
+      other: colors.gray600,
+    };
+    return colorMap[type] || colors.gray600;
+  };
+
+  const formatDocumentDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
   };
 
   const formatDate = (dateString) => {
@@ -188,7 +340,7 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <ArrowBackIcon size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detalhes da Consulta</Text>
         <View style={styles.placeholder} />
@@ -204,12 +356,12 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
               <Text style={styles.infoDescription}>{appointment.description}</Text>
             )}
             <View style={styles.infoRow}>
-              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+              <CalendarIcon size={20} color={colors.primary} />
               <Text style={styles.infoText}>{formatDate(appointmentDate)}</Text>
             </View>
             {appointment.location && (
               <View style={styles.infoRow}>
-                <Ionicons name="location-outline" size={20} color={colors.primary} />
+                <LocationIcon size={20} color={colors.primary} />
                 <Text style={styles.infoText}>{appointment.location}</Text>
               </View>
             )}
@@ -223,7 +375,7 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
             <View style={styles.infoCard}>
               <View style={styles.patientHeader}>
                 <View style={styles.patientAvatar}>
-                  <Ionicons name="person" size={32} color={colors.primary} />
+                  <PersonIcon size={32} color={colors.primary} />
                 </View>
                 <View style={styles.patientBasicInfo}>
                   <Text style={styles.patientName}>{patientInfo.name}</Text>
@@ -241,9 +393,10 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
               {/* Comorbidades */}
               {patientInfo.comorbidities && patientInfo.comorbidities.length > 0 && (
                 <View style={styles.infoSection}>
-                  <Text style={styles.infoLabel}>
-                    <Ionicons name="medical-outline" size={16} color={colors.warning} /> Comorbidades
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <MedicalOutlineIcon size={16} color={colors.warning} />
+                    <Text style={[styles.infoLabel, { marginLeft: 6 }]}>Comorbidades</Text>
+                  </View>
                   {patientInfo.comorbidities.map((comorbidity, index) => (
                     <View key={index} style={styles.tag}>
                       <Text style={styles.tagText}>{comorbidity}</Text>
@@ -255,9 +408,10 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
               {/* Alergias */}
               {patientInfo.allergies && patientInfo.allergies.length > 0 && (
                 <View style={styles.infoSection}>
-                  <Text style={styles.infoLabel}>
-                    <Ionicons name="warning-outline" size={16} color={colors.error} /> Alergias
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <WarningIcon size={16} color={colors.error} />
+                    <Text style={[styles.infoLabel, { marginLeft: 6 }]}>Alergias</Text>
+                  </View>
                   {patientInfo.allergies.map((allergy, index) => (
                     <View key={index} style={[styles.tag, styles.allergyTag]}>
                       <Text style={[styles.tagText, styles.allergyText]}>{allergy}</Text>
@@ -269,9 +423,10 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
               {/* Medicações Atuais */}
               {patientInfo.medications && patientInfo.medications.length > 0 && (
                 <View style={styles.infoSection}>
-                  <Text style={styles.infoLabel}>
-                    <Ionicons name="pills-outline" size={16} color={colors.primary} /> Medicações Atuais
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <PillsOutlineIcon size={16} color={colors.primary} />
+                    <Text style={[styles.infoLabel, { marginLeft: 6 }]}>Medicações Atuais</Text>
+                  </View>
                   {patientInfo.medications.map((medication, index) => (
                     <View key={index} style={styles.medicationItem}>
                       <Text style={styles.medicationText}>{medication}</Text>
@@ -279,6 +434,79 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
                   ))}
                 </View>
               )}
+
+              {/* Arquivos do Paciente */}
+              <View style={styles.infoSection}>
+                <View style={styles.filesHeader}>
+                  <View style={styles.filesHeaderLeft}>
+                    <FolderIcon size={16} color={colors.primary} />
+                    <Text style={styles.infoLabel}>Arquivos do Paciente</Text>
+                  </View>
+                  {documents.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        const groupId = appointment?.group_id || appointment?.groupId;
+                        if (groupId) {
+                          navigation.navigate('Documents', {
+                            groupId,
+                            groupName: appointment?.group?.name || 'Grupo',
+                          });
+                        }
+                      }}
+                    >
+                      <Text style={styles.seeAllText}>Ver todos</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {loadingDocuments ? (
+                  <View style={styles.filesLoading}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.filesLoadingText}>Carregando arquivos...</Text>
+                  </View>
+                ) : documents.length === 0 ? (
+                  <View style={styles.filesEmpty}>
+                    <FolderIcon size={32} color={colors.gray300} />
+                    <Text style={styles.filesEmptyText}>Nenhum arquivo disponível</Text>
+                  </View>
+                ) : (
+                  <View style={styles.filesList}>
+                    {documents.map((doc, index) => (
+                      <TouchableOpacity
+                        key={doc.id || index}
+                        style={styles.fileItem}
+                        onPress={() => {
+                          const groupId = appointment?.group_id || appointment?.groupId;
+                          navigation.navigate('DocumentDetails', {
+                            document: doc,
+                            groupId,
+                          });
+                        }}
+                      >
+                        <View style={[styles.fileIcon, { backgroundColor: getDocumentColor(doc.type) + '20' }]}>
+                          {(() => {
+                            const IconComponent = getDocumentIconComponent(doc.type);
+                            return <IconComponent size={20} color={getDocumentColor(doc.type)} />;
+                          })()}
+                        </View>
+                        <View style={styles.fileContent}>
+                          <Text style={styles.fileTitle} numberOfLines={1}>
+                            {doc.title || 'Documento sem título'}
+                          </Text>
+                          <Text style={styles.fileMeta}>
+                            {formatDocumentDate(doc.document_date || doc.date)}
+                            {doc.doctor_name && ` • ${doc.doctor_name}`}
+                          </Text>
+                        </View>
+                        <ChevronForwardIcon
+                          size={20}
+                          color={colors.gray400}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         )}
@@ -286,7 +514,7 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
         {/* Status de Início */}
         {!canStart && (
           <View style={styles.warningCard}>
-            <Ionicons name="time-outline" size={24} color={colors.warning} />
+            <TimeIcon size={24} color={colors.warning} />
             <Text style={styles.warningText}>
               Você poderá iniciar a consulta em {minutesUntilStart} minuto(s)
             </Text>
@@ -307,8 +535,7 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
           onPress={handleStartConsultation}
           disabled={!canStart}
         >
-          <Ionicons 
-            name="videocam" 
+          <VideoCamIcon 
             size={24} 
             color={canStart ? '#FFFFFF' : colors.textLight} 
           />
@@ -529,6 +756,74 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   startButtonTextDisabled: {
+    color: colors.textLight,
+  },
+  filesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  filesHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  filesLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  filesLoadingText: {
+    fontSize: 14,
+    color: colors.textLight,
+  },
+  filesEmpty: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  filesEmptyText: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginTop: 8,
+  },
+  filesList: {
+    gap: 8,
+  },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 0, // Remover bordas grossas
+  },
+  fileIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  fileContent: {
+    flex: 1,
+  },
+  fileTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  fileMeta: {
+    fontSize: 12,
     color: colors.textLight,
   },
 });

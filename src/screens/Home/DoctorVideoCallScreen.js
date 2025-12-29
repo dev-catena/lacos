@@ -14,9 +14,27 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import IconWrapper from '../../components/IconWrapper';
+import { 
+  MedicalIcon, 
+  MedicalOutlineIcon,
+  DocumentIcon, 
+  ReceiptIcon, 
+  CallIcon, 
+  MicIcon, 
+  VideoIcon, 
+  ChatIcon,
+  PersonIcon,
+  ProfileIcon,
+  AlertCircleIcon,
+  CloseIcon,
+  ImageIcon,
+  DocumentAttachIcon,
+  SendIcon,
+  PaperPlaneIcon,
+} from '../../components/CustomIcons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import colors from '../../constants/colors';
@@ -28,6 +46,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const DoctorVideoCallScreen = ({ route, navigation }) => {
   const { appointment, patientInfo } = route.params || {};
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [isCallActive, setIsCallActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
@@ -163,6 +182,24 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
     setPrescriptionType(type);
     setPrescriptionText('');
     setShowPrescriptionModal(true);
+  };
+
+  const handleGenerateRecipe = () => {
+    navigation.navigate('RecipeForm', {
+      appointment,
+      patientInfo,
+      doctorInfo: user,
+      groupId: appointment?.group_id,
+    });
+  };
+
+  const handleGenerateCertificate = () => {
+    navigation.navigate('MedicalCertificateForm', {
+      appointment,
+      patientInfo,
+      doctorInfo: user,
+      groupId: appointment?.group_id,
+    });
   };
 
   // Funções do Chat
@@ -381,7 +418,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
         )}
         {item.type === 'document' && (
           <View style={styles.chatMessageDocument}>
-            <Ionicons name="document" size={24} color={item.isOwn ? colors.textWhite : colors.primary} />
+            <DocumentIcon size={24} color={item.isOwn ? colors.textWhite : colors.primary} />
             <View style={styles.chatMessageDocumentInfo}>
               <Text style={[
                 styles.chatMessageDocumentName,
@@ -402,7 +439,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
         )}
         {item.type === 'prescription' && (
           <View style={styles.chatMessagePrescription}>
-            <Ionicons name="medical" size={24} color={item.isOwn ? colors.textWhite : colors.secondary} />
+            <MedicalOutlineIcon size={24} color={item.isOwn ? colors.textWhite : colors.secondary} />
             <Text style={[
               styles.chatMessageText,
               item.isOwn ? styles.chatMessageTextOwn : styles.chatMessageTextOther
@@ -413,7 +450,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
         )}
         {item.type === 'referral' && (
           <View style={styles.chatMessagePrescription}>
-            <Ionicons name="paper-plane" size={24} color={item.isOwn ? colors.textWhite : colors.info} />
+            <PaperPlaneIcon size={24} color={item.isOwn ? colors.textWhite : colors.info} />
             <Text style={[
               styles.chatMessageText,
               item.isOwn ? styles.chatMessageTextOwn : styles.chatMessageTextOther
@@ -453,7 +490,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
                 onPress={() => setShowPrescriptionModal(false)}
                 style={styles.modalCloseButton}
               >
-                <Ionicons name="close" size={24} color={colors.text} />
+                <CloseIcon size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -542,31 +579,35 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
 
   if (isInitializing) {
     return (
-      <SafeAreaView style={styles.container} edges={[]}>
+      <View style={styles.container}>
         <StatusBar style="light" />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Iniciando chamada de vídeo...</Text>
-        </View>
-      </SafeAreaView>
+        <SafeAreaView style={styles.safeAreaTop} edges={['top']}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Iniciando chamada de vídeo...</Text>
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
   if (callError) {
     return (
-      <SafeAreaView style={styles.container} edges={[]}>
+      <View style={styles.container}>
         <StatusBar style="light" />
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle" size={64} color={colors.error} />
-          <Text style={styles.errorText}>{callError}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.retryButtonText}>Voltar</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+        <SafeAreaView style={styles.safeAreaTop} edges={['top']}>
+          <View style={styles.errorContainer}>
+            <AlertCircleIcon size={64} color={colors.error} />
+            <Text style={styles.errorText}>{callError}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.retryButtonText}>Voltar</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
@@ -575,8 +616,20 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={[]}>
+    <View style={styles.container}>
       <StatusBar style="light" />
+      <SafeAreaView style={styles.safeAreaTop} edges={['top']}>
+        {/* Header com ícone de perfil */}
+        <View style={styles.header}>
+        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>Teleconsulta</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Profile')}
+          style={styles.profileButton}
+        >
+          <ProfileIcon size={32} color="#FFFFFF" filled={false} />
+        </TouchableOpacity>
+      </View>
       
       {/* Área de Vídeo */}
       <View style={styles.videoContainer}>
@@ -591,7 +644,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
             //   style={styles.videoView}
             // />
             <View style={styles.videoPlaceholder}>
-              <Ionicons name="videocam" size={80} color={colors.primary} />
+              <VideoIcon size={80} color={colors.primary} off={false} />
               <Text style={styles.videoPlaceholderText}>Vídeo do Paciente</Text>
               <Text style={styles.videoNote}>
                 {callError ? 'Erro ao conectar' : 'Aguardando paciente entrar na chamada...'}
@@ -604,7 +657,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
             </View>
           ) : (
             <View style={styles.videoPlaceholder}>
-              <Ionicons name="person" size={80} color={colors.textLight} />
+              <PersonIcon size={80} color={colors.textLight} />
               <Text style={styles.videoPlaceholderText}>
                 {patientInfo?.name || 'Paciente'}
               </Text>
@@ -626,11 +679,11 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
             //   style={styles.pipVideoView}
             // />
             <View style={styles.pipPlaceholder}>
-              <Ionicons name="videocam" size={24} color={colors.primary} />
+              <VideoIcon size={24} color={colors.primary} off={false} />
             </View>
           ) : (
             <View style={styles.pipPlaceholder}>
-              <Ionicons name="person" size={24} color={colors.textLight} />
+              <PersonIcon size={24} color={colors.textLight} />
             </View>
           )}
         </View>
@@ -641,74 +694,78 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
           <Text style={styles.callDuration}>00:00</Text>
         </View>
       </View>
+      </SafeAreaView>
 
-      {/* Controles da Chamada */}
-      <View style={styles.controlsContainer}>
-        <TouchableOpacity
-          style={[styles.controlButton, isMuted && styles.controlButtonActive]}
-          onPress={handleToggleMute}
-        >
-          <Ionicons
-            name={isMuted ? 'mic-off' : 'mic'}
-            size={24}
-            color={isMuted ? '#FFFFFF' : colors.text}
-          />
-        </TouchableOpacity>
+      {/* Controles Flutuantes - Fixos na parte inferior */}
+      <View style={[styles.controlsFloatingWrapper, { paddingBottom: Math.max(insets.bottom, 0) + 10 }]}>
+        <View style={styles.controlsFloating}>
+          {/* Primeira linha de botões */}
+          <View style={styles.controlsRow}>
+            <TouchableOpacity
+              style={[styles.controlButton, isMuted && styles.controlButtonActive]}
+              onPress={handleToggleMute}
+            >
+              <MicIcon size={24} color="#FFFFFF" muted={isMuted} />
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.controlButton, isVideoOff && styles.controlButtonActive]}
-          onPress={handleToggleVideo}
-        >
-          <Ionicons
-            name={isVideoOff ? 'videocam-off' : 'videocam'}
-            size={24}
-            color={isVideoOff ? '#FFFFFF' : colors.text}
-          />
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlButton, isVideoOff && styles.controlButtonActive]}
+              onPress={handleToggleVideo}
+            >
+              <VideoIcon size={24} color="#FFFFFF" off={isVideoOff} />
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.controlButton, styles.prescriptionButton]}
-          onPress={() => handlePrescription('medication')}
-        >
-          <Ionicons name="medical" size={24} color={colors.text} />
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlButton, styles.prescriptionButton]}
+              onPress={() => handlePrescription('medication')}
+            >
+              <MedicalIcon size={24} color="#FFFFFF" />
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.controlButton, styles.prescriptionButton]}
-          onPress={() => handlePrescription('exam')}
-        >
-          <Ionicons name="document-text" size={24} color={colors.text} />
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlButton, styles.prescriptionButton]}
+              onPress={() => handlePrescription('exam')}
+            >
+              <DocumentIcon size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity
-          style={[styles.controlButton, styles.prescriptionButton]}
-          onPress={() => handlePrescription('conduct')}
-        >
-          <Ionicons name="clipboard" size={24} color={colors.text} />
-        </TouchableOpacity>
+          {/* Segunda linha de botões */}
+          <View style={styles.controlsRow}>
+            <TouchableOpacity
+              style={[styles.controlButton, styles.prescriptionButton]}
+              onPress={handleGenerateRecipe}
+            >
+              <ReceiptIcon size={24} color="#FFFFFF" />
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.controlButton, showChat && styles.controlButtonActive]}
-          onPress={() => setShowChat(!showChat)}
-        >
-          <Ionicons
-            name="chatbubbles"
-            size={24}
-            color={showChat ? colors.primary : colors.text}
-          />
-          {chatMessages.length > 0 && (
-            <View style={styles.chatBadge}>
-              <Text style={styles.chatBadgeText}>{chatMessages.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlButton, styles.prescriptionButton]}
+              onPress={handleGenerateCertificate}
+            >
+              <DocumentIcon size={24} color="#FFFFFF" />
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.controlButton, styles.endCallButton]}
-          onPress={handleEndCall}
-        >
-          <Ionicons name="call" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlButton, showChat && styles.controlButtonActive]}
+              onPress={() => setShowChat(!showChat)}
+            >
+              <ChatIcon size={24} color="#FFFFFF" />
+              {chatMessages.length > 0 && (
+                <View style={styles.chatBadge}>
+                  <Text style={styles.chatBadgeText}>{chatMessages.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.controlButton, styles.endCallButton]}
+              onPress={handleEndCall}
+            >
+              <CallIcon size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {/* Modal de Prescrição */}
@@ -733,7 +790,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
                 onPress={() => setShowChat(false)}
                 style={styles.chatCloseButton}
               >
-                <Ionicons name="close" size={24} color={colors.text} />
+                <CloseIcon size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -758,13 +815,13 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
                 style={styles.chatInputButton}
                 onPress={showImagePickerOptions}
               >
-                <Ionicons name="image" size={24} color={colors.primary} />
+                <ImageIcon size={24} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.chatInputButton}
                 onPress={handlePickDocument}
               >
-                <Ionicons name="document-attach" size={24} color={colors.primary} />
+                <DocumentAttachIcon size={24} color={colors.primary} />
               </TouchableOpacity>
               <TextInput
                 style={styles.chatInput}
@@ -780,8 +837,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
                 onPress={handleSendMessage}
                 disabled={!messageText.trim() || sendingMessage}
               >
-                <Ionicons
-                  name="send"
+                <SendIcon
                   size={20}
                   color={messageText.trim() ? colors.textWhite : colors.gray400}
                 />
@@ -790,7 +846,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -798,6 +854,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  safeAreaTop: {
+    flex: 0,
+    zIndex: 10,
+  },
+  controlsFloatingWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   loadingContainer: {
     flex: 1,
@@ -835,9 +902,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    zIndex: 10,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  profileButton: {
+    padding: 4,
+  },
   videoContainer: {
     flex: 1,
     position: 'relative',
+    paddingBottom: 140, // Espaço para os botões flutuantes (2 linhas)
   },
   mainVideo: {
     flex: 1,
@@ -908,28 +993,36 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginTop: 4,
   },
-  controlsContainer: {
+  controlsFloating: {
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    paddingTop: 15,
+    paddingBottom: 15,
+    paddingHorizontal: 10,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  controlsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     gap: 12,
+    marginBottom: 8,
   },
   controlButton: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.backgroundLight,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   controlButtonActive: {
     backgroundColor: colors.error,
   },
   prescriptionButton: {
-    backgroundColor: colors.primary + '30',
+    backgroundColor: colors.primary,
   },
   endCallButton: {
     backgroundColor: colors.error,

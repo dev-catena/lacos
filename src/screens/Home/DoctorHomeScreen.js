@@ -16,11 +16,28 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import { LacosLogoFull } from '../../components/LacosLogo';
+import {
+  ProfileIcon,
+  CalendarIcon,
+  AppointmentIcon,
+  CheckmarkCircleIcon,
+  CloseCircleIcon,
+  ChevronBackIcon,
+  ChevronForwardIcon,
+  SaveOutlineIcon,
+  TrashOutlineIcon,
+  CloseIcon,
+  LockClosedIcon,
+  AddCircleOutlineIcon,
+  VideoCamIcon,
+  MedicalIcon,
+  TimeOutlineIcon,
+  LocationOutlineIcon,
+} from '../../components/CustomIcons';
 import appointmentService from '../../services/appointmentService';
 import doctorService from '../../services/doctorService';
 import groupService from '../../services/groupService';
@@ -37,6 +54,7 @@ const DoctorHomeScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' ou 'agenda'
   const [showCompleted, setShowCompleted] = useState(false); // Toggle para mostrar consultas realizadas
   const [groupNamesCache, setGroupNamesCache] = useState({}); // Cache de nomes de grupos
+  const [patientNamesCache, setPatientNamesCache] = useState({}); // Cache de nomes de pacientes por group_id
   
   // Estados para a agenda
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -133,34 +151,57 @@ const DoctorHomeScreen = ({ navigation }) => {
           });
         });
 
-        // Buscar nomes dos grupos que não estão no cache
+        // Buscar nomes dos grupos e pacientes que não estão no cache
         const groupIdsToFetch = doctorAppointments
           .map(apt => apt.group_id)
-          .filter(id => id && !groupNamesCache[id]);
+          .filter(id => id && (!groupNamesCache[id] || !patientNamesCache[id]));
         
         if (groupIdsToFetch.length > 0) {
-          console.log('🔍 Buscando nomes de grupos:', groupIdsToFetch);
-          // Buscar nomes dos grupos em paralelo
+          console.log('🔍 Buscando nomes de grupos e pacientes:', groupIdsToFetch);
+          // Buscar nomes dos grupos e pacientes em paralelo
           const groupPromises = groupIdsToFetch.map(async (groupId) => {
             try {
+              // Buscar informações do grupo
               const groupResult = await groupService.getGroup(groupId);
+              let groupName = null;
               if (groupResult.success && groupResult.data) {
-                return { groupId, name: groupResult.data.name || groupResult.data.groupName || null };
+                groupName = groupResult.data.name || groupResult.data.groupName || null;
               }
+              
+              // Buscar membros do grupo para encontrar o paciente
+              let patientName = null;
+              try {
+                const membersResult = await groupService.getGroupMembers(groupId);
+                if (membersResult.success && membersResult.data) {
+                  const patientMember = membersResult.data.find(m => m.role === 'patient' && m.user?.name);
+                  if (patientMember && patientMember.user) {
+                    patientName = patientMember.user.name;
+                  }
+                }
+              } catch (error) {
+                console.error(`Erro ao buscar membros do grupo ${groupId}:`, error);
+              }
+              
+              return { groupId, groupName, patientName };
             } catch (error) {
               console.error(`Erro ao buscar grupo ${groupId}:`, error);
+              return { groupId, groupName: null, patientName: null };
             }
-            return { groupId, name: null };
           });
           
-          const groupNames = await Promise.all(groupPromises);
-          const newCache = { ...groupNamesCache };
-          groupNames.forEach(({ groupId, name }) => {
-            if (name) {
-              newCache[groupId] = name;
+          const groupData = await Promise.all(groupPromises);
+          const newGroupCache = { ...groupNamesCache };
+          const newPatientCache = { ...patientNamesCache };
+          groupData.forEach(({ groupId, groupName, patientName }) => {
+            if (groupName) {
+              newGroupCache[groupId] = groupName;
+            }
+            if (patientName) {
+              newPatientCache[groupId] = patientName;
             }
           });
-          setGroupNamesCache(newCache);
+          setGroupNamesCache(newGroupCache);
+          setPatientNamesCache(newPatientCache);
         }
 
         // Ordenar por data (mais próximas primeiro)
@@ -390,46 +431,99 @@ const DoctorHomeScreen = ({ navigation }) => {
   };
 
   const getNextTimeSlot = () => {
+    // Normalizar horários para comparação (remover segundos se houver)
+    const normalizeTime = (t) => {
+      if (!t) return '';
+      const trimmed = t.trim();
+      if (/^\d{2}:\d{2}:\d{2}/.test(trimmed)) return trimmed.substring(0, 5);
+      return trimmed;
+    };
+
+    // Criar um Set com horários normalizados para busca rápida
+    const existingTimesSet = new Set(selectedDayTimes.map(t => normalizeTime(t)));
+
     // Se não há horários, começar com 08:00
     if (selectedDayTimes.length === 0) {
       return '08:00';
     }
 
-    // Ordenar horários para pegar o último
-    const sortedTimes = [...selectedDayTimes].sort();
+    // Ordenar horários para pegar o último horário válido
+    const sortedTimes = [...selectedDayTimes]
+      .map(t => normalizeTime(t))
+      .filter(t => /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(t))
+      .sort();
+    
+    // Se não há horários válidos, começar com 08:00
+    if (sortedTimes.length === 0) {
+      return '08:00';
+    }
+
     const lastTime = sortedTimes[sortedTimes.length - 1];
     
-    // Validar formato HH:MM
-    const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!timeRegex.test(lastTime)) {
-      return '08:00';
-    }
-
-    // Extrair horas e minutos
+    // Extrair horas e minutos do último horário
     const [hours, minutes] = lastTime.split(':').map(Number);
     
-    // Adicionar 1 hora
+    // Tentar encontrar próximo horário disponível (começar 1 hora depois do último)
     let nextHours = hours + 1;
     let nextMinutes = minutes;
+    let attempts = 0;
+    const maxAttempts = 24; // Evitar loop infinito (máximo 24 tentativas)
 
-    // Se ultrapassar 23:59, voltar para 08:00
-    if (nextHours > 23) {
-      return '08:00';
+    while (attempts < maxAttempts) {
+      // Se ultrapassar 23:59, voltar para 08:00
+      if (nextHours > 23) {
+        nextHours = 8;
+        nextMinutes = 0;
+      }
+
+      // Formatar com zero à esquerda
+      const formattedHours = String(nextHours).padStart(2, '0');
+      const formattedMinutes = String(nextMinutes).padStart(2, '0');
+      const candidateTime = `${formattedHours}:${formattedMinutes}`;
+      
+      // Verificar se este horário não está na lista
+      if (!existingTimesSet.has(candidateTime)) {
+        return candidateTime;
+      }
+
+      // Se já existe, tentar próximo horário
+      nextHours++;
+      attempts++;
     }
 
-    // Formatar com zero à esquerda
-    const formattedHours = String(nextHours).padStart(2, '0');
-    const formattedMinutes = String(nextMinutes).padStart(2, '0');
-    
-    return `${formattedHours}:${formattedMinutes}`;
+    // Se não encontrou nenhum horário disponível no dia, retornar null
+    // (será tratado na função addTimeSlot)
+    return null;
   };
 
   const addTimeSlot = () => {
     const nextTime = getNextTimeSlot();
     
-    // Verificar se o horário já existe
-    if (selectedDayTimes.includes(nextTime)) {
-      Alert.alert('Aviso', 'Este horário já está cadastrado. Por favor, escolha outro horário.');
+    // Se não há horário disponível (todos os horários do dia estão ocupados)
+    if (nextTime === null) {
+      Alert.alert(
+        'Aviso',
+        'Todos os horários do dia já estão cadastrados. Por favor, edite um horário existente ou remova um horário antes de adicionar outro.'
+      );
+      return;
+    }
+    
+    // Verificar se o horário já existe (verificação de segurança adicional)
+    const normalizeTime = (t) => {
+      if (!t) return '';
+      const trimmed = t.trim();
+      if (/^\d{2}:\d{2}:\d{2}/.test(trimmed)) return trimmed.substring(0, 5);
+      return trimmed;
+    };
+
+    const normalizedNextTime = normalizeTime(nextTime);
+    const exists = selectedDayTimes.some(t => normalizeTime(t) === normalizedNextTime);
+    
+    if (exists) {
+      Alert.alert(
+        'Aviso',
+        `O horário ${nextTime} já está cadastrado. Por favor, escolha outro horário ou edite um horário existente.`
+      );
       return;
     }
 
@@ -606,6 +700,13 @@ const DoctorHomeScreen = ({ navigation }) => {
     try {
       setSavingAvailability(true);
       
+      // Validar se há dados para salvar
+      if (availableDays.size === 0 && blockedDays.size === 0) {
+        Alert.alert('Aviso', 'Nenhuma agenda configurada para salvar');
+        setSavingAvailability(false);
+        return;
+      }
+      
       // Converter Set para Array e daySchedules para formato esperado
       const availableDaysArray = Array.from(availableDays);
       const daySchedulesObject = {};
@@ -622,18 +723,109 @@ const DoctorHomeScreen = ({ navigation }) => {
         daySchedules: daySchedulesObject,
       };
 
-      console.log('💾 Salvando agenda:', availabilityData);
+      console.log('💾 Salvando agenda:', {
+        doctorId: user.id,
+        doctorName: user.name,
+        doctorEmail: user.email,
+        doctorProfile: user.profile,
+        availableDays: availableDaysArray,
+        daySchedules: daySchedulesObject,
+        fullData: availabilityData,
+      });
       
-      const result = await doctorService.saveAvailability(user.id, availabilityData);
+      console.log('📡 Enviando requisição POST para:', `/doctors/${user.id}/availability`);
       
-      if (result && result.success) {
-        Alert.alert('Sucesso', 'Agenda atualizada com sucesso');
-      } else {
-        throw new Error(result?.message || 'Erro ao salvar agenda');
+      // Validar se user.id existe
+      if (!user || !user.id) {
+        throw new Error('ID do médico não encontrado. Faça logout e login novamente.');
       }
-    } catch (error) {
-      console.error('Erro ao salvar agenda:', error);
-      Alert.alert('Erro', error.message || 'Não foi possível salvar a agenda');
+      
+      let result;
+      try {
+        result = await doctorService.saveAvailability(user.id, availabilityData);
+      } catch (apiError) {
+        console.error('❌ Erro na chamada da API:', apiError);
+        
+        // Se o erro tem response.data, pode ser que o backend retornou erro mas com dados
+        if (apiError.response?.data) {
+          result = apiError.response.data;
+          console.log('📥 Usando dados do erro como resposta:', result);
+        } else {
+          throw apiError;
+        }
+      }
+      
+      console.log('📥 Resposta completa do servidor:', JSON.stringify(result, null, 2));
+      console.log('📥 Tipo da resposta:', typeof result);
+      console.log('📥 result.success:', result?.success);
+      console.log('📥 result.message:', result?.message);
+      console.log('📥 Chaves do objeto result:', result ? Object.keys(result) : 'result é null/undefined');
+      
+      // Verificar sucesso de diferentes formas
+      const isSuccess = result && (
+        result.success === true || 
+        result.success === 'true' ||
+        result.status === 'success' ||
+        (result.message && (
+          result.message.toLowerCase().includes('sucesso') ||
+          result.message.toLowerCase().includes('salva') ||
+          result.message.toLowerCase().includes('atualizada')
+        ))
+      );
+      
+      if (isSuccess) {
+        Alert.alert('Sucesso', result.message || 'Agenda atualizada com sucesso');
+        // Recarregar agenda após salvar para confirmar
+        setTimeout(async () => {
+          await loadAvailability();
+        }, 500);
+      } else {
+        const errorMessage = result?.message || result?.error || result?.data?.message || 'Erro ao salvar agenda';
+        console.error('❌ Erro na resposta:', {
+          result,
+          success: result?.success,
+          message: result?.message,
+          error: result?.error,
+          status: result?.status,
+        });
+        Alert.alert('Erro', errorMessage);
+        throw new Error(errorMessage);
+      }
+      } catch (error) {
+      console.error('❌ Erro ao salvar agenda:', error);
+      console.error('❌ Detalhes completos do erro:', {
+        message: error.message,
+        status: error.status,
+        response: error.response,
+        data: error.response?.data,
+        errors: error.errors,
+        _rawErrorData: error._rawErrorData,
+      });
+      
+      let errorMessage = 'Não foi possível salvar a agenda';
+      
+      // Verificar diferentes formatos de erro
+      if (error.status === 404) {
+        errorMessage = 'Médico não encontrado. Verifique se você está logado como médico.';
+      } else if (error.status === 403) {
+        errorMessage = 'Você não tem permissão para salvar esta agenda.';
+      } else if (error.status === 422) {
+        errorMessage = error.response?.data?.message || error.message || 'Dados inválidos. Verifique os horários informados.';
+        if (error.response?.data?.errors) {
+          const errors = error.response.data.errors;
+          const errorList = Object.values(errors).flat().join('\n');
+          errorMessage += '\n\n' + errorList;
+        }
+      } else if (error.status === 500) {
+        errorMessage = 'Erro no servidor. Tente novamente mais tarde.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      console.error('❌ Mensagem de erro final:', errorMessage);
+      Alert.alert('Erro ao Salvar Agenda', errorMessage);
     } finally {
       setSavingAvailability(false);
     }
@@ -733,7 +925,7 @@ const DoctorHomeScreen = ({ navigation }) => {
           {isAvailable && (
             <>
               <View style={styles.calendarDayIndicator}>
-                <Ionicons name="checkmark-circle" size={12} color={colors.success} />
+                <CheckmarkCircleIcon size={12} color={colors.success} />
               </View>
               {daySchedules[dateKey] && daySchedules[dateKey].length > 0 && (
                 <Text style={styles.calendarDayTimesCount}>
@@ -744,12 +936,12 @@ const DoctorHomeScreen = ({ navigation }) => {
           )}
           {isBlocked && (
             <View style={styles.calendarDayIndicator}>
-              <Ionicons name="close-circle" size={12} color={colors.error} />
+              <CloseCircleIcon size={12} color={colors.error} />
             </View>
           )}
           {hasBookedAppointments && !isBlocked && (
             <View style={styles.calendarDayAppointmentIndicator}>
-              <Ionicons name="calendar" size={10} color={colors.primary} />
+              <CalendarIcon size={10} color={colors.primary} />
             </View>
           )}
         </TouchableOpacity>
@@ -764,7 +956,7 @@ const DoctorHomeScreen = ({ navigation }) => {
             onPress={() => navigateMonth(-1)}
             style={styles.calendarNavButton}
           >
-            <Ionicons name="chevron-back" size={24} color={colors.primary} />
+            <ChevronBackIcon size={24} color={colors.primary} />
           </TouchableOpacity>
           
           <Text style={styles.calendarMonthText}>
@@ -775,7 +967,7 @@ const DoctorHomeScreen = ({ navigation }) => {
             onPress={() => navigateMonth(1)}
             style={styles.calendarNavButton}
           >
-            <Ionicons name="chevron-forward" size={24} color={colors.primary} />
+            <ChevronForwardIcon size={24} color={colors.primary} />
           </TouchableOpacity>
         </View>
         
@@ -832,10 +1024,17 @@ const DoctorHomeScreen = ({ navigation }) => {
       <View style={styles.header}>
         <LacosLogoFull width={120} height={40} />
         <TouchableOpacity
-          onPress={() => navigation.navigate('Profile')}
+          onPress={() => {
+            console.log('📱 DoctorHomeScreen - Navegando para Profile');
+            navigation.navigate('Profile');
+          }}
           style={styles.profileButton}
+          activeOpacity={0.7}
         >
-          <Ionicons name="person-circle-outline" size={32} color={colors.primary} />
+          <View style={styles.profileIconContainer}>
+            {/* Ícone SVG de silhueta de perfil */}
+            <ProfileIcon size={32} color={colors.primary} filled={false} />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -846,8 +1045,7 @@ const DoctorHomeScreen = ({ navigation }) => {
           onPress={() => setActiveTab('appointments')}
           activeOpacity={0.7}
         >
-          <Ionicons 
-            name="calendar" 
+          <AppointmentIcon 
             size={20} 
             color={activeTab === 'appointments' ? colors.primary : colors.textLight} 
           />
@@ -861,8 +1059,7 @@ const DoctorHomeScreen = ({ navigation }) => {
           onPress={() => setActiveTab('agenda')}
           activeOpacity={0.7}
         >
-          <Ionicons 
-            name="calendar-outline" 
+          <CalendarIcon 
             size={20} 
             color={activeTab === 'agenda' ? colors.primary : colors.textLight} 
           />
@@ -912,7 +1109,7 @@ const DoctorHomeScreen = ({ navigation }) => {
               if (filteredAppointments.length === 0) {
                 return (
                   <View style={styles.emptyContainer}>
-                    <Ionicons name="calendar-outline" size={64} color={colors.textLight} />
+                    <CalendarIcon size={64} color={colors.gray300} />
                     <Text style={styles.emptyText}>
                       {showCompleted ? 'Nenhuma consulta encontrada' : 'Nenhuma consulta agendada'}
                     </Text>
@@ -930,13 +1127,12 @@ const DoctorHomeScreen = ({ navigation }) => {
                 const isPast = appointmentDate < new Date();
                 
                 // Buscar nome do paciente de várias fontes possíveis
-                // 1. patient_name direto
-                // 2. group.name (se o relacionamento group foi carregado)
-                // 3. group_name (se vier direto da API)
-                // 4. Cache de nomes de grupos
-                // 5. group como string
+                // 1. patient_name direto (se vier da API)
+                // 2. Cache de nomes de pacientes (busca através dos membros do grupo)
+                // 3. Fallback para nome do grupo apenas se não encontrar paciente
                 const patientName = 
                   appointment.patient_name ||
+                  (appointment.group_id && patientNamesCache[appointment.group_id]) ||
                   appointment.group?.name ||
                   appointment.group_name ||
                   (appointment.group_id && groupNamesCache[appointment.group_id]) ||
@@ -954,11 +1150,11 @@ const DoctorHomeScreen = ({ navigation }) => {
                 >
                   <View style={styles.appointmentHeader}>
                     <View style={styles.appointmentIconContainer}>
-                      <Ionicons 
-                        name={appointment.is_teleconsultation ? "videocam" : "calendar"} 
-                        size={24} 
-                        color={isPast ? colors.textLight : colors.primary} 
-                      />
+                      {appointment.is_teleconsultation ? (
+                        <VideoCamIcon size={24} color={isPast ? colors.textLight : colors.primary} />
+                      ) : (
+                        <CalendarIcon size={24} color={isPast ? colors.textLight : colors.primary} />
+                      )}
                     </View>
                     <View style={styles.appointmentInfo}>
                       <View style={styles.appointmentTitleContainer}>
@@ -968,11 +1164,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                       </View>
                       {appointment.is_teleconsultation && (
                         <View style={styles.teleconsultationBadge}>
-                          <Ionicons 
-                            name="videocam" 
-                            size={18} 
-                            color={colors.textWhite} 
-                          />
+                          <VideoCamIcon size={18} color={colors.textWhite} />
                           <Text style={styles.teleconsultationBadgeText}>Teleconsulta</Text>
                         </View>
                       )}
@@ -981,11 +1173,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                       </Text>
                       {appointment.is_teleconsultation && (appointment.doctorUser || appointment.doctor) && (
                         <View style={styles.doctorInfoRow}>
-                          <Ionicons 
-                            name="medical" 
-                            size={14} 
-                            color={colors.primary} 
-                          />
+                          <MedicalIcon size={14} color={colors.primary} />
                           <Text style={styles.doctorInfoText}>
                             Dr(a). {appointment.doctorUser?.name || appointment.doctor?.name || 'Médico'}
                           </Text>
@@ -1001,22 +1189,14 @@ const DoctorHomeScreen = ({ navigation }) => {
                   
                   <View style={styles.appointmentFooter}>
                     <View style={styles.appointmentDateContainer}>
-                      <Ionicons 
-                        name="time-outline" 
-                        size={16} 
-                        color={colors.textLight} 
-                      />
+                      <TimeOutlineIcon size={16} color={colors.textLight} />
                       <Text style={styles.appointmentDate}>
                         {formatDate(appointmentDate)} às {formatTime(appointmentDate)}
                       </Text>
                     </View>
                     {appointment.location && (
                       <View style={styles.appointmentLocationContainer}>
-                        <Ionicons 
-                          name="location-outline" 
-                          size={16} 
-                          color={colors.textLight} 
-                        />
+                        <LocationOutlineIcon size={16} color={colors.textLight} />
                         <Text style={styles.appointmentLocation} numberOfLines={1}>
                           {appointment.location}
                         </Text>
@@ -1050,7 +1230,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                 onPress={saveAvailability}
                 disabled={savingAvailability}
               >
-                <Ionicons name="save-outline" size={20} color={colors.textWhite} />
+                <SaveOutlineIcon size={20} color={colors.textWhite} />
                 <Text style={styles.agendaButtonText}>
                   {savingAvailability ? 'Salvando...' : 'Salvar Agenda'}
                 </Text>
@@ -1060,7 +1240,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                 style={[styles.agendaButton, styles.agendaButtonClear]}
                 onPress={clearAllDays}
               >
-                <Ionicons name="trash-outline" size={20} color={colors.error} />
+                <TrashOutlineIcon size={20} color={colors.error} />
                 <Text style={[styles.agendaButtonText, { color: colors.error }]}>
                   Limpar Agenda
                 </Text>
@@ -1097,7 +1277,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                   {selectedDay && selectedDay.date ? `Horários - ${moment(selectedDay.date).format('DD/MM/YYYY')}` : 'Horários'}
                 </Text>
                 <TouchableOpacity onPress={closeScheduleModal} style={styles.modalCloseButton}>
-                  <Ionicons name="close" size={24} color={colors.text} />
+                  <CloseIcon size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
@@ -1162,7 +1342,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                           />
                           {isBooked && (
                             <View style={styles.bookedBadge}>
-                              <Ionicons name="lock-closed" size={12} color={colors.textWhite} />
+                              <LockClosedIcon size={12} color={colors.textWhite} />
                               <Text style={styles.bookedBadgeText}>Agendado</Text>
                             </View>
                           )}
@@ -1173,8 +1353,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                             style={styles.removeTimeButton}
                             onPress={() => removeTimeSlot(index)}
                           >
-                            <Ionicons 
-                              name="trash-outline" 
+                            <TrashOutlineIcon 
                               size={20} 
                               color={colors.error} 
                             />
@@ -1182,8 +1361,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                         )}
                         {isBooked && (
                           <View style={styles.bookedLockIcon}>
-                            <Ionicons 
-                              name="lock-closed" 
+                            <LockClosedIcon 
                               size={20} 
                               color={colors.primary} 
                             />
@@ -1199,7 +1377,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                   style={styles.addTimeButton}
                   onPress={addTimeSlot}
                 >
-                  <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+                  <AddCircleOutlineIcon size={24} color={colors.primary} />
                   <Text style={styles.addTimeButtonText}>Adicionar Horário</Text>
                 </TouchableOpacity>
 
@@ -1209,7 +1387,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                     style={[styles.modalButton, styles.modalButtonBlock]}
                     onPress={blockDay}
                   >
-                    <Ionicons name="close-circle" size={20} color={colors.textWhite} />
+                    <CloseCircleIcon size={20} color={colors.textWhite} />
                     <Text style={styles.modalButtonText}>Bloquear Dia</Text>
                   </TouchableOpacity>
                   
@@ -1217,7 +1395,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                     style={[styles.modalButton, styles.modalButtonSave]}
                     onPress={saveDaySchedule}
                   >
-                    <Ionicons name="checkmark-circle" size={20} color={colors.textWhite} />
+                    <CheckmarkCircleIcon size={20} color={colors.textWhite} />
                     <Text style={styles.modalButtonText}>Salvar</Text>
                   </TouchableOpacity>
                 </View>
@@ -1284,7 +1462,18 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   profileButton: {
-    padding: 4,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  profileIconContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,

@@ -17,6 +17,17 @@ import {
   CalendarIcon, 
   PulseIcon, 
   SettingsIcon,
+  HistoryIcon,
+  MedicationIcon,
+  MedicalKitIcon,
+  FolderIcon,
+  ImagesIcon,
+  WarningIcon,
+  ArrowBackIcon,
+  PeopleIcon,
+  ChevronForwardIcon,
+  ChatIcon,
+  InfoIcon,
 } from '../../components/CustomIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
@@ -77,7 +88,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
       title: 'Histórico',
       subtitle: 'Timeline completa de eventos',
       icon: 'time',
-      IconComponent: null,
+      IconComponent: HistoryIcon,
       color: colors.info,
       backgroundColor: colors.info + '20',
       onPress: () => navigation.navigate('History', { 
@@ -92,6 +103,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
       title: 'Remédios',
       subtitle: 'Gerenciar medicamentos e horários',
       icon: 'medical',
+      IconComponent: MedicationIcon,
       color: colors.secondary,
       backgroundColor: colors.secondary + '20',
       onPress: () => navigation.navigate('Medications', { 
@@ -119,7 +131,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
       title: 'Médicos',
       subtitle: 'Gerenciar médicos vinculados',
       icon: 'medkit',
-      IconComponent: null,
+      IconComponent: MedicalKitIcon,
       color: '#FF6B6B',
       backgroundColor: '#FF6B6B20',
       onPress: () => navigation.navigate('Doctors', { 
@@ -133,7 +145,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
       title: 'Arquivos',
       subtitle: 'Exames, receitas e laudos',
       icon: 'folder-open',
-      IconComponent: null,
+      IconComponent: FolderIcon,
       color: '#9C27B0',
       backgroundColor: '#9C27B020',
       onPress: () => navigation.navigate('Documents', { 
@@ -147,7 +159,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
       title: 'Mídias',
       subtitle: 'Fotos e vídeos do grupo',
       icon: 'images',
-      IconComponent: null,
+      IconComponent: ImagesIcon,
       color: '#FF6F00',
       backgroundColor: '#FF6F0020',
       onPress: () => navigation.navigate('GroupMedia', { 
@@ -190,7 +202,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
       title: 'Sensor de Queda',
       subtitle: 'Monitoramento de postura e quedas',
       icon: 'warning',
-      IconComponent: null,
+      IconComponent: WarningIcon,
       color: '#FF6B6B',
       backgroundColor: '#FF6B6B20',
       onPress: () => navigation.navigate('FallSensor', { 
@@ -240,7 +252,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <ArrowBackIcon size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>{groupName}</Text>
@@ -265,7 +277,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
           activeOpacity={0.7}
         >
           <View style={styles.infoIconContainer}>
-            <Ionicons name="people" size={32} color={colors.primary} />
+            <PeopleIcon size={32} color={colors.primary} />
           </View>
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>Grupo de Cuidados</Text>
@@ -273,11 +285,9 @@ const GroupDetailScreen = ({ route, navigation }) => {
               Feed de comunicação do grupo
             </Text>
           </View>
-          <Ionicons 
-            name="chatbubbles" 
+          <ChatIcon 
             size={24} 
             color={colors.primary} 
-            style={styles.infoArrow}
           />
         </TouchableOpacity>
 
@@ -311,8 +321,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
                   <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                 </View>
                 
-                <Ionicons 
-                  name="chevron-forward" 
+                <ChevronForwardIcon 
                   size={24} 
                   color={colors.gray400} 
                 />
@@ -323,7 +332,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
 
         {/* Info adicional */}
         <View style={styles.tipsCard}>
-          <Ionicons name="information-circle" size={24} color={colors.info} />
+          <InfoIcon size={24} color={colors.info} />
           <View style={styles.tipsContent}>
             <Text style={styles.tipsTitle}>💡 Dica</Text>
             <Text style={styles.tipsText}>

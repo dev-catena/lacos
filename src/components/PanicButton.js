@@ -11,11 +11,11 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import Toast from 'react-native-toast-message';
 import colors from '../constants/colors';
 import panicService from '../services/panicService';
+import { NotificationIcon, CallIcon } from './CustomIcons';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HOLD_DURATION = 5000; // 5 segundos
@@ -276,7 +276,9 @@ const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
               onPress={endCall}
               activeOpacity={0.8}
             >
-              <Ionicons name="call" size={24} color="#FF3B30" style={{ transform: [{ rotate: '135deg' }] }} />
+              <View style={{ transform: [{ rotate: '135deg' }] }}>
+                <CallIcon size={24} color="#FF3B30" />
+              </View>
               <Text style={styles.endCallText}>Encerrar Pânico</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -343,7 +345,7 @@ const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
           {!isHolding && (
             <View style={styles.defaultContent}>
               <Animated.View style={{ opacity: sirenBlink }}>
-                <Ionicons name="notifications" size={32} color="#FFFFFF" />
+                <NotificationIcon size={32} color="#FFFFFF" filled={true} />
               </Animated.View>
               <Text style={styles.buttonText}>SOS</Text>
             </View>

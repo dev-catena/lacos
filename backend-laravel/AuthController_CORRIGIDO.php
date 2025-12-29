@@ -607,7 +607,7 @@ class AuthController extends Controller
             // Atualizar dados de 2FA
             $user->two_factor_enabled = true;
             $user->two_factor_method = 'whatsapp';
-            $user->two_factor_phone = $request->phone;
+                $user->two_factor_phone = $request->phone;
 
             $user->save();
 

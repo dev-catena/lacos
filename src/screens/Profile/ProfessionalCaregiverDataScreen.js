@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -21,6 +22,9 @@ import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import userService from '../../services/userService';
 import medicalSpecialtyService from '../../services/medicalSpecialtyService';
+import { BR_UFS } from '../../constants/brUfs';
+import { parseCrm, formatCrmValue } from '../../utils/crm';
+import SafeIcon from '../../components/SafeIcon';
 
 const ProfessionalCaregiverDataScreen = ({ navigation }) => {
   const { user, updateUser } = useAuth();
@@ -32,6 +36,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
   };
 
   const isDoctor = user?.profile === 'doctor';
+  const parsedCrm = parseCrm(user?.crm || '');
   
   const [formData, setFormData] = useState({
     gender: user?.gender ? (genderMapFromEnglish[user.gender] || user.gender) : '',
@@ -45,7 +50,8 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
     latitude: user?.latitude || null,
     longitude: user?.longitude || null,
     // Campos específicos de médico
-    crm: user?.crm || '',
+    crmUf: parsedCrm.uf || '',
+    crmNumber: parsedCrm.number || '',
     medical_specialty_id: user?.medical_specialty_id || null,
     consultation_price: user?.consultation_price ? user.consultation_price.toString() : '',
   });
@@ -54,6 +60,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
   const [specialties, setSpecialties] = useState([]);
   const [specialtyModalVisible, setSpecialtyModalVisible] = useState(false);
   const [loadingSpecialties, setLoadingSpecialties] = useState(false);
+  const [ufModalVisible, setUfModalVisible] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -78,12 +85,33 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
     }
   }, [user]);
 
+
+  // Função para recarregar dados do usuário
+  const reloadUserData = useCallback(async () => {
+    try {
+      const response = await userService.getUser();
+      if (response.success && response.data && updateUser) {
+        updateUser(response.data);
+      }
+    } catch (error) {
+      console.error('Erro ao recarregar dados do usuário:', error);
+    }
+  }, [updateUser]);
+
+  // Recarregar dados quando a tela recebe foco
+  useFocusEffect(
+    useCallback(() => {
+      reloadUserData();
+    }, [reloadUserData])
+  );
+
   // Carregar especialidades se for médico
   useEffect(() => {
     if (isDoctor) {
       loadSpecialties();
     }
   }, [isDoctor]);
+
 
   const loadSpecialties = async () => {
     try {
@@ -170,6 +198,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
     }
   };
 
+
   const handleSave = async () => {
     // Validações básicas
     if (!formData.gender || !formData.city || !formData.neighborhood) {
@@ -180,8 +209,8 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
     // Validações específicas por perfil
     if (isDoctor) {
       // Validações para médico
-      if (!formData.crm || !formData.medical_specialty_id) {
-        Alert.alert('Atenção', 'Por favor, preencha CRM e Especialidade');
+      if (!formData.crmUf || !formData.crmNumber || !formData.medical_specialty_id) {
+        Alert.alert('Atenção', 'Por favor, preencha CRM (UF e número) e Especialidade');
         return;
       }
       // Validação do valor da consulta (opcional, mas se preenchido deve ser válido)
@@ -226,7 +255,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
       // Adicionar campos específicos por perfil
       if (isDoctor) {
         // Campos para médico
-        dataToUpdate.crm = formData.crm.trim();
+        dataToUpdate.crm = formatCrmValue(formData.crmUf, formData.crmNumber);
         dataToUpdate.medical_specialty_id = formData.medical_specialty_id;
         // Sempre enviar consultation_price, mesmo que seja 0 ou vazio
         if (formData.consultation_price && formData.consultation_price.trim()) {
@@ -333,7 +362,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Dados Profissionais</Text>
         <View style={styles.placeholder} />
@@ -404,7 +433,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
               <ActivityIndicator color={colors.white} />
             ) : (
               <>
-                <Ionicons name="location" size={20} color={colors.white} />
+                <SafeIcon name="location" size={20} color={colors.white} />
                 <Text style={styles.locationButtonText}>Usar minha localização</Text>
               </>
             )}
@@ -465,14 +494,80 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
             <>
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>CRM *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ex: CRM 123456"
-                  placeholderTextColor={colors.placeholder}
-                  value={formData.crm}
-                  onChangeText={(value) => updateFormData('crm', value)}
-                />
+                <View style={styles.crmRow}>
+                  <TouchableOpacity
+                    style={styles.ufSelector}
+                    activeOpacity={0.7}
+                    onPress={() => setUfModalVisible(true)}
+                  >
+                    <Text style={[
+                      styles.ufSelectorText,
+                      !formData.crmUf && styles.ufSelectorPlaceholder
+                    ]}>
+                      {formData.crmUf || 'UF'}
+                    </Text>
+                    <SafeIcon name="chevron-down" size={18} color={colors.textLight} />
+                  </TouchableOpacity>
+
+                  <TextInput
+                    style={[styles.input, styles.crmNumberInput]}
+                    placeholder="Número do CRM"
+                    placeholderTextColor={colors.placeholder}
+                    value={formData.crmNumber}
+                    onChangeText={(value) => updateFormData('crmNumber', value.replace(/\D/g, '').slice(0, 12))}
+                    keyboardType="number-pad"
+                  />
+                </View>
               </View>
+
+              {/* Modal UF */}
+              <Modal
+                visible={ufModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setUfModalVisible(false)}
+              >
+                <View style={styles.modalOverlay}>
+                  <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle}>Selecione o UF</Text>
+                      <TouchableOpacity
+                        style={styles.modalCloseButton}
+                        onPress={() => setUfModalVisible(false)}
+                      >
+                        <SafeIcon name="close" size={24} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
+                    <FlatList
+                      data={BR_UFS}
+                      keyExtractor={(item) => item}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={[
+                            styles.specialtyItem,
+                            formData.crmUf === item && styles.specialtyItemSelected
+                          ]}
+                          onPress={() => {
+                            updateFormData('crmUf', item);
+                            setUfModalVisible(false);
+                          }}
+                        >
+                          <Text style={[
+                            styles.specialtyItemText,
+                            formData.crmUf === item && styles.specialtyItemTextSelected
+                          ]}>
+                            {item}
+                          </Text>
+                          {formData.crmUf === item && (
+                            <SafeIcon name="checkmark" size={24} color={colors.primary} />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                      ItemSeparatorComponent={() => <View style={styles.separator} />}
+                    />
+                  </View>
+                </View>
+              </Modal>
 
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Especialidade *</Text>
@@ -480,7 +575,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
                   style={styles.inputWrapper}
                   onPress={() => setSpecialtyModalVisible(true)}
                 >
-                  <Ionicons name="medical-outline" size={20} color={colors.gray400} />
+                  <SafeIcon name="medical-outline" size={20} color={colors.gray400} />
                   <Text style={[
                     { flex: 1, fontSize: 16, color: formData.medical_specialty_id ? colors.text : colors.gray400 }
                   ]}>
@@ -488,7 +583,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
                       ? specialties.find(s => s.id === formData.medical_specialty_id)?.name
                       : 'Selecione a especialidade...'}
                   </Text>
-                  <Ionicons name="chevron-down" size={20} color={colors.gray400} />
+                  <SafeIcon name="chevron-down" size={20} color={colors.gray400} />
                 </TouchableOpacity>
               </View>
 
@@ -516,6 +611,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
                   keyboardType="decimal-pad"
                 />
               </View>
+
             </>
           )}
 
@@ -533,7 +629,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
                 setShowCourseForm(true);
               }}
             >
-              <Ionicons name="add" size={20} color={colors.white} />
+              <SafeIcon name="add" size={20} color={colors.white} />
               <Text style={styles.addButtonText}>Adicionar Curso</Text>
             </TouchableOpacity>
 
@@ -558,7 +654,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
                           setShowCourseForm(true);
                         }}
                       >
-                        <Ionicons name="create-outline" size={20} color="#B8A9E8" />
+                        <SafeIcon name="create-outline" size={20} color="#B8A9E8" />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => {
@@ -566,7 +662,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
                           setCourses(newCourses);
                         }}
                       >
-                        <Ionicons name="trash-outline" size={20} color={colors.error} />
+                        <SafeIcon name="trash-outline" size={20} color={colors.error} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -699,6 +795,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
           </View>
         </View>
 
+
         <TouchableOpacity
           style={[styles.saveButton, loading && styles.saveButtonDisabled]}
           onPress={handleSave}
@@ -711,6 +808,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
           )}
         </TouchableOpacity>
       </ScrollView>
+
 
       {/* Modal de Especialidades (apenas para médico) */}
       {isDoctor && (
@@ -771,6 +869,8 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
           </View>
         </Modal>
       )}
+
+
     </SafeAreaView>
   );
 };
@@ -840,6 +940,35 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: colors.text,
+  },
+  crmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ufSelector: {
+    width: 92,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+  },
+  ufSelectorText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  ufSelectorPlaceholder: {
+    color: colors.textLight,
+    fontWeight: '500',
+  },
+  crmNumberInput: {
+    flex: 1,
   },
   textArea: {
     minHeight: 80,
@@ -1133,6 +1262,39 @@ const styles = StyleSheet.create({
   separator: {
     height: 1,
     backgroundColor: colors.gray100,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: colors.gray200,
+  },
+  modalButtonCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalButtonConfirm: {
+    backgroundColor: colors.primary,
+  },
+  modalButtonConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 8,
   },
 });
 

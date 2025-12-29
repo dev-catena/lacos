@@ -113,3 +113,4 @@ echo ""
 echo "📊 Status final:"
 docker ps | grep $CONTAINER_NAME || docker ps -a | grep $CONTAINER_NAME
 
+

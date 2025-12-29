@@ -84,10 +84,24 @@ const doctorService = {
    */
   async saveAvailability(doctorId, availabilityData) {
     try {
+      console.log('📤 doctorService.saveAvailability - Enviando:', {
+        doctorId,
+        endpoint: `/doctors/${doctorId}/availability`,
+        data: availabilityData,
+      });
+      
       const response = await apiService.post(`/doctors/${doctorId}/availability`, availabilityData);
+      
+      console.log('📥 doctorService.saveAvailability - Resposta:', response);
+      
       return response;
     } catch (error) {
-      console.error('Erro ao salvar agenda do médico:', error);
+      console.error('❌ doctorService.saveAvailability - Erro completo:', {
+        message: error.message,
+        response: error.response,
+        data: error.response?.data,
+        status: error.response?.status,
+      });
       throw error;
     }
   },

@@ -48,3 +48,4 @@ echo ""
 echo "📋 Informações do container:"
 docker inspect $CONTAINER_NAME --format='{{.State.Status}} - {{.State.Error}}' 2>/dev/null || echo "Erro ao inspecionar"
 
+

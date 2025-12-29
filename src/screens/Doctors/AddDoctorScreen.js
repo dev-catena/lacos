@@ -24,10 +24,13 @@ import doctorService from '../../services/doctorService';
 import medicalSpecialtyService from '../../services/medicalSpecialtyService';
 import GOOGLE_MAPS_CONFIG from '../../config/maps';
 import { checkGoogleMapsConfig } from '../../utils/checkGoogleMapsConfig';
+import { BR_UFS } from '../../constants/brUfs';
+import { parseCrm, formatCrmValue } from '../../utils/crm';
 
 const AddDoctorScreen = ({ route, navigation }) => {
   const { groupId, groupName, doctor, isEditing = false } = route.params;
   const googlePlacesRef = useRef(null);
+  const parsedCrm = parseCrm(doctor?.crm || '');
 
   // Função para formatar telefone: +55(00)00000-0000 (definida antes do useState)
   const formatPhone = (text) => {
@@ -77,7 +80,8 @@ const AddDoctorScreen = ({ route, navigation }) => {
   const [formData, setFormData] = useState({
     name: doctor?.name || '',
     medicalSpecialtyId: doctor?.medical_specialty_id || null,
-    crm: doctor?.crm || '',
+    crmUf: parsedCrm.uf || '',
+    crmNumber: parsedCrm.number || '',
     phone: formatExistingPhone(doctor?.phone),
     email: doctor?.email || '',
     address: doctor?.address || '',
@@ -88,6 +92,12 @@ const AddDoctorScreen = ({ route, navigation }) => {
   const [specialties, setSpecialties] = useState([]);
   const [hasGoogleMapsConfig, setHasGoogleMapsConfig] = useState(false);
   const [specialtyModalVisible, setSpecialtyModalVisible] = useState(false);
+  const [ufModalVisible, setUfModalVisible] = useState(false);
+  const [addressListVisible, setAddressListVisible] = useState(false);
+  // "lock" curto para evitar que o autocomplete limpe/reabra lista logo após selecionar um item
+  const selectingAddressRef = useRef(false);
+  const lastSelectedAddressRef = useRef('');
+  const lastSelectedAddressAtRef = useRef(0);
 
   useEffect(() => {
     loadSpecialties();
@@ -126,6 +136,27 @@ const AddDoctorScreen = ({ route, navigation }) => {
 
   const updateField = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddressChange = (text) => {
+    // Durante a seleção, o componente pode disparar onChangeText extra (às vezes '')
+    // que apaga o valor selecionado. Ignoramos qualquer mudança nesse intervalo.
+    if (selectingAddressRef.current) return;
+
+    // Logo após selecionar, alguns devices disparam um onChangeText com o texto antigo/curto.
+    // Mantém o valor selecionado.
+    const recentlySelected = Date.now() - lastSelectedAddressAtRef.current < 1200;
+    if (
+      recentlySelected &&
+      lastSelectedAddressRef.current &&
+      text !== lastSelectedAddressRef.current &&
+      (String(text || '').length < lastSelectedAddressRef.current.length)
+    ) {
+      return;
+    }
+
+    updateField('address', text);
+    setAddressListVisible(true);
   };
 
   // Função para extrair apenas os dígitos do telefone (sem +55)
@@ -192,9 +223,10 @@ const AddDoctorScreen = ({ route, navigation }) => {
     try {
       // Se não estiver editando, verificar se já existe médico com mesmo nome ou CRM
       if (!isEditing) {
+        const crmValue = formatCrmValue(formData.crmUf, formData.crmNumber);
         const duplicate = await checkDuplicateDoctor(
           formData.name.trim(),
-          formData.crm.trim()
+          crmValue.trim()
         );
         
         if (duplicate) {
@@ -237,6 +269,17 @@ const AddDoctorScreen = ({ route, navigation }) => {
 
   const proceedWithSave = async () => {
     try {
+      const crmValue = formatCrmValue(formData.crmUf, formData.crmNumber);
+      // Se o usuário informou CRM, UF é obrigatório (e vice-versa)
+      if ((formData.crmNumber && !formData.crmUf) || (formData.crmUf && !formData.crmNumber)) {
+        Toast.show({
+          type: 'error',
+          text1: 'CRM incompleto',
+          text2: 'Selecione o UF e informe o número do CRM',
+        });
+        return;
+      }
+
       // Preparar telefone: remover formatação e manter apenas +55 + dígitos
       let phoneValue = null;
       if (formData.phone && formData.phone.trim()) {
@@ -251,7 +294,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
         group_id: groupId,
         name: formData.name.trim(),
         medical_specialty_id: formData.medicalSpecialtyId,
-        crm: formData.crm.trim() || null,
+        crm: crmValue.trim() || null,
         phone: phoneValue,
         email: formData.email.trim() || null,
         address: formData.address.trim() || null,
@@ -338,26 +381,32 @@ const AddDoctorScreen = ({ route, navigation }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <ScrollView
+        <FlatList
+          data={[]}
+          renderItem={() => null}
+          keyExtractor={() => 'doctor-form'}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Nome */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Nome Completo *</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={20} color={colors.gray400} />
-              <TextInput
-                style={styles.input}
-                value={formData.name}
-                onChangeText={(text) => updateField('name', text)}
-                placeholder="Dr. João Silva"
-                placeholderTextColor={colors.gray400}
-              />
-            </View>
-          </View>
+          keyboardShouldPersistTaps="always"
+          nestedScrollEnabled
+          removeClippedSubviews={false}
+          ListHeaderComponent={
+            <>
+              {/* Nome */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Nome Completo *</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="person-outline" size={20} color={colors.gray400} />
+                  <TextInput
+                    style={styles.input}
+                    value={formData.name}
+                    onChangeText={(text) => updateField('name', text)}
+                    placeholder="Dr. João Silva"
+                    placeholderTextColor={colors.gray400}
+                  />
+                </View>
+              </View>
 
           {/* Especialidade */}
           <View style={styles.inputContainer}>
@@ -441,22 +490,89 @@ const AddDoctorScreen = ({ route, navigation }) => {
           {/* CRM */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>CRM</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="card-outline" size={20} color={colors.gray400} />
-              <TextInput
-                style={styles.input}
-                value={formData.crm}
-                onChangeText={(text) => updateField('crm', text)}
-                placeholder="Ex: 123456-SP"
-                placeholderTextColor={colors.gray400}
-              />
+            <View style={styles.crmRow}>
+              <TouchableOpacity
+                style={styles.ufSelector}
+                activeOpacity={0.7}
+                onPress={() => setUfModalVisible(true)}
+              >
+                <Text style={[
+                  styles.ufSelectorText,
+                  !formData.crmUf && styles.ufSelectorPlaceholder
+                ]}>
+                  {formData.crmUf || 'UF'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={colors.textLight} />
+              </TouchableOpacity>
+
+              <View style={[styles.inputWrapper, styles.crmNumberWrapper]}>
+                <Ionicons name="card-outline" size={20} color={colors.gray400} />
+                <TextInput
+                  style={styles.input}
+                  value={formData.crmNumber}
+                  onChangeText={(text) => updateField('crmNumber', text.replace(/\D/g, '').slice(0, 12))}
+                  placeholder="Número do CRM"
+                  placeholderTextColor={colors.gray400}
+                  keyboardType="number-pad"
+                />
+              </View>
             </View>
-            {!formData.crm && (
+
+            {!formData.crmUf && !formData.crmNumber && (
               <Text style={styles.hint}>
-                Opcional - Informe apenas se disponível
+                Opcional - se informar CRM, selecione o UF
               </Text>
             )}
           </View>
+
+          {/* Modal de UF */}
+          <Modal
+            visible={ufModalVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setUfModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Selecione o UF</Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={() => setUfModalVisible(false)}
+                  >
+                    <Ionicons name="close" size={24} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={BR_UFS}
+                  keyExtractor={(item) => item}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.specialtyItem,
+                        formData.crmUf === item && styles.specialtyItemSelected
+                      ]}
+                      onPress={() => {
+                        updateField('crmUf', item);
+                        setUfModalVisible(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.specialtyItemText,
+                        formData.crmUf === item && styles.specialtyItemTextSelected
+                      ]}>
+                        {item}
+                      </Text>
+                      {formData.crmUf === item && (
+                        <Ionicons name="checkmark" size={24} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  ItemSeparatorComponent={() => <View style={styles.separator} />}
+                />
+              </View>
+            </View>
+          </Modal>
 
           {/* Telefone */}
           <View style={styles.inputContainer}>
@@ -524,9 +640,29 @@ const AddDoctorScreen = ({ route, navigation }) => {
                 ref={googlePlacesRef}
                 placeholder="Digite o endereço..."
                 fetchDetails={true}
+                numberOfLines={3}
                 onPress={(data, details = null) => {
-                  const fullAddress = details?.formatted_address || data.description;
+                  const main = data?.structured_formatting?.main_text || '';
+                  const secondary = data?.structured_formatting?.secondary_text || '';
+                  const composed = main ? `${main}${secondary ? ` - ${secondary}` : ''}` : '';
+                  const fullAddress = details?.formatted_address || data?.description || composed;
+                  selectingAddressRef.current = true;
+                  lastSelectedAddressRef.current = fullAddress;
+                  lastSelectedAddressAtRef.current = Date.now();
+                  setTimeout(() => {
+                    selectingAddressRef.current = false;
+                  }, 400);
+
                   updateField('address', fullAddress);
+                  // recolher lista e manter somente o endereço selecionado
+                  setAddressListVisible(false);
+                  // garantir que o texto do input fique atualizado no componente
+                  try {
+                    googlePlacesRef.current?.setAddressText?.(fullAddress);
+                    googlePlacesRef.current?.blur?.();
+                  } catch (e) {
+                    // noop
+                  }
                   Toast.show({
                     type: 'success',
                     text1: 'Endereço selecionado',
@@ -540,15 +676,41 @@ const AddDoctorScreen = ({ route, navigation }) => {
                   language: GOOGLE_MAPS_CONFIG.language,
                   components: `country:${GOOGLE_MAPS_CONFIG.region}`,
                 }}
+                listViewDisplayed={addressListVisible}
+                keepResultsAfterBlur={false}
+                listViewProps={{
+                  keyboardShouldPersistTaps: 'handled',
+                  nestedScrollEnabled: true,
+                }}
+                renderRow={(rowData) => {
+                  const label = rowData?.description || '';
+                  const main = rowData?.structured_formatting?.main_text || label;
+                  const secondary = rowData?.structured_formatting?.secondary_text || '';
+                  return (
+                    <View style={styles.placesRow}>
+                      <Text style={styles.placesMainText}>{main}</Text>
+                      {!!secondary && <Text style={styles.placesSecondaryText}>{secondary}</Text>}
+                    </View>
+                  );
+                }}
                 textInputProps={{
                   value: formData.address,
-                  onChangeText: (text) => updateField('address', text),
+                  onChangeText: handleAddressChange,
                   placeholderTextColor: colors.gray400,
                   style: styles.googlePlacesInput,
+                  onFocus: () => setAddressListVisible(true),
+                  onBlur: () => {
+                    // dar tempo do onPress da sugestão executar antes de recolher
+                    setTimeout(() => setAddressListVisible(false), 350);
+                  },
                 }}
                 styles={{
                   container: styles.googlePlacesContainer,
+                  textInputContainer: styles.googlePlacesTextInputContainer,
+                  textInput: styles.googlePlacesInput,
                   listView: styles.googlePlacesList,
+                  row: styles.googlePlacesRow,
+                  description: styles.googlePlacesDescription,
                 }}
                 enablePoweredByContainer={false}
                 debounce={400}
@@ -601,8 +763,10 @@ const AddDoctorScreen = ({ route, navigation }) => {
             />
           </View>
 
-          <View style={{ height: 40 }} />
-        </ScrollView>
+              <View style={{ height: 40 }} />
+            </>
+          }
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -686,6 +850,35 @@ const styles = StyleSheet.create({
     gap: 12,
     borderWidth: 1,
     borderColor: colors.gray200,
+  },
+  crmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ufSelector: {
+    width: 92,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  ufSelectorText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  ufSelectorPlaceholder: {
+    color: colors.gray400,
+    fontWeight: '500',
+  },
+  crmNumberWrapper: {
+    flex: 1,
   },
   input: {
     flex: 1,
@@ -810,7 +1003,14 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   googlePlacesContainer: {
-    flex: 0,
+    flex: 1,
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  googlePlacesTextInputContainer: {
+    width: '100%',
+    paddingHorizontal: 0,
+    alignSelf: 'stretch',
   },
   googlePlacesInput: {
     backgroundColor: colors.white,
@@ -821,10 +1021,51 @@ const styles = StyleSheet.create({
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.gray200,
+    width: '100%',
+    alignSelf: 'stretch',
   },
   googlePlacesList: {
     borderRadius: 12,
     marginTop: 8,
+    backgroundColor: colors.white,
+    maxHeight: 240,
+    zIndex: 10,
+    elevation: 10,
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  googlePlacesRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+  },
+  googlePlacesDescription: {
+    flexWrap: 'wrap',
+    flexShrink: 1,
+    width: '100%',
+    color: colors.text,
+    lineHeight: 18,
+  },
+  placesRow: {
+    width: '100%',
+    paddingVertical: 2,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  placesMainText: {
+    width: '100%',
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  placesSecondaryText: {
+    width: '100%',
+    marginTop: 2,
+    color: colors.gray400,
+    fontSize: 13,
+    lineHeight: 17,
   },
   switchContainer: {
     flexDirection: 'row',

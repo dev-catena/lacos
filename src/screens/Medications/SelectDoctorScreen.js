@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
 import doctorService from '../../services/doctorService';
+import { formatCrmDisplay } from '../../utils/crm';
 
 const SelectDoctorScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params;
@@ -297,7 +298,7 @@ const SelectDoctorScreen = ({ route, navigation }) => {
                       <Text style={styles.doctorSpecialty}>{doctor.medical_specialty.name}</Text>
                     )}
                     {doctor.crm && (
-                      <Text style={styles.doctorCrm}>CRM: {doctor.crm}</Text>
+                      <Text style={styles.doctorCrm}>CRM: {formatCrmDisplay(doctor.crm)}</Text>
                     )}
                   </View>
                   <Ionicons name="chevron-forward" size={24} color={colors.gray400} />

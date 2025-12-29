@@ -12,6 +12,10 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lacos.app",

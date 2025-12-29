@@ -14,7 +14,16 @@ import {
   ImageBackground,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  WhatsAppIcon,
+  CallIcon,
+  TimeOutlineIcon,
+  ChevronForwardIcon,
+  MicIcon,
+  VideoCamIcon,
+  CalendarIcon,
+  MedicalIcon,
+} from '../../components/CustomIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -756,7 +765,7 @@ const PatientHomeScreen = ({ navigation }) => {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <StatusBar style="dark" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -767,11 +776,11 @@ const PatientHomeScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <StatusBar style="dark" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
         <View style={styles.headerLeft}>
           <LacosIcon size={36} />
           <View>
@@ -822,11 +831,11 @@ const PatientHomeScreen = ({ navigation }) => {
                       imageStyle={styles.cardImage}
                     >
                       <View style={styles.cardOverlay}>
-                        <Ionicons 
-                          name={Platform.OS === 'android' ? 'logo-whatsapp' : 'call'} 
-                          size={36} 
-                          color={colors.textWhite} 
-                        />
+                        {Platform.OS === 'android' ? (
+                          <WhatsAppIcon size={36} color={colors.textWhite} />
+                        ) : (
+                          <CallIcon size={36} color={colors.textWhite} />
+                        )}
                         <Text style={styles.cardTitle}>{contact.name}</Text>
                         <View style={styles.cardBadge}>
                           <Text style={styles.cardBadgeText}>
@@ -837,11 +846,11 @@ const PatientHomeScreen = ({ navigation }) => {
                     </ImageBackground>
                   ) : (
                     <>
-                      <Ionicons 
-                        name={Platform.OS === 'android' ? 'logo-whatsapp' : 'call'} 
-                        size={36} 
-                        color={colors.textWhite} 
-                      />
+                      {Platform.OS === 'android' ? (
+                        <WhatsAppIcon size={36} color={colors.textWhite} />
+                      ) : (
+                        <CallIcon size={36} color={colors.textWhite} />
+                      )}
                       <Text style={styles.cardTitle}>{contact.name}</Text>
                       <View style={styles.cardBadge}>
                         <Text style={styles.cardBadgeText}>
@@ -904,13 +913,21 @@ const PatientHomeScreen = ({ navigation }) => {
                 activeOpacity={0.7}
               >
                 <View style={[styles.notificationIcon, { backgroundColor: notification.color + '20' }]}>
-                  <Ionicons name={notification.icon} size={28} color={notification.color} />
+                  {notification.icon === 'videocam' ? (
+                    <VideoCamIcon size={28} color={notification.color} />
+                  ) : notification.icon === 'calendar' ? (
+                    <CalendarIcon size={28} color={notification.color} />
+                  ) : notification.icon === 'medical' ? (
+                    <MedicalIcon size={28} color={notification.color} />
+                  ) : (
+                    <CalendarIcon size={28} color={notification.color} />
+                  )}
                 </View>
                 <View style={styles.notificationContent}>
                   <Text style={styles.notificationTitle}>{notification.title}</Text>
                   <Text style={styles.notificationDescription}>{notification.description}</Text>
                   <View style={styles.notificationTime}>
-                    <Ionicons name="time-outline" size={14} color={colors.textLight} />
+                    <TimeOutlineIcon size={14} color={colors.textLight} />
                     <Text style={styles.notificationTimeText}>
                       {notification.date} - {notification.time}
                     </Text>
@@ -919,10 +936,10 @@ const PatientHomeScreen = ({ navigation }) => {
                 
                 {showMicrophone ? (
                   <View style={styles.microphoneIndicator}>
-                    <Ionicons name="mic" size={24} color={colors.error} />
+                    <MicIcon size={24} color={colors.error} />
                   </View>
                 ) : (
-                  <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+                  <ChevronForwardIcon size={20} color={colors.gray400} />
                 )}
               </TouchableOpacity>
             );
