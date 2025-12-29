@@ -17,9 +17,21 @@ import {
   CalendarIcon, 
   PulseIcon, 
   SettingsIcon,
+  HistoryIcon,
+  MedicationIcon,
+  MedicalKitIcon,
+  FolderIcon,
+  ImagesIcon,
+  WarningIcon,
+  ArrowBackIcon,
+  PeopleIcon,
+  ChevronForwardIcon,
+  ChatIcon,
+  InfoIcon,
 } from '../../components/CustomIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
+import planService from '../../services/planService';
 
 const GroupDetailScreen = ({ route, navigation }) => {
   const { groupId, groupName, accompaniedName } = route.params || {};
@@ -27,9 +39,11 @@ const GroupDetailScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [userPlan, setUserPlan] = useState(null);
 
   useEffect(() => {
     checkAdminStatus();
+    loadUserPlan();
   }, [groupId]);
 
   const checkAdminStatus = async () => {
@@ -53,13 +67,28 @@ const GroupDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const loadUserPlan = async () => {
+    try {
+      const result = await planService.getUserPlan();
+      if (result.success && result.plan) {
+        setUserPlan(result.plan);
+        console.log('📦 GroupDetail - Plano carregado:', result.plan.name);
+      } else {
+        console.warn('⚠️ GroupDetail - Não foi possível carregar o plano do usuário');
+      }
+    } catch (error) {
+      console.error('❌ GroupDetail - Erro ao carregar plano:', error);
+    }
+  };
+
   const menuItems = [
     {
       id: 'history',
+      featureKey: 'historico', // Key da feature no plano
       title: 'Histórico',
       subtitle: 'Timeline completa de eventos',
       icon: 'time',
-      IconComponent: null,
+      IconComponent: HistoryIcon,
       color: colors.info,
       backgroundColor: colors.info + '20',
       onPress: () => navigation.navigate('History', { 
@@ -70,9 +99,11 @@ const GroupDetailScreen = ({ route, navigation }) => {
     },
     {
       id: 'medications',
+      featureKey: 'remedios',
       title: 'Remédios',
       subtitle: 'Gerenciar medicamentos e horários',
       icon: 'medical',
+      IconComponent: MedicationIcon,
       color: colors.secondary,
       backgroundColor: colors.secondary + '20',
       onPress: () => navigation.navigate('Medications', { 
@@ -82,6 +113,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     },
     {
       id: 'agenda',
+      featureKey: 'agenda',
       title: 'Agenda',
       subtitle: 'Consultas e compromissos',
       icon: 'calendar',
@@ -95,10 +127,11 @@ const GroupDetailScreen = ({ route, navigation }) => {
     },
     {
       id: 'doctors',
+      featureKey: 'medicos',
       title: 'Médicos',
       subtitle: 'Gerenciar médicos vinculados',
       icon: 'medkit',
-      IconComponent: null,
+      IconComponent: MedicalKitIcon,
       color: '#FF6B6B',
       backgroundColor: '#FF6B6B20',
       onPress: () => navigation.navigate('Doctors', { 
@@ -108,10 +141,11 @@ const GroupDetailScreen = ({ route, navigation }) => {
     },
     {
       id: 'documents',
+      featureKey: 'arquivos',
       title: 'Arquivos',
       subtitle: 'Exames, receitas e laudos',
       icon: 'folder-open',
-      IconComponent: null,
+      IconComponent: FolderIcon,
       color: '#9C27B0',
       backgroundColor: '#9C27B020',
       onPress: () => navigation.navigate('Documents', { 
@@ -121,10 +155,11 @@ const GroupDetailScreen = ({ route, navigation }) => {
     },
     {
       id: 'media',
+      featureKey: 'midias',
       title: 'Mídias',
       subtitle: 'Fotos e vídeos do grupo',
       icon: 'images',
-      IconComponent: null,
+      IconComponent: ImagesIcon,
       color: '#FF6F00',
       backgroundColor: '#FF6F0020',
       onPress: () => navigation.navigate('GroupMedia', { 
@@ -134,6 +169,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     },
     {
       id: 'vitalsigns',
+      featureKey: 'sinaisVitais',
       title: 'Sinais Vitais',
       subtitle: 'Registrar pressão, glicose e peso',
       icon: 'pulse',
@@ -148,6 +184,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     },
     {
       id: 'settings',
+      featureKey: 'configuracoes',
       title: 'Configurações',
       subtitle: 'Gerenciar grupo e contatos',
       icon: 'settings',
@@ -159,14 +196,39 @@ const GroupDetailScreen = ({ route, navigation }) => {
         groupName 
       }),
     },
+    {
+      id: 'fallSensor',
+      featureKey: 'sensorQuedas',
+      title: 'Sensor de Queda',
+      subtitle: 'Monitoramento de postura e quedas',
+      icon: 'warning',
+      IconComponent: WarningIcon,
+      color: '#FF6B6B',
+      backgroundColor: '#FF6B6B20',
+      onPress: () => navigation.navigate('FallSensor', { 
+        groupId, 
+        groupName 
+      }),
+    },
   ];
 
-  // Filtrar menuItems: só mostrar Configurações se for admin
+  // Filtrar menuItems baseado no plano do usuário e permissões de admin
   const visibleMenuItems = menuItems.filter(item => {
-    if (item.id === 'settings') {
-      return isAdmin;
+    // Se o plano ainda não foi carregado, mostrar todos os itens (exceto configurações se não for admin)
+    if (!userPlan) {
+      if (item.id === 'settings') {
+        return isAdmin;
+      }
+      return true; // Mostrar todos enquanto carrega o plano
     }
-    return true;
+    
+    // Configurações só aparece se for admin E a feature estiver habilitada
+    if (item.id === 'settings') {
+      return isAdmin && planService.isFeatureEnabled(userPlan, item.featureKey);
+    }
+    
+    // Outros itens aparecem se a feature estiver habilitada no plano
+    return planService.isFeatureEnabled(userPlan, item.featureKey);
   });
 
   if (loading) {
@@ -190,7 +252,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <ArrowBackIcon size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>{groupName}</Text>
@@ -215,7 +277,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
           activeOpacity={0.7}
         >
           <View style={styles.infoIconContainer}>
-            <Ionicons name="people" size={32} color={colors.primary} />
+            <PeopleIcon size={32} color={colors.primary} />
           </View>
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>Grupo de Cuidados</Text>
@@ -223,11 +285,9 @@ const GroupDetailScreen = ({ route, navigation }) => {
               Feed de comunicação do grupo
             </Text>
           </View>
-          <Ionicons 
-            name="chatbubbles" 
+          <ChatIcon 
             size={24} 
             color={colors.primary} 
-            style={styles.infoArrow}
           />
         </TouchableOpacity>
 
@@ -261,8 +321,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
                   <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                 </View>
                 
-                <Ionicons 
-                  name="chevron-forward" 
+                <ChevronForwardIcon 
                   size={24} 
                   color={colors.gray400} 
                 />
@@ -273,7 +332,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
 
         {/* Info adicional */}
         <View style={styles.tipsCard}>
-          <Ionicons name="information-circle" size={24} color={colors.info} />
+          <InfoIcon size={24} color={colors.info} />
           <View style={styles.tipsContent}>
             <Text style={styles.tipsTitle}>💡 Dica</Text>
             <Text style={styles.tipsText}>

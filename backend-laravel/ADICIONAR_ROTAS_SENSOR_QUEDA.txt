@@ -1,0 +1,137 @@
+# ============================================================================
+# SCRIPT PARA ADICIONAR ROTAS DO SENSOR DE QUEDA
+# COPIAR E COLAR TUDO ISSO NO TERMINAL DO SERVIDOR
+# ============================================================================
+
+cd /var/www/lacos-backend
+
+# Descobrir qual arquivo de rotas usar
+ROUTES_FILE=""
+if [ -f "routes/api.php" ]; then
+    ROUTES_FILE="routes/api.php"
+elif [ -f "routes_api_corrigido.php" ]; then
+    ROUTES_FILE="routes_api_corrigido.php"
+else
+    echo "❌ Arquivo de rotas não encontrado!"
+    exit 1
+fi
+
+echo "📋 Arquivo de rotas: $ROUTES_FILE"
+
+# Verificar se as rotas já existem
+if grep -q "fall-sensor/data" "$ROUTES_FILE" && \
+   grep -q "fall-sensor/history" "$ROUTES_FILE" && \
+   grep -q "fall-sensor/latest" "$ROUTES_FILE" && \
+   grep -q "fall-sensor/alerts" "$ROUTES_FILE"; then
+    echo "✅ Rotas do sensor de queda já existem!"
+    exit 0
+fi
+
+# Fazer backup
+echo "💾 Criando backup..."
+sudo cp "$ROUTES_FILE" "${ROUTES_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
+echo "✅ Backup criado"
+
+# Adicionar import se não existir
+if ! grep -q "FallSensorController" "$ROUTES_FILE"; then
+    echo "📝 Adicionando import do FallSensorController..."
+    # Adicionar após AdminAuthController (último import)
+    sudo sed -i '/use App\\Http\\Controllers\\Api\\AdminAuthController;/a use App\\Http\\Controllers\\Api\\FallSensorController;' "$ROUTES_FILE"
+    echo "✅ Import adicionado"
+fi
+
+# Adicionar rotas após Vital Signs
+echo "📝 Adicionando rotas após Vital Signs..."
+
+# Encontrar linha de Vital Signs
+VITAL_SIGNS_LINE=$(grep -n "// Vital Signs" "$ROUTES_FILE" | cut -d: -f1)
+
+if [ -n "$VITAL_SIGNS_LINE" ]; then
+    # Encontrar linha após Route::apiResource('vital-signs'
+    ROUTE_LINE=$(sed -n "${VITAL_SIGNS_LINE},$((VITAL_SIGNS_LINE+5))p" "$ROUTES_FILE" | grep -n "Route::apiResource('vital-signs'" | head -1 | cut -d: -f1)
+    if [ -n "$ROUTE_LINE" ]; then
+        INSERT_LINE=$((VITAL_SIGNS_LINE + ROUTE_LINE))
+    else
+        INSERT_LINE=$((VITAL_SIGNS_LINE + 2))
+    fi
+    
+    # Adicionar rotas
+    sudo sed -i "${INSERT_LINE}a\\
+    \\
+    // Fall Sensor (Sensor de Queda)\\
+    Route::post('/groups/{groupId}/fall-sensor/data', [FallSensorController::class, 'store']);\\
+    Route::get('/groups/{groupId}/fall-sensor/history', [FallSensorController::class, 'index']);\\
+    Route::get('/groups/{groupId}/fall-sensor/latest', [FallSensorController::class, 'getLatest']);\\
+    Route::get('/groups/{groupId}/fall-sensor/alerts', [FallSensorController::class, 'getFallAlerts']);\\
+" "$ROUTES_FILE"
+    echo "✅ Rotas adicionadas após Vital Signs"
+else
+    # Se não encontrar Vital Signs, adicionar antes de Documents
+    DOCS_LINE=$(grep -n "// Documents" "$ROUTES_FILE" | cut -d: -f1)
+    if [ -n "$DOCS_LINE" ]; then
+        sudo sed -i "${DOCS_LINE}i\\
+    // Fall Sensor (Sensor de Queda)\\
+    Route::post('/groups/{groupId}/fall-sensor/data', [FallSensorController::class, 'store']);\\
+    Route::get('/groups/{groupId}/fall-sensor/history', [FallSensorController::class, 'index']);\\
+    Route::get('/groups/{groupId}/fall-sensor/latest', [FallSensorController::class, 'getLatest']);\\
+    Route::get('/groups/{groupId}/fall-sensor/alerts', [FallSensorController::class, 'getFallAlerts']);\\
+    \\
+" "$ROUTES_FILE"
+        echo "✅ Rotas adicionadas antes de Documents"
+    else
+        # Última tentativa: adicionar antes do fechamento do grupo auth:sanctum
+        CLOSING_LINE=$(grep -n "^});" "$ROUTES_FILE" | tail -1 | cut -d: -f1)
+        if [ -n "$CLOSING_LINE" ]; then
+            sudo sed -i "$((CLOSING_LINE-1))a\\
+    // Fall Sensor (Sensor de Queda)\\
+    Route::post('/groups/{groupId}/fall-sensor/data', [FallSensorController::class, 'store']);\\
+    Route::get('/groups/{groupId}/fall-sensor/history', [FallSensorController::class, 'index']);\\
+    Route::get('/groups/{groupId}/fall-sensor/latest', [FallSensorController::class, 'getLatest']);\\
+    Route::get('/groups/{groupId}/fall-sensor/alerts', [FallSensorController::class, 'getFallAlerts']);\\
+" "$ROUTES_FILE"
+            echo "✅ Rotas adicionadas antes do fechamento do grupo"
+        else
+            echo "❌ Não foi possível encontrar local para adicionar rotas"
+            echo "   Adicione manualmente no arquivo $ROUTES_FILE"
+            exit 1
+        fi
+    fi
+fi
+
+# Verificar sintaxe PHP
+echo ""
+echo "🔍 Verificando sintaxe PHP..."
+php -l "$ROUTES_FILE" > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "✅ Sintaxe OK!"
+else
+    echo "❌ Erro de sintaxe detectado!"
+    php -l "$ROUTES_FILE"
+    echo ""
+    echo "💾 Restaurando backup..."
+    LATEST_BACKUP=$(ls -t ${ROUTES_FILE}.backup.* 2>/dev/null | head -1)
+    if [ -n "$LATEST_BACKUP" ]; then
+        sudo cp "$LATEST_BACKUP" "$ROUTES_FILE"
+        echo "✅ Backup restaurado"
+    fi
+    exit 1
+fi
+
+# Verificar se as rotas foram adicionadas
+echo ""
+echo "🔍 Verificando rotas adicionadas..."
+if grep -q "fall-sensor/data" "$ROUTES_FILE" && \
+   grep -q "fall-sensor/history" "$ROUTES_FILE" && \
+   grep -q "fall-sensor/latest" "$ROUTES_FILE" && \
+   grep -q "fall-sensor/alerts" "$ROUTES_FILE"; then
+    echo "✅ Todas as rotas foram adicionadas com sucesso!"
+    echo ""
+    echo "📋 Rotas encontradas:"
+    grep "fall-sensor" "$ROUTES_FILE" | sed 's/^/   /'
+else
+    echo "⚠️  Algumas rotas podem não ter sido adicionadas. Verifique manualmente."
+fi
+
+echo ""
+echo "✅ Processo concluído!"
+echo ""

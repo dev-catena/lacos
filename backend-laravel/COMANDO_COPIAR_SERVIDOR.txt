@@ -1,0 +1,205 @@
+# Copie e cole este comando completo no servidor para criar e executar o script:
+
+cat > /tmp/adicionar_metodo_getClients.sh << 'SCRIPT_EOF'
+#!/bin/bash
+
+echo "🔧 Adicionando método getClients ao CaregiverController..."
+echo ""
+
+cd /var/www/lacos-backend || exit 1
+
+CONTROLLER_FILE="app/Http/Controllers/Api/CaregiverController.php"
+BACKUP_FILE="${CONTROLLER_FILE}.bak.$(date +%Y%m%d_%H%M%S)"
+
+# 1. Fazer backup
+echo "📦 Criando backup..."
+sudo cp "$CONTROLLER_FILE" "$BACKUP_FILE"
+echo "✅ Backup criado: $BACKUP_FILE"
+echo ""
+
+# 2. Verificar se método já existe
+if grep -q "public function getClients" "$CONTROLLER_FILE"; then
+    echo "✅ Método getClients já existe!"
+    exit 0
+fi
+
+# 3. Encontrar onde adicionar o método (antes do último })
+echo "📝 Localizando onde adicionar o método..."
+LAST_BRACE_LINE=$(grep -n "^}" "$CONTROLLER_FILE" | tail -1 | cut -d: -f1)
+
+if [ -z "$LAST_BRACE_LINE" ]; then
+    echo "❌ Não foi possível encontrar o final da classe"
+    exit 1
+fi
+
+INSERT_LINE=$((LAST_BRACE_LINE - 1))
+echo "✅ Inserindo método na linha $INSERT_LINE"
+echo ""
+
+# 4. Criar método completo
+cat > /tmp/getClients_method.txt << 'METHOD_EOF'
+
+    /**
+     * Listar clientes (admins dos grupos onde o cuidador profissional é membro)
+     * 
+     * GET /api/caregivers/clients
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getClients()
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado'
+                ], 401);
+            }
+
+            // Buscar grupos onde o usuário é membro usando query direta na tabela group_members
+            $groupIds = DB::table('group_members')
+                ->where('user_id', $user->id)
+                ->pluck('group_id')
+                ->toArray();
+
+            if (empty($groupIds)) {
+                return response()->json([
+                    'success' => true,
+                    'data' => []
+                ]);
+            }
+
+            // Buscar admins (clientes) desses grupos
+            $clients = DB::table('group_members')
+                ->join('users', 'group_members.user_id', '=', 'users.id')
+                ->join('groups', 'group_members.group_id', '=', 'groups.id')
+                ->whereIn('group_members.group_id', $groupIds)
+                ->where('group_members.role', 'admin')
+                ->where('group_members.user_id', '!=', $user->id) // Excluir o próprio usuário
+                ->select(
+                    'users.id',
+                    'users.name',
+                    'users.email',
+                    'users.phone',
+                    'users.city',
+                    'users.neighborhood',
+                    'users.photo as photo_url',
+                    'groups.name as group_name',
+                    'groups.id as group_id'
+                )
+                ->distinct()
+                ->get()
+                ->map(function ($client) {
+                    // Calcular rating médio (se houver reviews)
+                    $rating = DB::table('reviews')
+                        ->where('reviewed_user_id', $client->id)
+                        ->avg('rating');
+                    
+                    $reviewsCount = DB::table('reviews')
+                        ->where('reviewed_user_id', $client->id)
+                        ->count();
+
+                    return [
+                        'id' => $client->id,
+                        'name' => $client->name,
+                        'email' => $client->email,
+                        'phone' => $client->phone,
+                        'city' => $client->city,
+                        'neighborhood' => $client->neighborhood,
+                        'photo_url' => $client->photo_url,
+                        'photo' => $client->photo_url, // Alias para compatibilidade
+                        'group_name' => $client->group_name,
+                        'group_id' => $client->group_id,
+                        'rating' => $rating ? round($rating, 1) : 0,
+                        'reviews_count' => $reviewsCount,
+                    ];
+                })
+                ->values();
+
+            return response()->json([
+                'success' => true,
+                'data' => $clients
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Erro em getClients: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'user_id' => Auth::id(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao buscar clientes',
+                'errors' => []
+            ], 500);
+        }
+    }
+METHOD_EOF
+
+# 5. Inserir método no arquivo
+echo "📝 Adicionando método ao controller..."
+sudo sed -i "${INSERT_LINE}r /tmp/getClients_method.txt" "$CONTROLLER_FILE"
+rm /tmp/getClients_method.txt
+echo "✅ Método adicionado"
+echo ""
+
+# 6. Verificar se precisa adicionar use Log
+if ! grep -q "use Illuminate\\Support\\Facades\\Log;" "$CONTROLLER_FILE"; then
+    echo "📝 Adicionando use Log..."
+    sudo sed -i "/^use Illuminate\\Support\\Facades\\DB;/a use Illuminate\\Support\\Facades\\Log;" "$CONTROLLER_FILE"
+    echo "✅ Use Log adicionado"
+fi
+echo ""
+
+# 7. Verificar sintaxe PHP
+echo "🔍 Verificando sintaxe PHP..."
+if php -l "$CONTROLLER_FILE" > /dev/null 2>&1; then
+    echo "✅ Sintaxe PHP válida"
+else
+    echo "❌ Erro de sintaxe detectado:"
+    php -l "$CONTROLLER_FILE"
+    echo ""
+    echo "🔄 Restaurando backup..."
+    sudo cp "$BACKUP_FILE" "$CONTROLLER_FILE"
+    exit 1
+fi
+echo ""
+
+# 8. Limpar cache
+echo "🧹 Limpando cache..."
+php artisan route:clear > /dev/null 2>&1
+php artisan config:clear > /dev/null 2>&1
+php artisan cache:clear > /dev/null 2>&1
+echo "✅ Cache limpo"
+echo ""
+
+# 9. Verificar se método foi adicionado
+if grep -q "public function getClients" "$CONTROLLER_FILE"; then
+    echo "✅ Método getClients confirmado no controller"
+else
+    echo "❌ Erro: Método não foi adicionado corretamente"
+    exit 1
+fi
+echo ""
+
+echo "✅ Método getClients adicionado com sucesso!"
+echo ""
+echo "📋 Resumo:"
+echo "   - Backup: $BACKUP_FILE"
+echo "   - Método getClients adicionado"
+echo "   - Use DB verificado"
+echo "   - Use Log adicionado (se necessário)"
+echo "   - Sintaxe PHP validada"
+echo "   - Cache limpo"
+echo ""
+echo "🧪 Agora teste o endpoint no app React Native!"
+SCRIPT_EOF
+
+chmod +x /tmp/adicionar_metodo_getClients.sh
+sudo bash /tmp/adicionar_metodo_getClients.sh
+
+

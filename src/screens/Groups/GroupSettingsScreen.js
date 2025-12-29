@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import SafeIcon from '../../components/SafeIcon';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -870,7 +871,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Configurações</Text>
@@ -883,7 +884,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         {/* Informações Básicas do Grupo */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="information-circle" size={24} color={colors.primary} />
+            <SafeIcon name="information-circle" size={24} color={colors.primary} />
             <Text style={styles.sectionTitle}>Informações do Grupo</Text>
           </View>
 
@@ -922,7 +923,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                       onPress={pickGroupPhoto}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="camera" size={20} color={colors.primary} />
+                      <SafeIcon name="camera" size={20} color={colors.primary} />
                       <Text style={styles.photoActionText}>Trocar</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -930,7 +931,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                       onPress={removeGroupPhoto}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="trash-outline" size={20} color={colors.error} />
+                      <SafeIcon name="trash-outline" size={20} color={colors.error} />
                       <Text style={[styles.photoActionText, { color: colors.error }]}>Remover</Text>
                     </TouchableOpacity>
                   </View>
@@ -941,7 +942,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                   onPress={pickGroupPhoto}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="camera" size={48} color={colors.primary} />
+                  <SafeIcon name="camera" size={48} color={colors.primary} />
                   <Text style={styles.addPhotoText}>Adicionar Foto</Text>
                 </TouchableOpacity>
               )}
@@ -986,7 +987,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                 <ActivityIndicator color={colors.textWhite} />
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.textWhite} />
+                  <SafeIcon name="checkmark-circle" size={20} color={colors.textWhite} />
                   <Text style={styles.saveBasicInfoText}>Salvar Alterações</Text>
                 </>
               )}
@@ -998,7 +999,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         {groupData?.code && (
           <View style={styles.codeSection}>
             <View style={styles.codeHeader}>
-              <Ionicons name="key" size={24} color={colors.secondary} />
+              <SafeIcon name="key" size={24} color={colors.secondary} />
               <Text style={styles.codeHeaderTitle}>Código do Paciente</Text>
             </View>
             <Text style={styles.codeDescription}>
@@ -1016,7 +1017,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                   style={styles.codeActionButton}
                   onPress={copyCodeToClipboard}
                 >
-                  <Ionicons name="copy-outline" size={20} color={colors.primary} />
+                  <SafeIcon name="copy-outline" size={20} color={colors.primary} />
                   <Text style={styles.codeActionText}>Copiar</Text>
                 </TouchableOpacity>
                 
@@ -1024,14 +1025,14 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                   style={[styles.codeActionButton, styles.shareButton]}
                   onPress={shareCode}
                 >
-                  <Ionicons name="share-social-outline" size={20} color={colors.textWhite} />
+                  <SafeIcon name="share-social-outline" size={20} color={colors.textWhite} />
                   <Text style={[styles.codeActionText, styles.shareButtonText]}>Compartilhar</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.codeInfoCard}>
-              <Ionicons name="information-circle" size={20} color={colors.info} />
+              <SafeIcon name="information-circle" size={20} color={colors.info} />
               <Text style={styles.codeInfoText}>
                 O paciente deve abrir o app, selecionar "Sou Paciente" e digitar este código
               </Text>
@@ -1046,7 +1047,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           activeOpacity={0.7}
         >
           <View style={styles.panicIconContainer}>
-            <Ionicons name="warning" size={28} color={colors.white} />
+            <SafeIcon name="warning" size={28} color={colors.white} />
           </View>
           <View style={styles.panicInfo}>
             <Text style={styles.panicTitle}>Botão de Pânico</Text>
@@ -1054,7 +1055,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
               Configure emergências e contatos prioritários
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
+          <SafeIcon name="chevron-forward" size={24} color={colors.gray400} />
         </TouchableOpacity>
 
         {/* Botão de Gerenciar Contatos */}
@@ -1064,7 +1065,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             onPress={() => navigation.navigate('GroupContacts', { groupId })}
           >
             <View style={styles.contactsButtonIcon}>
-              <Ionicons name="call" size={24} color={colors.textWhite} />
+              <SafeIcon name="call" size={24} color={colors.textWhite} />
             </View>
             <View style={styles.contactsButtonContent}>
               <Text style={styles.contactsButtonTitle}>Gerenciar Contatos</Text>
@@ -1072,17 +1073,17 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                 Configure contatos rápidos e SOS para o paciente
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.textWhite} />
+            <SafeIcon name="chevron-forward" size={24} color={colors.textWhite} />
           </TouchableOpacity>
         </View>
 
         {/* Membros do Grupo */}
         {groupData && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="people" size={24} color={colors.secondary} />
-              <Text style={styles.sectionTitle}>Membros do Grupo</Text>
-            </View>
+          <View style={styles.sectionHeader}>
+            <SafeIcon name="people" size={24} color={colors.secondary} />
+            <Text style={styles.sectionTitle}>Membros do Grupo</Text>
+          </View>
             <Text style={styles.sectionDescription}>
               Pessoas que fazem parte deste grupo de cuidados
             </Text>
@@ -1115,7 +1116,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                         styles.memberAvatar,
                         memberIsPatient && styles.patientAvatar
                       ]}>
-                        <Ionicons 
+                        <SafeIcon 
                           name={memberIsPatient ? 'heart' : 'person'} 
                           size={32} 
                           color={memberIsPatient ? colors.secondary : colors.primary} 
@@ -1128,31 +1129,31 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                           </Text>
                           {memberIsAdmin && (
                             <View style={styles.adminBadge}>
-                              <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
+                              <SafeIcon name="shield-checkmark" size={14} color={colors.primary} />
                               <Text style={styles.adminBadgeText}>Administrador</Text>
                             </View>
                           )}
                           {memberIsPatient && (
                             <>
                               <View style={styles.patientBadge}>
-                                <Ionicons name="medkit" size={14} color={colors.secondary} />
+                                <SafeIcon name="medkit" size={14} color={colors.secondary} />
                                 <Text style={styles.patientBadgeText}>Paciente</Text>
                               </View>
                               <View style={styles.editIconContainer}>
-                                <Ionicons name="create-outline" size={18} color={colors.secondary} />
+                                <SafeIcon name="create-outline" size={18} color={colors.secondary} />
                               </View>
                             </>
                           )}
                           {memberIsCaregiver && !memberIsAdmin && member.user?.profile !== 'professional_caregiver' && (
                             <View style={styles.caregiverBadge}>
-                              <Ionicons name="heart" size={14} color={colors.info} />
+                              <SafeIcon name="heart" size={14} color={colors.info} />
                               <Text style={styles.caregiverBadgeText}>Cuidador</Text>
                             </View>
                           )}
                         </View>
                         {memberIsCaregiver && !memberIsAdmin && member.user?.profile === 'professional_caregiver' && (
                           <View style={styles.professionalCaregiverBadge}>
-                            <Ionicons name="medical" size={14} color={colors.success} />
+                            <SafeIcon name="medical" size={14} color={colors.success} />
                             <Text style={styles.professionalCaregiverBadgeText}>Cuidador profissional</Text>
                           </View>
                         )}
@@ -1164,7 +1165,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                         </Text>
                         {member.joined_at && (
                           <View style={styles.memberDetail}>
-                            <Ionicons name="calendar-outline" size={14} color={colors.textLight} />
+                            <SafeIcon name="calendar-outline" size={14} color={colors.textLight} />
                             <Text style={styles.memberDetailText}>
                               Entrou em: {new Date(member.joined_at).toLocaleDateString('pt-BR')}
                             </Text>
@@ -1172,7 +1173,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                         )}
                         {member.user?.email && (
                           <View style={styles.memberDetail}>
-                            <Ionicons name="mail-outline" size={14} color={colors.textLight} />
+                            <SafeIcon name="mail-outline" size={14} color={colors.textLight} />
                             <Text style={styles.memberDetailText}>
                               {member.user.email}
                             </Text>
@@ -1193,7 +1194,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                                 onPress={() => handleDemoteAdmin(member)}
                                 activeOpacity={0.7}
                               >
-                                <Ionicons name="arrow-down-circle-outline" size={18} color={colors.warning} />
+                                <SafeIcon name="arrow-down-circle-outline" size={18} color={colors.warning} />
                                 <Text style={[styles.actionButtonText, { color: colors.warning }]}>
                                   Rebaixar
                                 </Text>
@@ -1204,7 +1205,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                                 onPress={() => handlePromoteToAdmin(member)}
                                 activeOpacity={0.7}
                               >
-                                <Ionicons name="arrow-up-circle-outline" size={18} color={colors.success} />
+                                <SafeIcon name="arrow-up-circle-outline" size={18} color={colors.success} />
                                 <Text style={[styles.actionButtonText, { color: colors.success }]}>
                                   Promover
                                 </Text>
@@ -1215,7 +1216,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                                 onPress={() => handlePatientToCaregiver(member)}
                                 activeOpacity={0.7}
                               >
-                                <Ionicons name="people-outline" size={18} color={colors.info} />
+                                <SafeIcon name="people-outline" size={18} color={colors.info} />
                                 <Text style={[styles.actionButtonText, { color: colors.info }]}>
                                   Tornar Cuidador
                                 </Text>
@@ -1229,7 +1230,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                                 onPress={() => handleChangePatient(member)}
                                 activeOpacity={0.7}
                               >
-                                <Ionicons name="swap-horizontal-outline" size={18} color={colors.info} />
+                                <SafeIcon name="swap-horizontal-outline" size={18} color={colors.info} />
                                 <Text style={[styles.actionButtonText, { color: colors.info }]}>
                                   Tornar Paciente
                                 </Text>
@@ -1242,7 +1243,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                               onPress={() => handleRemoveMember(member)}
                               activeOpacity={0.7}
                             >
-                              <Ionicons name="trash-outline" size={18} color={colors.error} />
+                              <SafeIcon name="trash-outline" size={18} color={colors.error} />
                               <Text style={[styles.actionButtonText, { color: colors.error }]}>
                                 Remover
                               </Text>
@@ -1256,13 +1257,13 @@ const GroupSettingsScreen = ({ route, navigation }) => {
               </>
             ) : (
               <View style={styles.emptyMembersCard}>
-                <Ionicons name="people-outline" size={48} color={colors.gray300} />
+                <SafeIcon name="people-outline" size={48} color={colors.gray300} />
                 <Text style={styles.emptyMembersText}>Nenhum membro no grupo</Text>
               </View>
             )}
 
             <View style={styles.membersInfoCard}>
-              <Ionicons name="information-circle" size={20} color={colors.info} />
+              <SafeIcon name="information-circle" size={20} color={colors.info} />
               <Text style={styles.membersInfoText}>
                 Atualmente este grupo tem {members.length} membro{members.length !== 1 ? 's' : ''}.
               </Text>
@@ -1273,7 +1274,9 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         {/* Sinais Vitais */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <VitalSignsIcon size={24} color={colors.primary} />
+            <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+              <VitalSignsIcon size={24} color={colors.primary} />
+            </View>
             <Text style={styles.sectionTitle}>Sinais Vitais</Text>
           </View>
           <Text style={styles.sectionDescription}>
@@ -1285,7 +1288,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             <View key={item.key} style={styles.settingCard}>
               <View style={styles.settingLeft}>
                 <View style={[styles.settingIcon, { backgroundColor: item.color + '20' }]}>
-                  <Ionicons name={item.icon} size={24} color={item.color} />
+                  <SafeIcon name={item.icon} size={24} color={item.color} />
                 </View>
                 <View style={styles.settingContent}>
                   <Text style={styles.settingLabel}>{item.label}</Text>
@@ -1304,7 +1307,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
 
         {/* Info Card */}
         <View style={styles.infoCard}>
-          <Ionicons name="information-circle" size={24} color={colors.info} />
+          <SafeIcon name="information-circle" size={24} color={colors.info} />
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>Limites Automáticos</Text>
             <Text style={styles.infoText}>
@@ -1317,7 +1320,9 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         {/* Permissões do Acompanhado */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <PermissionsIcon size={24} color={colors.secondary} />
+            <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+              <PermissionsIcon size={24} color={colors.secondary} />
+            </View>
             <Text style={styles.sectionTitle}>Telas do Acompanhado</Text>
           </View>
           <Text style={styles.sectionDescription}>
@@ -1331,7 +1336,9 @@ const GroupSettingsScreen = ({ route, navigation }) => {
               <View key={item.key} style={styles.settingCard}>
                 <View style={styles.settingLeft}>
                   <View style={[styles.settingIcon, { backgroundColor: colors.secondary + '20' }]}>
-                    <IconComponent size={24} color={colors.secondary} />
+                    <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+                      <IconComponent size={24} color={colors.secondary} />
+                    </View>
                   </View>
                   <View style={styles.settingContent}>
                     <Text style={styles.settingLabel}>{item.label}</Text>
@@ -1360,7 +1367,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
               <Text style={styles.saveButtonText}>Salvando...</Text>
             ) : (
               <>
-                <Ionicons name="checkmark-circle" size={20} color={colors.textWhite} />
+                <SafeIcon name="checkmark-circle" size={20} color={colors.textWhite} />
                 <Text style={styles.saveButtonText}>Salvar Configurações</Text>
               </>
             )}
@@ -1818,8 +1825,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginVertical: 12,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: colors.error + '30',
+    borderWidth: 0,
+    borderColor: 'transparent',
     shadowColor: colors.error,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,

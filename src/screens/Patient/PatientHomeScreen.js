@@ -14,7 +14,16 @@ import {
   ImageBackground,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  WhatsAppIcon,
+  CallIcon,
+  TimeOutlineIcon,
+  ChevronForwardIcon,
+  MicIcon,
+  VideoCamIcon,
+  CalendarIcon,
+  MedicalIcon,
+} from '../../components/CustomIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -266,8 +275,8 @@ const PatientHomeScreen = ({ navigation }) => {
             description: appointment.description || appointment.type || '',
             time: `${hours}:${minutes}`,
             date: dateLabel,
-            icon: 'calendar',
-            color: colors.warning,
+            icon: appointment.is_teleconsultation ? 'videocam' : 'calendar',
+            color: appointment.is_teleconsultation ? colors.primary : colors.warning,
             appointmentTime: appointmentDate.toISOString(),
             data: appointment,
           });
@@ -686,10 +695,45 @@ const PatientHomeScreen = ({ navigation }) => {
 
   const handleNotificationPress = async (notification) => {
     if (notification.type === 'appointment') {
-      // Navegar para tela de detalhes da consulta
-      navigation.navigate('AppointmentDetails', {
-        appointment: notification,
-      });
+      const appointment = notification.data;
+      
+      // Verificar se é teleconsulta
+      if (appointment?.is_teleconsultation) {
+        const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at || notification.appointmentTime);
+        const now = new Date();
+        const minutesUntilAppointment = (appointmentDate - now) / (1000 * 60);
+        
+        // Permitir entrada 15 minutos antes da consulta
+        if (minutesUntilAppointment <= 15 && minutesUntilAppointment >= -60) {
+          // Dentro do período permitido (15 min antes até 1 hora depois)
+          navigation.navigate('PatientVideoCall', {
+            appointment: appointment,
+            doctorInfo: appointment.doctorUser || appointment.doctor || {
+              name: appointment.doctor_name || 'Médico',
+            },
+          });
+        } else if (minutesUntilAppointment > 15) {
+          // Ainda não é hora (mais de 15 minutos antes)
+          const minutes = Math.ceil(minutesUntilAppointment - 15);
+          Alert.alert(
+            'Aguarde',
+            `Você poderá entrar na videochamada em ${minutes} minuto(s).\n\nA entrada é permitida 15 minutos antes do horário da consulta.`,
+            [{ text: 'OK' }]
+          );
+        } else {
+          // Consulta já passou (mais de 1 hora depois)
+          Alert.alert(
+            'Consulta Encerrada',
+            'O horário para entrar nesta consulta já passou.',
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        // Não é teleconsulta, navegar para detalhes normalmente
+        navigation.navigate('AppointmentDetails', {
+          appointment: notification,
+        });
+      }
     } else if (notification.type === 'medication') {
       Alert.alert(
         notification.title,
@@ -721,7 +765,7 @@ const PatientHomeScreen = ({ navigation }) => {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <StatusBar style="dark" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -732,11 +776,11 @@ const PatientHomeScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <StatusBar style="dark" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
         <View style={styles.headerLeft}>
           <LacosIcon size={36} />
           <View>
@@ -787,11 +831,11 @@ const PatientHomeScreen = ({ navigation }) => {
                       imageStyle={styles.cardImage}
                     >
                       <View style={styles.cardOverlay}>
-                        <Ionicons 
-                          name={Platform.OS === 'android' ? 'logo-whatsapp' : 'call'} 
-                          size={36} 
-                          color={colors.textWhite} 
-                        />
+                        {Platform.OS === 'android' ? (
+                          <WhatsAppIcon size={36} color={colors.textWhite} />
+                        ) : (
+                          <CallIcon size={36} color={colors.textWhite} />
+                        )}
                         <Text style={styles.cardTitle}>{contact.name}</Text>
                         <View style={styles.cardBadge}>
                           <Text style={styles.cardBadgeText}>
@@ -802,11 +846,11 @@ const PatientHomeScreen = ({ navigation }) => {
                     </ImageBackground>
                   ) : (
                     <>
-                      <Ionicons 
-                        name={Platform.OS === 'android' ? 'logo-whatsapp' : 'call'} 
-                        size={36} 
-                        color={colors.textWhite} 
-                      />
+                      {Platform.OS === 'android' ? (
+                        <WhatsAppIcon size={36} color={colors.textWhite} />
+                      ) : (
+                        <CallIcon size={36} color={colors.textWhite} />
+                      )}
                       <Text style={styles.cardTitle}>{contact.name}</Text>
                       <View style={styles.cardBadge}>
                         <Text style={styles.cardBadgeText}>
@@ -869,13 +913,21 @@ const PatientHomeScreen = ({ navigation }) => {
                 activeOpacity={0.7}
               >
                 <View style={[styles.notificationIcon, { backgroundColor: notification.color + '20' }]}>
-                  <Ionicons name={notification.icon} size={28} color={notification.color} />
+                  {notification.icon === 'videocam' ? (
+                    <VideoCamIcon size={28} color={notification.color} />
+                  ) : notification.icon === 'calendar' ? (
+                    <CalendarIcon size={28} color={notification.color} />
+                  ) : notification.icon === 'medical' ? (
+                    <MedicalIcon size={28} color={notification.color} />
+                  ) : (
+                    <CalendarIcon size={28} color={notification.color} />
+                  )}
                 </View>
                 <View style={styles.notificationContent}>
                   <Text style={styles.notificationTitle}>{notification.title}</Text>
                   <Text style={styles.notificationDescription}>{notification.description}</Text>
                   <View style={styles.notificationTime}>
-                    <Ionicons name="time-outline" size={14} color={colors.textLight} />
+                    <TimeOutlineIcon size={14} color={colors.textLight} />
                     <Text style={styles.notificationTimeText}>
                       {notification.date} - {notification.time}
                     </Text>
@@ -884,10 +936,10 @@ const PatientHomeScreen = ({ navigation }) => {
                 
                 {showMicrophone ? (
                   <View style={styles.microphoneIndicator}>
-                    <Ionicons name="mic" size={24} color={colors.error} />
+                    <MicIcon size={24} color={colors.error} />
                   </View>
                 ) : (
-                  <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+                  <ChevronForwardIcon size={20} color={colors.gray400} />
                 )}
               </TouchableOpacity>
             );

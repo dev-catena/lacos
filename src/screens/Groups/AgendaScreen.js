@@ -50,6 +50,18 @@ const AgendaScreen = ({ route, navigation }) => {
       
       // Se não tem recorrência, adicionar como está
       if (!recurrenceType || recurrenceType === 'none' || !recurrenceEnd) {
+        // Log para debug - verificar se doctorUser está presente antes de adicionar
+        if (appointment.is_teleconsultation || appointment.type === 'medical') {
+          console.log('📋 AgendaScreen - expandRecurringAppointments - Appointment sem recorrência:', {
+            id: appointment.id,
+            title: appointment.title,
+            doctor_id: appointment.doctor_id,
+            has_doctorUser: !!appointment.doctorUser,
+            doctorUser_name: appointment.doctorUser?.name,
+            has_doctor: !!appointment.doctor,
+            doctor_name: appointment.doctor?.name,
+          });
+        }
         expanded.push(appointment);
         return;
       }
@@ -92,6 +104,7 @@ const AgendaScreen = ({ route, navigation }) => {
           // Se não for uma exceção, incluir
           if (!isException) {
             // Criar uma cópia do compromisso para esta data
+            // IMPORTANTE: Preservar todos os relacionamentos, incluindo doctorUser
             const expandedAppointment = {
               ...appointment,
               id: `${appointment.id}_${dateStr}`,
@@ -100,6 +113,11 @@ const AgendaScreen = ({ route, navigation }) => {
               isRecurringInstance: true,
               originalAppointmentId: appointment.id,
               instanceDate: dateStr, // Guardar a data da instância para exclusão
+              // Preservar relacionamentos do médico
+              doctorUser: appointment.doctorUser,
+              doctor: appointment.doctor,
+              doctor_id: appointment.doctor_id,
+              doctor_name: appointment.doctor_name,
             };
             expanded.push(expandedAppointment);
           }
@@ -121,6 +139,23 @@ const AgendaScreen = ({ route, navigation }) => {
       
       if (result.success) {
         const rawAppointments = result.data || [];
+        
+        // Log para debug - verificar se doctorUser está presente
+        rawAppointments.forEach(apt => {
+          if (apt.is_teleconsultation || apt.type === 'medical') {
+            console.log('📋 AgendaScreen - Appointment com médico:', {
+              id: apt.id,
+              title: apt.title,
+              doctor_id: apt.doctor_id,
+              has_doctorUser: !!apt.doctorUser,
+              doctorUser_name: apt.doctorUser?.name,
+              has_doctor: !!apt.doctor,
+              doctor_name: apt.doctor?.name,
+              doctor_name_field: apt.doctor_name,
+            });
+          }
+        });
+        
         // Expandir compromissos recorrentes
         const expandedAppointments = expandRecurringAppointments(rawAppointments);
         setAppointments(expandedAppointments);
@@ -183,6 +218,22 @@ const AgendaScreen = ({ route, navigation }) => {
     const { day, month, weekDay } = formatDate(dateStr);
     const time = formatTime(dateStr);
     const isMedical = item.type === 'medical';
+    
+    // Log detalhado para teleconsultas
+    if (item.is_teleconsultation) {
+      console.log('📋 AgendaScreen - renderAppointmentCard - Teleconsulta:', {
+        id: item.id,
+        title: item.title,
+        doctor_id: item.doctor_id,
+        has_doctorUser: !!item.doctorUser,
+        doctorUser: item.doctorUser,
+        doctorUser_name: item.doctorUser?.name,
+        has_doctor: !!item.doctor,
+        doctor: item.doctor,
+        doctor_name: item.doctor_name,
+        all_keys: Object.keys(item),
+      });
+    }
 
     return (
       <TouchableOpacity 
@@ -204,15 +255,28 @@ const AgendaScreen = ({ route, navigation }) => {
 
         {/* Informações */}
         <View style={styles.appointmentInfo}>
-          <View style={styles.appointmentHeader}>
-            <View style={styles.titleContainer}>
-              {isMedical ? (
-                <MedicalIcon size={18} color={colors.secondary} />
-              ) : (
-                <CalendarIcon size={18} color={colors.primary} />
-              )}
-              <Text style={styles.appointmentTitle}>{item.title}</Text>
-            </View>
+          {/* Título em linha própria */}
+          <View style={styles.titleContainer}>
+            {isMedical ? (
+              <MedicalIcon size={14} color={colors.secondary} />
+            ) : (
+              <CalendarIcon size={14} color={colors.primary} />
+            )}
+            <Text style={styles.appointmentTitle} numberOfLines={2}>{item.title}</Text>
+          </View>
+
+          {/* Badges */}
+          <View style={styles.badgesContainer}>
+            {item.is_teleconsultation && (
+              <View style={styles.teleconsultationBadge}>
+                <Ionicons 
+                  name="videocam" 
+                  size={12} 
+                  color={colors.primary} 
+                />
+                <Text style={styles.teleconsultationBadgeText}>Teleconsulta</Text>
+              </View>
+            )}
             {isMedical && (
               <View style={styles.medicalBadge}>
                 <Text style={styles.medicalBadgeText}>Médico</Text>
@@ -220,21 +284,75 @@ const AgendaScreen = ({ route, navigation }) => {
             )}
           </View>
 
-          {item.doctor && (
+          {/* Banner de Pagamento para Teleconsultas */}
+          {item.is_teleconsultation && (
+            <TouchableOpacity
+              style={styles.paymentBanner}
+              onPress={(e) => {
+                e.stopPropagation();
+                navigation.navigate('PaymentScreen', {
+                  appointmentId: item.id,
+                  appointment: item,
+                  groupId,
+                });
+              }}
+            >
+              <Ionicons name="card-outline" size={16} color={colors.warning} />
+              <Text style={styles.paymentBannerText}>Aguarda pagamento. Clique aqui para pagar</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.warning} />
+            </TouchableOpacity>
+          )}
+
+          {/* Exibir médico para consultas médicas ou teleconsultas */}
+          {(isMedical || item.is_teleconsultation) && (
             <View style={styles.infoRow}>
-              <PersonIcon size={14} color={colors.textLight} />
-              <Text style={styles.infoText}>{item.doctor.name || item.doctor}</Text>
+              <PersonIcon size={12} color={colors.textLight} />
+              <Text style={styles.infoText}>
+                {(() => {
+                  // Tentar obter o nome do médico de diferentes formas
+                  const doctorName = 
+                    item.doctorUser?.name || 
+                    item.doctor?.name || 
+                    item.doctor_name || 
+                    (typeof item.doctor === 'string' ? item.doctor : null);
+                  
+                  if (doctorName) {
+                    return `Dr(a). ${doctorName}`;
+                  }
+                  
+                  // Se tem doctor_id mas não tem nome, logar para debug
+                  if (item.doctor_id || item.is_teleconsultation) {
+                    console.log('⚠️ AgendaScreen - Card: Appointment tem doctor_id mas sem nome:', {
+                      appointmentId: item.id,
+                      title: item.title,
+                      doctor_id: item.doctor_id,
+                      has_doctorUser: !!item.doctorUser,
+                      doctorUser_type: typeof item.doctorUser,
+                      doctorUser_name: item.doctorUser?.name,
+                      has_doctor: !!item.doctor,
+                      doctor_type: typeof item.doctor,
+                      doctor_name: item.doctor?.name,
+                      doctor_name_field: item.doctor_name,
+                      is_teleconsultation: item.is_teleconsultation,
+                      isRecurringInstance: item.isRecurringInstance,
+                      full_item_keys: Object.keys(item),
+                    });
+                  }
+                  
+                  return 'Dr(a). Médico não informado';
+                })()}
+              </Text>
             </View>
           )}
 
           <View style={styles.infoRow}>
-            <TimeIcon size={14} color={colors.textLight} />
+            <TimeIcon size={12} color={colors.textLight} />
             <Text style={styles.infoText}>{time}</Text>
           </View>
 
           {item.location && (
             <View style={styles.infoRow}>
-              <MapPinIcon size={14} color={colors.textLight} />
+              <MapPinIcon size={12} color={colors.textLight} />
               <Text style={styles.infoText}>{item.location}</Text>
             </View>
           )}
@@ -242,11 +360,30 @@ const AgendaScreen = ({ route, navigation }) => {
 
         {/* Ações */}
         <View style={styles.appointmentActions}>
-          <TouchableOpacity style={styles.actionIconButton}>
-            <NavigateIcon size={20} color={colors.info} />
+          <TouchableOpacity 
+            style={styles.actionIconButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              // TODO: Implementar navegação para localização
+              console.log('Navegar para localização:', item.location);
+            }}
+          >
+            <NavigateIcon size={16} color={colors.info} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionIconButton}>
-            <EditIcon size={20} color={colors.primary} />
+          <TouchableOpacity 
+            style={styles.actionIconButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              // Navegar para tela de edição
+              navigation.navigate('AddAppointment', {
+                groupId,
+                groupName,
+                appointmentId: item.isRecurringInstance ? item.originalAppointmentId : item.id,
+                appointment: item,
+              });
+            }}
+          >
+            <EditIcon size={16} color={colors.primary} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -401,15 +538,15 @@ const styles = StyleSheet.create({
     color: colors.textWhite,
   },
   listContainer: {
-    padding: 20,
+    padding: 16,
     paddingBottom: 100,
   },
   appointmentCard: {
     flexDirection: 'row',
     backgroundColor: colors.backgroundLight,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: colors.border,
     shadowColor: '#000',
@@ -419,82 +556,105 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   dateContainer: {
-    width: 60,
+    width: 50,
     alignItems: 'center',
     justifyContent: 'center',
     borderRightWidth: 1,
     borderRightColor: colors.border,
-    paddingRight: 16,
-    marginRight: 16,
+    paddingRight: 12,
+    marginRight: 12,
   },
   dateDay: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
-    lineHeight: 32,
+    lineHeight: 24,
   },
   dateMonth: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '600',
     color: colors.primary,
     textTransform: 'uppercase',
   },
   dateWeekday: {
-    fontSize: 12,
+    fontSize: 10,
     color: colors.textLight,
     textTransform: 'capitalize',
   },
   appointmentInfo: {
     flex: 1,
   },
-  appointmentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
   titleContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: 6,
   },
   appointmentTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.text,
     flex: 1,
+    flexWrap: 'wrap',
+  },
+  badgesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+  teleconsultationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    gap: 4,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  teleconsultationBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.textWhite,
+    textTransform: 'uppercase',
   },
   medicalBadge: {
     backgroundColor: colors.secondary + '20',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   medicalBadgeText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '600',
     color: colors.secondary,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    gap: 5,
+    marginBottom: 3,
   },
   infoText: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textLight,
   },
   appointmentActions: {
     flexDirection: 'column',
-    gap: 8,
-    marginLeft: 12,
+    gap: 6,
+    marginLeft: 8,
+    justifyContent: 'center',
   },
   actionIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
@@ -546,6 +706,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 6,
+  },
+  paymentBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.warning + '15',
+    borderWidth: 1,
+    borderColor: colors.warning + '40',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    gap: 8,
+  },
+  paymentBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.warning,
+    textAlign: 'center',
   },
 });
 

@@ -12,15 +12,39 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ArrowBackIcon,
+  LocationIcon,
+  CallIcon,
+  MailIcon,
+  PeopleIcon,
+  PersonIcon,
+  AddIcon,
+  FolderIcon,
+  CloseIcon,
+  AlertIcon,
+  StarIcon,
+  ReceiptIcon,
+  CalendarIcon,
+  DocumentIcon,
+  MaleIcon,
+  FemaleIcon,
+  ChevronForwardIcon,
+} from '../../components/CustomIcons';
 import colors from '../../constants/colors';
 import Toast from 'react-native-toast-message';
 import apiService from '../../services/apiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
+import documentService from '../../services/documentService';
+import planService from '../../services/planService';
+import API_CONFIG from '../../config/api';
+import appointmentService from '../../services/appointmentService';
 
 const ClientDetailsScreen = ({ route, navigation }) => {
   const { client: clientParam } = route.params || {};
@@ -33,6 +57,16 @@ const ClientDetailsScreen = ({ route, navigation }) => {
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviews, setReviews] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [userPlan, setUserPlan] = useState(null);
+  const [photoError, setPhotoError] = useState(false); // Estado para controlar erro na foto
+
+  // Resetar erro de foto quando o cliente mudar
+  useEffect(() => {
+    setPhotoError(false);
+    console.log('🔄 ClientDetailsScreen - Cliente mudou, resetando photoError');
+  }, [client?.id, client?.photo_url, client?.photo]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -50,8 +84,34 @@ const ClientDetailsScreen = ({ route, navigation }) => {
       const response = await apiService.get(`/caregivers/clients/${clientParam.id}`);
       
       if (response && response.success && response.data) {
+        console.log('📥 ClientDetailsScreen - Dados do cliente recebidos:', {
+          id: response.data.id,
+          name: response.data.name,
+          photo_url: response.data.photo_url,
+          photo: response.data.photo,
+          gender: response.data.gender,
+          group_id: response.data.group_id
+        });
         setClient(response.data);
+        setPhotoError(false); // Resetar erro ao carregar novo cliente
         setReviews(response.data.reviews || []);
+        
+        let groupId = response.data.group_id;
+        
+        // Se for médico, buscar documentos diretamente do paciente (independente do grupo)
+        if (user?.profile === 'doctor') {
+          console.log('🔍 ClientDetailsScreen - Médico acessando paciente, buscando documentos diretamente...');
+          // Buscar documentos do paciente usando patient_id
+          loadDocumentsForDoctor(clientParam.id);
+        } else {
+          // Para outros perfis, usar lógica normal (por grupo)
+          if (groupId) {
+            loadDocuments(groupId);
+          }
+        }
+        
+        // Carregar plano do usuário para verificar se arquivos está habilitado
+        loadUserPlan();
       }
     } catch (error) {
       console.error('Erro ao carregar detalhes do cliente:', error);
@@ -63,11 +123,200 @@ const ClientDetailsScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleContact = () => {
-    navigation.navigate('ClientChat', {
-      clientId: client.id,
-      clientName: client.name,
+  const findGroupIdFromAppointments = async (patientId) => {
+    try {
+      console.log('🔍 ClientDetailsScreen - Buscando group_id para paciente:', patientId);
+      
+      // Buscar consultas do médico atual com este paciente
+      const result = await appointmentService.getAppointments();
+      
+      if (result.success && result.data) {
+        console.log('📋 ClientDetailsScreen - Total de consultas encontradas:', result.data.length);
+        
+        // Filtrar consultas do médico atual
+        const currentDoctorId = Number(user?.id);
+        const doctorAppointments = result.data.filter((appointment) => {
+          const appointmentDoctorId = appointment.doctor_id ? Number(appointment.doctor_id) : null;
+          const doctorUserId = appointment.doctorUser?.id ? Number(appointment.doctorUser.id) : null;
+          const doctorId = appointment.doctor?.id ? Number(appointment.doctor.id) : null;
+          
+          return appointmentDoctorId === currentDoctorId ||
+                 doctorUserId === currentDoctorId ||
+                 doctorId === currentDoctorId;
+        });
+
+        console.log('👨‍⚕️ ClientDetailsScreen - Consultas do médico:', doctorAppointments.length);
+
+        // Buscar consulta que tenha group_id e onde o paciente seja membro
+        for (const appointment of doctorAppointments) {
+          if (appointment.group_id) {
+            console.log('🔍 ClientDetailsScreen - Verificando grupo:', appointment.group_id);
+            
+            // Verificar se o paciente é membro deste grupo
+            try {
+              const groupMembersResult = await apiService.get(`/groups/${appointment.group_id}/members`);
+              if (groupMembersResult && groupMembersResult.success && groupMembersResult.data) {
+                console.log('👥 ClientDetailsScreen - Membros do grupo:', groupMembersResult.data.length);
+                
+                const patientMember = groupMembersResult.data.find(
+                  member => {
+                    const memberUserId = member.user_id || member.user?.id;
+                    const isPatient = member.role === 'patient' || member.role === 'Patient';
+                    const matchesId = Number(memberUserId) === Number(patientId);
+                    
+                    console.log('🔍 Verificando membro:', {
+                      memberUserId,
+                      patientId: Number(patientId),
+                      role: member.role,
+                      isPatient,
+                      matchesId
+                    });
+                    
+                    return isPatient && matchesId;
+                  }
+                );
+                
+                if (patientMember) {
+                  console.log('✅ ClientDetailsScreen - group_id encontrado através das consultas:', appointment.group_id);
+                  return appointment.group_id;
+                } else {
+                  console.log('⚠️ ClientDetailsScreen - Paciente não encontrado como membro do grupo:', appointment.group_id);
+                }
+              }
+            } catch (err) {
+              console.log('⚠️ ClientDetailsScreen - Erro ao verificar membros do grupo:', err);
+            }
+          } else {
+            console.log('⚠️ ClientDetailsScreen - Consulta sem group_id:', appointment.id);
+          }
+        }
+      } else {
+        console.log('⚠️ ClientDetailsScreen - Nenhuma consulta encontrada');
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ ClientDetailsScreen - Erro ao buscar group_id através das consultas:', error);
+      return null;
+    }
+  };
+
+  const loadDocuments = async (groupId) => {
+    try {
+      setLoadingDocuments(true);
+      console.log('📂 ClientDetailsScreen - Carregando documentos do grupo:', groupId);
+      
+      if (!groupId) {
+        console.log('⚠️ ClientDetailsScreen - groupId não disponível para buscar documentos');
+        setDocuments([]);
+        return;
+      }
+
+      const docs = await documentService.getDocumentsByGroup(groupId);
+      
+      // Ordenar por data (mais recentes primeiro) e manter todos para contagem correta
+      const sortedDocs = docs.sort((a, b) => new Date(b.document_date || b.date) - new Date(a.document_date || a.date));
+      
+      setDocuments(sortedDocs);
+      console.log('✅ ClientDetailsScreen - Documentos carregados:', sortedDocs.length);
+    } catch (error) {
+      console.error('❌ ClientDetailsScreen - Erro ao carregar documentos:', error);
+      setDocuments([]);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const loadDocumentsForDoctor = async (patientId) => {
+    try {
+      setLoadingDocuments(true);
+      console.log('📂 ClientDetailsScreen - Carregando documentos do paciente para médico:', patientId);
+      
+      // Buscar documentos diretamente do paciente usando patient_id
+      const docs = await documentService.getDocumentsByPatient(patientId);
+      console.log('✅ ClientDetailsScreen - Documentos do paciente carregados:', docs.length);
+      
+      // Ordenar por data (mais recentes primeiro) e manter todos para contagem correta
+      const sortedDocs = docs.sort((a, b) => new Date(b.document_date || b.date) - new Date(a.document_date || a.date));
+      
+      setDocuments(sortedDocs);
+      console.log('✅ ClientDetailsScreen - Documentos do paciente exibidos:', sortedDocs.length);
+    } catch (error) {
+      console.error('❌ ClientDetailsScreen - Erro ao carregar documentos do paciente:', error);
+      setDocuments([]);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const loadUserPlan = async () => {
+    try {
+      const plan = await planService.getUserPlan();
+      setUserPlan(plan);
+    } catch (error) {
+      console.error('❌ ClientDetailsScreen - Erro ao carregar plano:', error);
+    }
+  };
+
+  const getDocumentIcon = (type) => {
+    const iconMap = {
+      exam_lab: 'flask',
+      exam_image: 'image',
+      prescription: 'document-text',
+      medical_leave: 'calendar',
+      medical_certificate: 'calendar',
+      report: 'document',
+      other: 'document-attach',
+    };
+    return iconMap[type] || 'document';
+  };
+
+  const getDocumentIconComponent = (type) => {
+    // Usar Ionicons diretamente para garantir que os ícones apareçam
+    const iconMap = {
+      prescription: 'receipt-outline',
+      medical_leave: 'calendar-outline',
+      medical_certificate: 'calendar-outline',
+      report: 'document-text-outline',
+      exam_lab: 'flask-outline',
+      exam_image: 'image-outline',
+      other: 'document-outline',
+    };
+    return iconMap[type] || 'document-outline';
+  };
+
+  const getDocumentColor = (type) => {
+    const colorMap = {
+      exam_lab: colors.info,
+      exam_image: colors.success,
+      prescription: '#FFB6C1', // Rosa pastel para receitas
+      medical_leave: '#B0E0E6', // Azul pastel para afastamentos
+      medical_certificate: '#B0E0E6', // Azul pastel para afastamentos
+      report: colors.warning,
+      other: colors.gray600,
+    };
+    return colorMap[type] || colors.gray600;
+  };
+
+  const formatDocumentDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
     });
+  };
+
+  const isFilesFeatureEnabled = () => {
+    // Se não tem plano ainda, mostrar (enquanto carrega)
+    if (!userPlan) {
+      console.log('📋 ClientDetailsScreen - userPlan não carregado ainda, mostrando card');
+      return true;
+    }
+    const enabled = planService.isFeatureEnabled(userPlan, 'arquivos');
+    console.log('📋 ClientDetailsScreen - Feature arquivos habilitada?', enabled, 'userPlan:', userPlan);
+    return enabled;
   };
 
   const handleAddReview = () => {
@@ -136,20 +385,20 @@ const ClientDetailsScreen = ({ route, navigation }) => {
 
     for (let i = 0; i < fullStars; i++) {
       stars.push(
-        <Ionicons key={i} name="star" size={20} color={colors.warning} />
+        <StarIcon key={i} size={20} color={colors.warning} filled={true} />
       );
     }
 
     if (hasHalfStar) {
       stars.push(
-        <Ionicons key="half" name="star-half" size={20} color={colors.warning} />
+        <StarIcon key="half" size={20} color={colors.warning} filled={true} />
       );
     }
 
     const emptyStars = 5 - Math.ceil(rating);
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
-        <Ionicons key={`empty-${i}`} name="star-outline" size={20} color={colors.gray400} />
+        <StarIcon key={`empty-${i}`} size={20} color={colors.gray400} filled={false} />
       );
     }
 
@@ -165,10 +414,10 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           onPress={() => setReviewRating(i)}
           activeOpacity={0.7}
         >
-          <Ionicons
-            name={i <= reviewRating ? 'star' : 'star-outline'}
+          <StarIcon
             size={40}
             color={i <= reviewRating ? colors.warning : colors.gray400}
+            filled={i <= reviewRating}
           />
         </TouchableOpacity>
       );
@@ -181,12 +430,14 @@ const ClientDetailsScreen = ({ route, navigation }) => {
       <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
         <StatusBar style="dark" />
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
+          <AlertIcon size={64} color={colors.error} />
           <Text style={styles.errorText}>Cliente não encontrado</Text>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
           >
+            <Ionicons name="arrow-back" size={20} color={colors.primary} />
             <Text style={styles.backButtonText}>Voltar</Text>
           </TouchableOpacity>
         </View>
@@ -206,7 +457,9 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Detalhes do Cliente</Text>
+          <Text style={styles.headerTitle}>
+          {user?.profile === 'doctor' ? 'Detalhes do Paciente' : 'Detalhes do Cliente'}
+        </Text>
           <View style={styles.headerRight} />
         </View>
         <View style={styles.loadingContainer}>
@@ -235,9 +488,13 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+            <ArrowBackIcon size={24} color={colors.text || '#1e293b'} />
+          </View>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Detalhes do Cliente</Text>
+        <Text style={styles.headerTitle}>
+          {user?.profile === 'doctor' ? 'Detalhes do Paciente' : 'Detalhes do Cliente'}
+        </Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -250,11 +507,54 @@ const ClientDetailsScreen = ({ route, navigation }) => {
         <View style={styles.mainCard}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Ionicons
-                name="person"
-                size={48}
-                color={colors.primary}
-              />
+              {(() => {
+                const photoUrl = client.photo_url || client.photo;
+                
+                // Se não há foto ou houve erro, mostrar ícone baseado no gênero
+                if (!photoUrl || photoError) {
+                  const gender = client.gender || client.user?.gender;
+                  if (gender === 'male' || gender === 'Masculino') {
+                    return <MaleIcon size={48} color={colors.primary} />;
+                  } else if (gender === 'female' || gender === 'Feminino') {
+                    return <FemaleIcon size={48} color={colors.primary} />;
+                  }
+                  return <PersonIcon size={48} color={colors.primary} />;
+                }
+                
+                // Construir URL da foto
+                let imageUri = photoUrl;
+                if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+                  const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+                  imageUri = photoUrl.startsWith('/') 
+                    ? `${baseUrl}${photoUrl}` 
+                    : `${baseUrl}/${photoUrl}`;
+                }
+                
+                console.log('📸 ClientDetailsScreen - Tentando carregar foto:', imageUri);
+                console.log('📸 ClientDetailsScreen - photo_url:', client.photo_url);
+                console.log('📸 ClientDetailsScreen - photo:', client.photo);
+                
+                return (
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.avatarImage}
+                    onError={(error) => {
+                      console.log('❌ ClientDetailsScreen - Erro ao carregar foto:', error);
+                      console.log('❌ ClientDetailsScreen - URI tentada:', imageUri);
+                      setPhotoError(true);
+                    }}
+                    onLoadStart={() => {
+                      setPhotoError(false);
+                      console.log('📸 ClientDetailsScreen - Iniciando carregamento da foto');
+                    }}
+                    onLoad={() => {
+                      console.log('✅ ClientDetailsScreen - Foto carregada com sucesso');
+                      setPhotoError(false);
+                    }}
+                    resizeMode="cover"
+                  />
+                );
+              })()}
             </View>
           </View>
           
@@ -262,7 +562,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           
           {client.city && (
             <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={16} color={colors.textLight} />
+              <LocationIcon size={16} color={colors.textLight} />
               <Text style={styles.locationText}>
                 {client.neighborhood || ''}, {client.city}
               </Text>
@@ -286,7 +586,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           <View style={styles.infoCard}>
             {client.phone && (
               <View style={styles.infoRow}>
-                <Ionicons name="call-outline" size={20} color={colors.primary} />
+                <CallIcon size={20} color={colors.primary} />
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Telefone</Text>
                   <Text style={styles.infoValue}>{client.phone}</Text>
@@ -295,7 +595,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
             )}
             {client.email && (
               <View style={styles.infoRow}>
-                <Ionicons name="mail-outline" size={20} color={colors.primary} />
+                <MailIcon size={20} color={colors.primary} />
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>E-mail</Text>
                   <Text style={styles.infoValue}>{client.email}</Text>
@@ -304,7 +604,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
             )}
             {client.group_name && (
               <View style={styles.infoRow}>
-                <Ionicons name="people-outline" size={20} color={colors.primary} />
+                <PeopleIcon size={20} color={colors.primary} />
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Grupo</Text>
                   <Text style={styles.infoValue}>{client.group_name}</Text>
@@ -313,6 +613,116 @@ const ClientDetailsScreen = ({ route, navigation }) => {
             )}
           </View>
         </View>
+
+        {/* Card de Arquivos - ANTES das avaliações */}
+        {/* Para médicos: sempre mostrar. Para outros: verificar plano e group_id */}
+        {(() => {
+          const isDoctor = user?.profile === 'doctor';
+          const shouldShow = isDoctor || (isFilesFeatureEnabled() && !!client?.group_id);
+          
+          console.log('📋 ClientDetailsScreen - Card Arquivos:', {
+            isDoctor,
+            userProfile: user?.profile,
+            shouldShow,
+            hasGroupId: !!client?.group_id,
+            groupId: client?.group_id
+          });
+          
+          return shouldShow;
+        })() && (
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.filesCard}
+              onPress={async () => {
+                // Para médicos, navegar para documentos do paciente usando patient_id
+                if (user?.profile === 'doctor' && client.id) {
+                  navigation.navigate('Documents', {
+                    patientId: client.id,
+                    patientName: client.name || 'Paciente',
+                  });
+                } else if (client.group_id) {
+                  // Para outros perfis, usar lógica normal (por grupo)
+                  navigation.navigate('Documents', {
+                    groupId: client.group_id,
+                    groupName: client.group_name || 'Grupo',
+                  });
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.filesCardHeader, documents.length > 0 && { marginBottom: 16 }]}>
+                <View style={styles.filesIconContainer}>
+                  <FolderIcon size={32} color="#9C27B0" />
+                </View>
+                <View style={styles.filesContent}>
+                  <Text style={styles.filesCardTitle}>Arquivos</Text>
+                  <Text style={styles.filesCardSubtitle}>Exames, receitas e laudos</Text>
+                </View>
+                {client.group_id && (
+                  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+                    <ChevronForwardIcon size={24} color={colors.gray400} />
+                  </View>
+                )}
+              </View>
+
+              {/* Preview de documentos dentro do card */}
+              {loadingDocuments ? (
+                <View style={styles.filesLoading} pointerEvents="none">
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.filesLoadingText}>Carregando arquivos...</Text>
+                </View>
+              ) : documents.length === 0 ? (
+                <View style={styles.filesEmpty} pointerEvents="none">
+                  <FolderIcon size={32} color={colors.gray300} />
+                  <Text style={styles.filesEmptyText}>Nenhum arquivo disponível</Text>
+                </View>
+              ) : (
+                <View style={styles.filesList} pointerEvents="box-none">
+                  {documents.slice(0, 3).map((doc, index) => (
+                    <TouchableOpacity
+                      key={doc.id || index}
+                      style={styles.fileItem}
+                      onPress={() => {
+                        navigation.navigate('DocumentDetails', {
+                          document: doc,
+                          groupId: client.group_id,
+                        });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.fileIcon, { backgroundColor: getDocumentColor(doc.type) + '20' }]}>
+                        <Ionicons 
+                          name={getDocumentIconComponent(doc.type)} 
+                          size={20} 
+                          color={getDocumentColor(doc.type)} 
+                        />
+                      </View>
+                      <View style={styles.fileContent}>
+                        <Text style={styles.fileTitle} numberOfLines={1}>
+                          {doc.title || 'Documento sem título'}
+                        </Text>
+                        <Text style={styles.fileMeta}>
+                          {formatDocumentDate(doc.document_date || doc.date)}
+                          {doc.doctor_name && ` • ${doc.doctor_name}`}
+                        </Text>
+                      </View>
+                      <View style={{ width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
+                        <ChevronForwardIcon size={20} color={colors.gray400} />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                  {documents.length > 3 && (
+                    <View style={styles.moreFilesIndicator} pointerEvents="none">
+                      <Text style={styles.moreFilesText}>
+                        +{documents.length - 3} {documents.length - 3 === 1 ? 'arquivo' : 'arquivos'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Avaliações */}
         <View style={styles.section}>
@@ -328,7 +738,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
               onPress={handleAddReview}
               activeOpacity={0.7}
             >
-              <Ionicons name="add-circle-outline" size={20} color="#C8A8E9" />
+              <AddIcon size={20} color="#C8A8E9" />
               <Text style={styles.addReviewButtonText}>Avaliar</Text>
             </TouchableOpacity>
           </View>
@@ -339,7 +749,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
                 <View style={styles.reviewHeader}>
                   <View style={styles.reviewAuthorInfo}>
                     <View style={styles.reviewAvatar}>
-                      <Ionicons name="person" size={20} color={colors.primary} />
+                      <PersonIcon size={20} color={colors.primary} />
                     </View>
                     <View style={styles.reviewAuthorDetails}>
                       <Text style={styles.reviewAuthorName}>{user?.name || 'Cuidador Profissional'}</Text>
@@ -385,7 +795,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
                 onPress={() => setShowReviewModal(false)}
                 activeOpacity={0.7}
               >
-                <Ionicons name="close" size={24} color={colors.text} />
+                <CloseIcon size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -451,15 +861,6 @@ const ClientDetailsScreen = ({ route, navigation }) => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Botão Flutuante de Contato */}
-      <TouchableOpacity
-        style={styles.contactButton}
-        onPress={handleContact}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="chatbubble-ellipses" size={24} color="#2D1B3D" />
-        <Text style={styles.contactButtonText}>Contatar Cliente</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -560,6 +961,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary + '20',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
   },
   name: {
     fontSize: 24,
@@ -601,6 +1008,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 24,
   },
+  filesCard: {
+    backgroundColor: colors.backgroundLight,
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  filesCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filesIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#9C27B020',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  filesContent: {
+    flex: 1,
+  },
+  filesCardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  filesCardSubtitle: {
+    fontSize: 14,
+    color: colors.textLight,
+    lineHeight: 18,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -621,15 +1067,17 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     backgroundColor: colors.white,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     gap: 16,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
     overflow: 'hidden',
-    ...(Platform.OS === 'android' ? {
-      elevation: 0,
-    } : {}),
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   infoRow: {
     flexDirection: 'row',
@@ -733,29 +1181,82 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textAlign: 'center',
   },
-  contactButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  filesLoading: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#C8A8E9',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+    paddingVertical: 20,
     gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
-  contactButtonText: {
-    fontSize: 16,
+  filesLoadingText: {
+    fontSize: 14,
+    color: colors.textLight,
+  },
+  filesEmpty: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  filesEmptyText: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginTop: 8,
+  },
+  filesList: {
+    gap: 8,
+  },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 0, // Remover bordas grossas
+  },
+  fileIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  fileContent: {
+    flex: 1,
+  },
+  fileTitle: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#2D1B3D',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  fileMeta: {
+    fontSize: 12,
+    color: colors.textLight,
+  },
+  moreFilesIndicator: {
+    paddingTop: 8,
+    alignItems: 'center',
+  },
+  moreFilesText: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,

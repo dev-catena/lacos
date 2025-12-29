@@ -13,17 +13,45 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import documentService from '../../services/documentService';
+import { useAuth } from '../../contexts/AuthContext';
 import API_CONFIG from '../../config/api';
+import {
+  ArrowBackIcon,
+  TrashIcon,
+  DocumentIcon,
+  FolderIcon,
+  CalendarIcon,
+  PersonIcon,
+  DownloadIcon,
+  ShareIcon,
+} from '../../components/CustomIcons';
 
 const DocumentDetailsScreen = ({ route, navigation }) => {
   const { document } = route.params || {};
+  const { user } = useAuth();
   const [downloading, setDownloading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  
+  // Verificar se o usuário é médico (médicos não podem excluir documentos)
+  const isDoctor = user?.profile === 'doctor';
+
+  const getDocumentTypeLabel = (type) => {
+    const typeMap = {
+      'exam_lab': 'Exame Lab',
+      'exam_image': 'Imagem',
+      'prescription': 'Receita',
+      'medical_leave': 'Afastamento',
+      'medical_certificate': 'Afastamento',
+      'report': 'Atestado',
+      'other': 'Outro',
+    };
+    return typeMap[type] || type;
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Data não informada';
@@ -124,17 +152,49 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
   };
 
   const handleDelete = () => {
+    if (!document || !document.id) {
+      Alert.alert('Erro', 'Documento inválido');
+      return;
+    }
+
     Alert.alert(
       'Excluir Documento',
-      'Tem certeza que deseja excluir este documento?',
+      'Tem certeza que deseja excluir este documento? Esta ação não pode ser desfeita.',
       [
         { text: 'Cancelar', style: 'cancel' },
         { 
           text: 'Excluir', 
           style: 'destructive',
-          onPress: () => {
-            // TODO: Implementar exclusão
-            navigation.goBack();
+          onPress: async () => {
+            try {
+              setDeleting(true);
+              
+              console.log('🗑️ Excluindo documento:', document.id);
+              
+              await documentService.deleteDocument(document.id);
+              
+              Toast.show({
+                type: 'success',
+                text1: 'Documento excluído',
+                text2: 'O documento foi removido com sucesso',
+              });
+              
+              // Voltar para a tela anterior após exclusão bem-sucedida
+              navigation.goBack();
+            } catch (error) {
+              console.error('❌ Erro ao excluir documento:', error);
+              
+              const errorMessage = error.response?.data?.message || 
+                                  error.message || 
+                                  'Não foi possível excluir o documento. Tente novamente.';
+              
+              Alert.alert(
+                'Erro ao excluir',
+                errorMessage
+              );
+            } finally {
+              setDeleting(false);
+            }
           }
         },
       ]
@@ -151,12 +211,23 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <ArrowBackIcon size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detalhes do Documento</Text>
-        <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
-          <Ionicons name="trash-outline" size={24} color={colors.error} />
-        </TouchableOpacity>
+        {!isDoctor && (
+          <TouchableOpacity 
+            onPress={handleDelete} 
+            style={styles.deleteButton}
+            disabled={deleting}
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <TrashIcon size={24} color={colors.error} />
+            )}
+          </TouchableOpacity>
+        )}
+        {isDoctor && <View style={{ width: 40 }} />}
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -183,7 +254,7 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
               />
             ) : (
               <View style={styles.pdfPreview}>
-                <Ionicons name="document-text" size={80} color={colors.primary} />
+                <DocumentIcon size={80} color={colors.primary} />
                 <Text style={styles.pdfText}>
                   {document.file_type === 'pdf' ? 'Documento PDF' : 'Documento'}
                 </Text>
@@ -197,22 +268,55 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
           <Text style={styles.documentTitle}>{document.title}</Text>
           
           <View style={styles.infoRow}>
-            <Ionicons name="folder" size={20} color={colors.gray600} />
+            <FolderIcon size={20} color={colors.gray600} />
             <Text style={styles.infoLabel}>Tipo:</Text>
-            <Text style={styles.infoValue}>{document.type}</Text>
+            <Text style={styles.infoValue}>{getDocumentTypeLabel(document.type)}</Text>
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="calendar" size={20} color={colors.gray600} />
+            <CalendarIcon size={20} color={colors.gray600} />
             <Text style={styles.infoLabel}>Data:</Text>
             <Text style={styles.infoValue}>{formatDate(document.document_date || document.date)}</Text>
           </View>
 
           {document.doctor_name && (
             <View style={styles.infoRow}>
-              <Ionicons name="person" size={20} color={colors.gray600} />
+              <PersonIcon size={20} color={colors.gray600} />
               <Text style={styles.infoLabel}>Médico:</Text>
               <Text style={styles.infoValue}>{document.doctor_name}</Text>
+            </View>
+          )}
+
+          {/* Mostrar quantidade de dias para afastamentos */}
+          {(document.type === 'medical_leave' || document.type === 'medical_certificate') && document.days && (
+            <View style={styles.infoRow}>
+              <CalendarIcon size={20} color={colors.gray600} />
+              <Text style={styles.infoLabel}>Dias de Afastamento:</Text>
+              <Text style={styles.infoValue}>{document.days} {document.days === 1 ? 'dia' : 'dias'}</Text>
+            </View>
+          )}
+
+          {/* Mostrar período de afastamento se disponível */}
+          {(document.type === 'medical_leave' || document.type === 'medical_certificate') && document.start_date && document.end_date && (
+            <>
+              <View style={styles.infoRow}>
+                <CalendarIcon size={20} color={colors.gray600} />
+                <Text style={styles.infoLabel}>Início:</Text>
+                <Text style={styles.infoValue}>{formatDate(document.start_date)}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <CalendarIcon size={20} color={colors.gray600} />
+                <Text style={styles.infoLabel}>Término:</Text>
+                <Text style={styles.infoValue}>{formatDate(document.end_date)}</Text>
+              </View>
+            </>
+          )}
+
+          {document.patient_cpf && (
+            <View style={styles.infoRow}>
+              <PersonIcon size={20} color={colors.gray600} />
+              <Text style={styles.infoLabel}>CPF do Paciente:</Text>
+              <Text style={styles.infoValue}>{document.patient_cpf}</Text>
             </View>
           )}
         </View>
@@ -227,7 +331,7 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
             {downloading ? (
               <ActivityIndicator size="small" color={colors.white} />
             ) : (
-              <Ionicons name="download-outline" size={24} color={colors.white} />
+              <DownloadIcon size={24} color={colors.white} />
             )}
             <Text style={styles.actionButtonText}>
               {downloading ? 'Baixando...' : 'Baixar Documento'}
@@ -238,7 +342,7 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
             style={[styles.actionButton, styles.shareButton]} 
             onPress={() => Alert.alert('Compartilhar', 'Funcionalidade em breve')}
           >
-            <Ionicons name="share-outline" size={24} color={colors.primary} />
+            <ShareIcon size={24} color={colors.primary} />
             <Text style={[styles.actionButtonText, { color: colors.primary }]}>
               Compartilhar
             </Text>
@@ -339,7 +443,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: '#FFB6C1', // Rosa pastel
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,

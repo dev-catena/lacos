@@ -25,6 +25,7 @@ import GroupContactsScreen from '../screens/Groups/GroupContactsScreen';
 import EditPatientDataScreen from '../screens/Groups/EditPatientDataScreen';
 import PanicSettingsScreen from '../screens/Groups/PanicSettingsScreen';
 import AddVitalSignsScreen from '../screens/Groups/AddVitalSignsScreen';
+import FallSensorScreen from '../screens/Groups/FallSensorScreen';
 import AgendaScreen from '../screens/Groups/AgendaScreen';
 import AddAppointmentScreen from '../screens/Groups/AddAppointmentScreen';
 import AppointmentDetailsScreen from '../screens/Groups/AppointmentDetailsScreen';
@@ -73,6 +74,9 @@ import DocumentDetailsScreen from '../screens/Documents/DocumentDetailsScreen';
 
 // Importa as telas de Mídias
 import MediaScreen from '../screens/Media/MediaScreen';
+
+// Importa telas de Pagamento
+import PaymentScreen from '../screens/Payment/PaymentScreen';
 
 // Importa telas de Debug
 import ShowGroupCodesScreen from '../screens/Debug/ShowGroupCodesScreen';
@@ -155,6 +159,13 @@ const HomeStack = () => {
         }}
       />
       <Stack.Screen 
+        name="FallSensor" 
+        component={FallSensorScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Agenda" 
         component={AgendaScreen}
         options={{ 
@@ -171,6 +182,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="AppointmentDetails" 
         component={AppointmentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PaymentScreen" 
+        component={PaymentScreen}
         options={{ 
           headerShown: false 
         }}
@@ -422,6 +440,13 @@ const GroupsStack = () => {
         }}
       />
       <Stack.Screen 
+        name="FallSensor" 
+        component={FallSensorScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Agenda" 
         component={AgendaScreen}
         options={{ 
@@ -438,6 +463,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="AppointmentDetails" 
         component={AppointmentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PaymentScreen" 
+        component={PaymentScreen}
         options={{ 
           headerShown: false 
         }}

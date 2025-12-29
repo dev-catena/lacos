@@ -31,6 +31,24 @@ const documentService = {
     }
   },
 
+  // Listar documentos de um paciente (para médicos)
+  async getDocumentsByPatient(patientId) {
+    try {
+      console.log('📡 documentService - Buscando documentos do paciente:', patientId);
+      const response = await apiService.get(`/documents?patient_id=${patientId}`);
+      console.log('📡 documentService - Resposta raw:', response);
+      
+      // O backend pode retornar {success: true, data: [...]} ou apenas [...]
+      const documents = response.data || response;
+      console.log('📡 documentService - Documentos do paciente extraídos:', documents.length);
+      
+      return documents;
+    } catch (error) {
+      console.error('❌ documentService - Erro ao buscar documentos do paciente:', error.response?.data || error);
+      throw error;
+    }
+  },
+
   // Buscar detalhes de um documento
   async getDocumentById(documentId) {
     try {

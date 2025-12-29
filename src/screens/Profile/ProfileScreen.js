@@ -11,7 +11,22 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  PersonOutlineIcon,
+  MedicalOutlineIcon,
+  LockClosedOutlineIcon,
+  NotificationsOutlineIcon,
+  KeyOutlineIcon,
+  InformationCircleOutlineIcon,
+  HelpCircleOutlineIcon,
+  DocumentTextOutlineIcon,
+  ChevronForwardIcon,
+  LogOutOutlineIcon,
+  CameraIcon,
+  MedicalIcon,
+  PersonIcon,
+  HeartIcon,
+} from '../../components/CustomIcons';
 import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -19,10 +34,12 @@ import { LacosIcon } from '../../components/LacosLogo';
 import userService from '../../services/userService';
 import Toast from 'react-native-toast-message';
 
+
 const ProfileScreen = ({ navigation }) => {
   const { user, signOut, updateUser } = useAuth();
   const [photoUri, setPhotoUri] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     // Carregar foto do usuário (preferir photo_url que tem URL completa)
@@ -114,38 +131,100 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Proteção contra múltiplos cliques
+    if (isLoggingOut) {
+      console.log('📱 ProfileScreen - Logout já em andamento, ignorando clique...');
+      return;
+    }
+    
+    console.log('📱 ProfileScreen - ========== INICIANDO LOGOUT ==========');
+    console.log('📱 ProfileScreen - handleLogout chamado!');
+    console.log('📱 ProfileScreen - signOut disponível?', typeof signOut === 'function');
+    
+    setIsLoggingOut(true);
+    
+    // Confirmar com Alert
     Alert.alert(
       'Sair da Conta',
       'Ao sair, você retornará à tela inicial onde poderá escolher entre entrar como Paciente ou Acompanhante novamente.\n\nDeseja continuar?',
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Cancelar', 
+          style: 'cancel',
+          onPress: () => {
+            console.log('📱 ProfileScreen - Logout cancelado pelo usuário');
+            setIsLoggingOut(false);
+          }
+        },
         { 
           text: 'Sair', 
           style: 'destructive',
           onPress: async () => {
+            console.log('📱 ProfileScreen - ========== USUÁRIO CONFIRMOU LOGOUT ==========');
+            
             try {
+              console.log('📱 ProfileScreen - Chamando signOut()...');
               await signOut();
+              console.log('📱 ProfileScreen - ✅ signOut() executado com sucesso!');
+              
+              // Forçar navegação imediatamente
+              setTimeout(() => {
+                console.log('📱 ProfileScreen - Forçando navegação para Welcome...');
+                try {
+                  // Usar navigation.reset
+                  if (navigation?.reset) {
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'Welcome' }],
+                    });
+                    console.log('📱 ProfileScreen - ✅ Navegação resetada via navigation');
+                  }
+                  // Último recurso: navigate
+                  else if (navigation?.navigate) {
+                    navigation.navigate('Welcome');
+                    console.log('📱 ProfileScreen - ✅ Navegação via navigate');
+                  } else {
+                    console.error('❌ ProfileScreen - Nenhum método de navegação disponível!');
+                    // Recarregar a página como último recurso
+                    if (typeof window !== 'undefined') {
+                      window.location.href = '/';
+                    }
+                  }
+                } catch (navError) {
+                  console.error('❌ ProfileScreen - Erro ao forçar navegação:', navError);
+                  // Recarregar a página como último recurso
+                  if (typeof window !== 'undefined') {
+                    window.location.href = '/';
+                  }
+                }
+              }, 200);
+              
             } catch (error) {
-              console.error('Erro ao sair:', error);
-              Alert.alert('Erro', 'Não foi possível sair. Tente novamente.');
+              console.error('❌ ProfileScreen - ERRO CRÍTICO ao sair:', error);
+              setIsLoggingOut(false);
+              Alert.alert(
+                'Erro', 
+                'Não foi possível sair. Tente novamente.'
+              );
             }
           }
         },
-      ]
+      ],
+      { cancelable: true, onDismiss: () => setIsLoggingOut(false) }
     );
   };
 
-  const MenuItem = ({ icon, title, subtitle, onPress, color = colors.text, showArrow = true }) => (
+  const MenuItem = ({ icon: IconComponent, title, subtitle, onPress, color = colors.text, showArrow = true }) => (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
       <View style={[styles.menuIcon, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon} size={22} color={color} />
+        <IconComponent size={22} color={color} />
       </View>
       <View style={styles.menuContent}>
         <Text style={styles.menuTitle}>{title}</Text>
         {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
       </View>
-      {showArrow && <Ionicons name="chevron-forward" size={20} color={colors.gray400} />}
+      {showArrow && <ChevronForwardIcon size={20} color={colors.gray400} />}
     </TouchableOpacity>
   );
 
@@ -185,7 +264,7 @@ const ProfileScreen = ({ navigation }) => {
               )}
             </View>
             <View style={styles.cameraIconContainer}>
-              <Ionicons name="camera" size={18} color={colors.textWhite} />
+              <CameraIcon size={18} color={colors.textWhite} />
             </View>
           </TouchableOpacity>
           
@@ -201,16 +280,15 @@ const ProfileScreen = ({ navigation }) => {
               user?.profile === 'accompanied' && { backgroundColor: colors.secondary + '20' },
               user?.profile === 'caregiver' && { backgroundColor: colors.info + '20' },
             ]}>
-              <Ionicons 
-                name={user?.profile === 'professional_caregiver' ? 'medical' : user?.profile === 'doctor' ? 'medical-outline' : user?.profile === 'accompanied' ? 'person' : 'heart'} 
-                size={14} 
-                color={
-                  user?.profile === 'professional_caregiver' ? colors.success :
-                  user?.profile === 'doctor' ? '#4A90E2' :
-                  user?.profile === 'accompanied' ? colors.secondary :
-                  colors.info
-                } 
-              />
+              {user?.profile === 'professional_caregiver' ? (
+                <MedicalIcon size={14} color={colors.success} />
+              ) : user?.profile === 'doctor' ? (
+                <MedicalOutlineIcon size={14} color="#4A90E2" />
+              ) : user?.profile === 'accompanied' ? (
+                <PersonIcon size={14} color={colors.secondary} />
+              ) : (
+                <HeartIcon size={14} color={colors.info} />
+              )}
               <Text style={[
                 styles.profileBadgeText,
                 user?.profile === 'professional_caregiver' && { color: colors.success },
@@ -232,7 +310,7 @@ const ProfileScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Conta</Text>
           <View style={styles.menuContainer}>
             <MenuItem
-              icon="person-outline"
+              icon={PersonOutlineIcon}
               title="Dados Pessoais"
               subtitle="Nome, e-mail, telefone"
               color={colors.primary}
@@ -240,7 +318,7 @@ const ProfileScreen = ({ navigation }) => {
             />
             {(user?.profile === 'professional_caregiver' || user?.profile === 'doctor') && (
               <MenuItem
-                icon="medical-outline"
+                icon={MedicalOutlineIcon}
                 title="Dados Profissionais"
                 subtitle="Formação, valor/hora, disponibilidade"
                 color={colors.success}
@@ -248,14 +326,14 @@ const ProfileScreen = ({ navigation }) => {
               />
             )}
             <MenuItem
-              icon="lock-closed-outline"
+              icon={LockClosedOutlineIcon}
               title="Segurança"
               subtitle="Senha e autenticação"
               color={colors.warning}
               onPress={() => navigation.navigate('Security')}
             />
             <MenuItem
-              icon="notifications-outline"
+              icon={NotificationsOutlineIcon}
               title="Notificações"
               subtitle="Preferências de notificações"
               color={colors.info}
@@ -269,26 +347,26 @@ const ProfileScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Aplicativo</Text>
           <View style={styles.menuContainer}>
             <MenuItem
-              icon="key-outline"
+              icon={KeyOutlineIcon}
               title="Códigos de Acesso"
               subtitle="Ver códigos de todos os grupos"
               color={colors.primary}
               onPress={() => navigation.navigate('ShowGroupCodes')}
             />
             <MenuItem
-              icon="information-circle-outline"
+              icon={InformationCircleOutlineIcon}
               title="Sobre o Laços"
               subtitle="Versão 1.0.0"
               color={colors.secondary}
             />
             <MenuItem
-              icon="help-circle-outline"
+              icon={HelpCircleOutlineIcon}
               title="Ajuda e Suporte"
               subtitle="FAQ e contato"
               color={colors.success}
             />
             <MenuItem
-              icon="document-text-outline"
+              icon={DocumentTextOutlineIcon}
               title="Termos e Privacidade"
               subtitle="Termos de uso e política"
               color={colors.text}
@@ -300,17 +378,22 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.section}>
           <TouchableOpacity 
             style={styles.logoutButton}
-            onPress={handleLogout}
+            onPress={() => {
+              console.log('📱 ProfileScreen - Botão Sair CLICADO!');
+              console.log('📱 ProfileScreen - handleLogout disponível?', typeof handleLogout === 'function');
+              handleLogout();
+            }}
             activeOpacity={0.7}
+            testID="logout-button"
           >
             <View style={styles.logoutIcon}>
-              <Ionicons name="log-out-outline" size={24} color={colors.textWhite} />
+              <LogOutOutlineIcon size={24} color={colors.textWhite} />
             </View>
             <View style={styles.logoutContent}>
             <Text style={styles.logoutText}>Sair da Conta</Text>
               <Text style={styles.logoutSubtext}>Voltar à tela inicial</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textWhite} />
+            <ChevronForwardIcon size={20} color={colors.textWhite} />
           </TouchableOpacity>
         </View>
 

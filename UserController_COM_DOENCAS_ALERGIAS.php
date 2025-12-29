@@ -144,12 +144,43 @@ class UserController extends Controller
 
         $user->update($data);
 
+        // Processar cursos se fornecidos (para cuidador profissional)
+        if ($request->has('courses') && is_array($request->courses)) {
+            \Log::info('UserController::update - Processando cursos', [
+                'user_id' => $id,
+                'courses_count' => count($request->courses),
+                'courses' => $request->courses,
+            ]);
+            
+            // Deletar cursos antigos
+            $user->caregiverCourses()->delete();
+            
+            // Criar novos cursos
+            foreach ($request->courses as $course) {
+                if (!empty($course['name']) && !empty($course['institution'])) {
+                    $user->caregiverCourses()->create([
+                        'name' => $course['name'],
+                        'institution' => $course['institution'],
+                        'year' => $course['year'] ?? null,
+                        'description' => $course['description'] ?? null,
+                        'certificate_url' => $course['certificate_url'] ?? null,
+                    ]);
+                }
+            }
+            
+            \Log::info('UserController::update - Cursos processados com sucesso', [
+                'user_id' => $id,
+                'courses_saved' => $user->caregiverCourses()->count(),
+            ]);
+        }
+
         // Log após atualizar
-        $updatedUser = $user->fresh();
+        $updatedUser = $user->fresh(['caregiverCourses']);
         \Log::info('UserController::update - Dados salvos', [
             'user_id' => $id,
             'chronic_diseases' => $updatedUser->chronic_diseases,
             'allergies' => $updatedUser->allergies,
+            'courses_count' => $updatedUser->caregiverCourses->count(),
         ]);
 
         return response()->json([

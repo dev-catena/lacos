@@ -1,0 +1,59 @@
+================================================================================
+  COMANDOS PARA EXECUTAR NO SERVIDOR
+================================================================================
+
+1. Verificar estrutura de diretórios:
+   cd /var/www/lacos-backend
+   ls -la
+
+2. Verificar onde estão os Models (pode ser app/Models ou raiz):
+   ls -la app/Models/ 2>/dev/null || echo "Pasta Models não existe"
+   ls -la *.php | grep -E "(Appointment|Document|PopularPharmacy)" | head -3
+
+3. Verificar onde está o arquivo de rotas:
+   ls -la routes/
+   cat routes/api.php | head -20  # ou routes/web.php
+
+4. Criar os arquivos de migration diretamente no servidor:
+
+   # Migration de planos
+   nano create_plans_table.php
+   # (Cole o conteúdo do arquivo create_plans_table.php)
+
+   # Migration de user_plans
+   nano create_user_plans_table.php
+   # (Cole o conteúdo do arquivo create_user_plans_table.php)
+
+5. Criar o Model Plan:
+   # Se existe app/Models:
+   nano app/Models/Plan.php
+   # OU se Models estão na raiz:
+   nano Plan.php
+   # (Cole o conteúdo do arquivo Plan.php)
+
+6. Criar o Controller:
+   nano app/Http/Controllers/Api/PlanController.php
+   # (Cole o conteúdo do arquivo PlanController.php)
+
+7. Adicionar rotas ao arquivo de rotas:
+   # Editar routes/api.php (ou o arquivo que está sendo usado)
+   nano routes/api.php
+   
+   # Adicionar no topo (com os outros use):
+   use App\Http\Controllers\Api\PlanController;
+   
+   # Adicionar dentro do grupo auth:sanctum:
+   Route::apiResource('plans', PlanController::class);
+   Route::get('/user/plan', [PlanController::class, 'getUserPlan']);
+
+8. Executar migrations:
+   php artisan migrate --path=create_plans_table.php
+   php artisan migrate --path=create_user_plans_table.php
+
+9. Verificar se funcionou:
+   php artisan tinker
+   >>> App\Models\Plan::count()
+   >>> exit
+
+================================================================================
+

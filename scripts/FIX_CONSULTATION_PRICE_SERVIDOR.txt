@@ -1,0 +1,51 @@
+# COPIE E COLE ESTE SCRIPT DIRETAMENTE NO TERMINAL DO SERVIDOR
+# Execute: bash <(cat << 'EOF'
+# ... todo o conteúdo abaixo ...
+# EOF
+# )
+
+cd /var/www/lacos-backend || exit 1
+
+echo "🔧 Corrigindo consultation_price..."
+
+# 1. Verificar Model Doctor
+if [ -f "app/Models/Doctor.php" ]; then
+    echo "1️⃣ Verificando Model Doctor..."
+    if ! grep -q "function user()" app/Models/Doctor.php; then
+        echo "   📝 Adicionando relacionamento user()..."
+        [ ! -f "app/Models/Doctor.php.backup" ] && cp app/Models/Doctor.php app/Models/Doctor.php.backup
+        sed -i '/^}$/i\
+    public function user()\
+    {\
+        return $this->belongsTo(User::class, '\''user_id'\'');\
+    }' app/Models/Doctor.php
+        echo "   ✅ Relacionamento adicionado"
+    else
+        echo "   ✅ Relacionamento já existe"
+    fi
+fi
+
+# 2. Modificar AppointmentController
+echo "2️⃣ Modificando AppointmentController..."
+[ ! -f "app/Http/Controllers/Api/AppointmentController.php.backup" ] && cp app/Http/Controllers/Api/AppointmentController.php app/Http/Controllers/Api/AppointmentController.php.backup && echo "   ✅ Backup criado"
+
+if ! grep -q "doctor.user.*consultation_price" app/Http/Controllers/Api/AppointmentController.php; then
+    sed -i "s/with(\['doctor', 'exceptions'\])/with(['doctor.user' => function(\$query) { \$query->select('id', 'name', 'email', 'consultation_price'); }, 'exceptions'])/" app/Http/Controllers/Api/AppointmentController.php
+    sed -i "s/Appointment::with(\['doctor', 'exceptions'\])/Appointment::with(['doctor.user' => function(\$query) { \$query->select('id', 'name', 'email', 'consultation_price'); }, 'exceptions'])/" app/Http/Controllers/Api/AppointmentController.php
+    sed -i "s/load('doctor')/load(['doctor.user' => function(\$query) { \$query->select('id', 'name', 'email', 'consultation_price'); }])/" app/Http/Controllers/Api/AppointmentController.php
+    echo "   ✅ AppointmentController atualizado"
+fi
+
+# 3. Verificar sintaxe
+echo "3️⃣ Verificando sintaxe..."
+php -l app/Http/Controllers/Api/AppointmentController.php > /dev/null 2>&1 && echo "   ✅ OK" || { echo "   ❌ Erro! Restaurando..."; cp app/Http/Controllers/Api/AppointmentController.php.backup app/Http/Controllers/Api/AppointmentController.php; exit 1; }
+
+# 4. Limpar cache
+echo "4️⃣ Limpando cache..."
+php artisan route:clear > /dev/null 2>&1
+php artisan config:clear > /dev/null 2>&1
+php artisan cache:clear > /dev/null 2>&1
+echo "   ✅ Cache limpo"
+echo ""
+echo "✅ Concluído!"
+

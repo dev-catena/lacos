@@ -1,0 +1,33 @@
+# ============================================================================
+# SCRIPT PARA VERIFICAR SE A TABELA FOI CRIADA
+# COPIAR E COLAR NO TERMINAL DO SERVIDOR
+# ============================================================================
+
+cd /var/www/lacos-backend
+
+# Descobrir nome do banco
+DB_NAME=$(sudo grep "^DB_DATABASE=" .env 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'" | tr -d ' ' | head -1)
+if [ -z "$DB_NAME" ]; then
+    DB_NAME="lacos"
+fi
+
+echo "📊 Banco de dados: $DB_NAME"
+echo ""
+
+# Verificar se a tabela fall_sensor_data existe
+echo "🔍 Verificando tabela fall_sensor_data..."
+sudo mysql $DB_NAME -e "SHOW TABLES LIKE 'fall_sensor_data';"
+
+echo ""
+echo "📋 Estrutura da tabela (se existir):"
+sudo mysql $DB_NAME -e "DESCRIBE fall_sensor_data;" 2>/dev/null || echo "❌ Tabela não encontrada"
+
+echo ""
+echo "📊 Total de registros:"
+sudo mysql $DB_NAME -e "SELECT COUNT(*) as total FROM fall_sensor_data;" 2>/dev/null || echo "❌ Erro ao contar registros"
+
+echo ""
+echo "💡 NOTA: A tabela 'groups' é uma palavra reservada no MySQL."
+echo "   Para consultá-la, use backticks: SELECT * FROM \`groups\`;"
+echo ""
+

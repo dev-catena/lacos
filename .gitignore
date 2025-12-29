@@ -11,6 +11,11 @@ npm-debug.*
 *.orig.*
 web-build/
 .env
+.env_COMPLETO_SERVIDOR
+**/ENV-prod.txt
+**/*ENV-prod*
+**/*STRIPE*.sh
+!**/.env.example
 
 # macOS
 .DS_Store
@@ -18,4 +23,13 @@ web-build/
 # IDE
 .vscode/
 .idea/
+
+# Vim swap files
+*.swp
+*.swo
+*.swk
+*.swl
+*.swm
+*.swn
+*.swr
 

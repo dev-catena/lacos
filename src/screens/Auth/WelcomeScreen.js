@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import { LacosLogoFull } from '../../components/LacosLogo';
 import { useAuth } from '../../contexts/AuthContext';
+import Svg, { Path } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
 
@@ -88,7 +89,13 @@ const WelcomeScreen = ({ navigation }) => {
         {/* Ilustração */}
         <View style={styles.illustrationContainer}>
           <View style={styles.iconCircle}>
-            <Ionicons name="heart-circle" size={120} color={colors.textWhite} />
+            <Svg width={120} height={120} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                fill={colors.textWhite}
+                opacity="0.9"
+              />
+            </Svg>
           </View>
         </View>
 
@@ -100,7 +107,17 @@ const WelcomeScreen = ({ navigation }) => {
             activeOpacity={0.8}
           >
             <Text style={styles.primaryButtonText}>Criar Conta</Text>
-            <Ionicons name="arrow-forward" size={20} color={colors.primary} />
+            <View style={{ width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M9 18l6-6-6-6"
+                  stroke={colors.primary}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity

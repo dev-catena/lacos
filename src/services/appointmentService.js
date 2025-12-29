@@ -12,12 +12,14 @@ class AppointmentService {
       // Se os dados já vierem em snake_case (do AddAppointmentScreen novo)
       const data = appointmentData.group_id ? appointmentData : {
         group_id: appointmentData.groupId,
-        type: appointmentData.type || 'common', // ADICIONADO
+        type: appointmentData.type || 'common',
         title: appointmentData.title,
         description: appointmentData.description,
         scheduled_at: appointmentData.scheduledAt,
         appointment_date: appointmentData.scheduledAt, // Backend espera este campo
         doctor_id: appointmentData.doctorId,
+        medical_specialty_id: appointmentData.medicalSpecialtyId,
+        is_teleconsultation: appointmentData.isTeleconsultation || appointmentData.is_teleconsultation || false,
         location: appointmentData.location,
         notes: appointmentData.notes,
       };
@@ -113,6 +115,7 @@ class AppointmentService {
         scheduled_at: appointmentData.scheduledAt || appointmentData.appointmentDate,
         doctor_id: appointmentData.doctorId,
         medical_specialty_id: appointmentData.medicalSpecialtyId,
+        is_teleconsultation: appointmentData.isTeleconsultation || appointmentData.is_teleconsultation || false,
         location: appointmentData.location,
         notes: appointmentData.notes,
       };

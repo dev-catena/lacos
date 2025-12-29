@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,22 @@ import {
   TextInput,
   Alert,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
+import userService from '../../services/userService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const SecurityScreen = ({ navigation }) => {
+  const { user, updateUser } = useAuth();
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [show2FA, setShow2FA] = useState(false);
+  const [showCertificate, setShowCertificate] = useState(false);
+  const isDoctor = user?.profile === 'doctor';
   
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -30,9 +37,38 @@ const SecurityScreen = ({ navigation }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [twoFactorMethod, setTwoFactorMethod] = useState('sms'); // 'sms' ou 'app'
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Estado do certificado digital
+  const [certificateData, setCertificateData] = useState({
+    certificateFile: null,
+    certificateUsername: '',
+    certificatePassword: '',
+  });
+  const [certificateLoading, setCertificateLoading] = useState(false);
+  const [certificateUploaded, setCertificateUploaded] = useState(false);
+
+  useEffect(() => {
+    // Sincronizar UI com o usuário logado (quando disponível)
+    if (!user) return;
+
+    const enabled = !!user.two_factor_enabled;
+    setTwoFactorEnabled(enabled);
+
+    // Se existir telefone específico do 2FA, preferir; senão usar telefone do perfil
+    const phone = user.two_factor_phone || user.phone || '';
+    setPhoneNumber(phone);
+
+    // Carregar dados do certificado se for médico
+    if (isDoctor && user.certificate_username) {
+      setCertificateUploaded(true);
+      setCertificateData(prev => ({
+        ...prev,
+        certificateUsername: user.certificate_username || '',
+      }));
+    }
+  }, [user, isDoctor]);
 
   const handleChangePassword = async () => {
     if (!passwordData.currentPassword) {
@@ -58,55 +94,73 @@ const SecurityScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // TODO: Integrar com API
-      // await changePassword(passwordData);
-      
-      Toast.show({
-        type: 'success',
-        text1: '✅ Senha alterada',
-        text2: 'Sua senha foi atualizada com sucesso',
-        position: 'bottom',
-      });
+      const result = await userService.changePassword(
+        passwordData.currentPassword,
+        passwordData.newPassword
+      );
 
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      });
-      setShowChangePassword(false);
+      if (result.success) {
+        Toast.show({
+          type: 'success',
+          text1: '✅ Senha alterada',
+          text2: result.message || 'Sua senha foi atualizada com sucesso',
+          position: 'bottom',
+        });
+
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+        setShowChangePassword(false);
+      } else {
+        // Exibir mensagem de erro específica
+        const errorMessage = result.error || 'Não foi possível alterar a senha';
+        Alert.alert('Erro', errorMessage);
+      }
     } catch (error) {
       console.error('Erro ao alterar senha:', error);
-      Alert.alert('Erro', 'Não foi possível alterar a senha');
+      const errorMessage = error.message || error.error || 'Não foi possível alterar a senha';
+      Alert.alert('Erro', errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   const handleEnable2FA = async () => {
-    if (twoFactorMethod === 'sms' && !phoneNumber) {
+    if (!phoneNumber) {
       Alert.alert('Erro', 'Digite um número de telefone');
       return;
     }
-
     setLoading(true);
 
     try {
-      // TODO: Integrar com API
-      // await enable2FA({ method: twoFactorMethod, phone: phoneNumber });
+      const result = await userService.enable2FA('whatsapp', phoneNumber);
       
-      setTwoFactorEnabled(true);
-      
-      Toast.show({
-        type: 'success',
-        text1: '✅ 2FA ativado',
-        text2: 'Autenticação de dois fatores configurada',
-        position: 'bottom',
-      });
+      if (result.success) {
+        setTwoFactorEnabled(true);
+        
+        Toast.show({
+          type: 'success',
+          text1: '✅ 2FA ativado',
+          text2: result.message || 'Autenticação de dois fatores via WhatsApp configurada',
+          position: 'bottom',
+        });
 
-      setShow2FA(false);
+        setShow2FA(false);
+
+        // Atualizar usuário em memória (para refletir o toggle imediatamente)
+        updateUser({
+          two_factor_enabled: true,
+          two_factor_method: 'whatsapp',
+          two_factor_phone: phoneNumber,
+        });
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível ativar a autenticação de dois fatores');
+      }
     } catch (error) {
       console.error('Erro ao ativar 2FA:', error);
-      Alert.alert('Erro', 'Não foi possível ativar a autenticação de dois fatores');
+      Alert.alert('Erro', error.message || 'Não foi possível ativar a autenticação de dois fatores');
     } finally {
       setLoading(false);
     }
@@ -123,19 +177,181 @@ const SecurityScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // TODO: Integrar com API
-              // await disable2FA();
+              const result = await userService.disable2FA();
               
-              setTwoFactorEnabled(false);
-              
-              Toast.show({
-                type: 'info',
-                text1: '2FA desativado',
-                text2: 'Autenticação de dois fatores removida',
-                position: 'bottom',
-              });
+              if (result.success) {
+                setTwoFactorEnabled(false);
+                
+                Toast.show({
+                  type: 'info',
+                  text1: '2FA desativado',
+                  text2: result.message || 'Autenticação de dois fatores removida',
+                  position: 'bottom',
+                });
+
+                updateUser({
+                  two_factor_enabled: false,
+                  two_factor_method: null,
+                  two_factor_phone: null,
+                });
+              } else {
+                Alert.alert('Erro', result.error || 'Não foi possível desativar o 2FA');
+              }
             } catch (error) {
-              Alert.alert('Erro', 'Não foi possível desativar o 2FA');
+              console.error('Erro ao desativar 2FA:', error);
+              Alert.alert('Erro', error.message || 'Não foi possível desativar o 2FA');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Funções do Certificado Digital
+  const handlePickCertificate = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/x-pkcs12', 'application/pkcs12', 'application/pfx', 'application/apx', 'application/octet-stream'],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const fileName = result.assets[0].name || '';
+        const isApx = fileName.toLowerCase().endsWith('.apx');
+        
+        setCertificateData(prev => ({
+          ...prev,
+          certificateFile: {
+            uri: result.assets[0].uri,
+            name: result.assets[0].name,
+            size: result.assets[0].size,
+            mimeType: isApx ? 'application/apx' : (result.assets[0].mimeType || 'application/x-pkcs12'),
+          },
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar certificado:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar o arquivo do certificado.');
+    }
+  };
+
+  const handleUploadCertificate = async () => {
+    if (!certificateData.certificateFile) {
+      Alert.alert('Atenção', 'Selecione o arquivo do certificado (.apx ou .pfx)');
+      return;
+    }
+
+    // Verificar se é arquivo .apx ou .pfx
+    const fileName = certificateData.certificateFile.name || '';
+    const isApx = fileName.toLowerCase().endsWith('.apx');
+    const isPfx = fileName.toLowerCase().endsWith('.pfx') || fileName.toLowerCase().endsWith('.p12');
+    
+    if (!isApx && !isPfx) {
+      Alert.alert('Atenção', 'Arquivo deve ser .apx ou .pfx');
+      return;
+    }
+
+    // Para .apx, não precisa de username, apenas senha
+    if (isApx) {
+      if (!certificateData.certificatePassword.trim()) {
+        Alert.alert('Atenção', 'Informe a senha do certificado');
+        return;
+      }
+    } else {
+      // Para .pfx, precisa de username e senha
+      if (!certificateData.certificateUsername.trim()) {
+        Alert.alert('Atenção', 'Informe o usuário do certificado');
+        return;
+      }
+
+      if (!certificateData.certificatePassword.trim()) {
+        Alert.alert('Atenção', 'Informe a senha do certificado');
+        return;
+      }
+    }
+
+    setCertificateLoading(true);
+
+    try {
+      const fileName = certificateData.certificateFile.name || '';
+      const isApx = fileName.toLowerCase().endsWith('.apx');
+      
+      const result = await userService.uploadCertificate({
+        certificateFile: certificateData.certificateFile,
+        username: isApx ? null : certificateData.certificateUsername.trim(),
+        password: certificateData.certificatePassword,
+        certificateType: isApx ? 'apx' : 'pfx',
+      });
+
+      if (result.success) {
+        setCertificateUploaded(true);
+        Toast.show({
+          type: 'success',
+          text1: '✅ Certificado configurado',
+          text2: 'Certificado ICP-Brasil A1 configurado com sucesso!',
+          position: 'bottom',
+        });
+
+        updateUser({
+          certificate_username: certificateData.certificateUsername.trim(),
+          has_certificate: true,
+        });
+
+        // Limpar senha (não salvar em memória)
+        setCertificateData(prev => ({
+          ...prev,
+          certificatePassword: '',
+        }));
+        setShowCertificate(false);
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível configurar o certificado');
+      }
+    } catch (error) {
+      console.error('Erro ao fazer upload do certificado:', error);
+      Alert.alert('Erro', error.message || 'Não foi possível configurar o certificado');
+    } finally {
+      setCertificateLoading(false);
+    }
+  };
+
+  const handleRemoveCertificate = () => {
+    Alert.alert(
+      'Remover Certificado',
+      'Tem certeza que deseja remover o certificado digital? Você não poderá assinar documentos até configurar um novo certificado.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await userService.removeCertificate();
+              
+              if (result.success) {
+                setCertificateUploaded(false);
+                setCertificateData({
+                  certificateFile: null,
+                  certificateUsername: '',
+                  certificatePassword: '',
+                });
+                
+                Toast.show({
+                  type: 'info',
+                  text1: 'Certificado removido',
+                  text2: 'Certificado digital removido com sucesso',
+                  position: 'bottom',
+                });
+
+                updateUser({
+                  certificate_username: null,
+                  has_certificate: false,
+                });
+              } else {
+                Alert.alert('Erro', result.error || 'Não foi possível remover o certificado');
+              }
+            } catch (error) {
+              console.error('Erro ao remover certificado:', error);
+              Alert.alert('Erro', error.message || 'Não foi possível remover o certificado');
             }
           },
         },
@@ -268,7 +484,7 @@ const SecurityScreen = ({ navigation }) => {
           <View style={styles.section}>
             <TouchableOpacity
               style={styles.sectionHeader}
-              onPress={() => !twoFactorEnabled && setShow2FA(!show2FA)}
+              onPress={() => setShow2FA(!show2FA)}
               activeOpacity={0.7}
             >
               <View style={styles.sectionHeaderLeft}>
@@ -282,100 +498,53 @@ const SecurityScreen = ({ navigation }) => {
                   </Text>
                 </View>
               </View>
-              {twoFactorEnabled ? (
                 <Switch
                   value={twoFactorEnabled}
-                  onValueChange={handleDisable2FA}
+                onValueChange={(v) => {
+                  if (v) {
+                    setShow2FA(true);
+                  } else {
+                    handleDisable2FA();
+                  }
+                }}
                   trackColor={{ false: colors.gray300, true: colors.success }}
                   thumbColor={colors.textWhite}
                 />
-              ) : (
-                <Ionicons 
-                  name={show2FA ? 'chevron-up' : 'chevron-down'} 
-                  size={24} 
-                  color={colors.gray400} 
-                />
-              )}
             </TouchableOpacity>
 
             {show2FA && !twoFactorEnabled && (
               <View style={styles.expandedContent}>
                 <Text style={styles.helpText}>
-                  Escolha como deseja receber o código de verificação:
+                  Ative para receber um código de verificação via WhatsApp ao fazer login.
                 </Text>
 
-                {/* Método SMS */}
-                <TouchableOpacity
-                  style={[
-                    styles.methodCard,
-                    twoFactorMethod === 'sms' && styles.methodCardActive,
-                  ]}
-                  onPress={() => setTwoFactorMethod('sms')}
-                >
+                <View style={[styles.methodCard, styles.methodCardActive]}>
                   <View style={styles.methodIcon}>
-                    <Ionicons 
-                      name="chatbubble" 
-                      size={24} 
-                      color={twoFactorMethod === 'sms' ? colors.primary : colors.gray400} 
-                    />
+                    <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
                   </View>
                   <View style={styles.methodContent}>
-                    <Text style={styles.methodTitle}>SMS</Text>
-                    <Text style={styles.methodSubtitle}>Receber código por SMS</Text>
+                    <Text style={styles.methodTitle}>WhatsApp</Text>
+                    <Text style={styles.methodSubtitle}>Receber código por WhatsApp</Text>
                   </View>
-                  {twoFactorMethod === 'sms' && (
                     <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
+                </View>
 
-                {twoFactorMethod === 'sms' && (
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>Número de Telefone *</Text>
                     <View style={styles.inputWrapper}>
                       <Ionicons name="call-outline" size={20} color={colors.gray400} />
                       <TextInput
                         style={styles.input}
-                        placeholder="(11) 99999-9999"
+                        placeholder="+55(00)00000-0000"
                         value={phoneNumber}
                         onChangeText={setPhoneNumber}
                         keyboardType="phone-pad"
                       />
                     </View>
-                  </View>
-                )}
-
-                {/* Método Aplicativo */}
-                <TouchableOpacity
-                  style={[
-                    styles.methodCard,
-                    twoFactorMethod === 'app' && styles.methodCardActive,
-                  ]}
-                  onPress={() => setTwoFactorMethod('app')}
-                >
-                  <View style={styles.methodIcon}>
-                    <Ionicons 
-                      name="phone-portrait" 
-                      size={24} 
-                      color={twoFactorMethod === 'app' ? colors.primary : colors.gray400} 
-                    />
-                  </View>
-                  <View style={styles.methodContent}>
-                    <Text style={styles.methodTitle}>Aplicativo Autenticador</Text>
-                    <Text style={styles.methodSubtitle}>Google Authenticator, Authy, etc</Text>
-                  </View>
-                  {twoFactorMethod === 'app' && (
-                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
-
-                {twoFactorMethod === 'app' && (
-                  <View style={styles.infoCard}>
-                    <Ionicons name="information-circle" size={20} color={colors.info} />
-                    <Text style={styles.infoText}>
-                      Você precisará escanear um QR Code com seu aplicativo autenticador na próxima etapa.
+                    <Text style={styles.hint}>
+                      Use o mesmo número do seu WhatsApp
                     </Text>
                   </View>
-                )}
 
                 <TouchableOpacity
                   style={[styles.actionButton, loading && styles.actionButtonDisabled]}
@@ -389,7 +558,7 @@ const SecurityScreen = ({ navigation }) => {
               </View>
             )}
 
-            {twoFactorEnabled && (
+            {twoFactorEnabled && show2FA && (
               <View style={styles.expandedContent}>
                 <View style={styles.successCard}>
                   <Ionicons name="checkmark-circle" size={32} color={colors.success} />
@@ -397,12 +566,142 @@ const SecurityScreen = ({ navigation }) => {
                     Autenticação de dois fatores está ativa
                   </Text>
                   <Text style={styles.successSubtext}>
-                    Método: {twoFactorMethod === 'sms' ? 'SMS' : 'Aplicativo Autenticador'}
+                    Método: WhatsApp
                   </Text>
                 </View>
               </View>
             )}
           </View>
+
+          {/* Certificado Digital ICP-Brasil - Apenas para Médicos */}
+          {isDoctor && (
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={styles.sectionHeader}
+                onPress={() => setShowCertificate(!showCertificate)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sectionHeaderLeft}>
+                  <View style={[styles.sectionIcon, { backgroundColor: colors.secondary + '20' }]}>
+                    <Ionicons name="lock-closed" size={24} color={colors.secondary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sectionTitle}>Certificado Digital ICP-Brasil</Text>
+                    <Text style={styles.sectionSubtitle}>
+                      {certificateUploaded ? 'Configurado' : 'Configure para assinar documentos digitalmente'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons 
+                  name={showCertificate ? 'chevron-up' : 'chevron-down'} 
+                  size={24} 
+                  color={colors.gray400} 
+                />
+              </TouchableOpacity>
+
+              {showCertificate && (
+                <View style={styles.expandedContent}>
+                  {certificateUploaded ? (
+                    <>
+                      <View style={styles.successCard}>
+                        <Ionicons name="checkmark-circle" size={32} color={colors.success} />
+                        <Text style={styles.successText}>
+                          Certificado Digital configurado
+                        </Text>
+                        <Text style={styles.successSubtext}>
+                          Usuário: {certificateData.certificateUsername}
+                        </Text>
+                        <Text style={styles.successSubtext}>
+                          Você pode assinar receitas e atestados digitalmente
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: colors.error, marginTop: 12 }]}
+                        onPress={handleRemoveCertificate}
+                      >
+                        <Text style={styles.actionButtonText}>Remover Certificado</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.helpText}>
+                        Faça upload do seu certificado digital ICP-Brasil (.apx ou .pfx) para assinar receitas e atestados digitalmente.
+                      </Text>
+
+                      {/* Seleção de Arquivo */}
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: colors.gray200, marginBottom: 16 }]}
+                        onPress={handlePickCertificate}
+                      >
+                        <Ionicons name="document-attach" size={20} color={colors.text} />
+                        <Text style={[styles.actionButtonText, { color: colors.text, marginLeft: 8 }]}>
+                          {certificateData.certificateFile 
+                            ? certificateData.certificateFile.name 
+                            : 'Selecionar Arquivo .apx ou .pfx'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Usuário do Certificado - Opcional para .apx */}
+                      {(() => {
+                        const fileName = certificateData.certificateFile?.name || '';
+                        const isApx = fileName.toLowerCase().endsWith('.apx');
+                        return !isApx ? (
+                          <View style={styles.inputContainer}>
+                            <Text style={styles.label}>Usuário do Certificado *</Text>
+                            <View style={styles.inputWrapper}>
+                              <Ionicons name="person-outline" size={20} color={colors.gray400} />
+                              <TextInput
+                                style={styles.input}
+                                placeholder="Usuário do certificado"
+                                placeholderTextColor={colors.gray400}
+                                value={certificateData.certificateUsername}
+                                onChangeText={(value) => setCertificateData({...certificateData, certificateUsername: value})}
+                                autoCapitalize="none"
+                              />
+                            </View>
+                          </View>
+                        ) : null;
+                      })()}
+
+                      {/* Senha do Certificado */}
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Senha do Certificado *</Text>
+                        <View style={styles.inputWrapper}>
+                          <Ionicons name="lock-closed-outline" size={20} color={colors.gray400} />
+                          <TextInput
+                            style={styles.input}
+                            placeholder="Senha do certificado"
+                            placeholderTextColor={colors.gray400}
+                            value={certificateData.certificatePassword}
+                            onChangeText={(value) => setCertificateData({...certificateData, certificatePassword: value})}
+                            secureTextEntry
+                          />
+                        </View>
+                        <Text style={styles.hint}>
+                          A senha será criptografada e armazenada com segurança
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        style={[styles.actionButton, certificateLoading && styles.actionButtonDisabled]}
+                        onPress={handleUploadCertificate}
+                        disabled={certificateLoading}
+                      >
+                        {certificateLoading ? (
+                          <ActivityIndicator color={colors.white} />
+                        ) : (
+                          <Text style={styles.actionButtonText}>
+                            Configurar Certificado
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
 
           <View style={{ height: 40 }} />
         </View>
@@ -592,6 +891,12 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginTop: 4,
     textAlign: 'center',
+  },
+  hint: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
 

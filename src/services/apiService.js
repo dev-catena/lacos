@@ -52,6 +52,9 @@ class ApiService {
           if (userDataStr) {
             const userData = JSON.parse(userDataStr);
             console.log(`📱 REQUEST [${method}] ${endpoint} - Usuário: ${userData.name} | Telefone: ${userData.phone || 'N/A'}`);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiService.js:54',message:'Request with auth',data:{method:method,endpoint:endpoint,hasToken:!!token,userId:userData?.id,userRole:userData?.role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+            // #endregion
           }
         } catch (e) {
           // Ignore se não conseguir pegar dados do usuário
@@ -90,8 +93,19 @@ class ApiService {
 
       clearTimeout(timeoutId);
 
+      // Log do status da resposta para debug
+      console.log(`📡 API Response - Status: ${response.status}, OK: ${response.ok}, Endpoint: ${endpoint}`);
+      
+      // Para endpoints públicos como medical-specialties, mesmo com status não-OK, tentar extrair dados
+      const isPublicEndpoint = endpoint.includes('/medical-specialties') || endpoint.includes('/register') || endpoint.includes('/login');
+      
       // Check for errors first
       if (!response.ok) {
+        console.log(`⚠️ Resposta não OK - Status: ${response.status}, Endpoint: ${endpoint}`);
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiService.js:94',message:'HTTP error detected',data:{status:response.status,statusText:response.statusText,endpoint:endpoint,contentType:response.headers.get('content-type')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+        // #endregion
         let errorData = {};
         const contentType = response.headers.get('content-type');
         
@@ -101,11 +115,95 @@ class ApiService {
         // Tentar fazer parse do JSON de erro se houver conteúdo
         if (contentType && contentType.includes('application/json')) {
           try {
-            errorData = await response.json();
+            const responseText = await response.text();
+            
+            // Para endpoints públicos, tentar extrair dados mesmo com erro
+            if (isPublicEndpoint && responseText) {
+              try {
+                // Limpar texto: remover qualquer conteúdo antes do primeiro { ou [
+                let cleanedText = responseText;
+                const firstBrace = responseText.indexOf('{');
+                const firstBracket = responseText.indexOf('[');
+                
+                if (firstBrace !== -1 || firstBracket !== -1) {
+                  const startIndex = firstBrace !== -1 && firstBracket !== -1
+                    ? Math.min(firstBrace, firstBracket)
+                    : firstBrace !== -1 ? firstBrace : firstBracket;
+                  
+                  if (startIndex > 0) {
+                    console.warn(`⚠️ Texto antes do JSON detectado (${startIndex} caracteres), removendo...`);
+                    cleanedText = responseText.substring(startIndex);
+                  }
+                }
+                
+                const parsedData = JSON.parse(cleanedText);
+                // Se a resposta tem success: true e data, retornar os dados mesmo com status não-OK
+                if (parsedData && parsedData.success === true && parsedData.data) {
+                  console.log('✅ Dados válidos encontrados em resposta com status não-OK:', {
+                    status: response.status,
+                    endpoint: endpoint,
+                    dataLength: Array.isArray(parsedData.data) ? parsedData.data.length : 'N/A'
+                  });
+                  return parsedData;
+                }
+              } catch (parseError) {
+                console.log('⚠️ Não foi possível fazer parse dos dados:', parseError);
+                console.log('⚠️ Texto que causou erro (primeiros 200 chars):', responseText.substring(0, 200));
+              }
+            }
+            
+            // #region agent log
+            const responseTextLog = {
+              location: 'apiService.js:105',
+              message: 'Error response text',
+              data: {
+                responseText: responseText.substring(0,1000),
+                textLength: responseText.length,
+                endpoint: endpoint,
+                status: response.status
+              },
+              timestamp: Date.now(),
+              sessionId: 'debug-session',
+              runId: 'run1',
+              hypothesisId: 'I'
+            };
+            console.log('🔍 DEBUG RESPONSE TEXT:', JSON.stringify(responseTextLog, null, 2));
+            fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(responseTextLog)}).catch(()=>{});
+            // #endregion
+            
+            // Limpar texto: remover qualquer conteúdo antes do primeiro { ou [
+            // Isso corrige o problema de "use AppHttpControllers..." aparecendo antes do JSON
+            let cleanedText = responseText;
+            const firstBrace = responseText.indexOf('{');
+            const firstBracket = responseText.indexOf('[');
+            
+            if (firstBrace !== -1 || firstBracket !== -1) {
+              const startIndex = firstBrace !== -1 && firstBracket !== -1
+                ? Math.min(firstBrace, firstBracket)
+                : firstBrace !== -1 ? firstBrace : firstBracket;
+              
+              if (startIndex > 0) {
+                console.warn(`⚠️ Texto antes do JSON detectado (${startIndex} caracteres), removendo...`);
+                console.warn(`⚠️ Texto removido: "${responseText.substring(0, Math.min(startIndex, 100))}"`);
+                cleanedText = responseText.substring(startIndex);
+              }
+            }
+            
+            errorData = JSON.parse(cleanedText);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiService.js:108',message:'Error data parsed',data:{errorData:errorData,errorKeys:Object.keys(errorData)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'})}).catch(()=>{});
+            // #endregion
           } catch (e) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiService.js:111',message:'Error parsing JSON',data:{parseError:e?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
+            // #endregion
             // Se falhar, usar mensagem genérica
             errorData = { message: `Erro HTTP ${response.status}` };
           }
+        } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiService.js:116',message:'Non-JSON error response',data:{contentType:contentType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'})}).catch(()=>{});
+          // #endregion
         }
         
         // Para erros 500 em endpoints não críticos (como alertas), não logar como erro crítico
@@ -114,17 +212,53 @@ class ApiService {
         const errorMessage = errorData.message || `Erro na requisição: ${response.status}`;
         
         // Criar objeto de erro sem logar ainda
+        // Verificar se o backend retornou "erros" (português) ou "errors" (inglês)
+        const errors = errorData.errors || errorData.erros || {};
+        
         const errorObj = {
           status: response.status,
           message: errorMessage,
-          errors: errorData.errors || {},
+          errors: errors,
+          // Manter referência ao errorData completo para debug
+          _rawErrorData: errorData,
         };
+        
+        // #region agent log
+        const errorObjLog = {
+          location: 'apiService.js:128',
+          message: 'Error object created',
+          data: {
+            errorObj: errorObj,
+            isNonCritical: isNonCriticalEndpoint,
+            isPharmacy404: isPharmacyPrice404,
+            errorData: errorData,
+            endpoint: endpoint,
+            status: response.status
+          },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'M'
+        };
+        console.log('🔍 DEBUG ERROR OBJ:', JSON.stringify(errorObjLog, null, 2));
+        fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(errorObjLog)}).catch(()=>{});
+        // #endregion
         
         // Não logar 404 de preços de farmácia como erro (é esperado quando não há preço informado)
         // Não logar 500 em endpoints não críticos
         const shouldLogError = !isPharmacyPrice404 && (!isNonCriticalEndpoint || response.status !== 500);
         if (shouldLogError) {
           console.error(`❌ API Error:`, errorMessage);
+          // Log detalhado para debug
+          if (response.status === 500) {
+            console.error('🔍 DEBUG 500 Error Details:', {
+              endpoint: endpoint,
+              status: response.status,
+              errorData: errorData,
+              errorObj: errorObj,
+              fullErrorData: JSON.stringify(errorData, null, 2)
+            });
+          }
         }
         // Para endpoints não críticos com erro 500, não logar nada aqui
         // O serviço específico vai tratar e logar como warning se necessário
@@ -137,20 +271,44 @@ class ApiService {
       
       // Se não houver content-type ou não for JSON, retornar resposta vazia
       if (!contentType || !contentType.includes('application/json')) {
+        console.warn('⚠️ Resposta não é JSON. Content-Type:', contentType);
         return {};
       }
 
       // Verificar se há conteúdo no body
-      const text = await response.text();
+      let text = await response.text();
       if (!text || text.trim() === '') {
+        console.warn('⚠️ Resposta vazia');
         return {};
+      }
+
+      // Limpar texto: remover qualquer conteúdo antes do primeiro { ou [
+      // Isso resolve problemas quando o backend retorna texto antes do JSON
+      const firstBrace = text.indexOf('{');
+      const firstBracket = text.indexOf('[');
+      
+      if (firstBrace !== -1 || firstBracket !== -1) {
+        const startIndex = firstBrace !== -1 && firstBracket !== -1
+          ? Math.min(firstBrace, firstBracket)
+          : firstBrace !== -1 ? firstBrace : firstBracket;
+        
+        if (startIndex > 0) {
+          console.warn(`⚠️ Texto antes do JSON detectado (${startIndex} caracteres), removendo...`);
+          text = text.substring(startIndex);
+        }
       }
 
       // Tentar fazer parse do JSON
       try {
-        return JSON.parse(text);
+        const parsed = JSON.parse(text);
+        console.log('✅ JSON parseado com sucesso. Tipo:', typeof parsed, 'É array?', Array.isArray(parsed));
+        if (parsed && typeof parsed === 'object') {
+          console.log('✅ Chaves do objeto:', Object.keys(parsed));
+        }
+        return parsed;
       } catch (e) {
-        console.error('Erro ao fazer parse do JSON:', text);
+        console.error('❌ Erro ao fazer parse do JSON:', e.message);
+        console.error('❌ Texto recebido (primeiros 500 chars):', text.substring(0, 500));
         throw {
           status: 500,
           message: 'Resposta inválida do servidor',

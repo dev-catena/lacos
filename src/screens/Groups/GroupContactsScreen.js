@@ -26,14 +26,48 @@ const GroupContactsScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [contacts, setContacts] = useState([
-    { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
-    { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
-    { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
+    { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
+    { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
+    { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
   ]);
   const [sosContacts, setSosContacts] = useState([
-    { id: null, name: '', phone: '', relationship: 'SOS', photo: null, photoUri: null },
-    { id: null, name: '', phone: '', relationship: 'SOS', photo: null, photoUri: null },
+    { id: null, name: '', phone: '+55', relationship: 'SOS', photo: null, photoUri: null },
+    { id: null, name: '', phone: '+55', relationship: 'SOS', photo: null, photoUri: null },
   ]);
+
+  // Função para formatar telefone: +55(00)00000-0000
+  const formatPhoneNumber = (text) => {
+    // Se o texto não começar com +55, garantir que comece
+    let cleanText = text;
+    if (!text || !text.startsWith('+55')) {
+      // Se não começar com +55, adicionar
+      const digits = text ? text.replace(/\D/g, '') : '';
+      cleanText = '+55' + digits;
+    }
+    
+    // Remove o +55 temporariamente para processar apenas os dígitos
+    const digitsOnly = cleanText.replace(/\+55/g, '').replace(/\D/g, '');
+    
+    // Limita a 11 dígitos (DDD + número)
+    const limitedDigits = digitsOnly.slice(0, 11);
+    
+    // Sempre começa com +55
+    let formatted = '+55';
+    
+    if (limitedDigits.length > 0) {
+      formatted += `(${limitedDigits.slice(0, 2)}`;
+    }
+    
+    if (limitedDigits.length > 2) {
+      formatted += `)${limitedDigits.slice(2, 7)}`;
+    }
+    
+    if (limitedDigits.length > 7) {
+      formatted += `-${limitedDigits.slice(7, 11)}`;
+    }
+    
+    return formatted;
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -65,17 +99,29 @@ const GroupContactsScreen = ({ route, navigation }) => {
         const quickContacts = apiContacts.filter(c => c.relationship !== 'SOS').slice(0, 3);
         const sosContactsList = apiContacts.filter(c => c.relationship === 'SOS').slice(0, 2);
         
+        // Função auxiliar para formatar telefone vindo da API
+        const formatPhoneFromAPI = (phone) => {
+          if (!phone) return '+55';
+          // Se já começar com +55, formatar normalmente
+          if (phone.startsWith('+55')) {
+            return formatPhoneNumber(phone);
+          }
+          // Se não começar com +55, adicionar
+          const digits = phone.replace(/\D/g, '');
+          return formatPhoneNumber('+55' + digits);
+        };
+        
         // Preencher contatos rápidos (sempre 3 slots)
         const filledQuickContacts = [
-          quickContacts[0] ? {...quickContacts[0], photoUri: null} : { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
-          quickContacts[1] ? {...quickContacts[1], photoUri: null} : { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
-          quickContacts[2] ? {...quickContacts[2], photoUri: null} : { id: null, name: '', phone: '', relationship: '', photo: null, photoUri: null, isSOS: false },
+          quickContacts[0] ? {...quickContacts[0], phone: formatPhoneFromAPI(quickContacts[0].phone), photoUri: null} : { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
+          quickContacts[1] ? {...quickContacts[1], phone: formatPhoneFromAPI(quickContacts[1].phone), photoUri: null} : { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
+          quickContacts[2] ? {...quickContacts[2], phone: formatPhoneFromAPI(quickContacts[2].phone), photoUri: null} : { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
         ];
         
         // Preencher contatos SOS (sempre 2 slots)
         const filledSosContacts = [
-          sosContactsList[0] ? {...sosContactsList[0], photoUri: null} : { id: null, name: '', phone: '', relationship: 'SOS', photo: null, photoUri: null },
-          sosContactsList[1] ? {...sosContactsList[1], photoUri: null} : { id: null, name: '', phone: '', relationship: 'SOS', photo: null, photoUri: null },
+          sosContactsList[0] ? {...sosContactsList[0], phone: formatPhoneFromAPI(sosContactsList[0].phone), photoUri: null} : { id: null, name: '', phone: '+55', relationship: 'SOS', photo: null, photoUri: null },
+          sosContactsList[1] ? {...sosContactsList[1], phone: formatPhoneFromAPI(sosContactsList[1].phone), photoUri: null} : { id: null, name: '', phone: '+55', relationship: 'SOS', photo: null, photoUri: null },
         ];
         
         setContacts(filledQuickContacts);
@@ -100,31 +146,49 @@ const GroupContactsScreen = ({ route, navigation }) => {
     }
   };
 
-  const formatPhoneNumber = (text) => {
-    // Remove tudo que não é número
-    const cleaned = text.replace(/\D/g, '');
+  // Handler para mudança do campo telefone
+  const handlePhoneChange = (text, index, isSOS = false) => {
+    // Se o texto estiver vazio ou não começar com +55, garantir +55
+    if (!text || text.length === 0) {
+      if (isSOS) {
+        updateSOSContact(index, 'phone', '+55');
+      } else {
+        updateContact(index, 'phone', '+55');
+      }
+      return;
+    }
     
-    // Formata: +55 (11) 99999-9999
-    if (cleaned.length <= 2) {
-      return `+${cleaned}`;
-    } else if (cleaned.length <= 4) {
-      return `+${cleaned.slice(0, 2)} (${cleaned.slice(2)}`;
-    } else if (cleaned.length <= 9) {
-      return `+${cleaned.slice(0, 2)} (${cleaned.slice(2, 4)}) ${cleaned.slice(4)}`;
+    // Se o usuário tentar apagar o +55, restaurar
+    if (!text.startsWith('+55')) {
+      // Se não começar com +55, adicionar +55 e formatar
+      const digits = text.replace(/\D/g, '');
+      const formatted = formatPhoneNumber('+55' + digits);
+      if (isSOS) {
+        updateSOSContact(index, 'phone', formatted);
+      } else {
+        updateContact(index, 'phone', formatted);
+      }
+      return;
+    }
+    
+    // Formatar o telefone mantendo o +55
+    const formatted = formatPhoneNumber(text);
+    if (isSOS) {
+      updateSOSContact(index, 'phone', formatted);
     } else {
-      return `+${cleaned.slice(0, 2)} (${cleaned.slice(2, 4)}) ${cleaned.slice(4, 9)}-${cleaned.slice(9, 13)}`;
+      updateContact(index, 'phone', formatted);
     }
   };
 
   const updateContact = (index, field, value) => {
     setContacts(prev => prev.map((contact, idx) => 
-      idx === index ? { ...contact, [field]: field === 'phone' ? formatPhoneNumber(value) : value } : contact
+      idx === index ? { ...contact, [field]: value } : contact
     ));
   };
 
   const updateSOSContact = (index, field, value) => {
     setSosContacts(prev => prev.map((contact, idx) => 
-      idx === index ? { ...contact, [field]: field === 'phone' ? formatPhoneNumber(value) : value } : contact
+      idx === index ? { ...contact, [field]: value } : contact
     ));
   };
 
@@ -451,12 +515,15 @@ const GroupContactsScreen = ({ route, navigation }) => {
                   <Text style={styles.inputLabel}>Telefone</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="+55 (11) 99999-9999"
+                    placeholder="+55(00)00000-0000"
                     placeholderTextColor={colors.placeholder}
-                    value={contact.phone}
-                    onChangeText={(text) => updateContact(index, 'phone', text)}
+                    value={contact.phone || '+55'}
+                    onChangeText={(text) => handlePhoneChange(text, index, false)}
                     keyboardType="phone-pad"
                   />
+                  <Text style={styles.hint}>
+                    Formato: +55(DDD)XXXXX-XXXX (11 dígitos)
+                  </Text>
                 </View>
 
                 {/* Foto do Contato */}
@@ -517,12 +584,15 @@ const GroupContactsScreen = ({ route, navigation }) => {
                   <Text style={styles.inputLabel}>Telefone</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="+55 (11) 99999-9999"
+                    placeholder="+55(00)00000-0000"
                     placeholderTextColor={colors.placeholder}
-                    value={contact.phone}
-                    onChangeText={(text) => updateSOSContact(index, 'phone', text)}
+                    value={contact.phone || '+55'}
+                    onChangeText={(text) => handlePhoneChange(text, index, true)}
                     keyboardType="phone-pad"
                   />
+                  <Text style={styles.hint}>
+                    Formato: +55(DDD)XXXXX-XXXX (11 dígitos)
+                  </Text>
                 </View>
 
                 {/* Foto do Contato SOS */}
@@ -727,6 +797,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: colors.text,
+  },
+  hint: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   photoButton: {
     width: '100%',

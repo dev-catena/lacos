@@ -68,3 +68,4 @@ echo \"   Sem coordenadas: {\$semCoords}\n\";
 
 
 
+

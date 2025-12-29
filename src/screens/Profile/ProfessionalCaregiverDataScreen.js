@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,10 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Modal,
+  FlatList,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -18,6 +21,10 @@ import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import userService from '../../services/userService';
+import medicalSpecialtyService from '../../services/medicalSpecialtyService';
+import { BR_UFS } from '../../constants/brUfs';
+import { parseCrm, formatCrmValue } from '../../utils/crm';
+import SafeIcon from '../../components/SafeIcon';
 
 const ProfessionalCaregiverDataScreen = ({ navigation }) => {
   const { user, updateUser } = useAuth();
@@ -28,6 +35,9 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
     'female': 'Feminino',
   };
 
+  const isDoctor = user?.profile === 'doctor';
+  const parsedCrm = parseCrm(user?.crm || '');
+  
   const [formData, setFormData] = useState({
     gender: user?.gender ? (genderMapFromEnglish[user.gender] || user.gender) : '',
     city: user?.city || '',
@@ -39,7 +49,18 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
     is_available: user?.is_available !== undefined ? user.is_available : true,
     latitude: user?.latitude || null,
     longitude: user?.longitude || null,
+    // Campos específicos de médico
+    crmUf: parsedCrm.uf || '',
+    crmNumber: parsedCrm.number || '',
+    medical_specialty_id: user?.medical_specialty_id || null,
+    consultation_price: user?.consultation_price ? user.consultation_price.toString() : '',
   });
+
+  // Estados para especialidades médicas
+  const [specialties, setSpecialties] = useState([]);
+  const [specialtyModalVisible, setSpecialtyModalVisible] = useState(false);
+  const [loadingSpecialties, setLoadingSpecialties] = useState(false);
+  const [ufModalVisible, setUfModalVisible] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -63,6 +84,61 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
       setCourses([]);
     }
   }, [user]);
+
+
+  // Função para recarregar dados do usuário
+  const reloadUserData = useCallback(async () => {
+    try {
+      const response = await userService.getUser();
+      if (response.success && response.data && updateUser) {
+        updateUser(response.data);
+      }
+    } catch (error) {
+      console.error('Erro ao recarregar dados do usuário:', error);
+    }
+  }, [updateUser]);
+
+  // Recarregar dados quando a tela recebe foco
+  useFocusEffect(
+    useCallback(() => {
+      reloadUserData();
+    }, [reloadUserData])
+  );
+
+  // Carregar especialidades se for médico
+  useEffect(() => {
+    if (isDoctor) {
+      loadSpecialties();
+    }
+  }, [isDoctor]);
+
+
+  const loadSpecialties = async () => {
+    try {
+      setLoadingSpecialties(true);
+      const response = await medicalSpecialtyService.getSpecialties();
+      if (response.success && response.data) {
+        // Remover duplicatas por nome
+        const uniqueSpecialties = response.data.reduce((acc, current) => {
+          const existing = acc.find(item => item.name === current.name);
+          if (!existing) {
+            acc.push(current);
+          }
+          return acc;
+        }, []);
+        
+        // Ordenar por nome
+        uniqueSpecialties.sort((a, b) => a.name.localeCompare(b.name));
+        
+        setSpecialties(uniqueSpecialties);
+        console.log(`✅ Especialidades carregadas: ${uniqueSpecialties.length}`);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar especialidades:', error);
+    } finally {
+      setLoadingSpecialties(false);
+    }
+  };
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -122,17 +198,40 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
     }
   };
 
+
   const handleSave = async () => {
-    // Validações
-    if (!formData.gender || !formData.city || !formData.neighborhood || 
-        !formData.formation_details || !formData.hourly_rate || !formData.availability) {
+    // Validações básicas
+    if (!formData.gender || !formData.city || !formData.neighborhood) {
       Alert.alert('Atenção', 'Por favor, preencha todos os campos obrigatórios');
       return;
     }
 
-    if (isNaN(parseFloat(formData.hourly_rate)) || parseFloat(formData.hourly_rate) <= 0) {
-      Alert.alert('Atenção', 'Valor por hora deve ser um número válido maior que zero');
-      return;
+    // Validações específicas por perfil
+    if (isDoctor) {
+      // Validações para médico
+      if (!formData.crmUf || !formData.crmNumber || !formData.medical_specialty_id) {
+        Alert.alert('Atenção', 'Por favor, preencha CRM (UF e número) e Especialidade');
+        return;
+      }
+      // Validação do valor da consulta (opcional, mas se preenchido deve ser válido)
+      if (formData.consultation_price && formData.consultation_price.trim()) {
+        const priceValue = parseFloat(formData.consultation_price);
+        if (isNaN(priceValue) || priceValue < 0) {
+          Alert.alert('Atenção', 'O valor da consulta deve ser um número válido maior ou igual a zero');
+          return;
+        }
+      }
+    } else {
+      // Validações para cuidador profissional
+      if (!formData.formation_details || !formData.hourly_rate || !formData.availability) {
+        Alert.alert('Atenção', 'Por favor, preencha todos os campos obrigatórios');
+        return;
+      }
+
+      if (isNaN(parseFloat(formData.hourly_rate)) || parseFloat(formData.hourly_rate) <= 0) {
+        Alert.alert('Atenção', 'Valor por hora deve ser um número válido maior que zero');
+        return;
+      }
     }
 
     setLoading(true);
@@ -150,11 +249,30 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
         gender: genderInEnglish,
         city: formData.city.trim(),
         neighborhood: formData.neighborhood.trim(),
-        formation_details: formData.formation_details.trim(),
-        hourly_rate: parseFloat(formData.hourly_rate),
-        availability: formData.availability.trim(),
         is_available: formData.is_available,
       };
+
+      // Adicionar campos específicos por perfil
+      if (isDoctor) {
+        // Campos para médico
+        dataToUpdate.crm = formatCrmValue(formData.crmUf, formData.crmNumber);
+        dataToUpdate.medical_specialty_id = formData.medical_specialty_id;
+        // Sempre enviar consultation_price, mesmo que seja 0 ou vazio
+        if (formData.consultation_price && formData.consultation_price.trim()) {
+          const priceValue = parseFloat(formData.consultation_price);
+          if (!isNaN(priceValue) && priceValue >= 0) {
+            dataToUpdate.consultation_price = priceValue;
+          }
+        } else {
+          // Se estiver vazio, enviar null para limpar o valor
+          dataToUpdate.consultation_price = null;
+        }
+      } else {
+        // Campos para cuidador profissional
+        dataToUpdate.formation_details = formData.formation_details.trim();
+        dataToUpdate.hourly_rate = parseFloat(formData.hourly_rate);
+        dataToUpdate.availability = formData.availability.trim();
+      }
       
       // Se houver descrição da formação, adicionar ao campo availability ou criar campo separado
       // Por enquanto, vamos concatenar com availability se necessário
@@ -176,13 +294,33 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
         certificate_url: course.certificate_url || null,
       }));
 
+      console.log('📚 Cursos a serem enviados:', dataToUpdate.courses);
+      console.log('📤 Dados completos a serem enviados:', dataToUpdate);
+      if (isDoctor) {
+        console.log('💳 Valor da consulta a ser enviado:', {
+          formDataValue: formData.consultation_price,
+          parsedValue: dataToUpdate.consultation_price,
+          type: typeof dataToUpdate.consultation_price,
+        });
+      }
+
       // Enviar para API
+      console.log('📤 ProfessionalCaregiverDataScreen - Enviando dados para API:', JSON.stringify(dataToUpdate, null, 2));
       const response = await userService.updateUserData(user.id, dataToUpdate);
+      
+      console.log('📥 ProfessionalCaregiverDataScreen - Resposta da API:', response);
       
       if (response.success && response.data) {
         // Atualizar contexto
         if (updateUser) {
           updateUser(response.data);
+        }
+        
+        // Verificar se consultation_price foi salvo
+        if (isDoctor && response.data.consultation_price !== undefined) {
+          console.log('✅ ProfessionalCaregiverDataScreen - Valor da consulta salvo:', response.data.consultation_price);
+        } else if (isDoctor) {
+          console.warn('⚠️ ProfessionalCaregiverDataScreen - Valor da consulta não retornado na resposta');
         }
         
         // Atualizar cursos no estado local se vierem na resposta
@@ -203,6 +341,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
           navigation.goBack();
         }, 1000);
       } else {
+        console.error('❌ ProfessionalCaregiverDataScreen - Erro na resposta:', response);
         throw new Error(response.error || 'Erro ao atualizar dados');
       }
     } catch (error) {
@@ -223,7 +362,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Dados Profissionais</Text>
         <View style={styles.placeholder} />
@@ -294,7 +433,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
               <ActivityIndicator color={colors.white} />
             ) : (
               <>
-                <Ionicons name="location" size={20} color={colors.white} />
+                <SafeIcon name="location" size={20} color={colors.white} />
                 <Text style={styles.locationButtonText}>Usar minha localização</Text>
               </>
             )}
@@ -304,46 +443,177 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informações Profissionais</Text>
           
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Formação *</Text>
-            <View style={styles.formationSelector}>
-              {['Cuidador', 'Auxiliar de enfermagem'].map((formation) => (
-                <TouchableOpacity
-                  key={formation}
-                  style={[
-                    styles.formationOption,
-                    formData.formation_details === formation && styles.formationOptionActive,
-                  ]}
-                  onPress={() => updateFormData('formation_details', formation)}
-                >
-                  <Text
-                    style={[
-                      styles.formationOptionText,
-                      formData.formation_details === formation && styles.formationOptionTextActive,
-                    ]}
-                  >
-                    {formation}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+          {/* Campos específicos para Cuidador Profissional */}
+          {!isDoctor && (
+            <>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Formação *</Text>
+                <View style={styles.formationSelector}>
+                  {['Cuidador', 'Auxiliar de enfermagem'].map((formation) => (
+                    <TouchableOpacity
+                      key={formation}
+                      style={[
+                        styles.formationOption,
+                        formData.formation_details === formation && styles.formationOptionActive,
+                      ]}
+                      onPress={() => updateFormData('formation_details', formation)}
+                    >
+                      <Text
+                        style={[
+                          styles.formationOptionText,
+                          formData.formation_details === formation && styles.formationOptionTextActive,
+                        ]}
+                      >
+                        {formation}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Detalhes da Formação</Text>
-            <Text style={styles.labelSubtitle}>
-              Descreva sua formação, especializações e experiência profissional
-            </Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Ex: Auxiliar de Enfermagem formado pela Escola Técnica de Saúde, com especialização em cuidados geriátricos e 5 anos de experiência..."
-              placeholderTextColor={colors.placeholder}
-              value={formData.formation_description}
-              onChangeText={(value) => updateFormData('formation_description', value)}
-              multiline
-              numberOfLines={5}
-            />
-          </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Detalhes da Formação</Text>
+                <Text style={styles.labelSubtitle}>
+                  Descreva sua formação, especializações e experiência profissional
+                </Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Ex: Auxiliar de Enfermagem formado pela Escola Técnica de Saúde, com especialização em cuidados geriátricos e 5 anos de experiência..."
+                  placeholderTextColor={colors.placeholder}
+                  value={formData.formation_description}
+                  onChangeText={(value) => updateFormData('formation_description', value)}
+                  multiline
+                  numberOfLines={5}
+                />
+              </View>
+            </>
+          )}
+
+          {/* Campos específicos para Médico */}
+          {isDoctor && (
+            <>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>CRM *</Text>
+                <View style={styles.crmRow}>
+                  <TouchableOpacity
+                    style={styles.ufSelector}
+                    activeOpacity={0.7}
+                    onPress={() => setUfModalVisible(true)}
+                  >
+                    <Text style={[
+                      styles.ufSelectorText,
+                      !formData.crmUf && styles.ufSelectorPlaceholder
+                    ]}>
+                      {formData.crmUf || 'UF'}
+                    </Text>
+                    <SafeIcon name="chevron-down" size={18} color={colors.textLight} />
+                  </TouchableOpacity>
+
+                  <TextInput
+                    style={[styles.input, styles.crmNumberInput]}
+                    placeholder="Número do CRM"
+                    placeholderTextColor={colors.placeholder}
+                    value={formData.crmNumber}
+                    onChangeText={(value) => updateFormData('crmNumber', value.replace(/\D/g, '').slice(0, 12))}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+
+              {/* Modal UF */}
+              <Modal
+                visible={ufModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setUfModalVisible(false)}
+              >
+                <View style={styles.modalOverlay}>
+                  <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle}>Selecione o UF</Text>
+                      <TouchableOpacity
+                        style={styles.modalCloseButton}
+                        onPress={() => setUfModalVisible(false)}
+                      >
+                        <SafeIcon name="close" size={24} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
+                    <FlatList
+                      data={BR_UFS}
+                      keyExtractor={(item) => item}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={[
+                            styles.specialtyItem,
+                            formData.crmUf === item && styles.specialtyItemSelected
+                          ]}
+                          onPress={() => {
+                            updateFormData('crmUf', item);
+                            setUfModalVisible(false);
+                          }}
+                        >
+                          <Text style={[
+                            styles.specialtyItemText,
+                            formData.crmUf === item && styles.specialtyItemTextSelected
+                          ]}>
+                            {item}
+                          </Text>
+                          {formData.crmUf === item && (
+                            <SafeIcon name="checkmark" size={24} color={colors.primary} />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                      ItemSeparatorComponent={() => <View style={styles.separator} />}
+                    />
+                  </View>
+                </View>
+              </Modal>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Especialidade *</Text>
+                <TouchableOpacity
+                  style={styles.inputWrapper}
+                  onPress={() => setSpecialtyModalVisible(true)}
+                >
+                  <SafeIcon name="medical-outline" size={20} color={colors.gray400} />
+                  <Text style={[
+                    { flex: 1, fontSize: 16, color: formData.medical_specialty_id ? colors.text : colors.gray400 }
+                  ]}>
+                    {formData.medical_specialty_id
+                      ? specialties.find(s => s.id === formData.medical_specialty_id)?.name
+                      : 'Selecione a especialidade...'}
+                  </Text>
+                  <SafeIcon name="chevron-down" size={20} color={colors.gray400} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Valor da Consulta (R$) *</Text>
+                <Text style={styles.labelSubtitle}>
+                  Este valor será usado como base para calcular o valor a pagar (valor + 20% de taxa)
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ex: 150.00"
+                  placeholderTextColor={colors.placeholder}
+                  value={formData.consultation_price}
+                  onChangeText={(value) => {
+                    // Permitir apenas números e ponto decimal
+                    const cleaned = value.replace(/[^0-9.]/g, '');
+                    // Garantir apenas um ponto decimal
+                    const parts = cleaned.split('.');
+                    let formatted = parts[0];
+                    if (parts.length > 1) {
+                      formatted += '.' + parts.slice(1).join('').substring(0, 2);
+                    }
+                    updateFormData('consultation_price', formatted);
+                  }}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+            </>
+          )}
 
           {/* Cursos e Certificações */}
           <View style={styles.inputContainer}>
@@ -359,7 +629,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
                 setShowCourseForm(true);
               }}
             >
-              <Ionicons name="add" size={20} color={colors.white} />
+              <SafeIcon name="add" size={20} color={colors.white} />
               <Text style={styles.addButtonText}>Adicionar Curso</Text>
             </TouchableOpacity>
 
@@ -384,7 +654,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
                           setShowCourseForm(true);
                         }}
                       >
-                        <Ionicons name="create-outline" size={20} color="#B8A9E8" />
+                        <SafeIcon name="create-outline" size={20} color="#B8A9E8" />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => {
@@ -392,7 +662,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
                           setCourses(newCourses);
                         }}
                       >
-                        <Ionicons name="trash-outline" size={20} color={colors.error} />
+                        <SafeIcon name="trash-outline" size={20} color={colors.error} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -472,33 +742,39 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
             )}
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Valor por hora (R$) *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 50.00"
-              placeholderTextColor={colors.placeholder}
-              value={formData.hourly_rate}
-              onChangeText={(value) => {
-                const cleaned = value.replace(/[^0-9.]/g, '');
-                updateFormData('hourly_rate', cleaned);
-              }}
-              keyboardType="decimal-pad"
-            />
-          </View>
+          {/* Valor por hora - apenas para cuidador profissional */}
+          {!isDoctor && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Valor por hora (R$) *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 50.00"
+                placeholderTextColor={colors.placeholder}
+                value={formData.hourly_rate}
+                onChangeText={(value) => {
+                  const cleaned = value.replace(/[^0-9.]/g, '');
+                  updateFormData('hourly_rate', cleaned);
+                }}
+                keyboardType="decimal-pad"
+              />
+            </View>
+          )}
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Disponibilidade *</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Ex: 24 horas ou Segunda a Sexta, 8h às 18h"
-              placeholderTextColor={colors.placeholder}
-              value={formData.availability}
-              onChangeText={(value) => updateFormData('availability', value)}
-              multiline
-              numberOfLines={3}
-            />
-          </View>
+          {/* Disponibilidade - apenas para cuidador profissional */}
+          {!isDoctor && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Disponibilidade *</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Ex: 24 horas ou Segunda a Sexta, 8h às 18h"
+                placeholderTextColor={colors.placeholder}
+                value={formData.availability}
+                onChangeText={(value) => updateFormData('availability', value)}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+          )}
 
           <View style={styles.inputContainer}>
             <View style={styles.switchRow}>
@@ -519,6 +795,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
           </View>
         </View>
 
+
         <TouchableOpacity
           style={[styles.saveButton, loading && styles.saveButtonDisabled]}
           onPress={handleSave}
@@ -531,6 +808,69 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+
+      {/* Modal de Especialidades (apenas para médico) */}
+      {isDoctor && (
+        <Modal
+          visible={specialtyModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setSpecialtyModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Selecione a Especialidade</Text>
+                <TouchableOpacity
+                  onPress={() => setSpecialtyModalVisible(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+              {loadingSpecialties ? (
+                <View style={styles.modalLoadingContainer}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={styles.modalLoadingText}>Carregando especialidades...</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={specialties}
+                  keyExtractor={(item) => item.id.toString()}
+                  style={styles.flatList}
+                  contentContainerStyle={styles.flatListContent}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.specialtyItem,
+                        formData.medical_specialty_id === item.id && styles.specialtyItemSelected
+                      ]}
+                      onPress={() => {
+                        updateFormData('medical_specialty_id', item.id);
+                        setSpecialtyModalVisible(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.specialtyItemText,
+                        formData.medical_specialty_id === item.id && styles.specialtyItemTextSelected
+                      ]}>
+                        {item.name}
+                      </Text>
+                      {formData.medical_specialty_id === item.id && (
+                        <Ionicons name="checkmark" size={24} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  ItemSeparatorComponent={() => <View style={styles.separator} />}
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
+
+
     </SafeAreaView>
   );
 };
@@ -600,6 +940,35 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: colors.text,
+  },
+  crmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ufSelector: {
+    width: 92,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+  },
+  ufSelectorText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  ufSelectorPlaceholder: {
+    color: colors.textLight,
+    fontWeight: '500',
+  },
+  crmNumberInput: {
+    flex: 1,
   },
   textArea: {
     minHeight: 80,
@@ -810,6 +1179,122 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Estilos para combo de especialidade (médico)
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+    backgroundColor: '#FFFFFF',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalLoadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalLoadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: colors.textLight,
+  },
+  flatList: {
+    backgroundColor: '#FFFFFF',
+  },
+  flatListContent: {
+    backgroundColor: '#FFFFFF',
+  },
+  specialtyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  specialtyItemSelected: {
+    backgroundColor: '#E3F2FD',
+  },
+  specialtyItemText: {
+    fontSize: 16,
+    color: colors.text,
+  },
+  specialtyItemTextSelected: {
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: colors.gray100,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: colors.gray200,
+  },
+  modalButtonCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalButtonConfirm: {
+    backgroundColor: colors.primary,
+  },
+  modalButtonConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 8,
   },
 });
 

@@ -10,47 +10,83 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import documentService from '../../services/documentService';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  DocumentIcon,
+  ReceiptIcon,
+  CalendarIcon,
+  WarningIcon,
+  AddIcon,
+  ArrowBackIcon,
+  PersonIcon,
+  FolderIcon,
+  FlaskIcon,
+  ImageIcon,
+} from '../../components/CustomIcons';
 
 const DocumentsScreen = ({ route, navigation }) => {
-  const { groupId, groupName } = route.params || {};
+  const { groupId, groupName, patientId, patientName } = route.params || {};
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState([]);
   const [filterType, setFilterType] = useState('all');
 
   const documentTypes = [
-    { id: 'all', label: 'Todos', icon: 'folder' },
-    { id: 'exam_lab', label: 'Exame Lab', icon: 'flask' },
-    { id: 'exam_image', label: 'Imagem', icon: 'image' },
-    { id: 'prescription', label: 'Receita', icon: 'document-text' },
-    { id: 'report', label: 'Laudo', icon: 'document' },
-    { id: 'other', label: 'Outro', icon: 'document-attach' },
+    { id: 'all', label: 'Todos', icon: 'folder', IconComponent: FolderIcon },
+    { id: 'exam_lab', label: 'Exame Lab', icon: 'flask', IconComponent: FlaskIcon },
+    { id: 'exam_image', label: 'Imagem', icon: 'image', IconComponent: ImageIcon },
+    { id: 'prescription', label: 'Receita', icon: 'document-text', IconComponent: ReceiptIcon },
+    { id: 'medical_leave', label: 'Afastamento', icon: 'calendar', IconComponent: CalendarIcon },
+    { id: 'medical_certificate', label: 'Afastamento', icon: 'calendar', IconComponent: CalendarIcon },
+    { id: 'report', label: 'Atestado', icon: 'document', IconComponent: DocumentIcon },
+    { id: 'other', label: 'Outro', icon: 'document-attach', IconComponent: DocumentIcon },
   ];
 
   useFocusEffect(
     React.useCallback(() => {
       loadDocuments();
-    }, [groupId])
+    }, [groupId, patientId])
   );
 
   const loadDocuments = async () => {
     setLoading(true);
     try {
-      console.log('📂 DocumentsScreen - Carregando documentos do grupo:', groupId);
+      let result = [];
       
-      if (!groupId) {
-        console.error('❌ DocumentsScreen - groupId não fornecido');
+      // Se for médico e tiver patientId, buscar documentos do paciente
+      if (user?.profile === 'doctor' && patientId) {
+        console.log('📂 DocumentsScreen - Carregando documentos do paciente:', patientId);
+        result = await documentService.getDocumentsByPatient(patientId);
+      } else if (groupId) {
+        console.log('📂 DocumentsScreen - Carregando documentos do grupo:', groupId);
+        result = await documentService.getDocumentsByGroup(groupId);
+      } else {
+        console.error('❌ DocumentsScreen - groupId ou patientId não fornecido');
         setDocuments([]);
         return;
       }
-
-      // Chamar API real
-      const result = await documentService.getDocumentsByGroup(groupId);
       
       console.log('✅ DocumentsScreen - Documentos carregados:', result.length);
+      if (result.length > 0) {
+        console.log('📋 DocumentsScreen - Primeiro documento (exemplo):', JSON.stringify(result[0], null, 2));
+        // Verificar especificamente campos de afastamento
+        const afastamentos = result.filter(doc => 
+          doc.type === 'medical_leave' || doc.type === 'medical_certificate' || doc.type === 'report'
+        );
+        if (afastamentos.length > 0) {
+          console.log('📅 DocumentsScreen - Afastamentos encontrados:', afastamentos.map(doc => ({
+            id: doc.id,
+            type: doc.type,
+            title: doc.title,
+            days: doc.days,
+            daysType: typeof doc.days
+          })));
+        }
+      }
       
       // Mapear para formato esperado (ajustar campos se necessário)
       const mappedDocs = result.map(doc => ({
@@ -59,7 +95,10 @@ const DocumentsScreen = ({ route, navigation }) => {
         title: doc.title,
         date: doc.document_date,
         consultation_id: doc.consultation_id,
-        doctor_name: doc.doctor_name || 'Não especificado',
+        doctor_name: doc.doctor_name || null, // null em vez de 'Não especificado' para não exibir quando não houver médico
+        days: doc.days !== undefined && doc.days !== null ? parseInt(doc.days, 10) : null, // Quantidade de dias de afastamento (preservar 0)
+        start_date: doc.start_date || null,
+        end_date: doc.end_date || null,
         file_url: doc.file_url,
         file_type: doc.file_type,
         notes: doc.notes,
@@ -81,11 +120,29 @@ const DocumentsScreen = ({ route, navigation }) => {
     return typeObj ? typeObj.icon : 'document';
   };
 
+  const getDocumentIconComponent = (type) => {
+    const typeObj = documentTypes.find(t => t.id === type);
+    if (typeObj?.IconComponent) {
+      return typeObj.IconComponent;
+    }
+    // Mapear tipos específicos para ícones SVG
+    const iconMap = {
+      'prescription': ReceiptIcon,
+      'medical_leave': CalendarIcon,
+      'medical_certificate': CalendarIcon,
+      'report': DocumentIcon,
+      'other': DocumentIcon,
+    };
+    return iconMap[type] || DocumentIcon;
+  };
+
   const getDocumentColor = (type) => {
     const colors_map = {
       exam_lab: colors.info,
       exam_image: colors.success,
-      prescription: colors.secondary,
+      prescription: '#FFB6C1', // Rosa pastel para receitas
+      medical_leave: '#B0E0E6', // Azul pastel para afastamentos
+      medical_certificate: '#B0E0E6', // Azul pastel para afastamentos
       report: colors.warning,
       other: colors.gray600,
     };
@@ -111,27 +168,55 @@ const DocumentsScreen = ({ route, navigation }) => {
       onPress={() => navigation.navigate('DocumentDetails', { document: item, groupId })}
     >
       <View style={[styles.docIcon, { backgroundColor: getDocumentColor(item.type) + '20' }]}>
-        <Ionicons name={getDocumentIcon(item.type)} size={28} color={getDocumentColor(item.type)} />
+        {(() => {
+          const IconComponent = getDocumentIconComponent(item.type);
+          return <IconComponent size={28} color={getDocumentColor(item.type)} />;
+        })()}
       </View>
       
       <View style={styles.docContent}>
         <Text style={styles.docTitle}>{item.title}</Text>
-        {item.doctor_name && (
-          <Text style={styles.docDoctor}>
-            <Ionicons name="person" size={14} color={colors.gray600} /> {item.doctor_name}
-          </Text>
-        )}
-        <Text style={styles.docDate}>
-          <Ionicons name="calendar-outline" size={14} color={colors.gray600} /> {formatDate(item.date)}
-        </Text>
+        {/* Mostrar quantidade de dias para afastamentos */}
+        {(() => {
+          const isAfastamento = item.type === 'medical_leave' || item.type === 'medical_certificate' || item.type === 'report';
+          // Verificar se days existe e é um número válido (incluindo 0)
+          const daysValue = item.days != null && item.days !== undefined && item.days !== '' 
+            ? (typeof item.days === 'string' ? parseInt(item.days, 10) : item.days)
+            : null;
+          const hasDays = daysValue !== null && !isNaN(daysValue);
+          
+          // Debug log apenas para afastamentos
+          if (isAfastamento) {
+            console.log('📅 DocumentsScreen - Afastamento renderizando:', {
+              type: item.type,
+              daysRaw: item.days,
+              daysValue,
+              hasDays,
+              title: item.title
+            });
+          }
+          
+          if (isAfastamento && hasDays) {
+            return (
+              <View style={styles.docInfoRow}>
+                <Text style={styles.docDays}>{daysValue} {daysValue === 1 ? 'dia' : 'dias'}</Text>
+              </View>
+            );
+          }
+          return null;
+        })()}
+        <View style={styles.docInfoRow}>
+          <CalendarIcon size={14} color={colors.gray600} />
+          <Text style={styles.docDate}>{formatDate(item.date)}</Text>
+        </View>
       </View>
 
       <View style={styles.docFileType}>
-        <Ionicons
-          name={item.file_type === 'pdf' ? 'document-text' : 'image'}
-          size={20}
-          color={colors.gray400}
-        />
+        {item.file_type === 'pdf' ? (
+          <DocumentIcon size={20} color={colors.gray400} />
+        ) : (
+          <ImageIcon size={20} color={colors.gray400} />
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -142,15 +227,18 @@ const DocumentsScreen = ({ route, navigation }) => {
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
+          <TouchableOpacity 
           onPress={() => navigation.goBack()}
           style={styles.backButton}
+          activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+            <ArrowBackIcon size={24} color={colors.text || '#1e293b'} />
+          </View>
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={styles.title}>Arquivos</Text>
-          <Text style={styles.subtitle}>{groupName}</Text>
+          <Text style={styles.subtitle}>{patientName || groupName}</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -170,11 +258,18 @@ const DocumentsScreen = ({ route, navigation }) => {
               ]}
               onPress={() => setFilterType(item.id)}
             >
-              <Ionicons 
-                name={item.icon} 
-                size={16} 
-                color={filterType === item.id ? colors.white : colors.gray600} 
-              />
+              {item.IconComponent ? (
+                <item.IconComponent 
+                  size={16} 
+                  color={filterType === item.id ? '#2C5F7C' : colors.gray600} 
+                />
+              ) : (
+                <Ionicons 
+                  name={item.icon} 
+                  size={16} 
+                  color={filterType === item.id ? '#2C5F7C' : colors.gray600} 
+                />
+              )}
               <Text style={[
                 styles.filterChipText,
                 filterType === item.id && styles.filterChipTextActive
@@ -195,7 +290,7 @@ const DocumentsScreen = ({ route, navigation }) => {
         </View>
       ) : filteredDocuments.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="folder-open-outline" size={80} color={colors.gray300} />
+          <FolderIcon size={80} color={colors.gray300} />
           <Text style={styles.emptyTitle}>Nenhum documento</Text>
           <Text style={styles.emptyText}>
             {filterType === 'all'
@@ -217,8 +312,9 @@ const DocumentsScreen = ({ route, navigation }) => {
       <TouchableOpacity
         style={styles.fab}
         onPress={() => navigation.navigate('AddDocument', { groupId, groupName })}
+        activeOpacity={0.8}
       >
-        <Ionicons name="add" size={28} color={colors.white} />
+        <AddIcon size={28} color="#8B4A6B" />
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -270,12 +366,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: colors.gray100,
+    backgroundColor: '#F0F0F0', // Cinza pastel
     gap: 6,
     marginRight: 8,
   },
   filterChipActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#B0E0E6', // Azul pastel
   },
   filterChipText: {
     fontSize: 14,
@@ -283,7 +379,7 @@ const styles = StyleSheet.create({
     color: colors.gray600,
   },
   filterChipTextActive: {
-    color: colors.white,
+    color: '#2C5F7C', // Azul escuro para contraste com fundo pastel
   },
   loadingContainer: {
     flex: 1,
@@ -324,11 +420,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    // Remover todas as sombras e bordas
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   docIcon: {
     width: 56,
@@ -347,14 +446,27 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 4,
   },
+  docInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
   docDoctor: {
     fontSize: 14,
     color: colors.gray600,
+    marginLeft: 4,
+  },
+  docDays: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '600',
     marginBottom: 2,
   },
   docDate: {
     fontSize: 14,
     color: colors.gray600,
+    marginLeft: 4,
   },
   docFileType: {
     marginLeft: 8,
@@ -366,12 +478,12 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: colors.primary,
+    backgroundColor: '#FFB6C1', // Rosa pastel
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 8,
   },

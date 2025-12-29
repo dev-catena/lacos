@@ -12,6 +12,10 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lacos.app",
@@ -23,7 +27,9 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
         "NSPhotoLibraryUsageDescription": "Este app precisa acessar suas fotos e vídeos para compartilhar momentos com o grupo de cuidados.",
         "NSPhotoLibraryAddUsageDescription": "Este app precisa salvar fotos e vídeos na galeria para compartilhar momentos com o grupo de cuidados.",
-        "NSCameraUsageDescription": "Este app precisa acessar a câmera para consultas de vídeo com pacientes."
+        "NSCameraUsageDescription": "Este app precisa acessar a câmera para consultas de vídeo com pacientes.",
+        "NSBluetoothAlwaysUsageDescription": "Precisamos de acesso ao Bluetooth para conectar ao sensor de queda.",
+        "NSBluetoothPeripheralUsageDescription": "Precisamos de acesso ao Bluetooth para conectar ao sensor de queda."
       }
     },
     "android": {
@@ -37,12 +43,15 @@
         "ACCESS_COARSE_LOCATION",
         "POST_NOTIFICATIONS",
         "SCHEDULE_EXACT_ALARM",
-        "CAMERA"
+        "CAMERA",
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT"
       ],
       "softwareKeyboardLayoutMode": "pan"
     },
     "plugins": [
-      "expo-dev-client",
       "expo-asset",
       "expo-font",
       [
@@ -71,6 +80,12 @@
           "color": "#6366f1"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    },
+    "scheme": "lacos"
   }
 }

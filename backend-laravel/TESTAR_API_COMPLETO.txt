@@ -1,0 +1,184 @@
+# ============================================================================
+# SCRIPT COMPLETO PARA TESTAR API DO SENSOR DE QUEDA
+# COPIAR E COLAR TUDO ISSO NO TERMINAL DO SERVIDOR
+# ============================================================================
+
+cd /var/www/lacos-backend
+
+# Configurações - EDITE AQUI
+EMAIL="seu_email@exemplo.com"
+PASSWORD="sua_senha"
+API_URL="http://193.203.182.22/api"
+
+echo "🧪 Testando API do Sensor de Queda"
+echo ""
+
+# Descobrir nome do banco
+DB_NAME=$(sudo grep "^DB_DATABASE=" .env 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'" | tr -d ' ' | head -1)
+if [ -z "$DB_NAME" ]; then
+    DB_NAME="lacos"
+fi
+
+# 1. Listar grupos disponíveis
+echo "1️⃣ Listando grupos disponíveis..."
+echo ""
+GROUPS=$(sudo mysql $DB_NAME -e "SELECT id, name FROM \`groups\` LIMIT 5;" 2>/dev/null)
+echo "$GROUPS"
+echo ""
+
+# Pegar o primeiro group_id
+GROUP_ID=$(sudo mysql $DB_NAME -e "SELECT id FROM \`groups\` LIMIT 1;" 2>/dev/null | tail -1)
+if [ -z "$GROUP_ID" ]; then
+    echo "❌ Nenhum grupo encontrado. Crie um grupo primeiro no app."
+    exit 1
+fi
+
+echo "📋 Usando GROUP_ID: $GROUP_ID"
+echo ""
+
+# 2. Fazer login
+echo "2️⃣ Fazendo login..."
+LOGIN_RESPONSE=$(curl -s -X POST "${API_URL}/login" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d "{\"email\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}")
+
+TOKEN=$(echo $LOGIN_RESPONSE | grep -o '"token":"[^"]*' | cut -d'"' -f4)
+
+if [ -z "$TOKEN" ]; then
+    echo "❌ Erro ao fazer login"
+    echo "   Resposta: $LOGIN_RESPONSE"
+    echo ""
+    echo "💡 Verifique:"
+    echo "   - Email e senha estão corretos?"
+    echo "   - Usuário não está bloqueado?"
+    exit 1
+fi
+
+echo "✅ Login realizado! Token obtido"
+echo ""
+
+# 3. Testar salvar dados
+echo "3️⃣ Testando salvar dados do sensor..."
+SAVE_RESPONSE=$(curl -s -X POST "${API_URL}/groups/${GROUP_ID}/fall-sensor/data" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{
+    "sensor_mac": "24E4B9E48D8F",
+    "posture": "standing",
+    "acceleration_x": 0.5,
+    "acceleration_y": -0.2,
+    "acceleration_z": 9.8,
+    "gyro_x": 0.1,
+    "gyro_y": 0.05,
+    "gyro_z": -0.03,
+    "magnitude": 9.85,
+    "is_fall_detected": false,
+    "confidence": 85.5
+  }')
+
+echo "Resposta:"
+echo "$SAVE_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$SAVE_RESPONSE"
+echo ""
+
+if echo "$SAVE_RESPONSE" | grep -q '"success":true'; then
+    echo "✅ Dados salvos com sucesso!"
+else
+    echo "❌ Erro ao salvar dados"
+    if echo "$SAVE_RESPONSE" | grep -q "404"; then
+        echo "   Rota não encontrada. Verifique se as rotas foram adicionadas."
+    elif echo "$SAVE_RESPONSE" | grep -q "401\|403"; then
+        echo "   Erro de autenticação. Verifique o token."
+    fi
+fi
+echo ""
+
+# 4. Testar buscar histórico
+echo "4️⃣ Testando buscar histórico..."
+HISTORY_RESPONSE=$(curl -s -X GET "${API_URL}/groups/${GROUP_ID}/fall-sensor/history?limit=5" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Accept: application/json")
+
+echo "Resposta:"
+echo "$HISTORY_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$HISTORY_RESPONSE"
+echo ""
+
+if echo "$HISTORY_RESPONSE" | grep -q '"success":true'; then
+    echo "✅ Histórico obtido!"
+else
+    echo "⚠️  Erro ou nenhum dado encontrado"
+fi
+echo ""
+
+# 5. Testar buscar última postura
+echo "5️⃣ Testando buscar última postura..."
+LATEST_RESPONSE=$(curl -s -X GET "${API_URL}/groups/${GROUP_ID}/fall-sensor/latest" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Accept: application/json")
+
+echo "Resposta:"
+echo "$LATEST_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$LATEST_RESPONSE"
+echo ""
+
+if echo "$LATEST_RESPONSE" | grep -q '"success":true'; then
+    echo "✅ Última postura obtida!"
+else
+    echo "⚠️  Nenhum dado encontrado (normal se ainda não salvou dados)"
+fi
+echo ""
+
+# 6. Testar buscar alertas
+echo "6️⃣ Testando buscar alertas de queda..."
+ALERTS_RESPONSE=$(curl -s -X GET "${API_URL}/groups/${GROUP_ID}/fall-sensor/alerts?hours=24" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Accept: application/json")
+
+echo "Resposta:"
+echo "$ALERTS_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$ALERTS_RESPONSE"
+echo ""
+
+if echo "$ALERTS_RESPONSE" | grep -q '"success":true'; then
+    echo "✅ Alertas obtidos!"
+    COUNT=$(echo "$ALERTS_RESPONSE" | grep -o '"count":[0-9]*' | cut -d: -f2)
+    echo "   Total de alertas: $COUNT"
+else
+    echo "⚠️  Nenhum alerta encontrado (normal se não houve quedas)"
+fi
+echo ""
+
+# 7. Verificar dados no banco
+echo "7️⃣ Verificando dados no banco de dados..."
+echo ""
+DB_DATA=$(sudo mysql $DB_NAME -e "
+SELECT 
+    id,
+    group_id,
+    posture,
+    posture_pt,
+    is_fall_detected,
+    confidence,
+    created_at
+FROM fall_sensor_data 
+ORDER BY created_at DESC 
+LIMIT 5;
+" 2>/dev/null)
+
+if [ -n "$DB_DATA" ]; then
+    echo "$DB_DATA"
+    echo ""
+    echo "✅ Dados encontrados no banco!"
+else
+    echo "⚠️  Nenhum dado encontrado no banco"
+fi
+
+echo ""
+echo "✅ Testes concluídos!"
+echo ""
+echo "💡 Para testar no app mobile:"
+echo "   1. Abra o app e faça login"
+echo "   2. Acesse um grupo (GROUP_ID: $GROUP_ID)"
+echo "   3. Toque no card 'Sensor de Queda'"
+echo "   4. Conecte ao sensor WT901BLE67"
+echo ""
+

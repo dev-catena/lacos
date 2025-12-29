@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
@@ -11,6 +10,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -186,7 +186,7 @@ const MedicationsScreen = ({ route, navigation }) => {
   const filteredPeriods = getFilteredPeriods();
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
@@ -219,7 +219,7 @@ const MedicationsScreen = ({ route, navigation }) => {
             onPress={() => setSelectedStatus('active')}
           >
             <Ionicons 
-              name="checkmark-circle" 
+              name="checkmark-circle-outline" 
               size={20} 
               color={selectedStatus === 'active' ? colors.success : colors.textLight} 
             />
@@ -233,7 +233,7 @@ const MedicationsScreen = ({ route, navigation }) => {
             onPress={() => setSelectedStatus('discontinued')}
           >
             <Ionicons 
-              name="archive" 
+              name="archive-outline" 
               size={20} 
               color={selectedStatus === 'discontinued' ? colors.error : colors.textLight} 
             />
@@ -267,7 +267,7 @@ const MedicationsScreen = ({ route, navigation }) => {
               onPress={() => setSelectedPeriod('all')}
             >
               <Ionicons 
-                name="grid" 
+                name="apps-outline" 
                 size={18} 
                 color={selectedPeriod === 'all' ? colors.textWhite : colors.text} 
               />
@@ -280,11 +280,11 @@ const MedicationsScreen = ({ route, navigation }) => {
               style={[styles.filterChip, selectedPeriod === 'morning' && styles.filterChipActive]}
               onPress={() => setSelectedPeriod('morning')}
             >
-              <Ionicons 
-                name="sunny" 
-                size={18} 
-                color={selectedPeriod === 'morning' ? colors.textWhite : colors.warning} 
-              />
+            <Ionicons 
+              name="sunny" 
+              size={18} 
+              color={selectedPeriod === 'morning' ? colors.textWhite : colors.warning} 
+            />
               <Text style={[styles.filterChipText, selectedPeriod === 'morning' && styles.filterChipTextActive]}>
                 Manhã
               </Text>
@@ -301,11 +301,11 @@ const MedicationsScreen = ({ route, navigation }) => {
               style={[styles.filterChip, selectedPeriod === 'afternoon' && styles.filterChipActive]}
               onPress={() => setSelectedPeriod('afternoon')}
             >
-              <Ionicons 
-                name="partly-sunny" 
-                size={18} 
-                color={selectedPeriod === 'afternoon' ? colors.textWhite : colors.info} 
-              />
+            <Ionicons 
+              name="partly-sunny" 
+              size={18} 
+              color={selectedPeriod === 'afternoon' ? colors.textWhite : colors.info} 
+            />
               <Text style={[styles.filterChipText, selectedPeriod === 'afternoon' && styles.filterChipTextActive]}>
                 Tarde
               </Text>
@@ -322,11 +322,11 @@ const MedicationsScreen = ({ route, navigation }) => {
               style={[styles.filterChip, selectedPeriod === 'night' && styles.filterChipActive]}
               onPress={() => setSelectedPeriod('night')}
             >
-              <Ionicons 
-                name="moon" 
-                size={18} 
-                color={selectedPeriod === 'night' ? colors.textWhite : colors.secondary} 
-              />
+            <Ionicons 
+              name="moon" 
+              size={18} 
+              color={selectedPeriod === 'night' ? colors.textWhite : colors.secondary} 
+            />
               <Text style={[styles.filterChipText, selectedPeriod === 'night' && styles.filterChipTextActive]}>
                 Noite
               </Text>
@@ -390,12 +390,16 @@ const MedicationsScreen = ({ route, navigation }) => {
                   {period.meds.map((med, index) => {
                     const getFormIcon = (form) => {
                       const formLower = form.toLowerCase();
-                      if (formLower.includes('comprimido')) return 'medical';
-                      if (formLower.includes('cápsula')) return 'ellipse';
-                      if (formLower.includes('gotas') || formLower.includes('solução')) return 'water';
-                      if (formLower.includes('xarope')) return 'flask';
-                      if (formLower.includes('pomada') || formLower.includes('creme')) return 'fitness';
-                      if (formLower.includes('injetável')) return 'bandage';
+                      if (formLower.includes('comprimido')) return 'medical-outline';
+                      if (formLower.includes('cápsula')) return 'ellipse-outline';
+                      if (formLower.includes('gotas') || formLower.includes('solução')) return 'water-outline';
+                      if (formLower.includes('xarope')) return 'flask-outline';
+                      if (formLower.includes('pomada') || formLower.includes('creme') || formLower.includes('gel')) return 'fitness-outline';
+                      if (formLower.includes('injetável') || formLower.includes('ampola')) return 'bandage-outline';
+                      if (formLower.includes('adesivo')) return 'square-outline';
+                      if (formLower.includes('supositório') || formLower.includes('óvulo')) return 'cube-outline';
+                      if (formLower.includes('spray') || formLower.includes('inal')) return 'airplane-outline';
+                      if (formLower.includes('colírio')) return 'eye-outline';
                       return 'medical-outline';
                     };
 

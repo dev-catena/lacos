@@ -60,7 +60,20 @@ const AddConsultationScreen = ({ route, navigation }) => {
     try {
       const response = await medicalSpecialtyService.getSpecialties();
       if (response.success && response.data) {
-        setSpecialties(response.data);
+        // Remover duplicatas por nome (caso o backend ainda retorne)
+        const uniqueSpecialties = response.data.reduce((acc, current) => {
+          const existing = acc.find(item => item.name === current.name);
+          if (!existing) {
+            acc.push(current);
+          }
+          return acc;
+        }, []);
+        
+        // Ordenar por nome
+        uniqueSpecialties.sort((a, b) => a.name.localeCompare(b.name));
+        
+        setSpecialties(uniqueSpecialties);
+        console.log(`✅ Especialidades carregadas: ${uniqueSpecialties.length} (após remover duplicatas)`);
       }
     } catch (error) {
       console.error('Erro ao carregar especialidades:', error);

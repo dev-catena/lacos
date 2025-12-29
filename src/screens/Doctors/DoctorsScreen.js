@@ -9,11 +9,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  ArrowBackIcon,
+  StarIcon,
+  PersonIcon,
+  MedicalOutlineIcon,
+  CardOutlineIcon,
+  CallOutlineIcon,
+  MailOutlineIcon,
+  LocationOutlineIcon,
+  CreateOutlineIcon,
+  TrashOutlineIcon,
+  AddIcon,
+} from '../../components/CustomIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import doctorService from '../../services/doctorService';
+import { formatCrmDisplay } from '../../utils/crm';
 
 const DoctorsScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params;
@@ -104,7 +117,7 @@ const DoctorsScreen = ({ route, navigation }) => {
       {/* Badge de Médico Principal */}
       {item.is_primary && (
         <View style={styles.primaryBadge}>
-          <Ionicons name="star" size={12} color={colors.white} />
+          <StarIcon size={12} color={colors.white} filled={true} />
           <Text style={styles.primaryBadgeText}>Principal</Text>
         </View>
       )}
@@ -112,13 +125,13 @@ const DoctorsScreen = ({ route, navigation }) => {
       {/* Avatar e Nome */}
       <View style={styles.doctorHeader}>
         <View style={styles.avatar}>
-          <Ionicons name="person" size={32} color={colors.primary} />
+          <PersonIcon size={32} color={colors.primary} />
         </View>
         <View style={styles.doctorInfo}>
           <Text style={styles.doctorName}>{item.name}</Text>
           {item.medical_specialty?.name && (
             <View style={styles.specialtyBadge}>
-              <Ionicons name="medical-outline" size={14} color={colors.primary} />
+              <MedicalOutlineIcon size={14} color={colors.primary} />
               <Text style={styles.specialtyText}>
                 {item.medical_specialty.name}
               </Text>
@@ -130,15 +143,15 @@ const DoctorsScreen = ({ route, navigation }) => {
       {/* CRM */}
       {item.crm && (
         <View style={styles.infoRow}>
-          <Ionicons name="card-outline" size={16} color={colors.gray400} />
-          <Text style={styles.infoText}>CRM: {item.crm}</Text>
+          <CardOutlineIcon size={16} color={colors.gray400} />
+          <Text style={styles.infoText}>CRM: {formatCrmDisplay(item.crm)}</Text>
         </View>
       )}
 
       {/* Telefone */}
       {item.phone && (
         <View style={styles.infoRow}>
-          <Ionicons name="call-outline" size={16} color={colors.gray400} />
+          <CallOutlineIcon size={16} color={colors.gray400} />
           <Text style={styles.infoText}>{item.phone}</Text>
         </View>
       )}
@@ -146,7 +159,7 @@ const DoctorsScreen = ({ route, navigation }) => {
       {/* Email */}
       {item.email && (
         <View style={styles.infoRow}>
-          <Ionicons name="mail-outline" size={16} color={colors.gray400} />
+          <MailOutlineIcon size={16} color={colors.gray400} />
           <Text style={styles.infoText}>{item.email}</Text>
         </View>
       )}
@@ -154,7 +167,7 @@ const DoctorsScreen = ({ route, navigation }) => {
       {/* Endereço */}
       {item.address && (
         <View style={styles.infoRow}>
-          <Ionicons name="location-outline" size={16} color={colors.gray400} />
+          <LocationOutlineIcon size={16} color={colors.gray400} />
           <Text style={styles.infoText} numberOfLines={1}>
             {item.address}
           </Text>
@@ -167,7 +180,7 @@ const DoctorsScreen = ({ route, navigation }) => {
           style={styles.actionButton}
           onPress={() => handleEditDoctor(item)}
         >
-          <Ionicons name="create-outline" size={20} color={colors.primary} />
+          <CreateOutlineIcon size={20} color={colors.primary} />
           <Text style={styles.actionButtonText}>Editar</Text>
         </TouchableOpacity>
 
@@ -175,7 +188,7 @@ const DoctorsScreen = ({ route, navigation }) => {
           style={[styles.actionButton, styles.deleteButton]}
           onPress={() => handleDeleteDoctor(item.id, item.name)}
         >
-          <Ionicons name="trash-outline" size={20} color={colors.error} />
+          <TrashOutlineIcon size={20} color={colors.error} />
           <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
             Excluir
           </Text>
@@ -187,7 +200,7 @@ const DoctorsScreen = ({ route, navigation }) => {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <View style={styles.emptyIconContainer}>
-        <Ionicons name="medical-outline" size={64} color={colors.gray300} />
+        <MedicalOutlineIcon size={64} color={colors.gray300} />
       </View>
       <Text style={styles.emptyTitle}>Nenhum médico cadastrado</Text>
       <Text style={styles.emptyText}>
@@ -209,7 +222,7 @@ const DoctorsScreen = ({ route, navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <ArrowBackIcon size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Médicos</Text>
@@ -240,7 +253,7 @@ const DoctorsScreen = ({ route, navigation }) => {
           onPress={handleAddDoctor}
           activeOpacity={0.8}
         >
-          <Ionicons name="add" size={28} color={colors.white} />
+          <AddIcon size={28} color={colors.white} />
         </TouchableOpacity>
       )}
     </SafeAreaView>
@@ -295,12 +308,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 16,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 0,
   },
   primaryBadge: {
     position: 'absolute',
@@ -365,10 +379,10 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.gray200,
+    borderTopWidth: 0,
+    borderTopColor: 'transparent',
     marginTop: 12,
-    paddingTop: 12,
+    paddingTop: 0,
     gap: 12,
   },
   actionButton: {

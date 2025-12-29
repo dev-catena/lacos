@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { ProfileIcon } from '../../components/CustomIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,6 +26,15 @@ import {
   VitalSignsIcon,
   AppointmentIcon,
   MessagesIcon,
+  PeopleIcon,
+  ChevronForwardIcon,
+  AddIcon,
+  CalendarIcon,
+  DocumentIcon,
+  TimeIcon,
+  PersonIcon,
+  WarningIcon,
+  ErrorIcon,
 } from '../../components/CustomIcons';
 
 const HomeScreen = ({ navigation }) => {
@@ -218,7 +228,7 @@ const HomeScreen = ({ navigation }) => {
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
         <StatusBar style="dark" />
         <View style={styles.errorContainer}>
-          <Ionicons name="lock-closed-outline" size={80} color={colors.error} />
+          <ErrorIcon size={80} color={colors.error} />
           <Text style={styles.errorTitle}>Acesso Negado</Text>
           <Text style={styles.errorText}>
             Você precisa estar logado para acessar esta tela.
@@ -260,9 +270,16 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.headerRight}>
           <TouchableOpacity 
             style={styles.profileButton}
-            onPress={() => navigation.navigate('Profile')}
+            onPress={() => {
+              console.log('📱 HomeScreen - Navegando para Profile');
+              navigation.navigate('Profile');
+            }}
+            activeOpacity={0.7}
           >
-            <Ionicons name="person-circle-outline" size={28} color={colors.primary} />
+            <View style={styles.profileIconContainer}>
+              {/* Ícone SVG de silhueta de perfil */}
+              <ProfileIcon size={32} color={colors.primary} filled={false} />
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -311,7 +328,7 @@ const HomeScreen = ({ navigation }) => {
                     <Image source={{ uri: group.photo_url }} style={styles.groupPhoto} />
                   ) : (
                     <View style={styles.groupIcon}>
-                      <Ionicons name="people" size={32} color={colors.primary} />
+                      <PeopleIcon size={32} color={colors.primary} />
                     </View>
                   )}
                   <View style={styles.groupInfo}>
@@ -320,12 +337,12 @@ const HomeScreen = ({ navigation }) => {
                       {group.accompanied_name ? `Acompanhando ${group.accompanied_name}` : 'Grupo de cuidados'}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
+                  <ChevronForwardIcon size={24} color={colors.gray400} />
                 </TouchableOpacity>
               ))
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="people-outline" size={48} color={colors.gray300} />
+                <PeopleIcon size={48} color={colors.gray300} />
                 <Text style={styles.emptyStateTitle}>Nenhum grupo criado</Text>
                 <Text style={styles.emptyStateText}>
                   Crie um grupo para acompanhar alguém especial
@@ -335,7 +352,7 @@ const HomeScreen = ({ navigation }) => {
                   onPress={handleCreateGroup}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="add" size={20} color={colors.textWhite} />
+                  <AddIcon size={20} color={colors.textWhite} />
                   <Text style={styles.createButtonText}>Criar Grupo</Text>
                 </TouchableOpacity>
               </View>
@@ -358,7 +375,7 @@ const HomeScreen = ({ navigation }) => {
                     <Image source={{ uri: group.photo_url }} style={styles.groupPhoto} />
                   ) : (
                     <View style={styles.groupIcon}>
-                      <Ionicons name="people" size={32} color={colors.secondary} />
+                      <PeopleIcon size={32} color={colors.secondary} />
                     </View>
                   )}
                   <View style={styles.groupInfo}>
@@ -367,12 +384,12 @@ const HomeScreen = ({ navigation }) => {
                       {group.accompanied_name ? `Acompanhando ${group.accompanied_name}` : 'Membro do grupo'}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
+                  <ChevronForwardIcon size={24} color={colors.gray400} />
                 </TouchableOpacity>
               ))
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="enter-outline" size={48} color={colors.gray300} />
+                <PeopleIcon size={48} color={colors.gray300} />
                 <Text style={styles.emptyStateTitle}>Nenhum grupo ainda</Text>
                 <Text style={styles.emptyStateText}>
                   Use um código de convite para entrar em um grupo
@@ -382,7 +399,7 @@ const HomeScreen = ({ navigation }) => {
                   onPress={() => navigation.navigate('Groups')}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="enter" size={20} color={colors.textWhite} />
+                  <AddIcon size={20} color={colors.textWhite} />
                   <Text style={styles.createButtonText}>Entrar em Grupo</Text>
                 </TouchableOpacity>
               </View>
@@ -390,8 +407,8 @@ const HomeScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* Buscar Cuidadores - Apenas para cuidadores/amigos */}
-        {user?.profile === 'caregiver' && (
+        {/* Buscar Cuidadores - Apenas para cuidadores/amigos (NÃO para cuidador profissional) */}
+        {user?.profile === 'caregiver' && user?.profile !== 'professional_caregiver' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Buscar Cuidadores</Text>
             <TouchableOpacity
@@ -400,7 +417,7 @@ const HomeScreen = ({ navigation }) => {
               activeOpacity={0.7}
             >
               <View style={styles.caregiverSearchIcon}>
-                <Ionicons name="people" size={32} color="#2D5016" />
+                <PeopleIcon size={32} color="#2D5016" />
               </View>
               <View style={styles.caregiverSearchContent}>
                 <Text style={styles.caregiverSearchTitle}>Encontrar Cuidador Profissional</Text>
@@ -408,7 +425,7 @@ const HomeScreen = ({ navigation }) => {
                   Busque por avaliações, proximidade e disponibilidade
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={24} color="#2D5016" />
+              <ChevronForwardIcon size={24} color="#2D5016" />
             </TouchableOpacity>
           </View>
         )}
@@ -418,12 +435,18 @@ const HomeScreen = ({ navigation }) => {
           const currentGroups = selectedTab === 'myGroups' ? myGroups : participatingGroups;
           const hasGroups = currentGroups.length > 0;
           
-          // Filtrar atividades apenas dos grupos da aba atual
+          // Filtrar atividades de TODOS os grupos do usuário (tanto "Meus Grupos" quanto "Participo")
+          // Isso garante que atividades não sejam perdidas se o usuário estiver na aba errada
+          const allUserGroups = [...myGroups, ...participatingGroups];
+          const allUserGroupIds = allUserGroups.map(g => g.id).filter(id => id != null);
+          
           // Usar IDs dos grupos para comparação (mais confiável que nomes)
           const currentGroupIds = currentGroups.map(g => g.id).filter(id => id != null);
           
           console.log(`📊 HomeScreen - DEBUG: Total de atividades recebidas: ${recentActivities.length}`);
+          console.log(`📊 HomeScreen - DEBUG: Meus Grupos: ${myGroups.length}, Participo: ${participatingGroups.length}`);
           console.log(`📊 HomeScreen - DEBUG: Grupos atuais (IDs):`, currentGroupIds);
+          console.log(`📊 HomeScreen - DEBUG: TODOS os grupos do usuário (IDs):`, allUserGroupIds);
           console.log(`📊 HomeScreen - DEBUG: Grupos atuais (nomes):`, currentGroups.map(g => ({ id: g.id, name: g.name })));
           console.log(`📊 HomeScreen - DEBUG: Todas as atividades:`, recentActivities.map(a => ({ 
             id: a.id, 
@@ -433,15 +456,25 @@ const HomeScreen = ({ navigation }) => {
           })));
           
           const filteredActivities = recentActivities.filter(activity => {
-            // Se a atividade tem groupId, comparar diretamente
+            // Se a atividade tem groupId, comparar diretamente com TODOS os grupos do usuário
             if (activity.groupId) {
-              const matches = currentGroupIds.includes(activity.groupId);
-              if (matches) {
-                console.log(`✅ HomeScreen - Atividade "${activity.title}" corresponde ao grupo ID ${activity.groupId}`);
+              // Primeiro verificar se está nos grupos da aba atual
+              const matchesCurrentTab = currentGroupIds.includes(activity.groupId);
+              // Se não estiver, verificar se está em qualquer grupo do usuário
+              const matchesAnyGroup = allUserGroupIds.includes(activity.groupId);
+              
+              if (matchesCurrentTab) {
+                console.log(`✅ HomeScreen - Atividade "${activity.title}" corresponde ao grupo ID ${activity.groupId} (aba atual)`);
+                return true;
+              } else if (matchesAnyGroup) {
+                // Atividade pertence a um grupo do usuário, mas não está na aba atual
+                // Ainda assim mostrar, pois é uma atividade válida
+                console.log(`✅ HomeScreen - Atividade "${activity.title}" corresponde ao grupo ID ${activity.groupId} (outra aba)`);
+                return true;
               } else {
-                console.log(`❌ HomeScreen - Atividade "${activity.title}" NÃO corresponde: groupId ${activity.groupId} não está em [${currentGroupIds.join(', ')}]`);
+                console.log(`❌ HomeScreen - Atividade "${activity.title}" NÃO corresponde: groupId ${activity.groupId} não está em [${allUserGroupIds.join(', ')}]`);
+                return false;
               }
-              return matches;
             }
             
             // Se não tem groupId, tentar comparar por nome
@@ -490,7 +523,28 @@ const HomeScreen = ({ navigation }) => {
                 filteredActivities.map((activity) => (
                   <View key={activity.id} style={styles.activityCard}>
                     <View style={[styles.activityIcon, { backgroundColor: activity.color + '20' }]}>
-                      <Ionicons name={activity.icon} size={24} color={activity.color} />
+                      {(() => {
+                        // Mapear ícones do Ionicons para componentes SVG
+                        const iconMap = {
+                          'person-add': PersonIcon,
+                          'arrow-up-circle': AddIcon,
+                          'person-remove': PersonIcon,
+                          'swap-horizontal': PeopleIcon,
+                          'add-circle': AddIcon,
+                          'create': AddIcon,
+                          'medical': MedicationIcon,
+                          'create-outline': AddIcon,
+                          'close-circle': AddIcon,
+                          'checkmark-done-circle': AddIcon,
+                          'document-text': DocumentIcon,
+                          'calendar': CalendarIcon,
+                          'calendar-outline': CalendarIcon,
+                          'warning': WarningIcon,
+                          'notifications': MessagesIcon,
+                        };
+                        const IconComponent = iconMap[activity.icon] || CalendarIcon;
+                        return <IconComponent size={24} color={activity.color} />;
+                      })()}
                     </View>
                     <View style={styles.activityContent}>
                       <Text style={styles.activityTitle}>{activity.title}</Text>
@@ -504,7 +558,7 @@ const HomeScreen = ({ navigation }) => {
                 ))
               ) : (
                 <View style={styles.emptyActivities}>
-                  <Ionicons name="time-outline" size={48} color={colors.gray300} />
+                  <TimeIcon size={48} color={colors.gray300} />
                   <Text style={styles.emptyActivitiesText}>
                     {selectedTab === 'myGroups' 
                       ? 'Nenhuma atividade recente nos seus grupos'
@@ -595,6 +649,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  profileIconContainer: {
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
   },

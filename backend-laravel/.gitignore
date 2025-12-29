@@ -1,0 +1,148 @@
+# Laravel
+/vendor/
+/node_modules/
+/public/hot
+/public/storage
+/storage/*.key
+/storage/app/*
+!/storage/app/.gitkeep
+/storage/framework/cache/*
+!/storage/framework/cache/.gitkeep
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitkeep
+/storage/framework/testing/*
+!/storage/framework/testing/.gitkeep
+/storage/framework/views/*
+!/storage/framework/views/.gitkeep
+/storage/logs/*
+!/storage/logs/.gitkeep
+/bootstrap/cache/*
+!/bootstrap/cache/.gitkeep
+
+# Environment
+.env
+.env.backup
+.env.production
+.env.*.local
+**/ENV-prod.txt
+**/*ENV-prod*
+**/*STRIPE*.sh
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.swr
+*.swk
+*.swl
+*.swm
+.DS_Store
+
+# Composer
+composer.phar
+composer.lock
+
+# NPM
+package-lock.json
+yarn.lock
+
+# Build
+/public/build
+/public/mix-manifest.json
+
+# Testing
+.phpunit.result.cache
+/coverage
+
+# Scripts temporários e backups
+*.bak
+*.backup
+*.old
+*.tmp
+*.log
+*.txt
+!README.md
+!README_GITHUB.md
+!composer.json
+!package.json
+!DEPLOY_GITHUB.sh
+
+# Arquivos de configuração sensíveis
+**/config_cors_atualizado.php
+**/config_services_com_stripe.php
+**/config_services_exemplo.php
+
+# Arquivos Python temporários
+*.pyc
+__pycache__/
+corrigir_*.py
+
+# Arquivos SQL temporários
+*.sql
+!database/migrations/*.php
+
+# Arquivos de deploy e scripts de servidor
+deploy-*.sh
+*_SERVIDOR*.sh
+*_SERVIDOR*.txt
+COPIAR_COLAR*.txt
+SCRIPT_*.txt
+COMANDO*.txt
+COMANDOS*.txt
+
+# Arquivos de correção temporários
+CORRIGIR_*.sh
+ADICIONAR_*.sh
+APLICAR_*.sh
+INSTALAR_*.sh
+RESTAURAR_*.sh
+VERIFICAR_*.sh
+CONFIGURAR_*.sh
+TESTAR_*.sh
+ENVIAR_*.sh
+EXECUTAR_*.sh
+CRIAR_*.sh
+FAZER_*.sh
+MODIFICAR_*.sh
+SUBSTITUIR_*.sh
+ATUALIZAR_*.sh
+DIAGNOSTICAR_*.sh
+LIMPAR_*.sh
+REMOVER_*.sh
+GEOCODIFICAR_*.sh
+IMPORTADOR_*.sh
+
+# Arquivos PHP temporários
+*_CORRIGIDO.php
+*_MODIFICADO*.php
+*_EXEMPLO.php
+*_APX.php
+fix_*.php
+getClients_*.php
+getPatients_*.php
+METODO_*.php
+test-*.php
+add_*.php
+change_*.php
+create_*.php
+!database/migrations/*.php
+
+# Arquivos de rotas temporários
+api_routes*.php
+routes_api*.php
+!routes/api.php
+!routes/web.php
+!routes/console.php
+
+# Arquivos de documentação temporários
+# Mantém README.md e README_GITHUB.md
+!COMO_USAR_DEPLOY.md
+
+# Outros
+*.orig
+*.rej
+.cache
+.temp
+

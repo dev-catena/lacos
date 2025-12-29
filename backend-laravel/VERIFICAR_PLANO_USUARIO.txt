@@ -1,0 +1,83 @@
+# ============================================================================
+# SCRIPT PARA VERIFICAR PLANO DO USUÁRIO E FEATURES
+# COPIAR E COLAR NO TERMINAL DO SERVIDOR
+# ============================================================================
+
+cd /var/www/lacos-backend
+
+# Descobrir nome do banco
+DB_NAME=$(sudo grep "^DB_DATABASE=" .env 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'" | tr -d ' ' | head -1)
+if [ -z "$DB_NAME" ]; then
+    DB_NAME="lacos"
+fi
+
+echo "📊 Banco de dados: $DB_NAME"
+echo ""
+
+# Solicitar email do usuário
+echo "Digite o email do usuário para verificar o plano:"
+read USER_EMAIL
+
+if [ -z "$USER_EMAIL" ]; then
+    echo "❌ Email não fornecido"
+    exit 1
+fi
+
+echo ""
+echo "🔍 Verificando usuário e plano..."
+echo ""
+
+# Buscar usuário e plano
+sudo mysql $DB_NAME -e "
+SELECT 
+    u.id as user_id,
+    u.email,
+    u.name as user_name,
+    up.plan_id,
+    up.is_active,
+    p.name as plan_name,
+    p.features
+FROM users u
+LEFT JOIN user_plans up ON u.id = up.user_id AND up.is_active = 1
+LEFT JOIN plans p ON up.plan_id = p.id
+WHERE u.email = '$USER_EMAIL'
+LIMIT 1;
+" 2>/dev/null
+
+echo ""
+echo "📋 Features do plano (JSON):"
+echo ""
+
+# Buscar apenas as features
+sudo mysql $DB_NAME -e "
+SELECT 
+    p.name as plan_name,
+    p.features
+FROM users u
+JOIN user_plans up ON u.id = up.user_id AND up.is_active = 1
+JOIN plans p ON up.plan_id = p.id
+WHERE u.email = '$USER_EMAIL'
+LIMIT 1;
+" 2>/dev/null | tail -1 | awk -F'\t' '{print $2}' | python3 -m json.tool 2>/dev/null || echo "Erro ao parsear JSON"
+
+echo ""
+echo "🔍 Verificando se sensorQuedas está habilitado:"
+echo ""
+
+# Verificar sensorQuedas especificamente
+sudo mysql $DB_NAME -e "
+SELECT 
+    p.name as plan_name,
+    JSON_EXTRACT(p.features, '$.sensorQuedas') as sensorQuedas_enabled
+FROM users u
+JOIN user_plans up ON u.id = up.user_id AND up.is_active = 1
+JOIN plans p ON up.plan_id = p.id
+WHERE u.email = '$USER_EMAIL'
+LIMIT 1;
+" 2>/dev/null
+
+echo ""
+echo "💡 Se sensorQuedas_enabled for NULL ou 0, a feature não está habilitada"
+echo "   Para habilitar, use a interface web de gestão de planos"
+echo ""
+
