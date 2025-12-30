@@ -124,3 +124,5 @@ git push -u origin main --force
 2. Verifique se você tem permissões de escrita no repositório
 3. Verifique se o token/SSH key tem as permissões corretas
 
+
+

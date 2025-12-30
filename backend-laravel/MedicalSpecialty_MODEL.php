@@ -24,3 +24,5 @@ class MedicalSpecialty extends Model
 
 
 
+
+

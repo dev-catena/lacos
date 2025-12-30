@@ -22,3 +22,5 @@ echo "   (Execute manualmente: curl -H 'Authorization: Bearer TOKEN' http://193.
 
 
 
+
+

@@ -25,3 +25,5 @@ echo "✅ Verificação concluída!"
 
 
 
+
+

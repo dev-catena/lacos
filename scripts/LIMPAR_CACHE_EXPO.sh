@@ -1,40 +1,38 @@
 #!/bin/bash
 
-echo "🧹 ============================================"
-echo "🧹 LIMPANDO CACHE DO EXPO/METRO"
-echo "🧹 ============================================"
+echo "🧹 Limpando cache do Expo/Metro..."
 echo ""
 
-cd /home/darley/lacos
+cd /home/darley/lacos || exit 1
 
-echo "1️⃣ Parando processos do Expo/Metro..."
-pkill -f "expo start" 2>/dev/null || true
-pkill -f "metro" 2>/dev/null || true
+# Parar processos do Expo
+echo "🛑 Parando processos do Expo..."
+pkill -f "expo start" || true
+pkill -f "metro" || true
 sleep 2
 
-echo ""
-echo "2️⃣ Removendo cache do Expo..."
-rm -rf .expo 2>/dev/null || true
-rm -rf node_modules/.cache 2>/dev/null || true
-rm -rf .metro 2>/dev/null || true
-rm -rf .expo-shared 2>/dev/null || true
+# Limpar cache do Metro
+echo "🗑️  Limpando cache do Metro..."
+rm -rf .expo
+rm -rf node_modules/.cache
+rm -rf $TMPDIR/metro-* 2>/dev/null || true
+rm -rf $TMPDIR/haste-* 2>/dev/null || true
 
-echo ""
-echo "3️⃣ Limpando cache do npm..."
+# Limpar cache do npm/yarn
+echo "🗑️  Limpando cache do npm..."
 npm cache clean --force 2>/dev/null || true
 
-echo ""
-echo "4️⃣ Limpando watchman (se instalado)..."
+# Limpar watchman (se instalado)
+echo "🗑️  Limpando watchman..."
 watchman watch-del-all 2>/dev/null || true
 
 echo ""
-echo "✅ Cache limpo com sucesso!"
+echo "✅ Cache limpo!"
 echo ""
-echo "📱 Agora reinicie o Expo com:"
-echo "   npm start"
-echo "   ou"
-echo "   npx expo start --clear"
+echo "🚀 Reiniciando Expo..."
+echo "   Execute: npx expo start --clear"
 echo ""
+
 
 
 

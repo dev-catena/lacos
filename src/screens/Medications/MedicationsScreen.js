@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
+import { ArrowBackIcon } from '../../components/CustomIcons';
 import medicationService from '../../services/medicationService';
 
 const MedicationsScreen = ({ route, navigation }) => {
@@ -195,7 +196,7 @@ const MedicationsScreen = ({ route, navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <ArrowBackIcon size={24} color={colors.text || '#1e293b'} />
         </TouchableOpacity>
         
         <View style={styles.headerCenter}>

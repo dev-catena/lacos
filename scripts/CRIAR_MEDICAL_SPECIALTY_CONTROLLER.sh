@@ -28,3 +28,5 @@ echo "   sudo bash $TMP_DIR/APLICAR_MEDICAL_SPECIALTY_CONTROLLER.sh"
 
 
 
+
+

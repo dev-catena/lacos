@@ -109,3 +109,5 @@ echo "   - certificate_type"
 echo "   - has_certificate"
 
 
+
+
