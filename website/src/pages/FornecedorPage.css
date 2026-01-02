@@ -1,0 +1,252 @@
+.fornecedor-hero {
+  background: var(--gradient-primary);
+  color: white;
+  padding: 80px 0 60px;
+  text-align: center;
+}
+
+.fornecedor-hero-content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.fornecedor-title {
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.fornecedor-subtitle {
+  font-size: 20px;
+  opacity: 0.95;
+  line-height: 1.7;
+}
+
+.fornecedor-section {
+  background: var(--bg-white);
+}
+
+.fornecedor-content {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.fornecedor-intro {
+  margin-bottom: 60px;
+  text-align: center;
+}
+
+.fornecedor-description {
+  font-size: 18px;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.fornecedor-benefits {
+  margin-bottom: 60px;
+}
+
+.benefits-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+}
+
+.benefit-card {
+  background: var(--bg-light);
+  padding: 32px;
+  border-radius: 12px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.benefit-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.benefit-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.benefit-card-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.benefit-card-text {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.fornecedor-process {
+  margin-bottom: 60px;
+  background: var(--gradient-soft);
+  padding: 48px;
+  border-radius: 16px;
+}
+
+.process-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+.process-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.process-step {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.process-step-number {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: white;
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-md);
+}
+
+.process-step-content {
+  flex: 1;
+}
+
+.process-step-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.process-step-text {
+  font-size: 16px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.fornecedor-advantages {
+  margin-bottom: 60px;
+}
+
+.advantages-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.advantages-list {
+  list-style: none;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.advantage-item {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-light);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  align-items: flex-start;
+}
+
+.advantage-check {
+  color: var(--secondary-color);
+  font-size: 24px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.advantage-item span:last-child {
+  font-size: 16px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.fornecedor-cta {
+  text-align: center;
+  background: var(--gradient-soft);
+  padding: 48px;
+  border-radius: 16px;
+}
+
+.cta-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.cta-text {
+  font-size: 18px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  line-height: 1.7;
+}
+
+.cta-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .fornecedor-title {
+    font-size: 32px;
+  }
+
+  .fornecedor-subtitle {
+    font-size: 18px;
+  }
+
+  .benefits-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fornecedor-process {
+    padding: 32px 24px;
+  }
+
+  .process-step {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .cta-title {
+    font-size: 24px;
+  }
+}
+
+

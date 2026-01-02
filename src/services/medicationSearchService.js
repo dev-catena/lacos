@@ -163,10 +163,39 @@ class MedicationSearchService {
   }
 
   /**
+   * Extrair apenas o nome do medicamento, removendo concentração e forma farmacêutica
+   * @param {string} medicationName - Nome completo do medicamento
+   * @returns {string} Nome do medicamento sem concentração
+   */
+  extractMedicationNameOnly(medicationName) {
+    if (!medicationName) return '';
+    
+    // Remover padrões comuns de concentração (ex: "500mg", "20mg", "10mg/ml")
+    let name = medicationName
+      .replace(/\s+\d+\.?\d*\s*(mg|g|mcg|UI|ml|mL|%)\s*/gi, '') // Remove "500mg", "20mg", etc
+      .replace(/\s+\d+\.?\d*\s*(mg|g|mcg|UI|ml|mL|%)\/\s*(ml|mL|g)\s*/gi, '') // Remove "10mg/ml"
+      .replace(/\s+\d+\s*(mg|g|mcg|UI|ml|mL|%)\s*/gi, '') // Remove "500 mg" (com espaço)
+      .trim();
+    
+    // Remover formas farmacêuticas comuns no final
+    const forms = ['Cápsula', 'Comprimido', 'Gotas', 'Xarope', 'Solução', 'Suspensão', 
+                   'Pomada', 'Creme', 'Gel', 'Spray', 'Colírio', 'Supositório', 'Óvulo',
+                   'Ampola', 'Frasco', 'Sachê', 'Adesivo', 'Bombinha', 'Inalável'];
+    
+    for (const form of forms) {
+      const regex = new RegExp(`\\s+${form}\\s*$`, 'i');
+      name = name.replace(regex, '').trim();
+    }
+    
+    return name.trim() || medicationName; // Se remover tudo, retornar original
+  }
+
+  /**
    * Buscar medicamentos por nome (autocomplete)
+   * Tenta usar API do backend primeiro, depois fallback local
    * @param {string} query - Termo de busca
    * @param {number} limit - Limite de resultados (padrão: 10)
-   * @returns {Promise<Array>} Lista de medicamentos encontrados
+   * @returns {Promise<Array>} Lista de medicamentos encontrados (sem duplicatas)
    */
   async searchMedications(query, limit = 10) {
     try {
@@ -174,26 +203,53 @@ class MedicationSearchService {
         return [];
       }
 
+      // Tentar buscar na API do backend primeiro
+      try {
+        const apiResults = await this.searchInBackendAPI(query, limit);
+        if (apiResults && apiResults.length > 0) {
+          return apiResults;
+        }
+      } catch (apiError) {
+        console.warn('Erro ao buscar na API do backend, usando fallback local:', apiError.message);
+      }
+
+      // Fallback: usar lista local
       const searchTerm = query.toLowerCase().trim();
 
       // Carregar lista completa (com cache)
       const medicationsList = await this.loadFullMedicationsList();
 
       // Filtrar medicamentos que contêm o termo de busca
-      const results = medicationsList
+      const allResults = medicationsList
         .filter(med => {
           const medName = typeof med === 'string' ? med : (med.name || med.nome || '');
           return medName.toLowerCase().includes(searchTerm);
         })
-        .slice(0, limit)
         .map(med => {
           const medName = typeof med === 'string' ? med : (med.name || med.nome || '');
+          // Exibir apenas o nome na lista (sem concentração)
+          const displayName = this.extractMedicationNameOnly(medName);
           return {
-            name: medName,
-            displayName: medName,
+            name: medName, // Nome completo para salvar
+            displayName: displayName, // Apenas nome para exibir na lista
             source: 'local',
           };
         });
+
+      // Remover duplicatas baseado no displayName (nome sem concentração)
+      // Usar Map para manter apenas a primeira ocorrência de cada displayName
+      const uniqueResultsMap = new Map();
+      
+      for (const result of allResults) {
+        const displayNameLower = result.displayName.toLowerCase().trim();
+        // Se ainda não existe no Map, adicionar
+        if (!uniqueResultsMap.has(displayNameLower)) {
+          uniqueResultsMap.set(displayNameLower, result);
+        }
+      }
+      
+      // Converter Map para Array e limitar resultados
+      const results = Array.from(uniqueResultsMap.values()).slice(0, limit);
 
       return results;
     } catch (error) {
@@ -201,17 +257,63 @@ class MedicationSearchService {
       // Em caso de erro, tentar com lista fallback
       try {
         const searchTerm = query.toLowerCase().trim();
-        return FALLBACK_MEDICATIONS_LIST
+        const fallbackResults = FALLBACK_MEDICATIONS_LIST
           .filter(med => med.toLowerCase().includes(searchTerm))
-          .slice(0, limit)
           .map(med => ({
             name: med,
-            displayName: med,
+            displayName: this.extractMedicationNameOnly(med), // Aplicar também no fallback
             source: 'fallback',
           }));
+        
+        // Remover duplicatas também no fallback
+        const uniqueFallbackMap = new Map();
+        for (const result of fallbackResults) {
+          const displayNameLower = result.displayName.toLowerCase().trim();
+          if (!uniqueFallbackMap.has(displayNameLower)) {
+            uniqueFallbackMap.set(displayNameLower, result);
+          }
+        }
+        
+        return Array.from(uniqueFallbackMap.values()).slice(0, limit);
       } catch (fallbackError) {
         return [];
       }
+    }
+  }
+
+  /**
+   * Buscar medicamentos na API do backend
+   * @param {string} query - Termo de busca
+   * @param {number} limit - Limite de resultados
+   * @returns {Promise<Array>} Lista de medicamentos da API
+   */
+  async searchInBackendAPI(query, limit = 10) {
+    try {
+      // Construir URL com query parameters
+      const queryParams = new URLSearchParams({
+        q: query,
+        limit: limit.toString(),
+      });
+      const endpoint = `/medications/search?${queryParams.toString()}`;
+      
+      const response = await apiService.get(endpoint, {
+        requiresAuth: false, // Busca de medicamentos é pública
+      });
+
+      if (response && response.success && response.data) {
+        return response.data.map(item => ({
+          name: item.name || item.nome_produto, // Nome completo
+          displayName: item.displayName || this.extractMedicationNameOnly(item.name || item.nome_produto), // Nome limpo
+          principio_ativo: item.principio_ativo,
+          classe_terapeutica: item.classe_terapeutica,
+          source: 'database',
+        }));
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Erro ao buscar na API do backend:', error);
+      return [];
     }
   }
 
@@ -249,18 +351,34 @@ class MedicationSearchService {
   }
 
   /**
-   * Obter lista completa de medicamentos comuns
-   * @returns {Promise<Array>} Lista de medicamentos
+   * Obter lista completa de medicamentos comuns (sem duplicatas)
+   * @returns {Promise<Array>} Lista de medicamentos únicos
    */
   async getCommonMedications() {
     const medicationsList = await this.loadFullMedicationsList();
-    return medicationsList.map(med => {
+    const allMedications = medicationsList.map(med => {
       const medName = typeof med === 'string' ? med : (med.name || med.nome || '');
+      // Exibir apenas o nome na lista (sem concentração)
+      const displayName = this.extractMedicationNameOnly(medName);
       return {
-        name: medName,
-        displayName: medName,
+        name: medName, // Nome completo para salvar
+        displayName: displayName, // Apenas nome para exibir
       };
     });
+    
+    // Remover duplicatas baseado no displayName (nome sem concentração)
+    const uniqueMedicationsMap = new Map();
+    
+    for (const med of allMedications) {
+      const displayNameLower = med.displayName.toLowerCase().trim();
+      // Se ainda não existe no Map, adicionar
+      if (!uniqueMedicationsMap.has(displayNameLower)) {
+        uniqueMedicationsMap.set(displayNameLower, med);
+      }
+    }
+    
+    // Converter Map para Array
+    return Array.from(uniqueMedicationsMap.values());
   }
 
   /**

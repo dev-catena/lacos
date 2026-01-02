@@ -88,7 +88,16 @@ const LoginScreen = ({ onLogin }) => {
       onLogin(data.user);
     } catch (err) {
       // Exibir mensagem de erro específica
-      const errorMessage = err.message || 'Erro ao fazer login. Verifique suas credenciais.';
+      let errorMessage = err.message || 'Erro ao fazer login. Verifique suas credenciais.';
+      
+      // Melhorar mensagem de erro de rede
+      if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('conectar ao servidor'))) {
+        errorMessage = 'Não foi possível conectar ao servidor. Verifique:\n' +
+          '• Sua conexão com a internet\n' +
+          '• Se o servidor está acessível\n' +
+          '• Se há bloqueio de firewall ou proxy';
+      }
+      
       setError(errorMessage);
       console.error('Erro no login:', err);
     } finally {

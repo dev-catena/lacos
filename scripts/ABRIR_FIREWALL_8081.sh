@@ -47,3 +47,7 @@ echo "   3. Expo Go está atualizado no celular"
 
 
 
+
+
+
+

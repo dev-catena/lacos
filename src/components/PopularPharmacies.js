@@ -7,8 +7,11 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
+  Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SafeIcon from './SafeIcon';
 import colors from '../constants/colors';
 import popularPharmacyService from '../services/popularPharmacyService';
 
@@ -65,8 +68,8 @@ const PopularPharmacies = ({ medicationName, groupId }) => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Ionicons name="location" size={20} color={colors.primary} />
-          <Text style={styles.title}>Farmácias Populares Próximas</Text>
+          <SafeIcon name="location-outline" size={20} color={colors.primary} />
+          <Text style={styles.title}>xxFarmácias Populares Próximas</Text>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color={colors.primary} />
@@ -80,11 +83,11 @@ const PopularPharmacies = ({ medicationName, groupId }) => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Ionicons name="location" size={20} color={colors.primary} />
-          <Text style={styles.title}>Farmácias Populares Próximas</Text>
+          <SafeIcon name="location-outline" size={20} color={colors.primary} />
+          <Text style={styles.title}>xxFarmácias Populares Próximas</Text>
         </View>
         <View style={styles.emptyContainer}>
-          <Ionicons name="location-outline" size={32} color={colors.gray300} />
+          <SafeIcon name="location-outline" size={32} color={colors.gray300} />
           <Text style={styles.emptyText}>
             {error || 'Nenhuma farmácia popular encontrada próxima'}
           </Text>
@@ -107,9 +110,9 @@ const PopularPharmacies = ({ medicationName, groupId }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Ionicons name="location" size={20} color={colors.primary} />
+        <SafeIcon name="location-outline" size={20} color={colors.primary} />
         <View style={styles.headerText}>
-          <Text style={styles.title}>Farmácias Populares Próximas</Text>
+          <Text style={styles.title}>xxFarmácias Populares Próximas</Text>
           <Text style={styles.subtitle}>
             {pharmacies.length} {pharmacies.length === 1 ? 'farmácia encontrada' : 'farmácias encontradas'} em até 10 km
           </Text>
@@ -117,8 +120,35 @@ const PopularPharmacies = ({ medicationName, groupId }) => {
       </View>
 
       {pharmacies.map((pharmacy, index) => (
-        <View key={pharmacy.id || index} style={styles.pharmacyCard}>
-          <View style={styles.pharmacyHeader}>
+        <TouchableWithoutFeedback key={pharmacy.id || index}>
+          <View 
+            style={{
+              backgroundColor: colors.white,
+              borderRadius: 12,
+              padding: 16,
+              marginBottom: 12,
+              borderWidth: 0.5,
+              borderColor: colors.gray200 || '#E2E8F0',
+              ...Platform.select({
+                android: {
+                  elevation: 0,
+                  shadowColor: 'transparent',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0,
+                  shadowRadius: 0,
+                },
+                ios: {
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 2,
+                },
+              }),
+            }}
+            collapsable={false}
+            needsOffscreenAlphaCompositing={false}
+          >
+            <View style={styles.pharmacyHeader}>
             <View style={styles.pharmacyInfo}>
               <Text style={styles.pharmacyName}>{pharmacy.name}</Text>
               {pharmacy.distance !== undefined && (
@@ -130,7 +160,7 @@ const PopularPharmacies = ({ medicationName, groupId }) => {
               )}
             </View>
             <View style={styles.badge}>
-              <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+              <SafeIcon name="checkmark-circle" size={16} color={colors.success} />
               <Text style={styles.badgeText}>Popular</Text>
             </View>
           </View>
@@ -138,7 +168,7 @@ const PopularPharmacies = ({ medicationName, groupId }) => {
           <View style={styles.pharmacyDetails}>
             {pharmacy.address && (
               <View style={styles.detailRow}>
-                <Ionicons name="location-outline" size={14} color={colors.gray500} />
+                <SafeIcon name="location-outline" size={14} color={colors.gray500} />
                 <Text style={styles.detailText} numberOfLines={2}>
                   {pharmacy.address}
                   {pharmacy.neighborhood && `, ${pharmacy.neighborhood}`}
@@ -149,7 +179,7 @@ const PopularPharmacies = ({ medicationName, groupId }) => {
 
             {pharmacy.phone && (
               <View style={styles.detailRow}>
-                <Ionicons name="call-outline" size={14} color={colors.gray500} />
+                <SafeIcon name="call" size={14} color={colors.gray500} />
                 <Text style={styles.detailText}>{pharmacy.phone}</Text>
               </View>
             )}
@@ -160,7 +190,7 @@ const PopularPharmacies = ({ medicationName, groupId }) => {
               style={styles.actionButton}
               onPress={() => handleOpenMaps(pharmacy)}
             >
-              <Ionicons name="map-outline" size={18} color={colors.primary} />
+              <SafeIcon name="map-outline" size={18} color={colors.primary} />
               <Text style={styles.actionButtonText}>Ver no mapa</Text>
             </TouchableOpacity>
 
@@ -169,14 +199,15 @@ const PopularPharmacies = ({ medicationName, groupId }) => {
                 style={[styles.actionButton, styles.callButton]}
                 onPress={() => handleCall(pharmacy)}
               >
-                <Ionicons name="call-outline" size={18} color={colors.success} />
+                <SafeIcon name="call" size={18} color={colors.success} />
                 <Text style={[styles.actionButtonText, styles.callButtonText]}>
                   Ligar
                 </Text>
               </TouchableOpacity>
             )}
           </View>
-        </View>
+          </View>
+        </TouchableWithoutFeedback>
       ))}
     </View>
   );
@@ -246,19 +277,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  pharmacyCard: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
+  // pharmacyCard removido - usando estilos inline para evitar bordas
   pharmacyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

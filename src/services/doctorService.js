@@ -105,6 +105,57 @@ const doctorService = {
       throw error;
     }
   },
+
+  /**
+   * Busca médicos da plataforma (usuários com profile='doctor')
+   */
+  async getPlatformDoctors() {
+    try {
+      const params = {
+        profile: 'doctor',
+      };
+      
+      const queryString = Object.keys(params)
+        .map(key => `${key}=${encodeURIComponent(params[key])}`)
+        .join('&');
+      
+      const response = await apiService.get(`/caregivers?${queryString}`);
+      
+      // Normalizar resposta
+      let doctorsList = [];
+      if (Array.isArray(response)) {
+        doctorsList = response;
+      } else if (response && response.success && response.data) {
+        doctorsList = response.data;
+      } else if (response && response.data && Array.isArray(response.data)) {
+        doctorsList = response.data;
+      }
+      
+      // Filtrar apenas médicos (profile='doctor') e mapear para formato consistente
+      return doctorsList
+        .filter(doctor => doctor.profile === 'doctor')
+        .map(doctor => ({
+          id: doctor.id,
+          name: doctor.name,
+          email: doctor.email,
+          crm: doctor.crm,
+          phone: doctor.phone,
+          address: doctor.address || doctor.city || null,
+          medical_specialty: doctor.medical_specialty ? {
+            id: doctor.medical_specialty.id || doctor.medical_specialty_id,
+            name: doctor.medical_specialty.name || doctor.medical_specialty,
+          } : null,
+          medical_specialty_id: doctor.medical_specialty_id,
+          photo: doctor.photo || doctor.photo_url,
+          photo_url: doctor.photo_url || doctor.photo,
+          is_platform_doctor: true, // Marcar como médico da plataforma
+          is_primary: false, // Médicos da plataforma não são marcados como principais por padrão
+        }));
+    } catch (error) {
+      console.error('Erro ao buscar médicos da plataforma:', error);
+      return []; // Retornar array vazio em caso de erro
+    }
+  },
 };
 
 export default doctorService;

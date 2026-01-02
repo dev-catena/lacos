@@ -29,7 +29,7 @@ import groupService from '../../services/groupService';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../contexts/AuthContext';
 
-const GroupsScreen = ({ navigation }) => {
+const GroupsScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const [searchText, setSearchText] = useState('');
   const [myGroups, setMyGroups] = useState([]);
@@ -38,6 +38,41 @@ const GroupsScreen = ({ navigation }) => {
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [joiningGroup, setJoiningGroup] = useState(false);
+  
+  // Processar código de convite de deep link
+  useEffect(() => {
+    // Verificar se há código de convite nos parâmetros da rota
+    if (route?.params?.inviteCode) {
+      const code = route.params.inviteCode;
+      console.log('🔗 GroupsScreen - Código de convite recebido via deep link:', code);
+      setInviteCode(code);
+      setInviteModalVisible(true);
+      // Limpar parâmetros para evitar reprocessamento
+      navigation.setParams({ inviteCode: undefined, openModal: undefined });
+    } else if (route?.params?.openModal && global.pendingInviteCode) {
+      // Se há código pendente (de quando o usuário não estava autenticado)
+      const code = global.pendingInviteCode;
+      console.log('🔗 GroupsScreen - Usando código pendente:', code);
+      setInviteCode(code);
+      setInviteModalVisible(true);
+      global.pendingInviteCode = undefined;
+      navigation.setParams({ inviteCode: undefined, openModal: undefined });
+    } else if (route?.params?.openModal) {
+      // Apenas abrir o modal se solicitado
+      setInviteModalVisible(true);
+      navigation.setParams({ openModal: undefined });
+    }
+  }, [route?.params?.inviteCode, route?.params?.openModal, navigation]);
+  
+  // Função para testar deep link manualmente (útil para Expo Go)
+  const testDeepLink = () => {
+    const testUrl = 'http://192.168.1.105/grupo/TESTE123';
+    console.log('🧪 Testando deep link manualmente:', testUrl);
+    // Simular processamento de deep link
+    const code = 'TESTE123';
+    setInviteCode(code);
+    setInviteModalVisible(true);
+  };
 
   // Função auxiliar para verificar se é admin do grupo
   const isAdminOfGroup = (group) => {

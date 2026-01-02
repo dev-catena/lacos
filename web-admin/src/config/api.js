@@ -15,12 +15,19 @@ const getApiBaseUrl = () => {
     return apiUrl;
   }
   
-  // Se for o domínio lacosapp.com, www.lacosapp.com ou admin.lacosapp.com, usar IP do backend
+  // Se for o domínio lacosapp.com, www.lacosapp.com ou admin.lacosapp.com, usar gateway HTTPS
   if (hostname === 'lacosapp.com' || hostname === 'www.lacosapp.com' || hostname === 'admin.lacosapp.com') {
-    // Usar IP do backend diretamente (CORS já está configurado)
-    const apiUrl = 'http://193.203.182.22/api';
-    console.log('📍 Domínio de produção detectado, usando backend no IP:', apiUrl);
-    return apiUrl;
+    // Se estiver em HTTPS, usar gateway HTTPS para evitar mixed content
+    if (protocol === 'https:') {
+      const apiUrl = 'https://gateway.lacosapp.com/api';
+      console.log('📍 Domínio de produção detectado (HTTPS), usando gateway HTTPS:', apiUrl);
+      return apiUrl;
+    } else {
+      // HTTP: usar IP do backend diretamente
+      const apiUrl = 'http://193.203.182.22/api';
+      console.log('📍 Domínio de produção detectado (HTTP), usando backend no IP:', apiUrl);
+      return apiUrl;
+    }
   }
   
   // Se for o IP do servidor, usar o mesmo
@@ -43,9 +50,20 @@ console.log('🌐 API Base URL configurada:', API_BASE_URL);
 console.log('📍 Current hostname:', window.location.hostname);
 console.log('📍 Current origin:', window.location.origin);
 
-// Testar conectividade (opcional, apenas para debug)
-if (process.env.NODE_ENV === 'development') {
-  fetch(API_BASE_URL, { method: 'OPTIONS', mode: 'no-cors' })
-    .then(() => console.log('✅ Backend acessível'))
-    .catch(() => console.warn('⚠️  Não foi possível verificar conectividade com backend'));
-}
+// Testar conectividade (sempre, para debug)
+fetch(`${API_BASE_URL}/gateway/status`, { 
+  method: 'GET',
+  headers: {
+    'Accept': 'application/json',
+  },
+})
+  .then(async (res) => {
+    const text = await res.text();
+    console.log('✅ Backend acessível:', res.status, text);
+  })
+  .catch((err) => {
+    console.error('⚠️  Não foi possível verificar conectividade com backend:', err);
+    console.error('   URL tentada:', `${API_BASE_URL}/gateway/status`);
+    console.error('   Origem atual:', window.location.origin);
+    console.error('   Erro completo:', err.message);
+  });

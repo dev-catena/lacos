@@ -34,6 +34,8 @@ import AddMedicationChoiceScreen from '../screens/Medications/AddMedicationChoic
 import SelectDoctorScreen from '../screens/Medications/SelectDoctorScreen';
 import AddMedicationScreen from '../screens/Medications/AddMedicationScreen';
 import MedicationDetailsScreen from '../screens/Medications/MedicationDetailsScreen';
+import PrescriptionsScreen from '../screens/Prescriptions/PrescriptionsScreen';
+import PrescriptionDetailsScreen from '../screens/Prescriptions/PrescriptionDetailsScreen';
 import ConsultationsScreen from '../screens/Consultations/ConsultationsScreen';
 import AddConsultationScreen from '../screens/Consultations/AddConsultationScreen';
 import ConsultationDetailsScreen from '../screens/Consultations/ConsultationDetailsScreen';

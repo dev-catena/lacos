@@ -4,11 +4,20 @@ use App\Http\Controllers\Api\AdminAuthController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\GatewayController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\MedicationCatalogController;
+use App\Http\Controllers\Api\ChangePasswordController;
+use App\Http\Controllers\Api\SupplierController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Gateway Status - Rota pública
 Route::get('/gateway/status', [GatewayController::class, 'status']);
+
+// ==================== ROTAS PÚBLICAS DE MEDICAMENTOS ====================
+// Busca de medicamentos (público - não requer autenticação)
+Route::get('/medications/search', [MedicationCatalogController::class, 'search']);
+Route::get('/medications/info', [MedicationCatalogController::class, 'getInfo']);
+Route::get('/medications/stats', [MedicationCatalogController::class, 'stats']);
 
 // ==================== ROTAS PÚBLICAS DE AUTENTICAÇÃO ====================
 
@@ -44,6 +53,18 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/change-password', [ChangePasswordController::class, 'changePassword']);
+    
+    // Fornecedores
+    Route::post('/suppliers/register', [SupplierController::class, 'register']);
+    Route::get('/suppliers/me', [SupplierController::class, 'getMySupplier']);
+    
+    // Gestão de Fornecedores (apenas root)
+    Route::get('/suppliers', [SupplierController::class, 'index']);
+    Route::put('/suppliers/{id}/approve', [SupplierController::class, 'approve']);
+    Route::put('/suppliers/{id}/reject', [SupplierController::class, 'reject']);
+    Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy']);
+    
     Route::put('/users/{id}', [App\Http\Controllers\Api\UserController::class, 'update']);
     Route::post('/users/{id}/certificate', [App\Http\Controllers\Api\UserController::class, 'uploadCertificate']);
 });

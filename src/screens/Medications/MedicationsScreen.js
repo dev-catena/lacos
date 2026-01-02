@@ -7,8 +7,6 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Modal,
-  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -17,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
 import { ArrowBackIcon } from '../../components/CustomIcons';
+import SafeIcon from '../../components/SafeIcon';
 import medicationService from '../../services/medicationService';
 
 const MedicationsScreen = ({ route, navigation }) => {
@@ -30,7 +29,6 @@ const MedicationsScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('all'); // all, morning, afternoon, night
   const [selectedStatus, setSelectedStatus] = useState('active'); // active, discontinued, completed
-  const [showAddMenu, setShowAddMenu] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -119,7 +117,23 @@ const MedicationsScreen = ({ route, navigation }) => {
             durationType: duration.type || 'continuo',
             durationDays: duration.value || null,
             active: med.is_active,
+            created_at: med.created_at, // Data de criação/prescrição
+            start_date: med.start_date, // Data de início
           };
+        });
+        
+        // Ordenar por data de prescrição (mais recentes primeiro)
+        // Usar start_date se disponível, senão usar created_at
+        transformedMeds.sort((a, b) => {
+          const dateA = a.start_date || a.created_at;
+          const dateB = b.start_date || b.created_at;
+          
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1; // Sem data vai para o final
+          if (!dateB) return -1; // Sem data vai para o final
+          
+          // Converter para Date e comparar (mais recente primeiro = ordem decrescente)
+          return new Date(dateB) - new Date(dateA);
         });
         
         setMedications(transformedMeds);
@@ -159,16 +173,7 @@ const MedicationsScreen = ({ route, navigation }) => {
   };
 
   const handleAddMedication = () => {
-    setShowAddMenu(true);
-  };
-
-  const handleWithPrescription = () => {
-    setShowAddMenu(false);
-    navigation.navigate('SelectDoctor', { groupId, groupName });
-  };
-
-  const handleWithoutPrescription = () => {
-    setShowAddMenu(false);
+    // Agora apenas cadastra sem prescrição diretamente
     navigation.navigate('AddMedication', { groupId, groupName, prescriptionId: null });
   };
 
@@ -219,7 +224,7 @@ const MedicationsScreen = ({ route, navigation }) => {
             style={[styles.statusTab, selectedStatus === 'active' && styles.statusTabActive]}
             onPress={() => setSelectedStatus('active')}
           >
-            <Ionicons 
+            <SafeIcon 
               name="checkmark-circle-outline" 
               size={20} 
               color={selectedStatus === 'active' ? colors.success : colors.textLight} 
@@ -233,7 +238,7 @@ const MedicationsScreen = ({ route, navigation }) => {
             style={[styles.statusTab, selectedStatus === 'discontinued' && styles.statusTabActive]}
             onPress={() => setSelectedStatus('discontinued')}
           >
-            <Ionicons 
+            <SafeIcon 
               name="archive-outline" 
               size={20} 
               color={selectedStatus === 'discontinued' ? colors.error : colors.textLight} 
@@ -247,7 +252,7 @@ const MedicationsScreen = ({ route, navigation }) => {
             style={[styles.statusTab, selectedStatus === 'completed' && styles.statusTabActive]}
             onPress={() => setSelectedStatus('completed')}
           >
-            <Ionicons 
+            <SafeIcon 
               name="checkmark-done-circle" 
               size={20} 
               color={selectedStatus === 'completed' ? colors.info : colors.textLight} 
@@ -267,7 +272,7 @@ const MedicationsScreen = ({ route, navigation }) => {
               style={[styles.filterChip, selectedPeriod === 'all' && styles.filterChipActive]}
               onPress={() => setSelectedPeriod('all')}
             >
-              <Ionicons 
+              <SafeIcon 
                 name="apps-outline" 
                 size={18} 
                 color={selectedPeriod === 'all' ? colors.textWhite : colors.text} 
@@ -281,7 +286,7 @@ const MedicationsScreen = ({ route, navigation }) => {
               style={[styles.filterChip, selectedPeriod === 'morning' && styles.filterChipActive]}
               onPress={() => setSelectedPeriod('morning')}
             >
-            <Ionicons 
+            <SafeIcon 
               name="sunny" 
               size={18} 
               color={selectedPeriod === 'morning' ? colors.textWhite : colors.warning} 
@@ -302,7 +307,7 @@ const MedicationsScreen = ({ route, navigation }) => {
               style={[styles.filterChip, selectedPeriod === 'afternoon' && styles.filterChipActive]}
               onPress={() => setSelectedPeriod('afternoon')}
             >
-            <Ionicons 
+            <SafeIcon 
               name="partly-sunny" 
               size={18} 
               color={selectedPeriod === 'afternoon' ? colors.textWhite : colors.info} 
@@ -323,7 +328,7 @@ const MedicationsScreen = ({ route, navigation }) => {
               style={[styles.filterChip, selectedPeriod === 'night' && styles.filterChipActive]}
               onPress={() => setSelectedPeriod('night')}
             >
-            <Ionicons 
+            <SafeIcon 
               name="moon" 
               size={18} 
               color={selectedPeriod === 'night' ? colors.textWhite : colors.secondary} 
@@ -351,7 +356,7 @@ const MedicationsScreen = ({ route, navigation }) => {
           </View>
         ) : medications.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons 
+            <SafeIcon 
               name={
                 selectedStatus === 'discontinued' ? "archive-outline" :
                 selectedStatus === 'completed' ? "checkmark-done-circle-outline" :
@@ -381,7 +386,7 @@ const MedicationsScreen = ({ route, navigation }) => {
               period.meds.length > 0 && (
                 <View key={key} style={styles.periodSection}>
                   <View style={styles.periodHeader}>
-                    <Ionicons name={period.icon} size={24} color={period.color} />
+                    <SafeIcon name={period.icon} size={24} color={period.color} />
                     <Text style={styles.periodTitle}>{period.name}</Text>
                     <View style={styles.periodBadge}>
                       <Text style={styles.periodBadgeText}>{period.meds.length}</Text>
@@ -414,19 +419,21 @@ const MedicationsScreen = ({ route, navigation }) => {
                       >
                         <View style={styles.medicationLeft}>
                           <View style={[styles.medicationIcon, { backgroundColor: period.color + '20' }]}>
-                            <Ionicons name={getFormIcon(med.form)} size={24} color={period.color} />
+                            <SafeIcon name={getFormIcon(med.form)} size={24} color={period.color} />
                           </View>
                           <View style={styles.medicationInfo}>
                             <Text style={styles.medicationName}>{med.name}</Text>
                             <Text style={styles.medicationDosage}>
                               {med.dosage} {med.unit} - {med.form}
                             </Text>
-                            <Text style={styles.medicationTime}>
-                              <Ionicons name="time-outline" size={14} color={colors.textLight} /> {med.time}
-                            </Text>
+                            {med.time && (
+                              <Text style={styles.medicationTime}>
+                                <SafeIcon name="time-outline" size={14} color={colors.textLight} /> {med.time}
+                              </Text>
+                            )}
                           </View>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+                        <SafeIcon name="chevron-forward" size={20} color={colors.gray400} />
                       </TouchableOpacity>
                     );
                   })}
@@ -445,53 +452,8 @@ const MedicationsScreen = ({ route, navigation }) => {
         onPress={handleAddMedication}
         activeOpacity={0.8}
       >
-        <Ionicons name="add" size={28} color={colors.textWhite} />
+        <SafeIcon name="add" size={28} color={colors.textWhite} />
       </TouchableOpacity>
-
-      {/* Menu Suspenso de Opções */}
-      <Modal
-        visible={showAddMenu}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowAddMenu(false)}
-      >
-        <Pressable 
-          style={styles.menuOverlay}
-          onPress={() => setShowAddMenu(false)}
-        >
-          <View style={styles.menuContainer}>
-            <TouchableOpacity
-              style={styles.menuOption}
-              onPress={handleWithPrescription}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.menuOptionIcon, { backgroundColor: colors.secondary + '20' }]}>
-                <Ionicons name="document-text" size={24} color={colors.secondary} />
-              </View>
-              <View style={styles.menuOptionText}>
-                <Text style={styles.menuOptionTitle}>Receita</Text>
-                <Text style={styles.menuOptionSubtitle}>Com prescrição médica</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuOption}
-              onPress={handleWithoutPrescription}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.menuOptionIcon, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="add-circle" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.menuOptionText}>
-                <Text style={styles.menuOptionTitle}>Sem prescrição</Text>
-                <Text style={styles.menuOptionSubtitle}>Cadastro rápido</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 };

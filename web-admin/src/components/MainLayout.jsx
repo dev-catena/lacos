@@ -6,6 +6,7 @@ const MainLayout = ({ activeSection, onSectionChange, children, user, onLogout }
     { id: 'users', label: '👥 Usuários', icon: '👥' },
     { id: 'doctors', label: '👨‍⚕️ Médicos', icon: '👨‍⚕️' },
     { id: 'plans', label: '📋 Planos', icon: '📋' },
+    { id: 'suppliers', label: '🏪 Fornecedores', icon: '🏪' },
   ];
 
   return (

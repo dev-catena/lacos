@@ -20,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
 import doctorService from '../../services/doctorService';
 import { formatCrmDisplay } from '../../utils/crm';
+import SafeIcon from '../../components/SafeIcon';
 
 const SelectDoctorScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params;
@@ -184,16 +185,16 @@ const SelectDoctorScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={styles.title}>Selecionar Médico</Text>
@@ -222,7 +223,7 @@ const SelectDoctorScreen = ({ route, navigation }) => {
                   style={styles.removeImageButton}
                   onPress={handleRemovePrescription}
                 >
-                  <Ionicons name="close-circle" size={24} color={colors.error} />
+                  <SafeIcon name="close-circle" size={24} color={colors.error} />
                 </TouchableOpacity>
               </View>
             ) : (
@@ -231,7 +232,7 @@ const SelectDoctorScreen = ({ route, navigation }) => {
                   style={[styles.scanButton, styles.scanButtonPrimary]}
                   onPress={handleScanPrescription}
                 >
-                  <Ionicons name="camera" size={24} color={colors.primary} />
+                  <SafeIcon name="camera" size={24} color={colors.primary} />
                   <Text style={styles.scanButtonText}>Tirar Foto</Text>
                 </TouchableOpacity>
                 
@@ -239,7 +240,7 @@ const SelectDoctorScreen = ({ route, navigation }) => {
                   style={[styles.scanButton, styles.scanButtonSecondary]}
                   onPress={handlePickFromGallery}
                 >
-                  <Ionicons name="images" size={24} color={colors.secondary} />
+                  <SafeIcon name="images" size={24} color={colors.secondary} />
                   <Text style={[styles.scanButtonText, { color: colors.secondary }]}>
                     Galeria
                   </Text>
@@ -252,7 +253,7 @@ const SelectDoctorScreen = ({ route, navigation }) => {
 
           {/* Campo de Busca */}
           <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color={colors.textLight} style={styles.searchIcon} />
+            <SafeIcon name="search" size={20} color={colors.textLight} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
               placeholder="Buscar por nome, CRM ou especialidade..."
@@ -265,7 +266,7 @@ const SelectDoctorScreen = ({ route, navigation }) => {
                 onPress={() => handleSearchChange('')}
                 style={styles.clearButton}
               >
-                <Ionicons name="close-circle" size={20} color={colors.textLight} />
+                <SafeIcon name="close-circle" size={20} color={colors.textLight} />
               </TouchableOpacity>
             )}
           </View>
@@ -290,7 +291,7 @@ const SelectDoctorScreen = ({ route, navigation }) => {
                   onPress={() => handleSelectDoctor(doctor)}
                 >
                   <View style={styles.doctorIcon}>
-                    <Ionicons name="medical" size={32} color={colors.secondary} />
+                    <SafeIcon name="medical" size={32} color={colors.secondary} />
                   </View>
                   <View style={styles.doctorInfo}>
                     <Text style={styles.doctorName}>{doctor.name}</Text>
@@ -301,7 +302,7 @@ const SelectDoctorScreen = ({ route, navigation }) => {
                       <Text style={styles.doctorCrm}>CRM: {formatCrmDisplay(doctor.crm)}</Text>
                     )}
                   </View>
-                  <Ionicons name="chevron-forward" size={24} color={colors.gray400} />
+                  <SafeIcon name="chevron-forward" size={24} color={colors.gray400} />
                 </TouchableOpacity>
               ))}
 
@@ -313,14 +314,14 @@ const SelectDoctorScreen = ({ route, navigation }) => {
             </>
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="medical-outline" size={64} color={colors.gray300} />
+              <SafeIcon name="medical-outline" size={64} color={colors.gray300} />
               <Text style={styles.emptyText}>Nenhum médico cadastrado</Text>
             </View>
           )}
 
           {/* Info */}
           <View style={styles.infoCard}>
-            <Ionicons name="information-circle" size={20} color={colors.info} />
+            <SafeIcon name="information-circle" size={20} color={colors.info} />
             <Text style={styles.infoText}>
               Vincular a receita médica ajuda a manter o histórico organizado e facilita consultas futuras
             </Text>
@@ -334,7 +335,7 @@ const SelectDoctorScreen = ({ route, navigation }) => {
         onPress={handleAddNewDoctor}
         activeOpacity={0.8}
       >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
+        <SafeIcon name="add" size={28} color="#FFFFFF" />
       </TouchableOpacity>
     </SafeAreaView>
   );

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../constants/colors';
+import SafeIcon from './SafeIcon';
 
 const MedicationAutocomplete = ({
   value,
@@ -56,7 +57,9 @@ const MedicationAutocomplete = ({
   };
 
   const handleSelect = (item) => {
-    const medicationName = item.name;
+    // Usar displayName (apenas nome) se disponível, senão usar name
+    // Isso garante que apenas o nome seja salvo, sem concentração
+    const medicationName = item.displayName || item.name;
     
     // Marcar que estamos selecionando
     isSelectingRef.current = true;
@@ -70,9 +73,12 @@ const MedicationAutocomplete = ({
       onChangeText(medicationName);
     }
     
-    // Chamar callback de seleção
+    // Chamar callback de seleção (passar item atualizado com nome limpo)
     if (onSelect) {
-      onSelect(item);
+      onSelect({
+        ...item,
+        name: medicationName, // Atualizar name para o nome limpo
+      });
     }
     
     // Garantir que o valor seja mantido mesmo após onBlur
@@ -108,26 +114,26 @@ const MedicationAutocomplete = ({
         />
         {isLoading && (
           <View style={styles.indicator}>
-            <Ionicons name="search" size={16} color={colors.textLight} />
+            <SafeIcon name="search" size={16} color={colors.textLight} />
           </View>
         )}
         {value && !isLoading && !showSuggestions && (
           <View style={styles.indicator}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+            <SafeIcon name="checkmark-circle" size={20} color={colors.primary} />
           </View>
         )}
       </View>
       
       {isFarmaciaPopular && (
         <View style={styles.farmaciaPopularBadge}>
-          <Ionicons name="checkmark-circle" size={18} color={colors.success || '#10b981'} />
+          <SafeIcon name="checkmark-circle" size={18} color={colors.success || '#10b981'} />
           <Text style={styles.farmaciaPopularText}>Disponível na Farmácia Popular</Text>
         </View>
       )}
       
       {showPrice && price && (
         <View style={styles.priceContainer}>
-          <Ionicons name="cash-outline" size={16} color={colors.textLight} />
+          <SafeIcon name="cash-outline" size={16} color={colors.textLight} />
           <Text style={styles.priceLabel}>Preço de referência:</Text>
           <Text style={styles.priceValue}>R$ {price.toFixed(2).replace('.', ',')}</Text>
         </View>
@@ -145,7 +151,8 @@ const MedicationAutocomplete = ({
               onTouchStart={() => {
                 // Marcar flag e definir valor ANTES do onBlur ser disparado
                 isSelectingRef.current = true;
-                const medicationName = item.name;
+                // Usar displayName (apenas nome) se disponível, senão usar name
+                const medicationName = item.displayName || item.name;
                 
                 // Fechar sugestões imediatamente
                 setShowSuggestions(false);
@@ -156,9 +163,12 @@ const MedicationAutocomplete = ({
                   onChangeText(medicationName);
                 }
                 
-                // Chamar callback
+                // Chamar callback (passar item atualizado com nome limpo)
                 if (onSelect) {
-                  onSelect(item);
+                  onSelect({
+                    ...item,
+                    name: medicationName, // Atualizar name para o nome limpo
+                  });
                 }
                 
                 // Garantir que o valor seja mantido após onBlur
@@ -177,15 +187,16 @@ const MedicationAutocomplete = ({
               onPress={() => {
                 // Apenas garantir que o valor está correto
                 if (onChangeText && !isSelectingRef.current) {
-                  onChangeText(item.name);
+                  const medicationName = item.displayName || item.name;
+                  onChangeText(medicationName);
                 }
               }}
             >
               <View style={styles.suggestionIconContainer}>
-                <Ionicons name="medical" size={20} color={colors.primary} />
+                <SafeIcon name="medical" size={20} color={colors.primary} />
               </View>
               <Text style={styles.suggestionText}>{item.displayName || item.name}</Text>
-              <Ionicons 
+              <SafeIcon 
                 name="checkmark-circle-outline" 
                 size={20} 
                 color={colors.primary} 

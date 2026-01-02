@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import SafeIcon from '../../components/SafeIcon';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import AdvancedFrequencyModal from './AdvancedFrequencyModal';
@@ -93,16 +95,22 @@ const FREQUENCIES = [
   { label: '12 em 12 horas', value: '12', times: 2 },
   { label: '8 em 8 horas', value: '8', times: 3 },
   { label: '6 em 6 horas', value: '6', times: 4 },
+  { label: '4 em 4 horas', value: '4', times: 6 },
+  { label: '2 em 2 horas', value: '2', times: 12 },
   { label: 'Outros', value: 'advanced', times: null, icon: 'settings-outline' },
 ];
 
 const AddMedicationScreen = ({ route, navigation }) => {
-  let { groupId, groupName, prescriptionId, doctorId, doctorName, prescriptionImage } = route.params;
+  const insets = useSafeAreaInsets();
+  let { groupId, groupName, prescriptionId, doctorId, doctorName, prescriptionImage, medicationId, medication } = route.params;
   
   // TEMPORÁRIO: Se groupId é um timestamp, usar o grupo de teste
   if (groupId && groupId > 999999999999) {
     groupId = 1;
   }
+
+  // Verificar se é edição
+  const isEditing = !!medicationId;
 
   const [name, setName] = useState('');
   const [isFarmaciaPopular, setIsFarmaciaPopular] = useState(false);
@@ -119,6 +127,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
   const [durationDays, setDurationDays] = useState('');
   const [advancedFrequency, setAdvancedFrequency] = useState(null);
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
+  const [loadingMedication, setLoadingMedication] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [prescriptionSaved, setPrescriptionSaved] = useState(false); // Flag para evitar salvar receita múltiplas vezes
@@ -196,6 +205,84 @@ const AddMedicationScreen = ({ route, navigation }) => {
     };
   }, []);
 
+  // Carregar dados do medicamento se for edição
+  useEffect(() => {
+    if (isEditing) {
+      loadMedicationForEdit();
+    }
+  }, [isEditing]);
+
+  const loadMedicationForEdit = async () => {
+    try {
+      setLoadingMedication(true);
+      
+      // Se os dados do medicamento foram passados via route.params, usar eles
+      if (medication) {
+        populateFormWithMedication(medication);
+        return;
+      }
+
+      // Caso contrário, buscar da API
+      if (medicationId) {
+        const result = await medicationService.getMedication(medicationId);
+        if (result.success && result.data) {
+          populateFormWithMedication(result.data);
+        } else {
+          Alert.alert('Erro', 'Não foi possível carregar os dados do medicamento');
+          navigation.goBack();
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar medicamento para edição:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os dados do medicamento');
+      navigation.goBack();
+    } finally {
+      setLoadingMedication(false);
+    }
+  };
+
+  const populateFormWithMedication = (med) => {
+    // Transformar dados da API para o formato esperado pela UI
+    const frequency = typeof med.frequency === 'string' 
+      ? JSON.parse(med.frequency) 
+      : (med.frequency || {});
+    
+    const frequencyDetails = frequency.details || {};
+    const frequencyType = frequency.type || 'simple';
+    
+    const duration = typeof med.duration === 'string'
+      ? JSON.parse(med.duration)
+      : (med.duration || { type: 'continuo', value: null });
+
+    // Preencher formulário com dados do medicamento
+    setName(med.name || '');
+    setForm(med.pharmaceutical_form || med.form || '');
+    setDosage(med.dosage || '');
+    setUnit(med.unit || 'mg');
+    setDoseQuantity(med.dose_quantity || '');
+    setDoseQuantityUnit(med.dose_quantity_unit || '');
+    setAdministrationRoute(med.administration_route || 'Oral');
+    setFrequency(frequencyType === 'advanced' ? 'advanced' : (frequencyDetails.interval || '24'));
+    setAdvancedFrequency(frequencyType === 'advanced' ? frequencyDetails : null);
+    setInstructions(med.notes || '');
+    setDurationType(duration.type || 'continuo');
+    setDurationDays(duration.value ? duration.value.toString() : '');
+    
+    // Extrair primeiro horário do schedule
+    const schedule = med.times || frequencyDetails.schedule || [];
+    if (schedule.length > 0) {
+      const firstTime = schedule[0];
+      if (firstTime && firstTime.includes(':')) {
+        setFirstDoseTime(firstTime.substring(0, 5)); // Formato HH:MM
+      }
+    }
+
+    // Verificar se é da Farmácia Popular
+    if (med.name) {
+      const isPopular = medicationSearchService.isFarmaciaPopular(med.name);
+      setIsFarmaciaPopular(isPopular);
+    }
+  };
 
   const handleAdvancedFrequencyConfirm = (config) => {
     setAdvancedFrequency(config);
@@ -307,6 +394,10 @@ const AddMedicationScreen = ({ route, navigation }) => {
       Alert.alert('Erro', 'Digite a concentração');
       return;
     }
+    if (!doseQuantity.trim()) {
+      Alert.alert('Erro', 'Digite a quantidade da dose');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -357,7 +448,10 @@ const AddMedicationScreen = ({ route, navigation }) => {
         endDate: calculatedEndDate, // Data final calculada para dias intercalados
       };
 
-      const result = await medicationService.createMedication(medicationData);
+      // Se for edição, usar updateMedication, senão createMedication
+      const result = isEditing 
+        ? await medicationService.updateMedication(medicationId, medicationData)
+        : await medicationService.createMedication(medicationData);
 
       if (result.success) {
         // Agendar notificações locais
@@ -377,10 +471,16 @@ const AddMedicationScreen = ({ route, navigation }) => {
 
         Toast.show({
           type: 'success',
-          text1: 'Medicamento cadastrado',
-          text2: `${name} foi adicionado com sucesso`,
+          text1: isEditing ? 'Medicamento atualizado' : 'Medicamento cadastrado',
+          text2: isEditing ? `${name} foi atualizado com sucesso` : `${name} foi adicionado com sucesso`,
           position: 'bottom',
         });
+
+        // Se for edição, voltar para a tela de detalhes
+        if (isEditing) {
+          navigation.goBack();
+          return;
+        }
 
         // Se estiver cadastrando uma receita (com prescriptionImage), oferecer opção de adicionar mais
         if (prescriptionImage) {
@@ -463,20 +563,20 @@ const AddMedicationScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={styles.title}>
-            {prescriptionImage ? 'Receita Médica' : 'Cadastrar Remédio'}
+            {isEditing ? 'Editar Remédio' : (prescriptionImage ? 'Receita Médica' : 'Cadastrar Remédio')}
           </Text>
           <Text style={styles.subtitle}>
             {doctorName ? `${doctorName} - ${groupName}` : groupName}
@@ -490,7 +590,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
           {/* Indicador de Receita */}
           {prescriptionImage && (
             <View style={styles.prescriptionIndicator}>
-              <Ionicons name="document-text" size={20} color={colors.secondary} />
+              <SafeIcon name="document-text" size={20} color={colors.secondary} />
               <Text style={styles.prescriptionIndicatorText}>
                 Cadastrando medicamentos da receita
               </Text>
@@ -594,7 +694,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
           {/* Quantidade da Dose */}
           <View style={styles.row}>
             <View style={[styles.field, { flex: 2 }]}>
-              <Text style={styles.label}>Quantidade da dose</Text>
+              <Text style={styles.label}>Quantidade da dose *</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Ex: 1, 2, 0.5"
@@ -658,7 +758,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
                   onPress={() => handleFrequencyChange(item.value)}
                 >
                   {item.icon && (
-                    <Ionicons 
+                    <SafeIcon 
                       name={item.icon} 
                       size={20} 
                       color={frequency === item.value ? colors.primary : colors.textLight} 
@@ -683,12 +783,12 @@ const AddMedicationScreen = ({ route, navigation }) => {
             </View>
             {frequency === 'advanced' && advancedFrequency && (
               <View style={styles.advancedFrequencyInfo}>
-                <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                <SafeIcon name="checkmark-circle" size={20} color={colors.success} />
                 <Text style={styles.advancedFrequencyText}>
                   {getFrequencyLabel()}
                 </Text>
                 <TouchableOpacity onPress={() => setShowAdvancedModal(true)}>
-                  <Ionicons name="create-outline" size={20} color={colors.primary} />
+                  <SafeIcon name="create-outline" size={20} color={colors.primary} />
                 </TouchableOpacity>
               </View>
             )}
@@ -722,7 +822,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
                 ]}
                 onPress={() => setDurationType('continuo')}
               >
-                <Ionicons 
+                <SafeIcon 
                   name="infinite" 
                   size={24} 
                   color={durationType === 'continuo' ? colors.primary : colors.textLight} 
@@ -741,8 +841,8 @@ const AddMedicationScreen = ({ route, navigation }) => {
                 ]}
                 onPress={() => setDurationType('temporario')}
               >
-                <Ionicons 
-                  name="calendar" 
+                <SafeIcon 
+                  name="calendar-outline" 
                   size={24} 
                   color={durationType === 'temporario' ? colors.primary : colors.textLight} 
                 />
@@ -797,7 +897,7 @@ const AddMedicationScreen = ({ route, navigation }) => {
             onPress={handleSave}
             disabled={saving}
           >
-            <Ionicons name="checkmark-circle" size={24} color={colors.textWhite} />
+            <SafeIcon name="checkmark-circle" size={24} color={colors.textWhite} />
             <Text style={styles.saveButtonText}>
               {saving ? 'Salvando...' : 'Salvar Medicamento'}
             </Text>

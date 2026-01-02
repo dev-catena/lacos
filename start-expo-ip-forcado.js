@@ -10,7 +10,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 // IP FIXO - NUNCA MUDAR
-const FORCED_IP = '10.102.0.103';
+const FORCED_IP = '192.168.1.105';
 const FORCED_PORT = '8081';
 
 console.log('');

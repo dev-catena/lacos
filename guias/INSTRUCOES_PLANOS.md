@@ -72,6 +72,7 @@ Cada plano pode ter as seguintes funcionalidades ativadas/desativadas:
 - `grupoCuidados` - Grupo de cuidados
 - `historico` - Histórico
 - `remedios` - Remédios
+- `receitas` - Receitas médicas e prescrições
 - `agenda` - Agenda
 - `medicos` - Médicos
 - `arquivos` - Arquivos

@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import SafeIcon from '../../components/SafeIcon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import * as Location from 'expo-location';
 import colors from '../../constants/colors';
@@ -30,6 +32,7 @@ const DOSE_HISTORY_STORAGE_KEY = '@lacos_dose_history';
 
 const MedicationDetailsScreen = ({ route, navigation }) => {
   const { medicationId, groupId } = route.params;
+  const insets = useSafeAreaInsets();
   const [medication, setMedication] = useState(null);
   const [doseHistory, setDoseHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -538,8 +541,8 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
 
   if (loading || !medication) {
     return (
-      <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
-        <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
+        <View style={[styles.loadingContainer, { paddingTop: Math.max(insets.top, 16) }]}>
           <Text>Carregando...</Text>
         </View>
       </SafeAreaView>
@@ -547,20 +550,32 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Detalhes do Remédio</Text>
-        <TouchableOpacity style={styles.editButton}>
-          <Ionicons name="create-outline" size={24} color={colors.primary} />
+        <TouchableOpacity 
+          style={styles.editButton}
+          onPress={() => {
+            if (medication) {
+              navigation.navigate('AddMedication', {
+                groupId: groupId,
+                groupName: medication.groupName || 'Grupo',
+                medicationId: medication.id,
+                medication: medication, // Passar dados do medicamento para edição
+              });
+            }
+          }}
+        >
+          <SafeIcon name="create-outline" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -569,7 +584,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
         <View style={styles.infoCard}>
           <View style={styles.medicationHeader}>
             <View style={styles.medicationIcon}>
-              <Ionicons name="medical" size={32} color={colors.secondary} />
+              <SafeIcon name="medical" size={32} color={colors.secondary} />
             </View>
             <View style={styles.medicationTitleContainer}>
               <Text style={styles.medicationName}>{medication.name}</Text>
@@ -581,7 +596,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
 
           <View style={styles.infoGrid}>
             <View style={styles.infoItem}>
-              <Ionicons name="repeat" size={20} color={colors.info} />
+              <SafeIcon name="repeat" size={20} color={colors.info} />
               <Text style={styles.infoLabel}>Frequência</Text>
               <Text style={styles.infoValue}>
                 {medication.frequency === 'advanced' && medication.advancedFrequency
@@ -590,12 +605,12 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
               </Text>
             </View>
             <View style={styles.infoItem}>
-              <Ionicons name="water" size={20} color={colors.info} />
+              <SafeIcon name="water" size={20} color={colors.info} />
               <Text style={styles.infoLabel}>Via</Text>
               <Text style={styles.infoValue}>{medication.route || 'Não informado'}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Ionicons name="calendar" size={20} color={colors.info} />
+              <SafeIcon name="calendar-outline" size={20} color={colors.info} />
               <Text style={styles.infoLabel}>Duração</Text>
               <Text style={styles.infoValue}>
                 {medication.durationType === 'continuo' ? 'Contínuo' : `${medication.durationDays} dias`}
@@ -605,7 +620,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
 
           {medication.instructions && (
             <View style={styles.instructionsBox}>
-              <Ionicons name="information-circle" size={20} color={colors.primary} />
+              <SafeIcon name="information-circle" size={20} color={colors.primary} />
               <Text style={styles.instructionsText}>{medication.instructions}</Text>
             </View>
           )}
@@ -631,7 +646,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                 activeOpacity={0.7}
               >
                 <View style={styles.scheduleLeft}>
-                  <Ionicons name={status.icon} size={32} color={status.color} />
+                  <SafeIcon name={status.icon} size={32} color={status.color} />
                   <View style={styles.scheduleInfo}>
                     <Text style={styles.scheduleTime}>{time}</Text>
                     <Text style={[styles.scheduleStatus, { color: status.color }]}>
@@ -641,7 +656,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                 </View>
                 {status.status !== 'taken' && status.status !== 'not_administered' && (
                   <View style={[styles.quickRegisterBadge, { backgroundColor: status.color + '20' }]}>
-                    <Ionicons name="checkmark" size={16} color={status.color} />
+                    <SafeIcon name="checkmark" size={16} color={status.color} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -661,7 +676,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
           ) : medicationPrice !== null && (
             <View style={styles.priceCard}>
               <View style={styles.priceHeader}>
-                <Ionicons name="cash-outline" size={24} color={colors.primary} />
+                <SafeIcon name="cash-outline" size={24} color={colors.primary} />
                 <Text style={styles.priceLabel}>Preço de Referência</Text>
               </View>
               <Text style={styles.priceValue}>
@@ -676,7 +691,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
           {/* Badge Farmácia Popular */}
           {isFarmaciaPopular && (
             <View style={styles.farmaciaPopularBadge}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <SafeIcon name="checkmark-circle" size={20} color={colors.success} />
               <Text style={styles.farmaciaPopularText}>
                 Disponível na Farmácia Popular
               </Text>
@@ -711,7 +726,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
               style={styles.completeButton}
               onPress={handleComplete}
             >
-              <Ionicons name="checkmark-done-circle" size={24} color={colors.info} />
+              <SafeIcon name="checkmark-done-circle" size={24} color={colors.info} />
               <Text style={styles.completeButtonText}>Concluir Medicamento</Text>
             </TouchableOpacity>
             
@@ -719,7 +734,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
               style={styles.discontinueButton}
               onPress={handleDiscontinue}
             >
-              <Ionicons name="close-circle" size={24} color={colors.error} />
+              <SafeIcon name="close-circle" size={24} color={colors.error} />
               <Text style={styles.discontinueButtonText}>Descontinuar Medicamento</Text>
             </TouchableOpacity>
           </View>
@@ -743,7 +758,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Registrar Dose</Text>
               <TouchableOpacity onPress={() => setShowRegisterModal(false)}>
-                <Ionicons name="close" size={28} color={colors.text} />
+                <SafeIcon name="close" size={28} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -770,7 +785,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                   setShowRegisterModal(false);
                 }}
               >
-                <Ionicons name="checkmark-circle" size={32} color={colors.success} />
+                <SafeIcon name="checkmark-circle" size={32} color={colors.success} />
                 <View style={styles.modalOptionContent}>
                   <Text style={styles.modalOptionTitle}>Tomado</Text>
                   <Text style={styles.modalOptionDescription}>
@@ -781,7 +796,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
 
               {/* Opção 2: Registrar com horário customizado */}
               <View style={styles.modalOption}>
-                <Ionicons name="time" size={32} color={colors.warning} />
+                <SafeIcon name="time-outline" size={32} color={colors.warning} />
                 <View style={styles.modalOptionContent}>
                   <Text style={styles.modalOptionTitle}>Horário Real</Text>
                   <Text style={styles.modalOptionDescription}>
@@ -844,7 +859,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
 
               {/* Opção 3: Não administrado */}
               <View style={[styles.modalOption, styles.modalOptionDanger]}>
-                <Ionicons name="close-circle" size={32} color={colors.error} />
+                <SafeIcon name="close-circle" size={32} color={colors.error} />
                 <View style={styles.modalOptionContent}>
                   <Text style={styles.modalOptionTitle}>Não Administrado</Text>
                   <Text style={styles.modalOptionDescription}>

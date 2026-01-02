@@ -100,3 +100,7 @@ echo "   3. Testar múltiplos perfis com mesmo email"
 
 
 
+
+
+
+

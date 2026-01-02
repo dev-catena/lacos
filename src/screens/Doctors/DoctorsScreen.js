@@ -6,6 +6,8 @@ import {
   StyleSheet,
   FlatList,
   Alert,
+  Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +23,7 @@ import {
   CreateOutlineIcon,
   TrashOutlineIcon,
   AddIcon,
+  CheckmarkCircleIcon,
 } from '../../components/CustomIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
@@ -41,10 +44,47 @@ const DoctorsScreen = ({ route, navigation }) => {
   const loadDoctors = async () => {
     try {
       setLoading(true);
-      const response = await doctorService.getDoctors(validGroupId);
-      if (response.success && response.data) {
-        setDoctors(response.data);
+      
+      // Buscar médicos do grupo e médicos da plataforma em paralelo
+      const [groupDoctorsResponse, platformDoctors] = await Promise.all([
+        doctorService.getDoctors(validGroupId),
+        doctorService.getPlatformDoctors(),
+      ]);
+      
+      // Processar médicos do grupo
+      let groupDoctors = [];
+      if (groupDoctorsResponse.success && groupDoctorsResponse.data) {
+        groupDoctors = groupDoctorsResponse.data.map(doctor => ({
+          ...doctor,
+          is_platform_doctor: false, // Marcar como médico do grupo
+        }));
       }
+      
+      // Combinar as duas listas
+      // Remover duplicatas baseado no ID (se um médico da plataforma já estiver no grupo, priorizar o do grupo)
+      const doctorsMap = new Map();
+      
+      // Primeiro adicionar médicos do grupo (têm prioridade)
+      groupDoctors.forEach(doctor => {
+        doctorsMap.set(doctor.id, doctor);
+      });
+      
+      // Depois adicionar médicos da plataforma que não estão no grupo
+      platformDoctors.forEach(doctor => {
+        if (!doctorsMap.has(doctor.id)) {
+          doctorsMap.set(doctor.id, doctor);
+        }
+      });
+      
+      // Converter Map para array e ordenar por nome
+      const allDoctors = Array.from(doctorsMap.values()).sort((a, b) => {
+        // Ordenar: médicos principais primeiro, depois por nome
+        if (a.is_primary && !b.is_primary) return -1;
+        if (!a.is_primary && b.is_primary) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      
+      setDoctors(allDoctors);
     } catch (error) {
       Toast.show({
         type: 'error',
@@ -109,26 +149,59 @@ const DoctorsScreen = ({ route, navigation }) => {
   };
 
   const renderDoctorItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.doctorCard}
-      onPress={() => handleEditDoctor(item)}
-      activeOpacity={0.7}
+    <TouchableWithoutFeedback
+      onPress={() => {
+        // Médicos da plataforma não são editáveis através desta tela
+        if (!item.is_platform_doctor) {
+          handleEditDoctor(item);
+        }
+      }}
+      disabled={item.is_platform_doctor}
     >
-      {/* Badge de Médico Principal */}
-      {item.is_primary && (
-        <View style={styles.primaryBadge}>
-          <StarIcon size={12} color={colors.white} filled={true} />
-          <Text style={styles.primaryBadgeText}>Principal</Text>
-        </View>
-      )}
+      <View
+        style={[
+          styles.doctorCard,
+          item.is_platform_doctor && styles.platformDoctorCard,
+        ]}
+        collapsable={false}
+        needsOffscreenAlphaCompositing={false}
+      >
+      {/* Badges */}
+      <View style={styles.badgesContainer}>
+        {item.is_primary && (
+          <View style={styles.primaryBadge}>
+            <StarIcon size={12} color={colors.white} filled={true} />
+            <Text style={styles.primaryBadgeText}>Principal</Text>
+          </View>
+        )}
+        {item.is_platform_doctor && (
+          <View style={styles.platformBadge}>
+            <CheckmarkCircleIcon size={12} color={colors.white} />
+            <Text style={styles.platformBadgeText}>Plataforma</Text>
+          </View>
+        )}
+      </View>
 
       {/* Avatar e Nome */}
       <View style={styles.doctorHeader}>
-        <View style={styles.avatar}>
-          <PersonIcon size={32} color={colors.primary} />
+        <View style={[
+          styles.avatar,
+          item.is_platform_doctor && styles.platformAvatar,
+        ]}>
+          <PersonIcon 
+            size={32} 
+            color={item.is_platform_doctor ? colors.success : colors.primary} 
+          />
         </View>
         <View style={styles.doctorInfo}>
-          <Text style={styles.doctorName}>{item.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.doctorName}>{item.name}</Text>
+            {item.is_platform_doctor && (
+              <View style={styles.platformIndicator}>
+                <CheckmarkCircleIcon size={16} color={colors.success} />
+              </View>
+            )}
+          </View>
           {item.medical_specialty?.name && (
             <View style={styles.specialtyBadge}>
               <MedicalOutlineIcon size={14} color={colors.primary} />
@@ -174,27 +247,30 @@ const DoctorsScreen = ({ route, navigation }) => {
         </View>
       )}
 
-      {/* Botões de Ação */}
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleEditDoctor(item)}
-        >
-          <CreateOutlineIcon size={20} color={colors.primary} />
-          <Text style={styles.actionButtonText}>Editar</Text>
-        </TouchableOpacity>
+      {/* Botões de Ação - Apenas para médicos do grupo (não da plataforma) */}
+      {!item.is_platform_doctor && (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleEditDoctor(item)}
+          >
+            <CreateOutlineIcon size={20} color={colors.primary} />
+            <Text style={styles.actionButtonText}>Editar</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDeleteDoctor(item.id, item.name)}
-        >
-          <TrashOutlineIcon size={20} color={colors.error} />
-          <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-            Excluir
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => handleDeleteDoctor(item.id, item.name)}
+          >
+            <TrashOutlineIcon size={20} color={colors.error} />
+            <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
+              Excluir
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       </View>
-    </TouchableOpacity>
+    </TouchableWithoutFeedback>
   );
 
   const renderEmptyState = () => (
@@ -309,17 +385,38 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 0,
+    borderWidth: 0.5,
+    borderColor: colors.gray200,
+    ...Platform.select({
+      android: {
+        elevation: 0,
+        shadowColor: 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+    }),
   },
-  primaryBadge: {
+  platformDoctorCard: {
+    borderWidth: 1.5,
+    borderColor: colors.success,
+    backgroundColor: colors.success + '08', // Fundo levemente verde
+  },
+  badgesContainer: {
     position: 'absolute',
     top: 12,
     right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  primaryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
@@ -329,6 +426,20 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   primaryBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  platformBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.success || '#10b981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  platformBadgeText: {
     fontSize: 11,
     fontWeight: '600',
     color: colors.white,
@@ -350,11 +461,23 @@ const styles = StyleSheet.create({
   doctorInfo: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 6,
+  },
   doctorName: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 4,
+    flex: 1,
+  },
+  platformIndicator: {
+    marginLeft: 4,
+  },
+  platformAvatar: {
+    backgroundColor: colors.success + '20', // Fundo verde claro para avatar
   },
   specialtyBadge: {
     flexDirection: 'row',

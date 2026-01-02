@@ -103,6 +103,12 @@ export const AuthProvider = ({ children }) => {
         await AsyncStorage.setItem('@lacos:token', response.token);
         setUser(response.user);
         console.log('🔑 AuthContext - User setado, signed agora é true');
+        
+        // Processar código de convite pendente (se houver)
+        if (global.pendingInviteCode) {
+          console.log('🔗 AuthContext - Código de convite pendente detectado após login:', global.pendingInviteCode);
+          // O DeepLinkHandler vai processar automaticamente quando signed mudar
+        }
       } else {
         // Se não tiver token, remover do storage
         await AsyncStorage.removeItem('@lacos:user');

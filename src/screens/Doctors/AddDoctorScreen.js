@@ -14,9 +14,10 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import SafeIcon from '../../components/SafeIcon';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
@@ -28,6 +29,7 @@ import { BR_UFS } from '../../constants/brUfs';
 import { parseCrm, formatCrmValue } from '../../utils/crm';
 
 const AddDoctorScreen = ({ route, navigation }) => {
+  const insets = useSafeAreaInsets();
   const { groupId, groupName, doctor, isEditing = false } = route.params;
   const googlePlacesRef = useRef(null);
   const parsedCrm = parseCrm(doctor?.crm || '');
@@ -355,16 +357,16 @@ const AddDoctorScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar style="dark" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>
@@ -397,7 +399,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Nome Completo *</Text>
                 <View style={styles.inputWrapper}>
-                  <Ionicons name="person-outline" size={20} color={colors.gray400} />
+                  <SafeIcon name="person" size={20} color={colors.gray400} />
                   <TextInput
                     style={styles.input}
                     value={formData.name}
@@ -418,7 +420,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
               onPress={() => setSpecialtyModalVisible(true)}
               disabled={specialties.length === 0}
             >
-              <Ionicons name="medical-outline" size={20} color={colors.gray400} />
+              <SafeIcon name="medical-outline" size={20} color={colors.gray400} />
               <Text style={[
                 styles.selectButtonText,
                 !formData.medicalSpecialtyId && styles.selectButtonPlaceholder
@@ -427,7 +429,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
                   ? specialties.find(s => s.id === formData.medicalSpecialtyId)?.name
                   : 'Selecione a especialidade...'}
               </Text>
-              <Ionicons name="chevron-down" size={20} color={colors.gray400} />
+              <SafeIcon name="chevron-down" size={20} color={colors.gray400} />
             </TouchableOpacity>
             {specialties.length === 0 && (
               <Text style={styles.hint}>
@@ -451,7 +453,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
                     onPress={() => setSpecialtyModalVisible(false)}
                     style={styles.modalCloseButton}
                   >
-                    <Ionicons name="close" size={24} color={colors.text} />
+                    <SafeIcon name="close" size={24} color={colors.text} />
                   </TouchableOpacity>
                 </View>
                 <FlatList
@@ -477,7 +479,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
                         {item.name}
                       </Text>
                       {formData.medicalSpecialtyId === item.id && (
-                        <Ionicons name="checkmark" size={24} color={colors.primary} />
+                        <SafeIcon name="checkmark" size={24} color={colors.primary} />
                       )}
                     </TouchableOpacity>
                   )}
@@ -502,11 +504,11 @@ const AddDoctorScreen = ({ route, navigation }) => {
                 ]}>
                   {formData.crmUf || 'UF'}
                 </Text>
-                <Ionicons name="chevron-down" size={18} color={colors.textLight} />
+                <SafeIcon name="chevron-down" size={18} color={colors.textLight} />
               </TouchableOpacity>
 
               <View style={[styles.inputWrapper, styles.crmNumberWrapper]}>
-                <Ionicons name="card-outline" size={20} color={colors.gray400} />
+                <SafeIcon name="card-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   value={formData.crmNumber}
@@ -540,7 +542,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
                     style={styles.modalCloseButton}
                     onPress={() => setUfModalVisible(false)}
                   >
-                    <Ionicons name="close" size={24} color={colors.text} />
+                    <SafeIcon name="close" size={24} color={colors.text} />
                   </TouchableOpacity>
                 </View>
                 <FlatList
@@ -564,7 +566,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
                         {item}
                       </Text>
                       {formData.crmUf === item && (
-                        <Ionicons name="checkmark" size={24} color={colors.primary} />
+                        <SafeIcon name="checkmark" size={24} color={colors.primary} />
                       )}
                     </TouchableOpacity>
                   )}
@@ -578,7 +580,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Telefone</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="call-outline" size={20} color={colors.gray400} />
+              <SafeIcon name="call" size={20} color={colors.gray400} />
               <TextInput
                 style={styles.input}
                 value={formData.phone}
@@ -598,7 +600,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>E-mail</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={20} color={colors.gray400} />
+              <SafeIcon name="mail-outline" size={20} color={colors.gray400} />
               <TextInput
                 style={styles.input}
                 value={formData.email}
@@ -621,14 +623,14 @@ const AddDoctorScreen = ({ route, navigation }) => {
                     style={styles.mapButton}
                     onPress={() => openMap('google')}
                   >
-                    <Ionicons name="map-outline" size={16} color={colors.primary} />
+                    <SafeIcon name="map-outline" size={16} color={colors.primary} />
                     <Text style={styles.mapButtonText}>Maps</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.mapButton}
                     onPress={() => openMap('waze')}
                   >
-                    <Ionicons name="navigate-outline" size={16} color={colors.primary} />
+                    <SafeIcon name="location-outline" size={16} color={colors.primary} />
                     <Text style={styles.mapButtonText}>Waze</Text>
                   </TouchableOpacity>
                 </View>
@@ -717,7 +719,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
               />
             ) : (
               <View style={styles.inputWrapper}>
-                <Ionicons name="location-outline" size={20} color={colors.gray400} />
+                <SafeIcon name="location-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   value={formData.address}
@@ -750,7 +752,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
           {/* Médico Principal */}
           <View style={styles.switchContainer}>
             <View style={styles.switchLabel}>
-              <Ionicons name="star" size={20} color={colors.primary} />
+              <SafeIcon name="star" size={20} color={colors.primary} />
               <Text style={styles.switchText}>
                 Este é o médico assistente principal do paciente
               </Text>

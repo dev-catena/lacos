@@ -4,6 +4,7 @@ import LoginScreen from './components/LoginScreen';
 import UsersManagement from './components/UsersManagement';
 import DoctorsManagement from './components/DoctorsManagement';
 import PlansManagement from './components/PlansManagement';
+import SuppliersManagement from './components/SuppliersManagement';
 import authService from './services/authService';
 import usersService from './services/usersService';
 import './App.css';
@@ -77,6 +78,8 @@ function App() {
         return <DoctorsManagement />;
       case 'plans':
         return <PlansManagement />;
+      case 'suppliers':
+        return <SuppliersManagement />;
       default:
         return <PlansManagement />;
     }

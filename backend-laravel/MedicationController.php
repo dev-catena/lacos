@@ -7,14 +7,23 @@ use App\Models\Medication;
 use App\Models\GroupActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class MedicationController extends Controller
 {
     public function index(Request $request)
     {
+        \Log::info("🚀 MedicationController.index - INÍCIO DA REQUISIÇÃO");
+        
         $groupId = $request->query('group_id');
         $isActive = $request->query('is_active'); // Sem valor padrão - null se não fornecido
 
+        \Log::info("🚀 MedicationController.index - Parâmetros:", [
+            'group_id' => $groupId,
+            'is_active' => $isActive,
+        ]);
+
+        // Carregar médico - usar join para garantir que temos os dados do médico
         $query = Medication::with(['doctor']);
 
         if ($groupId) {
@@ -27,7 +36,303 @@ class MedicationController extends Controller
             $query->where('is_active', $isActiveBool);
         }
 
-        return response()->json($query->get());
+        // Ordenar por data de prescrição (mais recentes primeiro)
+        $query->orderByRaw('COALESCE(start_date, created_at) DESC');
+
+        $medications = $query->get();
+        
+        \Log::info("🚀 MedicationController.index - Medicamentos encontrados:", [
+            'total' => $medications->count(),
+        ]);
+        
+        // Converter para array ANTES de adicionar especialidade
+        // Isso garante que temos uma estrutura limpa para modificar
+        $medicationsArray = [];
+        foreach ($medications as $medication) {
+            $medArray = $medication->toArray();
+            
+            // Se tem médico, garantir que medical_specialty_id está presente
+            if (isset($medArray['doctor']) && $medArray['doctor']) {
+                // Se o médico não tem medical_specialty_id no array, buscar do relacionamento
+                if (!isset($medArray['doctor']['medical_specialty_id']) && $medication->doctor) {
+                    $doctorData = DB::table('doctors')
+                        ->where('id', $medication->doctor->id)
+                        ->select('medical_specialty_id', 'user_id')
+                        ->first();
+                    
+                    if ($doctorData) {
+                        $medArray['doctor']['medical_specialty_id'] = $doctorData->medical_specialty_id;
+                        if ($doctorData->user_id) {
+                            $medArray['doctor']['user_id'] = $doctorData->user_id;
+                        }
+                    }
+                }
+            }
+            
+            $medicationsArray[] = $medArray;
+        }
+        
+        \Log::info("🚀 MedicationController.index - Array convertido, total:", count($medicationsArray));
+        
+        // Carregar especialidade médica para cada medicamento que tem médico
+        foreach ($medicationsArray as $index => $medication) {
+            if (isset($medication['doctor']) && $medication['doctor']) {
+                $doctorId = $medication['doctor']['id'] ?? null;
+                $doctorName = $medication['doctor']['name'] ?? 'Desconhecido';
+                $medicalSpecialtyId = null;
+                
+                \Log::info("🔍 MedicationController - Buscando especialidade para médico:", [
+                    'doctor_id' => $doctorId,
+                    'doctor_name' => $doctorName,
+                    'medication_id' => $medication['id'] ?? null,
+                ]);
+                
+                if ($doctorId) {
+                    // Buscar diretamente na tabela doctors usando o ID do médico
+                    $doctorData = DB::table('doctors')
+                        ->where('id', $doctorId)
+                        ->select('medical_specialty_id', 'user_id')
+                        ->first();
+                    
+                    \Log::info("🔍 MedicationController - Dados do médico na tabela doctors:", [
+                        'doctor_id' => $doctorId,
+                        'doctor_name' => $doctorName,
+                        'doctor_data' => $doctorData ? [
+                            'medical_specialty_id' => $doctorData->medical_specialty_id,
+                            'user_id' => $doctorData->user_id,
+                        ] : 'não encontrado',
+                    ]);
+                    
+                    if ($doctorData) {
+                        if ($doctorData->medical_specialty_id) {
+                            $medicalSpecialtyId = $doctorData->medical_specialty_id;
+                            \Log::info("✅ MedicationController - Encontrou medical_specialty_id na tabela doctors:", [
+                                'doctor_id' => $doctorId,
+                                'doctor_name' => $doctorName,
+                                'medical_specialty_id' => $medicalSpecialtyId,
+                            ]);
+                        } elseif ($doctorData->user_id) {
+                            // Se o médico tem user_id, buscar na tabela users
+                            $user = DB::table('users')
+                                ->where('id', $doctorData->user_id)
+                                ->select('medical_specialty_id')
+                                ->first();
+                            
+                            \Log::info("🔍 MedicationController - Buscando na tabela users:", [
+                                'doctor_id' => $doctorId,
+                                'doctor_name' => $doctorName,
+                                'user_id' => $doctorData->user_id,
+                                'user_data' => $user ? ['medical_specialty_id' => $user->medical_specialty_id] : 'não encontrado',
+                            ]);
+                            
+                            if ($user && $user->medical_specialty_id) {
+                                $medicalSpecialtyId = $user->medical_specialty_id;
+                                \Log::info("✅ MedicationController - Encontrou medical_specialty_id na tabela users:", [
+                                    'doctor_id' => $doctorId,
+                                    'doctor_name' => $doctorName,
+                                    'medical_specialty_id' => $medicalSpecialtyId,
+                                ]);
+                            }
+                        }
+                    }
+                    
+                    // Buscar nome da especialidade se encontrou o ID
+                    if ($medicalSpecialtyId) {
+                        // Primeiro, verificar se a especialidade existe
+                        $specialtyExists = DB::table('medical_specialties')
+                            ->where('id', $medicalSpecialtyId)
+                            ->exists();
+                        
+                        \Log::info("🔍 MedicationController - Verificando se especialidade existe:", [
+                            'doctor_id' => $doctorId,
+                            'doctor_name' => $doctorName,
+                            'medical_specialty_id' => $medicalSpecialtyId,
+                            'specialty_exists' => $specialtyExists,
+                        ]);
+                        
+                        // Buscar todas as especialidades para debug
+                        $allSpecialties = DB::table('medical_specialties')
+                            ->where('id', $medicalSpecialtyId)
+                            ->orWhere('name', 'LIKE', '%Geriatra%')
+                            ->select('id', 'name')
+                            ->get();
+                        
+                        \Log::info("🔍 MedicationController - Especialidades encontradas (ID ou contém Geriatra):", [
+                            'doctor_id' => $doctorId,
+                            'doctor_name' => $doctorName,
+                            'medical_specialty_id' => $medicalSpecialtyId,
+                            'all_specialties' => $allSpecialties->toArray(),
+                        ]);
+                        
+                        $specialty = DB::table('medical_specialties')
+                            ->where('id', $medicalSpecialtyId)
+                            ->select('id', 'name')
+                            ->first();
+                        
+                        \Log::info("🔍 MedicationController - Buscando especialidade na tabela medical_specialties:", [
+                            'doctor_id' => $doctorId,
+                            'doctor_name' => $doctorName,
+                            'medical_specialty_id' => $medicalSpecialtyId,
+                            'specialty_found' => $specialty ? [
+                                'id' => $specialty->id,
+                                'name' => $specialty->name,
+                                'name_type' => gettype($specialty->name),
+                                'name_length' => strlen($specialty->name ?? ''),
+                            ] : 'não encontrado',
+                        ]);
+                        
+                        if ($specialty) {
+                            // Verificar se o nome não está vazio
+                            $specialtyName = trim($specialty->name ?? '');
+                            
+                            \Log::info("🔍 MedicationController - Processando especialidade encontrada:", [
+                                'doctor_id' => $doctorId,
+                                'doctor_name' => $doctorName,
+                                'specialty_id' => $specialty->id,
+                                'specialty_name_raw' => $specialty->name,
+                                'specialty_name_trimmed' => $specialtyName,
+                                'specialty_name_length' => strlen($specialtyName),
+                                'specialty_name_empty' => empty($specialtyName),
+                            ]);
+                            
+                            if (!empty($specialtyName)) {
+                                // Garantir que o array doctor existe
+                                if (!isset($medicationsArray[$index]['doctor'])) {
+                                    $medicationsArray[$index]['doctor'] = [];
+                                }
+                                
+                                // Adicionar especialidade ao array do médico
+                                $medicationsArray[$index]['doctor']['medical_specialty'] = [
+                                    'id' => (int)$specialty->id,
+                                    'name' => $specialtyName,
+                                ];
+                                
+                                // Verificar imediatamente se foi adicionado
+                                $verification = isset($medicationsArray[$index]['doctor']['medical_specialty']) 
+                                    ? $medicationsArray[$index]['doctor']['medical_specialty'] 
+                                    : 'ERRO: NÃO FOI ADICIONADO';
+                                
+                                \Log::info("✅ MedicationController - ESPECIALIDADE ADICIONADA:", [
+                                    'doctor_id' => $doctorId,
+                                    'doctor_name' => $doctorName,
+                                    'specialty_id' => $specialty->id,
+                                    'specialty_name' => $specialtyName,
+                                    'medication_id' => $medication['id'] ?? null,
+                                    'verification' => $verification,
+                                    'full_doctor_array' => json_encode($medicationsArray[$index]['doctor'] ?? []),
+                                ]);
+                            } else {
+                                \Log::warning("⚠️ MedicationController - Nome da especialidade está vazio:", [
+                                    'doctor_id' => $doctorId,
+                                    'doctor_name' => $doctorName,
+                                    'specialty_id' => $specialty->id ?? null,
+                                    'specialty_name_raw' => $specialty->name ?? 'null',
+                                ]);
+                            }
+                        } else {
+                            \Log::warning("⚠️ MedicationController - Especialidade não encontrada ou nome vazio:", [
+                                'doctor_id' => $doctorId,
+                                'doctor_name' => $doctorName,
+                                'medical_specialty_id' => $medicalSpecialtyId,
+                                'specialty_object' => $specialty ? json_encode($specialty) : 'null',
+                            ]);
+                        }
+                    } else {
+                        \Log::warning("⚠️ MedicationController - Nenhum medical_specialty_id encontrado:", [
+                            'doctor_id' => $doctorId,
+                            'doctor_name' => $doctorName,
+                        ]);
+                    }
+                }
+            }
+        }
+        
+        // Log final e correção para Ariadna
+        foreach ($medicationsArray as $index => $med) {
+            if (isset($med['doctor']) && isset($med['doctor']['name']) && stripos($med['doctor']['name'], 'Ariadna') !== false) {
+                \Log::info("🔍 MedicationController - VERIFICAÇÃO FINAL - Ariadna antes de retornar:", [
+                    'doctor_id' => $med['doctor']['id'] ?? null,
+                    'doctor_name' => $med['doctor']['name'] ?? null,
+                    'medical_specialty' => $med['doctor']['medical_specialty'] ?? 'NÃO DEFINIDO',
+                    'medical_specialty_id' => $med['doctor']['medical_specialty_id'] ?? null,
+                    'medical_specialty_type' => isset($med['doctor']['medical_specialty']) ? gettype($med['doctor']['medical_specialty']) : 'não definido',
+                    'doctor_keys' => array_keys($med['doctor'] ?? []),
+                ]);
+                
+                // Forçar adição da especialidade se não estiver presente mas tiver o ID
+                if (!isset($med['doctor']['medical_specialty']) && isset($med['doctor']['medical_specialty_id'])) {
+                    $specialtyId = $med['doctor']['medical_specialty_id'];
+                    $specialty = DB::table('medical_specialties')
+                        ->where('id', $specialtyId)
+                        ->select('id', 'name')
+                        ->first();
+                    
+                    if ($specialty && $specialty->name) {
+                        $medicationsArray[$index]['doctor']['medical_specialty'] = [
+                            'id' => (int)$specialty->id,
+                            'name' => trim($specialty->name),
+                        ];
+                        \Log::info("✅ MedicationController - ESPECIALIDADE FORÇADA PARA ARIADNA:", [
+                            'index' => $index,
+                            'specialty_id' => $specialty->id,
+                            'specialty_name' => $specialty->name,
+                            'verification' => isset($medicationsArray[$index]['doctor']['medical_specialty']) ? 'ADICIONADO' : 'ERRO',
+                        ]);
+                    } else {
+                        \Log::warning("⚠️ MedicationController - Não conseguiu buscar especialidade para Ariadna:", [
+                            'specialty_id' => $specialtyId,
+                            'specialty_found' => $specialty ? 'sim' : 'não',
+                        ]);
+                    }
+                }
+            }
+        }
+        
+        // CORREÇÃO FINAL: Garantir que TODOS os médicos com medical_specialty_id tenham a especialidade
+        foreach ($medicationsArray as $index => $med) {
+            if (isset($med['doctor']) && is_array($med['doctor'])) {
+                $medicalSpecialtyId = $med['doctor']['medical_specialty_id'] ?? null;
+                
+                // Se tem medical_specialty_id mas não tem medical_specialty, buscar e adicionar
+                if ($medicalSpecialtyId && !isset($med['doctor']['medical_specialty'])) {
+                    $specialty = DB::table('medical_specialties')
+                        ->where('id', $medicalSpecialtyId)
+                        ->select('id', 'name')
+                        ->first();
+                    
+                    if ($specialty && $specialty->name) {
+                        $medicationsArray[$index]['doctor']['medical_specialty'] = [
+                            'id' => (int)$specialty->id,
+                            'name' => trim($specialty->name),
+                        ];
+                    }
+                }
+            }
+        }
+        
+        // Debug: contar quantos têm especialidade
+        $withSpecialty = 0;
+        foreach ($medicationsArray as $med) {
+            if (isset($med['doctor']['medical_specialty'])) {
+                $withSpecialty++;
+            }
+        }
+        \Log::info("📊 MedicationController - Estatísticas finais:", [
+            'total_medications' => count($medicationsArray),
+            'with_specialty' => $withSpecialty,
+        ]);
+        
+        // Log de uma amostra do JSON que será retornado (apenas para Ariadna)
+        foreach ($medicationsArray as $med) {
+            if (isset($med['doctor']) && isset($med['doctor']['name']) && stripos($med['doctor']['name'], 'Ariadna') !== false) {
+                \Log::info("📤 MedicationController - JSON FINAL para Ariadna:", [
+                    'doctor' => json_encode($med['doctor'] ?? []),
+                ]);
+                break; // Apenas o primeiro
+            }
+        }
+
+        return response()->json($medicationsArray);
     }
 
     public function store(Request $request)
@@ -132,6 +437,40 @@ class MedicationController extends Controller
     public function show($id)
     {
         $medication = Medication::with(['doctor', 'doseHistory'])->findOrFail($id);
+        
+        // Carregar especialidade médica se o médico tiver
+        if ($medication->doctor) {
+            // Verificar se o médico tem medical_specialty_id (pode estar na tabela doctors ou users)
+            $medicalSpecialtyId = null;
+            
+            // Tentar pegar de diferentes lugares
+            if (isset($medication->doctor->medical_specialty_id)) {
+                $medicalSpecialtyId = $medication->doctor->medical_specialty_id;
+            } elseif (isset($medication->doctor->user_id)) {
+                // Se o médico tem user_id, buscar na tabela users
+                $user = DB::table('users')
+                    ->where('id', $medication->doctor->user_id)
+                    ->select('medical_specialty_id')
+                    ->first();
+                if ($user && $user->medical_specialty_id) {
+                    $medicalSpecialtyId = $user->medical_specialty_id;
+                }
+            }
+            
+            if ($medicalSpecialtyId) {
+                $specialty = DB::table('medical_specialties')
+                    ->where('id', $medicalSpecialtyId)
+                    ->select('id', 'name')
+                    ->first();
+                
+                if ($specialty) {
+                    $medication->doctor->medical_specialty = [
+                        'id' => $specialty->id,
+                        'name' => $specialty->name,
+                    ];
+                }
+            }
+        }
         return response()->json($medication);
     }
 

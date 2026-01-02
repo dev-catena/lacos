@@ -562,8 +562,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
   },
   pharmacyHeader: {
     flexDirection: 'row',

@@ -28,6 +28,7 @@ import {
   ChevronForwardIcon,
   ChatIcon,
   InfoIcon,
+  DocumentIcon,
 } from '../../components/CustomIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
@@ -107,6 +108,20 @@ const GroupDetailScreen = ({ route, navigation }) => {
       color: colors.secondary,
       backgroundColor: colors.secondary + '20',
       onPress: () => navigation.navigate('Medications', { 
+        groupId, 
+        groupName 
+      }),
+    },
+    {
+      id: 'prescriptions',
+      featureKey: 'receitas',
+      title: 'Receitas',
+      subtitle: 'Receitas médicas e prescrições',
+      icon: 'document-text',
+      IconComponent: DocumentIcon,
+      color: '#8B5CF6',
+      backgroundColor: '#8B5CF620',
+      onPress: () => navigation.navigate('Prescriptions', { 
         groupId, 
         groupName 
       }),

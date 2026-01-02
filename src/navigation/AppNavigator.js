@@ -51,6 +51,8 @@ import AddMedicationChoiceScreen from '../screens/Medications/AddMedicationChoic
 import SelectDoctorScreen from '../screens/Medications/SelectDoctorScreen';
 import AddMedicationScreen from '../screens/Medications/AddMedicationScreen';
 import MedicationDetailsScreen from '../screens/Medications/MedicationDetailsScreen';
+import PrescriptionsScreen from '../screens/Prescriptions/PrescriptionsScreen';
+import PrescriptionDetailsScreen from '../screens/Prescriptions/PrescriptionDetailsScreen';
 
 // Importa as telas de Consultas
 import ConsultationsScreen from '../screens/Consultations/ConsultationsScreen';
@@ -196,6 +198,20 @@ const HomeStack = () => {
       <Stack.Screen 
         name="Medications" 
         component={MedicationsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Prescriptions" 
+        component={PrescriptionsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PrescriptionDetails" 
+        component={PrescriptionDetailsScreen}
         options={{ 
           headerShown: false 
         }}
@@ -477,6 +493,20 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="Medications" 
         component={MedicationsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Prescriptions" 
+        component={PrescriptionsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PrescriptionDetails" 
+        component={PrescriptionDetailsScreen}
         options={{ 
           headerShown: false 
         }}

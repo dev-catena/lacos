@@ -29,6 +29,10 @@ class AuthService {
 
   async login(email, password) {
     try {
+      console.log('🔐 Tentando login em:', `${API_BASE_URL}/admin/login`);
+      console.log('🔐 Origem atual:', window.location.origin);
+      console.log('🔐 Protocolo:', window.location.protocol);
+      
       const response = await fetch(`${API_BASE_URL}/admin/login`, {
         method: 'POST',
         headers: {
@@ -36,6 +40,26 @@ class AuthService {
           'Accept': 'application/json',
         },
         body: JSON.stringify({ email, password }),
+        mode: 'cors', // Explicitamente habilitar CORS
+        credentials: 'omit', // Não enviar cookies
+      }).catch((fetchError) => {
+        console.error('❌ Erro na requisição fetch:', fetchError);
+        console.error('❌ Tipo do erro:', fetchError.name);
+        console.error('❌ Mensagem:', fetchError.message);
+        console.error('❌ Stack:', fetchError.stack);
+        
+        // Se for erro de rede/CORS, fornecer mensagem mais clara
+        if (fetchError.message.includes('Failed to fetch') || 
+            fetchError.message.includes('NetworkError') ||
+            fetchError.message.includes('Network request failed') ||
+            fetchError.name === 'TypeError') {
+          throw new Error('Não foi possível conectar ao servidor. Verifique:\n' +
+            '• Sua conexão com a internet\n' +
+            '• Se o servidor está acessível\n' +
+            '• Se há bloqueio de firewall ou proxy\n' +
+            '• Se o certificado SSL está válido');
+        }
+        throw fetchError;
       });
 
       // Tentar parsear JSON, mas tratar erros de parse

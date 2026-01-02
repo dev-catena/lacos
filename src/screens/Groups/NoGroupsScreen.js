@@ -44,12 +44,30 @@ const NoGroupsScreen = ({ navigation, route, onGroupJoined }) => {
     }
   }, [signed, user]);
 
-  // Abrir modal automaticamente se veio de "Entrar com Código"
+  // Processar código de convite de deep link
   useEffect(() => {
-    if (route?.params?.openModal) {
+    // Verificar se há código de convite nos parâmetros da rota
+    if (route?.params?.inviteCode) {
+      const code = route.params.inviteCode;
+      console.log('🔗 NoGroupsScreen - Código de convite recebido via deep link:', code);
+      setInviteCode(code);
       setInviteModalVisible(true);
+      // Limpar parâmetros para evitar reprocessamento
+      navigation.setParams({ inviteCode: undefined, openModal: undefined });
+    } else if (route?.params?.openModal && global.pendingInviteCode) {
+      // Se há código pendente (de quando o usuário não estava autenticado)
+      const code = global.pendingInviteCode;
+      console.log('🔗 NoGroupsScreen - Usando código pendente:', code);
+      setInviteCode(code);
+      setInviteModalVisible(true);
+      global.pendingInviteCode = undefined;
+      navigation.setParams({ inviteCode: undefined, openModal: undefined });
+    } else if (route?.params?.openModal) {
+      // Apenas abrir o modal se solicitado
+      setInviteModalVisible(true);
+      navigation.setParams({ openModal: undefined });
     }
-  }, [route?.params?.openModal]);
+  }, [route?.params?.inviteCode, route?.params?.openModal, navigation]);
 
   const handleCreateGroup = () => {
     // GUARD: Verificar autenticação antes de qualquer ação
