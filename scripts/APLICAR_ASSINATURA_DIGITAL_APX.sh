@@ -35,3 +35,6 @@ echo "   sudo bash $TMP_DIR/APLICAR_ASSINATURA_DIGITAL_APX_SERVIDOR.sh"
 
 
 
+
+
+

@@ -271,16 +271,39 @@ const AddDoctorScreen = ({ route, navigation }) => {
 
   const proceedWithSave = async () => {
     try {
-      const crmValue = formatCrmValue(formData.crmUf, formData.crmNumber);
-      // Se o usuário informou CRM, UF é obrigatório (e vice-versa)
-      if ((formData.crmNumber && !formData.crmUf) || (formData.crmUf && !formData.crmNumber)) {
-        Toast.show({
-          type: 'error',
-          text1: 'CRM incompleto',
-          text2: 'Selecione o UF e informe o número do CRM',
-        });
-        return;
+      // Validar CRM: se informado, deve ter UF e número com 6 dígitos
+      if (formData.crmNumber || formData.crmUf) {
+        if (!formData.crmUf) {
+          Toast.show({
+            type: 'error',
+            text1: 'CRM incompleto',
+            text2: 'Selecione o UF do CRM',
+          });
+          return;
+        }
+        
+        if (!formData.crmNumber || formData.crmNumber.length === 0) {
+          Toast.show({
+            type: 'error',
+            text1: 'CRM incompleto',
+            text2: 'Informe o número do CRM (6 dígitos)',
+          });
+          return;
+        }
+        
+        // Validar que o número tem exatamente 6 dígitos
+        const cleanNumber = formData.crmNumber.replace(/\D/g, '');
+        if (cleanNumber.length !== 6) {
+          Toast.show({
+            type: 'error',
+            text1: 'CRM inválido',
+            text2: 'O número do CRM deve ter exatamente 6 dígitos',
+          });
+          return;
+        }
       }
+      
+      const crmValue = formatCrmValue(formData.crmUf, formData.crmNumber);
 
       // Preparar telefone: remover formatação e manter apenas +55 + dígitos
       let phoneValue = null;
@@ -512,10 +535,15 @@ const AddDoctorScreen = ({ route, navigation }) => {
                 <TextInput
                   style={styles.input}
                   value={formData.crmNumber}
-                  onChangeText={(text) => updateField('crmNumber', text.replace(/\D/g, '').slice(0, 12))}
-                  placeholder="Número do CRM"
+                  onChangeText={(text) => {
+                    // Apenas números, máximo 6 dígitos
+                    const numbers = text.replace(/\D/g, '').slice(0, 6);
+                    updateField('crmNumber', numbers);
+                  }}
+                  placeholder="000000"
                   placeholderTextColor={colors.gray400}
                   keyboardType="number-pad"
+                  maxLength={6}
                 />
               </View>
             </View>

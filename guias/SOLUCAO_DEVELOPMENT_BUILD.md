@@ -105,3 +105,6 @@ npx expo start --tunnel --clear
 - **NÃO** deve mostrar: `Using development build`
 
 
+
+
+

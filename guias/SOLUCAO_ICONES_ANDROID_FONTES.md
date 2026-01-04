@@ -149,3 +149,6 @@ Se após todas as soluções o problema ainda persistir:
 - [Expo Splash Screen Documentation](https://docs.expo.dev/versions/latest/sdk/splash-screen/)
 
 
+
+
+

@@ -82,6 +82,215 @@ class SupplierService {
       throw error;
     }
   }
+
+  // ========== PRODUTOS ==========
+  async getProducts() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers/products`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ${response.status}`);
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ SupplierService - Erro ao buscar produtos:', error);
+      throw error;
+    }
+  }
+
+  async createProduct(productData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers/products`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(productData),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ${response.status}`);
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ SupplierService - Erro ao criar produto:', error);
+      throw error;
+    }
+  }
+
+  async updateProduct(productId, productData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers/products/${productId}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify(productData),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ${response.status}`);
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ SupplierService - Erro ao atualizar produto:', error);
+      throw error;
+    }
+  }
+
+  async deleteProduct(productId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers/products/${productId}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ${response.status}`);
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ SupplierService - Erro ao excluir produto:', error);
+      throw error;
+    }
+  }
+
+  async toggleProductStatus(productId, isActive) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers/products/${productId}/toggle-status`, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_active: isActive }),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ${response.status}`);
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ SupplierService - Erro ao alterar status do produto:', error);
+      throw error;
+    }
+  }
+
+  // ========== PEDIDOS ==========
+  async getOrders(filters = {}) {
+    try {
+      const queryParams = new URLSearchParams(filters).toString();
+      const response = await fetch(`${API_BASE_URL}/suppliers/orders?${queryParams}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ${response.status}`);
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ SupplierService - Erro ao buscar pedidos:', error);
+      throw error;
+    }
+  }
+
+  async updateOrderStatus(orderId, status) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ status }),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ${response.status}`);
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ SupplierService - Erro ao atualizar status do pedido:', error);
+      throw error;
+    }
+  }
+
+  // ========== MENSAGENS ==========
+  async getConversations() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers/conversations`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ${response.status}`);
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ SupplierService - Erro ao buscar conversas:', error);
+      throw error;
+    }
+  }
+
+  async getMessages(conversationId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers/conversations/${conversationId}/messages`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ${response.status}`);
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ SupplierService - Erro ao buscar mensagens:', error);
+      throw error;
+    }
+  }
+
+  async sendMessage(conversationId, content) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/suppliers/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ content }),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `Erro ${response.status}`);
+      }
+      return data;
+    } catch (error) {
+      console.error('❌ SupplierService - Erro ao enviar mensagem:', error);
+      throw error;
+    }
+  }
 }
 
 export default new SupplierService();

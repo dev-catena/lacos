@@ -167,3 +167,6 @@ console.log('Primeiros 10:', data.slice(0, 10));
 - Considerar performance: lista muito grande pode afetar busca (mas 10.000+ ainda é aceitável)
 
 
+
+
+

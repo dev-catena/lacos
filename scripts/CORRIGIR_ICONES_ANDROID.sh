@@ -44,3 +44,6 @@ echo "🚀 Reiniciando Expo em TUNNEL MODE..."
 npx expo start --tunnel --clear
 
 
+
+
+

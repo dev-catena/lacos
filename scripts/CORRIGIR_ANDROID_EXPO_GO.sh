@@ -57,3 +57,6 @@ EXPO_NO_DOTENV=1 \
 npx expo start --tunnel --clear --go
 
 
+
+
+

@@ -80,6 +80,12 @@ import MediaScreen from '../screens/Media/MediaScreen';
 // Importa telas de Pagamento
 import PaymentScreen from '../screens/Payment/PaymentScreen';
 
+// Importa telas da Loja
+import StoreScreen from '../screens/Store/StoreScreen';
+import ProductDetailsScreen from '../screens/Store/ProductDetailsScreen';
+import OrdersScreen from '../screens/Store/OrdersScreen';
+import OrderDetailsScreen from '../screens/Store/OrderDetailsScreen';
+
 // Importa telas de Debug
 import ShowGroupCodesScreen from '../screens/Debug/ShowGroupCodesScreen';
 
@@ -240,6 +246,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="MedicationDetails" 
         component={MedicationDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Store" 
+        component={StoreStack}
         options={{ 
           headerShown: false 
         }}
@@ -540,6 +553,13 @@ const GroupsStack = () => {
         }}
       />
       <Stack.Screen 
+        name="Store" 
+        component={StoreStack}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Consultations" 
         component={ConsultationsScreen}
         options={{ 
@@ -704,6 +724,42 @@ const NotificationsStack = () => {
       <Stack.Screen 
         name="NotificationsMain" 
         component={NotificationsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+    </Stack.Navigator>
+  );
+};
+
+// Stack Navigator para Loja
+const StoreStack = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="StoreMain" 
+        component={StoreScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="ProductDetails" 
+        component={ProductDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Orders" 
+        component={OrdersScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="OrderDetails" 
+        component={OrderDetailsScreen}
         options={{ 
           headerShown: false 
         }}

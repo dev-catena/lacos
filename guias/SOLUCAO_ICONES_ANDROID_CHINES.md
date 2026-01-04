@@ -137,3 +137,6 @@ A **Solução 1** (limpar cache do Expo Go) resolve o problema na maioria dos ca
 5. ✅ Como último recurso, execute a **Solução 5** (reinstalar dependências)
 
 
+
+
+

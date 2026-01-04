@@ -7,6 +7,10 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\MedicationCatalogController;
 use App\Http\Controllers\Api\ChangePasswordController;
 use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\SupplierProductController;
+use App\Http\Controllers\Api\SupplierOrderController;
+use App\Http\Controllers\Api\SupplierMessageController;
+use App\Http\Controllers\Api\StoreController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -18,6 +22,11 @@ Route::get('/gateway/status', [GatewayController::class, 'status']);
 Route::get('/medications/search', [MedicationCatalogController::class, 'search']);
 Route::get('/medications/info', [MedicationCatalogController::class, 'getInfo']);
 Route::get('/medications/stats', [MedicationCatalogController::class, 'stats']);
+
+// ==================== ROTAS PÚBLICAS DA LOJA ====================
+// Listar produtos (público, mas verifica plano se autenticado)
+Route::get('/store/products', [StoreController::class, 'getProducts']);
+Route::get('/store/products/{id}', [StoreController::class, 'getProduct']);
 
 // ==================== ROTAS PÚBLICAS DE AUTENTICAÇÃO ====================
 
@@ -64,6 +73,32 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/suppliers/{id}/approve', [SupplierController::class, 'approve']);
     Route::put('/suppliers/{id}/reject', [SupplierController::class, 'reject']);
     Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy']);
+    
+    // Produtos do Fornecedor
+    Route::get('/suppliers/products', [SupplierProductController::class, 'index']);
+    Route::post('/suppliers/products', [SupplierProductController::class, 'store']);
+    Route::put('/suppliers/products/{id}', [SupplierProductController::class, 'update']);
+    Route::delete('/suppliers/products/{id}', [SupplierProductController::class, 'destroy']);
+    Route::patch('/suppliers/products/{id}/toggle-status', [SupplierProductController::class, 'toggleStatus']);
+    
+    // Pedidos do Fornecedor
+    Route::get('/suppliers/orders', [SupplierOrderController::class, 'index']);
+    Route::get('/suppliers/orders/{id}', [SupplierOrderController::class, 'show']);
+    Route::patch('/suppliers/orders/{id}/status', [SupplierOrderController::class, 'updateStatus']);
+    
+    // Mensagens do Fornecedor
+    Route::get('/suppliers/conversations', [SupplierMessageController::class, 'index']);
+    Route::get('/suppliers/conversations/{id}/messages', [SupplierMessageController::class, 'getMessages']);
+    Route::post('/suppliers/conversations/{id}/messages', [SupplierMessageController::class, 'sendMessage']);
+    
+    // Loja - Pedidos do Cliente
+    Route::post('/store/orders', [StoreController::class, 'createOrder']);
+    Route::get('/store/orders', [StoreController::class, 'getOrders']);
+    Route::get('/store/orders/{id}', [StoreController::class, 'getOrder']);
+    Route::post('/store/orders/{id}/cancel', [StoreController::class, 'cancelOrder']);
+    Route::get('/store/orders/{id}/conversation', [StoreController::class, 'getOrderConversation']);
+    Route::get('/store/conversations/{id}/messages', [StoreController::class, 'getConversationMessages']);
+    Route::post('/store/conversations/{id}/messages', [StoreController::class, 'sendMessage']);
     
     Route::put('/users/{id}', [App\Http\Controllers\Api\UserController::class, 'update']);
     Route::post('/users/{id}/certificate', [App\Http\Controllers\Api\UserController::class, 'uploadCertificate']);

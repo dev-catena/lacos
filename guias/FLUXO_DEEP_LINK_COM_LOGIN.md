@@ -95,3 +95,6 @@ O app verifica se o usuário está logado:
 - Se o usuário fechar o app sem fazer login, o código é perdido (comportamento esperado)
 
 
+
+
+

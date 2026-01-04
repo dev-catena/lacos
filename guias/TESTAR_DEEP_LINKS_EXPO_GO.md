@@ -104,3 +104,6 @@ Para desenvolvimento com Expo Go:
 Isso criará um build de desenvolvimento que você pode instalar no dispositivo e testar deep links reais.
 
 
+
+
+

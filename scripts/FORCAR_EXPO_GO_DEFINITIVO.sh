@@ -64,3 +64,6 @@ EXPO_NO_LOCALHOST=1 \
 npx expo start --tunnel --clear --go
 
 
+
+
+

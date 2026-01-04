@@ -30,3 +30,6 @@ echo "      http://192.168.1.105/grupo/TESTE123"
 echo "   4. O Android deve perguntar qual app abrir (se o app estiver instalado)"
 
 
+
+
+

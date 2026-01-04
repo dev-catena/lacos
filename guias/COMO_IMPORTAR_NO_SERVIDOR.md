@@ -102,3 +102,6 @@ php artisan medications:import DADOS_ABERTOS_MEDICAMENTOS.csv --chunk=1000
 ```
 
 
+
+
+

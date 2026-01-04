@@ -184,3 +184,6 @@ GET /api/medications/stats
 - Funcionalidade de Farmácia Popular **não foi alterada**
 
 
+
+
+

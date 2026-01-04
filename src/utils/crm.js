@@ -28,7 +28,12 @@ export function parseCrm(raw) {
 
 export function formatCrmValue(uf, number) {
   const cleanUf = (uf || '').toString().trim().toUpperCase();
-  const cleanNumber = (number || '').toString().replace(/\D/g, '');
+  let cleanNumber = (number || '').toString().replace(/\D/g, '');
+  
+  // Garantir que o número tenha exatamente 6 dígitos (preencher com zeros à esquerda)
+  if (cleanNumber && cleanNumber.length > 0) {
+    cleanNumber = cleanNumber.padStart(6, '0');
+  }
 
   if (!cleanUf && !cleanNumber) return '';
   if (!cleanUf) return cleanNumber;

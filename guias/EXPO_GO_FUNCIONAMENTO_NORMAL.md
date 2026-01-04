@@ -47,3 +47,6 @@ npx expo start --tunnel
 - **Deep links de convite são apenas para URLs HTTP/HTTPS específicas**
 
 
+
+
+

@@ -77,6 +77,30 @@ class Supplier extends Model
     {
         return $this->hasMany(SupplierCategory::class);
     }
+
+    /**
+     * Relacionamento com produtos
+     */
+    public function products(): HasMany
+    {
+        return $this->hasMany(SupplierProduct::class);
+    }
+
+    /**
+     * Relacionamento com pedidos
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    /**
+     * Relacionamento com conversas
+     */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
+    }
 }
 
 

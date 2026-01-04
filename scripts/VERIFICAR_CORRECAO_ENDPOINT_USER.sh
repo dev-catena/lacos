@@ -34,3 +34,6 @@ echo "   4. O card verde deve aparecer mostrando '✅ Certificado digital instal
 
 
 
+
+
+

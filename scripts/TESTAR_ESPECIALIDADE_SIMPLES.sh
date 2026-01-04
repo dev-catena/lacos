@@ -39,3 +39,6 @@ LIMIT 3;
 " 2>/dev/null || echo "Erro ao conectar ao MySQL"
 
 
+
+
+

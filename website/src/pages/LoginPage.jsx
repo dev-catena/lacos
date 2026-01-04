@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import authService from '../services/authService';
+import supplierService from '../services/supplierService';
 import './AuthPage.css';
 
 const LoginPage = () => {
@@ -32,8 +33,21 @@ const LoginPage = () => {
 
     try {
       await authService.login(formData.email, formData.password);
-      // Redirecionar para área logada, redirect ou home
-      const targetPath = redirect || '/';
+      
+      // Verificar se o usuário é fornecedor aprovado
+      let targetPath = redirect || '/';
+      
+      try {
+        const supplierData = await supplierService.getMySupplier();
+        if (supplierData.success && supplierData.supplier && supplierData.supplier.status === 'approved') {
+          // Se for fornecedor aprovado, redirecionar para o dashboard
+          targetPath = '/fornecedor/dashboard';
+        }
+      } catch (supplierError) {
+        // Se não encontrar fornecedor ou der erro, usar o caminho padrão
+        console.log('Usuário não é fornecedor ou erro ao verificar:', supplierError);
+      }
+      
       navigate(targetPath);
       // Pequeno delay para garantir que o token foi salvo
       setTimeout(() => {

@@ -52,3 +52,6 @@ foreach ($medications as $med) {
 echo "\n=== Teste concluído ===\n";
 
 
+
+
+

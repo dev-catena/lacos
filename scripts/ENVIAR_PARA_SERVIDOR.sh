@@ -64,3 +64,6 @@ echo "   php artisan medications:import-fast /tmp/medicamentos_processados.csv"
 echo ""
 
 
+
+
+

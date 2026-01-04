@@ -31,3 +31,6 @@ echo "✅ Verificação concluída!"
 
 
 
+
+
+

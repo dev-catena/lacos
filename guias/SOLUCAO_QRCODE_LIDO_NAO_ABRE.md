@@ -108,3 +108,6 @@ sudo ufw status
 4. Se funcionar, você verá a tela de boas-vindas
 
 
+
+
+

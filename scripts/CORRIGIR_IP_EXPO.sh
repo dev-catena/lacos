@@ -75,3 +75,6 @@ echo "   ou"
 echo "   ./scripts/USAR_EXPO_GO_APENAS.sh"
 
 
+
+
+

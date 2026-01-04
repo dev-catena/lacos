@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import FornecedorPage from './pages/FornecedorPage';
 import SupplierRegisterPage from './pages/SupplierRegisterPage';
+import SupplierDashboard from './pages/SupplierDashboard';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -16,6 +17,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/fornecedor" element={<FornecedorPage />} />
         <Route path="/fornecedor/cadastro" element={<SupplierRegisterPage />} />
+        <Route path="/fornecedor/dashboard" element={<SupplierDashboard />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/cadastro" element={<SignUpPage />} />
         <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />

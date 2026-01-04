@@ -244,3 +244,6 @@ Para manter a lista atualizada:
 5. 🔮 Implementar integração automática (futuro)
 
 
+
+
+

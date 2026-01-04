@@ -1,10 +1,27 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { useSupplier } from '../hooks/useSupplier';
+import authService from '../services/authService';
 import './HomePage.css';
 
 const HomePage = () => {
+  const { isApproved, loading } = useSupplier();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Se o usuário estiver logado e for fornecedor aprovado, redirecionar para o dashboard
+    if (!loading && authService.isAuthenticated() && isApproved) {
+      navigate('/fornecedor/dashboard', { replace: true });
+    }
+  }, [isApproved, loading, navigate]);
+
+  // Se estiver carregando ou redirecionando, não renderizar conteúdo
+  if (loading || (authService.isAuthenticated() && isApproved)) {
+    return null;
+  }
+
   return (
     <div className="App">
       <Header />
@@ -26,9 +43,11 @@ const HomePage = () => {
                 <Link to="/cadastro" className="btn btn-primary">
                   Quero cuidar de alguém
                 </Link>
-                <Link to="/fornecedor" className="btn btn-secondary">
-                  Quero ser fornecedor
-                </Link>
+                {!isApproved && (
+                  <Link to="/fornecedor" className="btn btn-secondary">
+                    Quero ser fornecedor
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -196,9 +215,11 @@ const HomePage = () => {
                 <Link to="/cadastro" className="btn btn-primary">
                   Começar Agora
                 </Link>
-                <Link to="/fornecedor" className="btn btn-secondary">
-                  Quero ser Fornecedor
-                </Link>
+                {!isApproved && (
+                  <Link to="/fornecedor" className="btn btn-secondary">
+                    Quero ser Fornecedor
+                  </Link>
+                )}
               </div>
             </div>
           </div>

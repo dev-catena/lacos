@@ -29,3 +29,6 @@ echo "💡 Ou reinicie o Expo com:"
 echo "   npx expo start --clear"
 
 
+
+
+

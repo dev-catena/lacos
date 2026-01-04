@@ -37,3 +37,6 @@ echo "   sudo bash $TMP_DIR/APLICAR_MUDANCAS_CPF_EMAIL.sh"
 
 
 
+
+
+

@@ -13,6 +13,21 @@
   justify-content: space-between;
 }
 
+.header-content.supplier-logged {
+  justify-content: flex-start;
+  gap: 40px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.header-right {
+  margin-left: auto;
+}
+
 .logo {
   display: flex;
   align-items: center;
@@ -90,6 +105,10 @@
   margin-left: auto;
 }
 
+.header-content.supplier-logged .user-menu {
+  margin-left: 0;
+}
+
 .menu-toggle {
   display: none;
   flex-direction: column;
@@ -111,6 +130,18 @@
 @media (max-width: 768px) {
   .menu-toggle {
     display: flex;
+  }
+
+  .header-content.supplier-logged {
+    gap: 20px;
+  }
+
+  .header-left {
+    gap: 20px;
+  }
+
+  .header-left .nav {
+    display: none;
   }
 
   .nav {

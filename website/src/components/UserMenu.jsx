@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
+import { useSupplier } from '../hooks/useSupplier';
 import './UserMenu.css';
 
 const UserMenu = ({ user, onLogout }) => {
+  const { supplier, isApproved } = useSupplier();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
   const navigate = useNavigate();
@@ -71,6 +73,26 @@ const UserMenu = ({ user, onLogout }) => {
             <span className="menu-icon">🔒</span>
             <span>Trocar Senha</span>
           </Link>
+          {supplier && (
+            <Link 
+              to="/fornecedor/dashboard" 
+              className="user-menu-item"
+              onClick={() => setIsOpen(false)}
+            >
+              <span className="menu-icon">🏪</span>
+              <span>Painel do Fornecedor</span>
+            </Link>
+          )}
+          {!supplier && (
+            <Link 
+              to="/fornecedor/cadastro" 
+              className="user-menu-item"
+              onClick={() => setIsOpen(false)}
+            >
+              <span className="menu-icon">➕</span>
+              <span>Cadastrar como Fornecedor</span>
+            </Link>
+          )}
           <div className="user-menu-divider"></div>
           <button 
             className="user-menu-item user-menu-logout"
