@@ -2,7 +2,7 @@
 
 /**
  * Script para iniciar Expo Go com IP FORÇADO
- * GARANTE que o QR code sempre mostra: exp://10.102.0.103:8081
+ * GARANTE que o QR code sempre mostra: exp://10.102.0.149:8081
  * NUNCA, NUNCA, NUNCA usa localhost
  */
 
@@ -10,7 +10,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 // IP FIXO - NUNCA MUDAR
-const FORCED_IP = '192.168.1.105';
+const FORCED_IP = '10.102.0.149';
 const FORCED_PORT = '8081';
 
 console.log('');
@@ -95,6 +95,11 @@ const env = {
   RCT_METRO_PORT: FORCED_PORT,
   PORT: FORCED_PORT,
   EXPO_PACKAGER_PORT: FORCED_PORT,
+  
+  // Evitar autenticação do Expo em modo não-interativo
+  CI: 'false', // Não é CI, mas permite modo interativo
+  EXPO_NO_DOTENV: '1',
+  EXPO_OFFLINE: '1', // Usar modo offline para evitar autenticação
 };
 
 console.log('🔧 Variáveis de ambiente configuradas:');
@@ -113,6 +118,8 @@ const args = [
   '--port', FORCED_PORT,       // Forçar porta
   '--go',                      // Usar Expo Go
   '--clear',                   // Limpar cache
+  // NÃO usar --offline aqui, pois pode bloquear conexões
+  // O EXPO_OFFLINE=1 nas variáveis de ambiente já evita autenticação
 ];
 
 // Adicionar argumentos passados via linha de comando (exceto os que conflitam)

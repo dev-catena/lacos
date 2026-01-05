@@ -1190,178 +1190,6 @@ export const FemaleIcon = ({ size = 24, color = '#ec4899' }) => {
   );
 };
 
-export default {
-  // Ações Rápidas
-  MedicationIcon,
-  VitalSignsIcon,
-  AppointmentIcon,
-  MessagesIcon,
-  
-  // Navegação
-  HomeIcon,
-  GroupsIcon,
-  NotificationIcon,
-  ProfileIcon,
-  
-  // Funcionais
-  ElderlyIcon,
-  EmergencyIcon,
-  MedicalHistoryIcon,
-  InviteCodeIcon,
-  CaregiverIcon,
-  CompanionAppIcon,
-  PermissionsIcon,
-  SuccessIcon,
-  ErrorIcon,
-  ShareIcon,
-  LocationIcon,
-  
-  // UI/Ações
-  CalendarIcon,
-  SettingsIcon,
-  PulseIcon,
-  TimeIcon,
-  PersonIcon,
-  TrashIcon,
-  DownloadIcon,
-  MoneyIcon,
-  SearchIcon,
-  FilterIcon,
-  CheckIcon,
-  FlaskIcon,
-  ImageIcon,
-  MaleIcon,
-  FemaleIcon,
-  NavigateIcon,
-  EditIcon,
-  ChevronForwardIcon,
-  ArrowBackIcon,
-  AddIcon,
-  CloseIcon,
-  MapPinIcon,
-  MedicalIcon,
-  DocumentIcon,
-  ReceiptIcon,
-  CallIcon,
-  MicIcon,
-  VideoIcon,
-  ChatIcon,
-  
-  // Email/Mail
-  MailIcon,
-  
-  // People/Grupo
-  PeopleIcon,
-  
-  // Folder/Arquivos
-  FolderIcon,
-  
-  // Star/Avaliação
-  StarIcon,
-  
-  // Alert/Erro
-  AlertIcon,
-  
-  // Histórico
-  HistoryIcon,
-  
-  // Medical Kit (Médicos)
-  MedicalKitIcon,
-  
-  // Images (Mídias)
-  ImagesIcon,
-  
-  // Warning (Sensor de Queda)
-  WarningIcon,
-  
-  // Medical Outline (para comorbidades)
-  MedicalOutlineIcon,
-  
-  // Pills Outline (para medicações)
-  PillsOutlineIcon,
-  
-  // Video Camera (para iniciar consulta)
-  VideoCamIcon,
-  
-  // Text Outline (para título)
-  TextOutlineIcon,
-  
-  // Video Cam Outline (para teleconsulta)
-  VideoCamOutlineIcon,
-  
-  // Alert Circle Outline (para alertas)
-  AlertCircleOutlineIcon,
-  
-  // Checkmark Circle (para seleção)
-  CheckmarkCircleIcon,
-  
-  // Star (para avaliações)
-  StarIcon,
-  
-  // Star Half (para avaliações)
-  StarHalfIcon,
-  
-  // Star Outline (para avaliações)
-  StarOutlineIcon,
-  
-  // School (para formação)
-  SchoolIcon,
-  
-  // Information Circle (para informações)
-  InformationCircleIcon,
-  
-  // Information Circle Outline (para informações)
-  InformationCircleOutlineIcon,
-  
-  // Checkmark (para confirmação)
-  CheckmarkIcon,
-  
-  // Fitness Outline (para fisioterapia)
-  FitnessOutlineIcon,
-  
-  // Flask Outline (para exames)
-  FlaskOutlineIcon,
-  
-  // Close Circle (para fechar/bloquear)
-  CloseCircleIcon,
-  
-  // Chevron Back (seta para esquerda)
-  ChevronBackIcon,
-  
-  // Save Outline (para salvar)
-  SaveOutlineIcon,
-  
-  // Lock Closed (cadeado fechado)
-  LockClosedIcon,
-  
-  // Add Circle Outline (adicionar)
-  AddCircleOutlineIcon,
-  
-  // Time Outline (para horários)
-  TimeOutlineIcon,
-  
-  // Location Outline (para localização)
-  LocationOutlineIcon,
-  
-  // Heart (coração)
-  HeartIcon,
-  
-  // Alert Circle (preenchido)
-  AlertCircleIcon,
-  
-  // Video Cam Off (vídeo desligado)
-  VideoCamOffIcon,
-  
-  // Send (enviar)
-  SendIcon,
-  
-  // Document Attach (anexar documento)
-  DocumentAttachIcon,
-  
-  // Paper Plane (avião de papel)
-  PaperPlaneIcon,
-};
-
 // 🏋️ Ícone de Fitness Outline (para fisioterapia)
 export const FitnessOutlineIcon = ({ size = 24, color = '#10b981' }) => {
   const iconColor = color || '#10b981';
@@ -1662,6 +1490,178 @@ export const VideoCamIcon = ({ size = 24, color = '#ffffff' }) => {
       </Svg>
     </View>
   );
+};
+
+export default {
+  // Ações Rápidas
+  MedicationIcon,
+  VitalSignsIcon,
+  AppointmentIcon,
+  MessagesIcon,
+  
+  // Navegação
+  HomeIcon,
+  GroupsIcon,
+  NotificationIcon,
+  ProfileIcon,
+  
+  // Funcionais
+  ElderlyIcon,
+  EmergencyIcon,
+  MedicalHistoryIcon,
+  InviteCodeIcon,
+  CaregiverIcon,
+  CompanionAppIcon,
+  PermissionsIcon,
+  SuccessIcon,
+  ErrorIcon,
+  ShareIcon,
+  LocationIcon,
+  
+  // UI/Ações
+  CalendarIcon,
+  SettingsIcon,
+  PulseIcon,
+  TimeIcon,
+  PersonIcon,
+  TrashIcon,
+  DownloadIcon,
+  MoneyIcon,
+  SearchIcon,
+  FilterIcon,
+  CheckIcon,
+  FlaskIcon,
+  ImageIcon,
+  MaleIcon,
+  FemaleIcon,
+  NavigateIcon,
+  EditIcon,
+  ChevronForwardIcon,
+  ArrowBackIcon,
+  AddIcon,
+  CloseIcon,
+  MapPinIcon,
+  MedicalIcon,
+  DocumentIcon,
+  ReceiptIcon,
+  CallIcon,
+  MicIcon,
+  VideoIcon,
+  ChatIcon,
+  
+  // Email/Mail
+  MailIcon,
+  
+  // People/Grupo
+  PeopleIcon,
+  
+  // Folder/Arquivos
+  FolderIcon,
+  
+  // Star/Avaliação
+  StarIcon,
+  
+  // Alert/Erro
+  AlertIcon,
+  
+  // Histórico
+  HistoryIcon,
+  
+  // Medical Kit (Médicos)
+  MedicalKitIcon,
+  
+  // Images (Mídias)
+  ImagesIcon,
+  
+  // Warning (Sensor de Queda)
+  WarningIcon,
+  
+  // Medical Outline (para comorbidades)
+  MedicalOutlineIcon,
+  
+  // Pills Outline (para medicações)
+  PillsOutlineIcon,
+  
+  // Video Camera (para iniciar consulta)
+  VideoCamIcon,
+  
+  // Text Outline (para título)
+  TextOutlineIcon,
+  
+  // Video Cam Outline (para teleconsulta)
+  VideoCamOutlineIcon,
+  
+  // Alert Circle Outline (para alertas)
+  AlertCircleOutlineIcon,
+  
+  // Checkmark Circle (para seleção)
+  CheckmarkCircleIcon,
+  
+  // Star (para avaliações)
+  StarIcon,
+  
+  // Star Half (para avaliações)
+  StarHalfIcon,
+  
+  // Star Outline (para avaliações)
+  StarOutlineIcon,
+  
+  // School (para formação)
+  SchoolIcon,
+  
+  // Information Circle (para informações)
+  InformationCircleIcon,
+  
+  // Information Circle Outline (para informações)
+  InformationCircleOutlineIcon,
+  
+  // Checkmark (para confirmação)
+  CheckmarkIcon,
+  
+  // Fitness Outline (para fisioterapia)
+  FitnessOutlineIcon,
+  
+  // Flask Outline (para exames)
+  FlaskOutlineIcon,
+  
+  // Close Circle (para fechar/bloquear)
+  CloseCircleIcon,
+  
+  // Chevron Back (seta para esquerda)
+  ChevronBackIcon,
+  
+  // Save Outline (para salvar)
+  SaveOutlineIcon,
+  
+  // Lock Closed (cadeado fechado)
+  LockClosedIcon,
+  
+  // Add Circle Outline (adicionar)
+  AddCircleOutlineIcon,
+  
+  // Time Outline (para horários)
+  TimeOutlineIcon,
+  
+  // Location Outline (para localização)
+  LocationOutlineIcon,
+  
+  // Heart (coração)
+  HeartIcon,
+  
+  // Alert Circle (preenchido)
+  AlertCircleIcon,
+  
+  // Video Cam Off (vídeo desligado)
+  VideoCamOffIcon,
+  
+  // Send (enviar)
+  SendIcon,
+  
+  // Document Attach (anexar documento)
+  DocumentAttachIcon,
+  
+  // Paper Plane (avião de papel)
+  PaperPlaneIcon,
 };
 
 // ============================================================================

@@ -66,7 +66,7 @@ const GroupsScreen = ({ navigation, route }) => {
   
   // Função para testar deep link manualmente (útil para Expo Go)
   const testDeepLink = () => {
-    const testUrl = 'http://192.168.1.105/grupo/TESTE123';
+    const testUrl = 'http://10.102.0.149/grupo/TESTE123';
     console.log('🧪 Testando deep link manualmente:', testUrl);
     // Simular processamento de deep link
     const code = 'TESTE123';

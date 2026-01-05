@@ -279,8 +279,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  background: #1976d2;
-  color: white;
+  background: #A8D5E2;
+  color: #2c3e50;
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.2s;
@@ -288,7 +288,7 @@
 }
 
 .image-upload-label:hover:not(:disabled) {
-  background: #1565c0;
+  background: #8FC4D6;
 }
 
 .image-upload-label:disabled {

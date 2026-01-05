@@ -31,7 +31,6 @@ const ProductsManagement = () => {
     price: '',
     stock: '',
     category: '',
-    image_url: '',
     photos: [],
     payment_methods: [],
     shipping_methods: [],
@@ -59,6 +58,13 @@ const ProductsManagement = () => {
     e.preventDefault();
     try {
       setError('');
+      
+      // Validação: pelo menos uma imagem é obrigatória
+      if (uploadedImages.length === 0) {
+        setError('Por favor, adicione pelo menos uma imagem do produto.');
+        return;
+      }
+      
       const productData = await prepareProductData();
       
       if (editingProduct) {
@@ -77,7 +83,7 @@ const ProductsManagement = () => {
     }
   };
 
-  // Função para formatar preço em R$ (exibe)
+  // Função para formatar preço em R$ (exibe com máscara)
   const formatPriceDisplay = (value) => {
     if (!value) return '';
     // Se já é um número, formatar
@@ -91,33 +97,25 @@ const ProductsManagement = () => {
     });
   };
 
-  // Função para lidar com mudança de preço
+  // Função para lidar com mudança de preço com máscara de Real
   const handlePriceChange = (e) => {
     let value = e.target.value;
     
-    // Remove tudo que não é dígito ou vírgula/ponto
-    value = value.replace(/[^\d,.]/g, '');
+    // Remove tudo que não é dígito
+    value = value.replace(/\D/g, '');
     
-    // Substitui vírgula por ponto para processamento
-    value = value.replace(',', '.');
-    
-    // Remove múltiplos pontos
-    const parts = value.split('.');
-    if (parts.length > 2) {
-      value = parts[0] + '.' + parts.slice(1).join('');
+    // Se estiver vazio, limpar
+    if (value === '') {
+      setFormData({ ...formData, price: '' });
+      return;
     }
     
-    // Limita a 2 casas decimais
-    if (parts.length === 2 && parts[1].length > 2) {
-      value = parts[0] + '.' + parts[1].substring(0, 2);
-    }
+    // Converte para número (centavos)
+    const numValue = parseFloat(value) / 100;
     
-    // Converte para número e salva
-    const numValue = parseFloat(value);
+    // Salva o valor numérico
     if (!isNaN(numValue) && numValue >= 0) {
       setFormData({ ...formData, price: numValue.toFixed(2) });
-    } else if (value === '' || value === '.') {
-      setFormData({ ...formData, price: '' });
     }
   };
 
@@ -157,7 +155,6 @@ const ProductsManagement = () => {
       price: product.price || '',
       stock: product.stock || '',
       category: product.category || '',
-      image_url: product.image_url || '',
       photos: product.photos || [],
       payment_methods: product.payment_methods || [],
       shipping_methods: product.shipping_methods || [],
@@ -165,8 +162,13 @@ const ProductsManagement = () => {
     });
     
     // Se o produto já tem fotos (URLs), criar previews
-    if (product.photos && product.photos.length > 0) {
-      const existingPreviews = product.photos.map((url, idx) => ({
+    const photos = product.photos || [];
+    if (product.image_url && !photos.includes(product.image_url)) {
+      photos.unshift(product.image_url);
+    }
+    
+    if (photos.length > 0) {
+      const existingPreviews = photos.map((url, idx) => ({
         file: null,
         preview: url,
         name: `Imagem ${idx + 1}`,
@@ -210,7 +212,6 @@ const ProductsManagement = () => {
       price: '',
       stock: '',
       category: '',
-      image_url: '',
       photos: [],
       payment_methods: [],
       shipping_methods: [],
@@ -224,25 +225,59 @@ const ProductsManagement = () => {
   const prepareProductData = async () => {
     const data = { ...formData };
     
-    // Se houver imagens novas para upload, precisaríamos fazer upload primeiro
-    // Por enquanto, vamos manter apenas as URLs das imagens existentes
-    // e as novas precisariam ser enviadas via FormData em uma requisição separada
+    // Converter tipos para o formato esperado pelo backend
+    // Preço deve ser numérico
+    if (data.price) {
+      data.price = parseFloat(data.price);
+      if (isNaN(data.price) || data.price < 0) {
+        throw new Error('Preço inválido');
+      }
+    } else {
+      throw new Error('Preço é obrigatório');
+    }
+    
+    // Estoque deve ser inteiro
+    if (data.stock !== undefined && data.stock !== null && data.stock !== '') {
+      data.stock = parseInt(data.stock, 10);
+      if (isNaN(data.stock) || data.stock < 0) {
+        throw new Error('Estoque inválido');
+      }
+    } else {
+      throw new Error('Estoque é obrigatório');
+    }
+    
+    // Preparar imagens: separar existentes (URLs) de novas (files)
     if (uploadedImages.length > 0) {
-      // Separar imagens existentes (URLs) de novas (files)
       const existingPhotos = uploadedImages
         .filter(img => img.isExisting)
         .map(img => img.preview);
       
-      // Para novas imagens, precisaríamos fazer upload
-      // Por enquanto, vamos manter apenas image_url se houver
+      const newImages = uploadedImages
+        .filter(img => !img.isExisting && img.file)
+        .map(img => img.file);
+      
+      // Se houver novas imagens, adicionar para upload via FormData
+      if (newImages.length > 0) {
+        data.newImages = newImages;
+      }
+      
+      // Manter URLs das imagens existentes
       if (existingPhotos.length > 0) {
         data.photos = existingPhotos;
       }
       
-      // Se houver image_url principal, manter
-      if (data.image_url) {
-        data.photos = [data.image_url, ...existingPhotos.filter(url => url !== data.image_url)];
+      // Se houver pelo menos uma imagem, usar a primeira como image_url principal
+      if (existingPhotos.length > 0) {
+        data.image_url = existingPhotos[0];
+      } else if (newImages.length > 0) {
+        // Para novas imagens, o backend precisará processar após upload
+        // Por enquanto, não definimos image_url (será processado pelo backend)
+        // Mas precisamos enviar pelo menos uma URL temporária ou deixar vazio
+        data.image_url = null;
       }
+    } else {
+      // Se não houver imagens, image_url pode ser null
+      data.image_url = null;
     }
     
     return data;
@@ -309,7 +344,7 @@ const ProductsManagement = () => {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Preço (R$) *</label>
+                  <label>Preço *</label>
                   <div className="price-input-wrapper">
                     <span className="price-prefix">R$</span>
                     <input
@@ -319,8 +354,10 @@ const ProductsManagement = () => {
                       placeholder="0,00"
                       required
                       className="price-input"
+                      maxLength={20}
                     />
                   </div>
+                  <small className="form-hint">Digite o valor do produto</small>
                 </div>
 
                 <div className="form-group">
@@ -351,6 +388,11 @@ const ProductsManagement = () => {
 
               <div className="form-group">
                 <label>Imagens do Produto (máximo 8) *</label>
+                {uploadedImages.length === 0 && (
+                  <small className="form-hint" style={{ color: '#dc3545', display: 'block', marginBottom: '0.5rem' }}>
+                    Pelo menos uma imagem é obrigatória
+                  </small>
+                )}
                 <div className="image-upload-container">
                   <input
                     type="file"
@@ -390,18 +432,17 @@ const ProductsManagement = () => {
                   {uploadedImages.length === 0 && (
                     <p className="upload-hint">Nenhuma imagem adicionada. Adicione até 8 imagens do produto.</p>
                   )}
+                  
+                  {uploadedImages.length > 0 && uploadedImages.length < 8 && (
+                    <p className="upload-hint">Você pode adicionar mais {8 - uploadedImages.length} imagem(ns).</p>
+                  )}
+                  
+                  {uploadedImages.length >= 8 && (
+                    <p className="upload-hint" style={{ color: '#1976d2', fontWeight: '500' }}>
+                      Limite de 8 imagens atingido. Remova uma imagem para adicionar outra.
+                    </p>
+                  )}
                 </div>
-              </div>
-
-              <div className="form-group">
-                <label>URL da Imagem Principal (alternativa)</label>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://exemplo.com/imagem.jpg"
-                />
-                <small className="form-hint">Use este campo se preferir informar uma URL ao invés de fazer upload</small>
               </div>
 
               <div className="form-group">

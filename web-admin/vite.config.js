@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // IP para acesso na rede
-const EXPO_IP = process.env.EXPO_IP || '10.102.0.103';
+const EXPO_IP = process.env.EXPO_IP || '10.102.0.149';
 const EXPO_PORT = process.env.EXPO_PORT || '8081';
 
 export default defineConfig({

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class SupplierProductController extends Controller
 {
@@ -68,7 +69,65 @@ class SupplierProductController extends Controller
                 return response()->json(['success' => false, 'message' => 'Fornecedor não aprovado'], 403);
             }
 
-            $validator = Validator::make($request->all(), [
+            // Preparar dados de validação
+            $validationData = $request->all();
+            
+            // Se houver imagens sendo enviadas via FormData, validar
+            $hasImageFiles = false;
+            $imageUrls = [];
+            
+            // Processar upload de imagens se houver
+            // O FormData pode enviar como images[0], images[1], etc.
+            $imageFiles = [];
+            if ($request->hasFile('images')) {
+                $files = $request->file('images');
+                if (is_array($files)) {
+                    $imageFiles = $files;
+                } else {
+                    $imageFiles = [$files];
+                }
+            } else {
+                // Tentar pegar imagens enviadas como images[0], images[1], etc.
+                $allInput = $request->all();
+                foreach ($allInput as $key => $value) {
+                    if (preg_match('/^images\[(\d+)\]$/', $key) && $request->hasFile($key)) {
+                        $imageFiles[] = $request->file($key);
+                    }
+                }
+            }
+            
+            if (!empty($imageFiles)) {
+                $hasImageFiles = true;
+                foreach ($imageFiles as $file) {
+                    if ($file && $file->isValid()) {
+                        $path = $file->store('products', 'public');
+                        $url = Storage::url($path);
+                        $imageUrls[] = url($url);
+                    }
+                }
+            }
+            
+            // Processar URLs de imagens existentes se houver
+            if ($request->has('photos')) {
+                $photos = $request->input('photos');
+                if (is_array($photos)) {
+                    $imageUrls = array_merge($imageUrls, $photos);
+                } elseif (is_string($photos)) {
+                    $imageUrls[] = $photos;
+                }
+            }
+            
+            // Se image_url foi enviado diretamente, adicionar
+            if ($request->has('image_url') && $request->image_url) {
+                if (!in_array($request->image_url, $imageUrls)) {
+                    array_unshift($imageUrls, $request->image_url);
+                }
+            }
+            
+            // Usar a primeira imagem como image_url principal
+            $mainImageUrl = !empty($imageUrls) ? $imageUrls[0] : null;
+            
+            $validator = Validator::make($validationData, [
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'price' => 'required|numeric|min:0',
@@ -76,6 +135,7 @@ class SupplierProductController extends Controller
                 'category' => 'nullable|string|max:100',
                 'image_url' => 'nullable|url|max:500',
                 'is_active' => 'boolean',
+                'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB por imagem
             ], [
                 'name.required' => 'O nome do produto é obrigatório',
                 'name.max' => 'O nome não pode exceder 255 caracteres',
@@ -86,6 +146,9 @@ class SupplierProductController extends Controller
                 'stock.integer' => 'O estoque deve ser um número inteiro',
                 'stock.min' => 'O estoque não pode ser negativo',
                 'image_url.url' => 'A URL da imagem deve ser válida',
+                'images.*.image' => 'Os arquivos devem ser imagens',
+                'images.*.mimes' => 'As imagens devem ser do tipo: jpeg, png, jpg, gif ou webp',
+                'images.*.max' => 'Cada imagem não pode exceder 5MB',
             ]);
 
             if ($validator->fails()) {
@@ -96,6 +159,17 @@ class SupplierProductController extends Controller
                 ], 422);
             }
 
+            // Converter is_active para boolean
+            $isActive = true;
+            if ($request->has('is_active')) {
+                $isActiveValue = $request->input('is_active');
+                if (is_string($isActiveValue)) {
+                    $isActive = in_array(strtolower($isActiveValue), ['1', 'true', 'yes']);
+                } else {
+                    $isActive = (bool) $isActiveValue;
+                }
+            }
+
             $product = SupplierProduct::create([
                 'supplier_id' => $supplier->id,
                 'name' => $request->name,
@@ -103,8 +177,9 @@ class SupplierProductController extends Controller
                 'price' => $request->price,
                 'stock' => $request->stock,
                 'category' => $request->category,
-                'image_url' => $request->image_url,
-                'is_active' => $request->has('is_active') ? $request->is_active : true,
+                'image_url' => $mainImageUrl,
+                'images' => !empty($imageUrls) ? $imageUrls : null,
+                'is_active' => $isActive,
             ]);
 
             Log::info('Produto criado', ['product_id' => $product->id, 'supplier_id' => $supplier->id]);
@@ -145,7 +220,62 @@ class SupplierProductController extends Controller
                 return response()->json(['success' => false, 'message' => 'Produto não encontrado'], 404);
             }
 
-            $validator = Validator::make($request->all(), [
+            // Preparar dados de validação
+            $validationData = $request->all();
+            
+            // Processar upload de imagens se houver
+            $imageUrls = $product->images ? (is_array($product->images) ? $product->images : json_decode($product->images, true) ?? []) : [];
+            
+            // Se houver novas imagens sendo enviadas via FormData
+            $imageFiles = [];
+            if ($request->hasFile('images')) {
+                $files = $request->file('images');
+                if (is_array($files)) {
+                    $imageFiles = $files;
+                } else {
+                    $imageFiles = [$files];
+                }
+            } else {
+                // Tentar pegar imagens enviadas como images[0], images[1], etc.
+                $allInput = $request->all();
+                foreach ($allInput as $key => $value) {
+                    if (preg_match('/^images\[(\d+)\]$/', $key) && $request->hasFile($key)) {
+                        $imageFiles[] = $request->file($key);
+                    }
+                }
+            }
+            
+            if (!empty($imageFiles)) {
+                foreach ($imageFiles as $file) {
+                    if ($file && $file->isValid()) {
+                        $path = $file->store('products', 'public');
+                        $url = Storage::url($path);
+                        $imageUrls[] = url($url);
+                    }
+                }
+            }
+            
+            // Processar URLs de imagens existentes se houver
+            if ($request->has('photos')) {
+                $photos = $request->input('photos');
+                if (is_array($photos)) {
+                    $imageUrls = array_merge($imageUrls, $photos);
+                } elseif (is_string($photos)) {
+                    $imageUrls[] = $photos;
+                }
+            }
+            
+            // Se image_url foi enviado diretamente, adicionar
+            if ($request->has('image_url') && $request->image_url) {
+                if (!in_array($request->image_url, $imageUrls)) {
+                    array_unshift($imageUrls, $request->image_url);
+                }
+            }
+            
+            // Usar a primeira imagem como image_url principal
+            $mainImageUrl = !empty($imageUrls) ? $imageUrls[0] : ($request->image_url ?? $product->image_url);
+            
+            $validator = Validator::make($validationData, [
                 'name' => 'sometimes|required|string|max:255',
                 'description' => 'nullable|string',
                 'price' => 'sometimes|required|numeric|min:0',
@@ -153,6 +283,7 @@ class SupplierProductController extends Controller
                 'category' => 'nullable|string|max:100',
                 'image_url' => 'nullable|url|max:500',
                 'is_active' => 'boolean',
+                'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB por imagem
             ]);
 
             if ($validator->fails()) {
@@ -163,9 +294,27 @@ class SupplierProductController extends Controller
                 ], 422);
             }
 
-            $product->update($request->only([
-                'name', 'description', 'price', 'stock', 'category', 'image_url', 'is_active'
-            ]));
+            // Converter is_active para boolean
+            $isActive = $product->is_active;
+            if ($request->has('is_active')) {
+                $isActiveValue = $request->input('is_active');
+                if (is_string($isActiveValue)) {
+                    $isActive = in_array(strtolower($isActiveValue), ['1', 'true', 'yes']);
+                } else {
+                    $isActive = (bool) $isActiveValue;
+                }
+            }
+
+            $product->update([
+                'name' => $request->has('name') ? $request->name : $product->name,
+                'description' => $request->has('description') ? $request->description : $product->description,
+                'price' => $request->has('price') ? $request->price : $product->price,
+                'stock' => $request->has('stock') ? $request->stock : $product->stock,
+                'category' => $request->has('category') ? $request->category : $product->category,
+                'image_url' => $mainImageUrl,
+                'images' => !empty($imageUrls) ? $imageUrls : null,
+                'is_active' => $isActive,
+            ]);
 
             Log::info('Produto atualizado', ['product_id' => $product->id]);
 

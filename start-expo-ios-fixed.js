@@ -17,7 +17,7 @@ try {
 }
 
 // IP correto
-const EXPO_IP = '10.102.0.103';
+const EXPO_IP = '10.102.0.149';
 const EXPO_PORT = '8081';
 
 // Configurar TODAS as variáveis de ambiente ANTES de iniciar
@@ -37,6 +37,9 @@ process.env.EXPO_DEVTOOLS_LISTEN_PORT = EXPO_PORT;
 process.env.EXPO_NO_LOCALHOST = '1';
 process.env.EXPO_USE_LOCALHOST = '0';
 process.env.EXPO_USE_FAST_RESOLVER = '1';
+// Evitar autenticação do Expo em modo não-interativo
+process.env.CI = 'false'; // Não é CI, permite modo interativo
+process.env.EXPO_OFFLINE = '1'; // Usar modo offline para evitar autenticação
 
 console.log(`🔧 Forçando IP: ${EXPO_IP}:${EXPO_PORT}`);
 console.log(`🚫 localhost está BLOQUEADO`);
@@ -120,6 +123,8 @@ if (!hasTunnel) {
   if (!hasLan) {
     expoArgs.push('--lan');
   }
+  // NÃO usar --offline aqui, pois pode bloquear conexões
+  // O EXPO_OFFLINE=1 nas variáveis de ambiente já evita autenticação
 } else {
   expoArgs.push('--tunnel');
 }
@@ -134,8 +139,10 @@ console.log(`🚀 Executando: npx ${expoArgs.join(' ')}`);
 console.log('');
 
 // Iniciar processo
+// IMPORTANTE: stdio: 'inherit' permite interação com o terminal
+// Isso evita o erro de "non-interactive mode" do Expo
 const expo = spawn('npx', expoArgs, {
-  stdio: ['inherit', 'pipe', 'pipe'],
+  stdio: 'inherit', // Usar 'inherit' para permitir interação
   env: process.env,
   shell: true,
 });

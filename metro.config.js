@@ -4,7 +4,7 @@ const http = require('http');
 const config = getDefaultConfig(__dirname);
 
 // IP CORRETO - NUNCA MUDAR
-const EXPO_IP = '192.168.1.105';
+const EXPO_IP = '10.102.0.149';
 const EXPO_PORT = '8081';
 
 // FORÇAR TODAS as variáveis ANTES de qualquer coisa
