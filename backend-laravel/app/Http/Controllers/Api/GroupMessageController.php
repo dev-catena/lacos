@@ -60,6 +60,13 @@ class GroupMessageController extends Controller
                 ->orderBy('group_messages.created_at', 'asc')
                 ->get()
                 ->map(function ($message) use ($user) {
+                    // Converter URL relativa em URL completa se necessário
+                    $imageUrl = $message->image_url;
+                    if ($imageUrl && !filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                        // Se for URL relativa, converter para URL completa
+                        $imageUrl = url($imageUrl);
+                    }
+                    
                     return [
                         'id' => $message->id,
                         'group_id' => $message->group_id,
@@ -72,7 +79,7 @@ class GroupMessageController extends Controller
                         ],
                         'message' => $message->message,
                         'type' => $message->type ?? 'text',
-                        'image_url' => $message->image_url,
+                        'image_url' => $imageUrl,
                         'is_read' => $message->is_read,
                         'created_at' => $message->created_at,
                     ];
@@ -149,7 +156,7 @@ class GroupMessageController extends Controller
             if ($request->hasFile('image')) {
                 $image = $request->file('image');
                 $path = $image->store('group-messages', 'public');
-                $imageUrl = Storage::url($path);
+                $imageUrl = url(Storage::url($path)); // URL completa com domínio
                 $messageType = 'image';
             }
 
@@ -184,6 +191,13 @@ class GroupMessageController extends Controller
                 )
                 ->first();
 
+            // Converter URL relativa em URL completa se necessário
+            $imageUrl = $message->image_url;
+            if ($imageUrl && !filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                // Se for URL relativa, converter para URL completa
+                $imageUrl = url($imageUrl);
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -198,7 +212,7 @@ class GroupMessageController extends Controller
                     ],
                     'message' => $message->message,
                     'type' => $message->type,
-                    'image_url' => $message->image_url,
+                    'image_url' => $imageUrl,
                     'is_read' => $message->is_read,
                     'created_at' => $message->created_at,
                 ],
