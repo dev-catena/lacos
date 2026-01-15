@@ -114,10 +114,18 @@ class GroupMessageController extends Controller
 
             $validated = $request->validate([
                 'group_id' => 'required|exists:groups,id',
-                'message' => 'required_without:image|string|max:5000',
+                'message' => 'nullable|string|max:5000',
                 'type' => 'nullable|in:text,image',
                 'image' => 'nullable|image|max:10240', // 10MB
             ]);
+            
+            // Validar que pelo menos message ou image foi enviado
+            if (empty($validated['message']) && !$request->hasFile('image')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'É necessário enviar uma mensagem ou uma imagem'
+                ], 400);
+            }
 
             $groupId = $validated['group_id'];
 
@@ -159,7 +167,7 @@ class GroupMessageController extends Controller
 
             // Buscar mensagem criada com dados do usuário
             $message = DB::table('group_messages')
-                ->where('id', $messageId)
+                ->where('group_messages.id', $messageId)
                 ->join('users', 'group_messages.user_id', '=', 'users.id')
                 ->select(
                     'group_messages.id',
