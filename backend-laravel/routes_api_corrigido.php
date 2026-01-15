@@ -119,6 +119,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('doctors/{doctorId}/availability', [DoctorController::class, 'getAvailability']);
     Route::post('doctors/{doctorId}/availability', [DoctorController::class, 'saveAvailability']);
     
+    // Especialidades Médicas (também dentro do middleware para uso autenticado)
+    Route::get('/medical-specialties', [MedicalSpecialtyController::class, 'index']);
+    Route::get('/medical-specialties/{id}', [MedicalSpecialtyController::class, 'show']);
+    
     // Emergency Contacts
     Route::apiResource('emergency-contacts', EmergencyContactController::class);
     Route::post('/emergency-contacts/{id}', [EmergencyContactController::class, 'update']); // Method spoofing

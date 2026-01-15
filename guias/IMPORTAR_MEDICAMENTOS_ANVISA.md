@@ -189,3 +189,5 @@ php artisan medications:import ../scripts/DADOS_ABERTOS_MEDICAMENTOS.csv
 
 
 
+
+

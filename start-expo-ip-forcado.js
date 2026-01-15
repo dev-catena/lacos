@@ -2,7 +2,7 @@
 
 /**
  * Script para iniciar Expo Go com IP FORÇADO
- * GARANTE que o QR code sempre mostra: exp://10.102.0.149:8081
+ * GARANTE que o QR code sempre mostra: exp://10.102.0.103:8081
  * NUNCA, NUNCA, NUNCA usa localhost
  */
 
@@ -10,7 +10,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 // IP FIXO - NUNCA MUDAR
-const FORCED_IP = '10.102.0.149';
+const FORCED_IP = '10.102.0.103';
 const FORCED_PORT = '8081';
 
 console.log('');

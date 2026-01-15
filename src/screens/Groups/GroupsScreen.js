@@ -66,7 +66,7 @@ const GroupsScreen = ({ navigation, route }) => {
   
   // Função para testar deep link manualmente (útil para Expo Go)
   const testDeepLink = () => {
-    const testUrl = 'http://10.102.0.149/grupo/TESTE123';
+    const testUrl = 'http://10.102.0.103/grupo/TESTE123';
     console.log('🧪 Testando deep link manualmente:', testUrl);
     // Simular processamento de deep link
     const code = 'TESTE123';
@@ -101,6 +101,11 @@ const GroupsScreen = ({ navigation, route }) => {
       if (result.success && result.data) {
         const allGroups = result.data;
         console.log(`✅ GroupsScreen - ${allGroups.length} grupo(s) encontrado(s)`);
+        
+        // Debug: verificar photo_url
+        allGroups.forEach(g => {
+          console.log(`📸 GroupsScreen - Grupo ${g.id} (${g.name}): photo_url = ${g.photo_url || 'null'}`);
+        });
         
         // "Meus Grupos" = grupos que EU criei (is_creator=true)
         // FALLBACK: Se is_creator não existir, usa is_admin como critério temporário

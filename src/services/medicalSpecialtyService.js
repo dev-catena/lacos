@@ -9,7 +9,7 @@ const medicalSpecialtyService = {
       const params = search ? { search } : {};
       const response = await apiService.get('/medical-specialties', {
         params,
-        requiresAuth: false, // Não requer autenticação para buscar especialidades
+        requiresAuth: true, // Requer autenticação (a rota está dentro de auth:sanctum)
       });
       
       console.log('📋 medicalSpecialtyService.getSpecialties - Resposta recebida:', JSON.stringify(response, null, 2));

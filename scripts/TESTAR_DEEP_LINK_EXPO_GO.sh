@@ -33,3 +33,5 @@ echo "   4. O Android deve perguntar qual app abrir (se o app estiver instalado)
 
 
 
+
+

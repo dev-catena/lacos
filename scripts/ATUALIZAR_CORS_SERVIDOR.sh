@@ -107,3 +107,5 @@ echo "📝 Agora o web-admin na porta 8081 deve funcionar corretamente."
 
 
 
+
+

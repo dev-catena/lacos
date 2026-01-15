@@ -326,6 +326,26 @@ const GroupContactsScreen = ({ route, navigation }) => {
         }
         
         try {
+          // Validar dados antes de enviar
+          if (!contact.name || !contact.name.trim()) {
+            errorCount++;
+            console.error('❌ [GroupContacts] Nome do contato vazio:', contact);
+            continue;
+          }
+          
+          if (!contact.phone || !validatePhoneNumber(contact.phone)) {
+            errorCount++;
+            console.error('❌ [GroupContacts] Telefone inválido:', contact.name, contact.phone);
+            continue;
+          }
+          
+          console.log('📤 [GroupContacts] Enviando contato:', {
+            name: contact.name,
+            phone: contact.phone,
+            hasPhoto: !!contact.photoUri,
+            contactData: contactData instanceof FormData ? 'FormData' : contactData
+          });
+          
           if (contact.id) {
             // Atualizar contato existente
             const result = await emergencyContactService.updateEmergencyContact(contact.id, contactData);
@@ -345,11 +365,13 @@ const GroupContactsScreen = ({ route, navigation }) => {
             } else {
               errorCount++;
               console.error('❌ [GroupContacts] Erro ao criar:', contact.name, result.error);
+              console.error('❌ [GroupContacts] Dados enviados:', contactData instanceof FormData ? 'FormData' : JSON.stringify(contactData, null, 2));
             }
           }
         } catch (error) {
           errorCount++;
           console.error('❌ [GroupContacts] Erro ao salvar contato:', contact.name, error);
+          console.error('❌ [GroupContacts] Stack trace:', error.stack);
         }
       }
       

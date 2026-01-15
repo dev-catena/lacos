@@ -3,7 +3,7 @@
 // Script para iniciar Expo em modo tunnel com IP correto para Android
 const { spawn } = require('child_process');
 
-const EXPO_IP = '10.102.0.149';
+const EXPO_IP = '10.102.0.103';
 const EXPO_PORT = '8081';
 
 console.log('\n');

@@ -34,3 +34,5 @@ echo "✅ Verificação concluída!"
 
 
 
+
+

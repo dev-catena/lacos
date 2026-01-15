@@ -112,6 +112,8 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       if (result.success && result.data) {
         console.log('✅ GroupSettings - Grupo carregado:', result.data);
         console.log('📸 GroupSettings - photo_url do servidor:', result.data.photo_url);
+        console.log('🔑 GroupSettings - access_code:', result.data.access_code);
+        console.log('🔑 GroupSettings - code:', result.data.code);
         setGroupData(result.data);
         setEditedGroupName(result.data.name || '');
         setEditedDescription(result.data.description || '');
@@ -170,23 +172,63 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       } else {
         console.error('❌ GroupSettings - Erro ao carregar grupo:', result.error);
         Alert.alert('Erro', 'Não foi possível carregar os dados do grupo');
+        setLoading(false);
+        return; // Não continuar se o grupo não foi carregado
       }
 
-      // Carregar membros do grupo
+      // Carregar membros do grupo (só se o grupo foi carregado com sucesso)
       console.log('👥 GroupSettings - Carregando membros do grupo:', groupId);
+      
+      // Primeiro, tentar pegar membros do método getGroup (se disponível)
+      let membersFromGroup = [];
+      if (result.success && result.data && result.data.group_members) {
+        membersFromGroup = result.data.group_members;
+        console.log('📋 GroupSettings - Membros do getGroup:', membersFromGroup.length);
+      }
+      
+      // Depois, tentar pegar do método members
       const membersResult = await groupMemberService.getGroupMembers(groupId);
+      let membersFromApi = [];
       if (membersResult.success && membersResult.data) {
-        console.log('✅ GroupSettings - Membros carregados:', membersResult.data.length);
-        setMembers(membersResult.data);
+        membersFromApi = membersResult.data;
+        console.log('✅ GroupSettings - Membros carregados da API:', membersFromApi.length);
+      }
+      
+      // Usar membros da API se disponível, senão usar do getGroup
+      const finalMembers = membersFromApi.length > 0 ? membersFromApi : membersFromGroup;
+      console.log('📋 GroupSettings - Dados do grupo carregado:', JSON.stringify(result.data, null, 2));
+      console.log('👤 GroupSettings - Usuário logado ID:', user?.id);
+      console.log('👥 GroupSettings - Membros finais:', finalMembers.length, JSON.stringify(finalMembers, null, 2));
+      setMembers(finalMembers);
+      
+      if (finalMembers.length > 0) {
         
         // Verificar se o usuário logado é admin
-        const currentUserMember = membersResult.data.find(m => m.user_id === user?.id);
-        const userIsAdmin = currentUserMember?.role === 'admin';
+        // Usar result.data diretamente (dados do grupo já carregados) ao invés de groupData (state pode não estar atualizado)
+        const loadedGroupData = result.data;
+        
+        // 1. Verificar se é criador do grupo
+        const isCreator = loadedGroupData?.created_by === user?.id;
+        console.log('🔍 GroupSettings - É criador?', isCreator, 'created_by:', loadedGroupData?.created_by, 'user.id:', user?.id);
+        
+        // 2. Verificar se tem role=admin ou is_admin=true
+        const currentUserMember = finalMembers.find(m => {
+          const matchesUserId = m.user_id === user?.id;
+          const matchesId = m.id === user?.id;
+          return matchesUserId || matchesId;
+        });
+        console.log('🔍 GroupSettings - Membro atual encontrado:', JSON.stringify(currentUserMember, null, 2));
+        console.log('🔍 GroupSettings - Todos os membros:', JSON.stringify(finalMembers.map(m => ({ id: m.id, user_id: m.user_id, name: m.name, role: m.role, is_admin: m.is_admin })), null, 2));
+        const hasAdminRole = currentUserMember?.role === 'admin' || currentUserMember?.is_admin === true;
+        console.log('🔍 GroupSettings - Tem role admin?', hasAdminRole, 'role:', currentUserMember?.role, 'is_admin:', currentUserMember?.is_admin);
+        
+        const userIsAdmin = isCreator || hasAdminRole;
         setIsAdmin(userIsAdmin);
-        console.log(`👤 Usuário é admin: ${userIsAdmin}`);
+        console.log(`👤 GroupSettings - Usuário é admin: ${userIsAdmin} (criador: ${isCreator}, role admin: ${hasAdminRole})`);
         
         // Se não for admin, bloquear acesso
         if (!userIsAdmin) {
+          console.warn('⚠️ GroupSettings - Acesso negado. Usuário não é admin.');
           Alert.alert(
             'Acesso Negado',
             'Apenas administradores podem acessar as configurações do grupo.',
@@ -200,7 +242,13 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         }
       } else {
         console.warn('⚠️ GroupSettings - Erro ao carregar membros:', membersResult.error);
-        setMembers([]);
+        // Se não conseguiu carregar membros da API, mas tem membros no getGroup, usar esses
+        if (membersFromGroup.length > 0) {
+          console.log('📋 GroupSettings - Usando membros do getGroup como fallback');
+          setMembers(membersFromGroup);
+        } else {
+          setMembers([]);
+        }
       }
     } catch (error) {
       console.error('❌ GroupSettings - Erro ao carregar dados do grupo:', error);
@@ -211,21 +259,27 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   };
 
   const copyCodeToClipboard = () => {
-    if (groupData?.code) {
-      Clipboard.setString(groupData.code);
+    const code = groupData?.code || groupData?.access_code;
+    if (code && code !== 'NULL' && code !== 'null') {
+      Clipboard.setString(code);
       Alert.alert('Código Copiado!', 'O código foi copiado para a área de transferência.');
+    } else {
+      Alert.alert('Erro', 'Código não disponível');
     }
   };
 
   const shareCode = async () => {
-    if (groupData?.code) {
+    const code = groupData?.code || groupData?.access_code;
+    if (code && code !== 'NULL' && code !== 'null') {
       try {
         await Share.share({
-          message: ``,
+          message: `Código de acesso ao grupo: ${code}`,
         });
       } catch (error) {
         console.error('Erro ao compartilhar código:', error);
       }
+    } else {
+      Alert.alert('Erro', 'Código não disponível');
     }
   };
 
@@ -995,21 +1049,21 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           )}
         </View>
 
-        {/* Código do Paciente */}
-        {groupData?.code && (
+        {/* Código do Grupo para Compartilhar */}
+        {(groupData?.code || groupData?.access_code) && (
           <View style={styles.codeSection}>
             <View style={styles.codeHeader}>
               <SafeIcon name="key" size={24} color={colors.secondary} />
-              <Text style={styles.codeHeaderTitle}>Código do Paciente</Text>
+              <Text style={styles.codeHeaderTitle}>Código do Grupo</Text>
             </View>
             <Text style={styles.codeDescription}>
-              Compartilhe este código com o paciente para que ele possa acessar o aplicativo
+              Compartilhe este código com participantes que querem entrar no grupo
             </Text>
             
             <View style={styles.codeCard}>
               <View style={styles.codeDisplay}>
                 <Text style={styles.codeLabel}>Código:</Text>
-                <Text style={styles.codeText}>{groupData.code}</Text>
+                <Text style={styles.codeText}>{groupData.code || groupData.access_code || 'N/A'}</Text>
               </View>
               
               <View style={styles.codeActions}>
@@ -1034,7 +1088,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             <View style={styles.codeInfoCard}>
               <SafeIcon name="information-circle" size={20} color={colors.info} />
               <Text style={styles.codeInfoText}>
-                O paciente deve abrir o app, selecionar "Sou Paciente" e digitar este código
+                Os participantes devem usar este código para entrar no grupo através da opção "Entrar com Código"
               </Text>
             </View>
           </View>
@@ -1078,18 +1132,17 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         </View>
 
         {/* Membros do Grupo */}
-        {groupData && (
-          <View style={styles.section}>
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <SafeIcon name="people" size={24} color={colors.secondary} />
             <Text style={styles.sectionTitle}>Membros do Grupo</Text>
           </View>
-            <Text style={styles.sectionDescription}>
-              Pessoas que fazem parte deste grupo de cuidados
-            </Text>
+          <Text style={styles.sectionDescription}>
+            Pessoas que fazem parte deste grupo de cuidados
+          </Text>
 
-            {/* Lista de Membros Real */}
-            {members.length > 0 ? (
+          {/* Lista de Membros Real */}
+          {members.length > 0 ? (
               <>
                 {members.map((member) => {
                   const memberIsAdmin = member.role === 'admin';
@@ -1125,7 +1178,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                       <View style={styles.memberInfo}>
                         <View style={styles.memberHeader}>
                           <Text style={styles.memberName}>
-                            {member.user?.name || 'Membro'}
+                            {member.name || member.user?.name || 'Membro'}
                           </Text>
                           {memberIsAdmin && (
                             <View style={styles.adminBadge}>
@@ -1144,14 +1197,14 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                               </View>
                             </>
                           )}
-                          {memberIsCaregiver && !memberIsAdmin && member.user?.profile !== 'professional_caregiver' && (
+                          {memberIsCaregiver && !memberIsAdmin && member.profile !== 'professional_caregiver' && (
                             <View style={styles.caregiverBadge}>
                               <SafeIcon name="heart" size={14} color={colors.info} />
                               <Text style={styles.caregiverBadgeText}>Cuidador</Text>
                             </View>
                           )}
                         </View>
-                        {memberIsCaregiver && !memberIsAdmin && member.user?.profile === 'professional_caregiver' && (
+                        {memberIsCaregiver && !memberIsAdmin && member.profile === 'professional_caregiver' && (
                           <View style={styles.professionalCaregiverBadge}>
                             <SafeIcon name="medical" size={14} color={colors.success} />
                             <Text style={styles.professionalCaregiverBadgeText}>Cuidador profissional</Text>
@@ -1160,7 +1213,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                         <Text style={styles.memberRole}>
                           {memberIsAdmin ? 'Cuidador Principal' : 
                            memberIsPatient ? 'Pessoa Acompanhada' : 
-                           member.user?.profile === 'professional_caregiver' ? 'Cuidador profissional' :
+                           member.profile === 'professional_caregiver' ? 'Cuidador profissional' :
                            'Cuidador'}
                         </Text>
                         {member.joined_at && (
@@ -1171,11 +1224,11 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                             </Text>
                           </View>
                         )}
-                        {member.user?.email && (
+                        {(member.email || member.user?.email) && (
                           <View style={styles.memberDetail}>
                             <SafeIcon name="mail-outline" size={14} color={colors.textLight} />
                             <Text style={styles.memberDetailText}>
-                              {member.user.email}
+                              {member.email || member.user?.email}
                             </Text>
                           </View>
                         )}
@@ -1183,7 +1236,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                         {/* Botões de Ação (só visíveis para admin e não para si mesmo) */}
                         {(() => {
                           const shouldShowActions = isAdmin && member.user_id !== user?.id;
-                          console.log(`🔧 Membro: ${member.user?.name} | isAdmin: ${isAdmin} | member.user_id: ${member.user_id} | user.id: ${user?.id} | Mostrar ações: ${shouldShowActions}`);
+                          console.log(`🔧 Membro: ${member.name || member.user?.name} | isAdmin: ${isAdmin} | member.user_id: ${member.user_id} | user.id: ${user?.id} | Mostrar ações: ${shouldShowActions}`);
                           return shouldShowActions;
                         })() && (
                           <View style={styles.memberActions}>
@@ -1224,7 +1277,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                             ) : null}
                             
                             {/* Trocar Paciente (só para não-pacientes e não para cuidador profissional) */}
-                            {member.role !== 'patient' && member.user?.profile !== 'professional_caregiver' && (
+                            {member.role !== 'patient' && member.profile !== 'professional_caregiver' && (
                               <TouchableOpacity
                                 style={[styles.actionButton, styles.changePatientButton]}
                                 onPress={() => handleChangePatient(member)}
@@ -1269,7 +1322,6 @@ const GroupSettingsScreen = ({ route, navigation }) => {
               </Text>
             </View>
           </View>
-        )}
 
         {/* Sinais Vitais */}
         <View style={styles.section}>

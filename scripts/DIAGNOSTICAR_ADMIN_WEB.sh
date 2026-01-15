@@ -92,3 +92,5 @@ echo "   4. Verifique se há bloqueio de extensões do navegador"
 
 
 
+
+

@@ -125,3 +125,5 @@ echo "   3. Verificar logs em storage/logs/laravel.log se houver problemas"
 
 
 
+
+

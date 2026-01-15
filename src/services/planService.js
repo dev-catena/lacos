@@ -39,6 +39,11 @@ class PlanService {
    */
   isFeatureEnabled(plan, featureKey) {
     if (!plan || !plan.features) {
+      console.log('⚠️ PlanService.isFeatureEnabled - Plano ou features não disponíveis:', {
+        hasPlan: !!plan,
+        hasFeatures: !!(plan && plan.features),
+        featureKey
+      });
       return false;
     }
 
@@ -47,7 +52,16 @@ class PlanService {
       return true;
     }
 
-    return plan.features[featureKey] === true;
+    const enabled = plan.features[featureKey] === true;
+    console.log('🔍 PlanService.isFeatureEnabled:', {
+      featureKey,
+      enabled,
+      featureValue: plan.features[featureKey],
+      featuresType: typeof plan.features,
+      allFeatures: Object.keys(plan.features || {})
+    });
+    
+    return enabled;
   }
 }
 

@@ -140,3 +140,5 @@ A **Solução 1** (limpar cache do Expo Go) resolve o problema na maioria dos ca
 
 
 
+
+

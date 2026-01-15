@@ -120,10 +120,22 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     }
   }, [appointmentId, appointment]);
 
-  const loadSpecialties = async () => {
+  // Recarregar especialidades quando o modal é aberto se a lista estiver vazia
+  useEffect(() => {
+    if (specialtyModalVisible && specialties.length === 0) {
+      console.log('🔄 AddAppointmentScreen - Modal aberto com lista vazia, recarregando especialidades...');
+      loadSpecialties();
+    }
+  }, [specialtyModalVisible]);
+
+  const loadSpecialties = async (retryCount = 0) => {
+    const MAX_RETRIES = 2;
     try {
+      console.log(`🔄 AddAppointmentScreen - Iniciando carregamento de especialidades... (tentativa ${retryCount + 1})`);
       const response = await medicalSpecialtyService.getSpecialties();
-      if (response.success && response.data) {
+      console.log('📋 AddAppointmentScreen - Resposta recebida:', response);
+      
+      if (response && response.success && response.data && Array.isArray(response.data)) {
         // Remover duplicatas por nome (caso o backend ainda retorne)
         const uniqueSpecialties = response.data.reduce((acc, current) => {
           const existing = acc.find(item => item.name === current.name);
@@ -137,7 +149,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
         uniqueSpecialties.sort((a, b) => a.name.localeCompare(b.name));
         
         setSpecialties(uniqueSpecialties);
-        console.log(`✅ Especialidades carregadas: ${uniqueSpecialties.length} (após remover duplicatas)`);
+        console.log(`✅ AddAppointmentScreen - Especialidades carregadas: ${uniqueSpecialties.length} (após remover duplicatas)`);
         
         // Definir "Clínica Médica" como padrão se não estiver editando e tipo for "medical"
         if (!isEditing && formData.type === 'medical' && !formData.medicalSpecialtyId) {
@@ -150,12 +162,44 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           
           if (clinicaMedica) {
             updateField('medicalSpecialtyId', clinicaMedica.id);
-            console.log(`✅ Especialidade padrão definida: ${clinicaMedica.name} (ID: ${clinicaMedica.id})`);
+            console.log(`✅ AddAppointmentScreen - Especialidade padrão definida: ${clinicaMedica.name} (ID: ${clinicaMedica.id})`);
           }
+        }
+      } else {
+        console.warn('⚠️ AddAppointmentScreen - Resposta inválida ou sem dados:', response);
+        // Tentar novamente se ainda houver tentativas
+        if (retryCount < MAX_RETRIES) {
+          console.log(`🔄 AddAppointmentScreen - Tentando novamente em 1 segundo... (${retryCount + 1}/${MAX_RETRIES})`);
+          setTimeout(() => {
+            loadSpecialties(retryCount + 1);
+          }, 1000);
+        } else {
+          setSpecialties([]);
+          Toast.show({
+            type: 'error',
+            text1: 'Erro ao carregar especialidades',
+            text2: 'Verifique sua conexão e tente novamente',
+          });
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar especialidades:', error);
+      console.error('❌ AddAppointmentScreen - Erro ao carregar especialidades:', error);
+      console.error('❌ AddAppointmentScreen - Erro completo:', JSON.stringify(error, null, 2));
+      
+      // Tentar novamente se ainda houver tentativas
+      if (retryCount < MAX_RETRIES) {
+        console.log(`🔄 AddAppointmentScreen - Tentando novamente em 1 segundo após erro... (${retryCount + 1}/${MAX_RETRIES})`);
+        setTimeout(() => {
+          loadSpecialties(retryCount + 1);
+        }, 1000);
+      } else {
+        setSpecialties([]);
+        Toast.show({
+          type: 'error',
+          text1: 'Erro ao carregar especialidades',
+          text2: error.message || 'Verifique sua conexão e tente novamente',
+        });
+      }
     }
   };
 
@@ -1171,7 +1215,17 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   <Text style={styles.label}>Especialidade Médica</Text>
                   <TouchableOpacity
                     style={styles.inputWrapper}
-                    onPress={() => setSpecialtyModalVisible(true)}
+                    onPress={() => {
+                      console.log('🔘 AddAppointmentScreen - Botão de especialidade pressionado');
+                      console.log('📋 AddAppointmentScreen - Especialidades disponíveis:', specialties.length);
+                      if (specialties.length === 0) {
+                        console.log('⚠️ AddAppointmentScreen - Nenhuma especialidade carregada, recarregando...');
+                        loadSpecialties();
+                      }
+                      setSpecialtyModalVisible(true);
+                      console.log('✅ AddAppointmentScreen - Modal de especialidades aberto');
+                    }}
+                    activeOpacity={0.7}
                   >
                     <MedicalOutlineIcon size={20} color={colors.gray400} />
                     <Text style={[
@@ -1656,48 +1710,76 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           visible={specialtyModalVisible}
           animationType="slide"
           transparent={true}
-          onRequestClose={() => setSpecialtyModalVisible(false)}
+          onRequestClose={() => {
+            console.log('🔘 AddAppointmentScreen - Modal fechado via onRequestClose');
+            setSpecialtyModalVisible(false);
+          }}
+          onShow={() => {
+            console.log('✅ AddAppointmentScreen - Modal de especialidades exibido');
+            console.log('📋 AddAppointmentScreen - Especialidades no modal:', specialties.length);
+          }}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Selecione a Especialidade</Text>
                 <TouchableOpacity
-                  onPress={() => setSpecialtyModalVisible(false)}
+                  onPress={() => {
+                    console.log('🔘 AddAppointmentScreen - Botão fechar modal pressionado');
+                    setSpecialtyModalVisible(false);
+                  }}
                   style={styles.modalCloseButton}
+                  activeOpacity={0.7}
                 >
                   <CloseIcon size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
-              <FlatList
-                data={specialties}
-                keyExtractor={(item) => item.id.toString()}
-                style={styles.flatList}
-                contentContainerStyle={styles.flatListContent}
-                renderItem={({ item }) => (
+              {specialties.length === 0 ? (
+                <View style={styles.modalEmptyContainer}>
+                  <Text style={styles.modalEmptyText}>Carregando especialidades...</Text>
                   <TouchableOpacity
-                    style={[
-                      styles.specialtyItem,
-                      formData.medicalSpecialtyId === item.id && styles.specialtyItemSelected
-                    ]}
                     onPress={() => {
-                      updateField('medicalSpecialtyId', item.id);
-                      setSpecialtyModalVisible(false);
+                      console.log('🔄 AddAppointmentScreen - Recarregando especialidades do modal');
+                      loadSpecialties();
                     }}
+                    style={styles.modalRetryButton}
                   >
-                    <Text style={[
-                      styles.specialtyItemText,
-                      formData.medicalSpecialtyId === item.id && styles.specialtyItemTextSelected
-                    ]}>
-                      {item.name}
-                    </Text>
-                    {formData.medicalSpecialtyId === item.id && (
-                      <CheckmarkIcon size={24} color={colors.primary} />
-                    )}
+                    <Text style={styles.modalRetryButtonText}>Tentar novamente</Text>
                   </TouchableOpacity>
-                )}
-                ItemSeparatorComponent={() => <View style={styles.separator} />}
-              />
+                </View>
+              ) : (
+                <FlatList
+                  data={specialties}
+                  keyExtractor={(item) => item.id.toString()}
+                  style={styles.flatList}
+                  contentContainerStyle={styles.flatListContent}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.specialtyItem,
+                        formData.medicalSpecialtyId === item.id && styles.specialtyItemSelected
+                      ]}
+                      onPress={() => {
+                        console.log('🔘 AddAppointmentScreen - Especialidade selecionada:', item.name, item.id);
+                        updateField('medicalSpecialtyId', item.id);
+                        setSpecialtyModalVisible(false);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[
+                        styles.specialtyItemText,
+                        formData.medicalSpecialtyId === item.id && styles.specialtyItemTextSelected
+                      ]}>
+                        {item.name}
+                      </Text>
+                      {formData.medicalSpecialtyId === item.id && (
+                        <CheckmarkIcon size={24} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  ItemSeparatorComponent={() => <View style={styles.separator} />}
+                />
+              )}
             </View>
           </View>
         </Modal>
@@ -2457,6 +2539,28 @@ const styles = StyleSheet.create({
   separator: {
     height: 1,
     backgroundColor: colors.gray100,
+  },
+  modalEmptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalEmptyText: {
+    fontSize: 16,
+    color: colors.textLight,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalRetryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  modalRetryButtonText: {
+    color: colors.textWhite,
+    fontSize: 16,
+    fontWeight: '600',
   },
   // Estilos para Switch de Teleconsulta
   switchContainer: {

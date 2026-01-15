@@ -28,9 +28,13 @@ class AlertController extends Controller
                 ], 403);
             }
 
-            // Buscar paciente do grupo
-            $patient = $group->members()
-                ->wherePivot('role', 'patient')
+            // Buscar paciente do grupo usando query direta na tabela group_members
+            $patient = \Illuminate\Support\Facades\DB::table('group_members')
+                ->join('users', 'group_members.user_id', '=', 'users.id')
+                ->where('group_members.group_id', $groupId)
+                ->where('group_members.role', 'patient')
+                ->where('users.is_active', 1)
+                ->select('users.id', 'users.name')
                 ->first();
 
             if (!$patient) {

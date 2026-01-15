@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { LacosIcon, LacosLogoFull } from '../../components/LacosLogo';
 import groupService from '../../services/groupService';
 import activityService from '../../services/activityService';
+import planService from '../../services/planService';
 import moment from 'moment';
 import {
   MedicationIcon,
@@ -44,6 +45,7 @@ const HomeScreen = ({ navigation }) => {
   const [selectedTab, setSelectedTab] = useState('myGroups');
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [userPlan, setUserPlan] = useState(null);
 
   // Verificar autenticação
   useEffect(() => {
@@ -53,15 +55,49 @@ const HomeScreen = ({ navigation }) => {
     }
   }, [signed, user]);
 
+  // Carregar plano do usuário - PRIMEIRO, antes de tudo
+  useEffect(() => {
+    if (signed && user) {
+      console.log('🚀 HomeScreen - Carregando plano imediatamente...');
+      loadUserPlan();
+    }
+  }, [signed, user]);
+
   // Carregar grupos e atividades quando a tela recebe foco
   useFocusEffect(
     React.useCallback(() => {
       if (signed && user) {
+        // Garantir que o plano seja carregado primeiro
+        if (!userPlan) {
+          console.log('🔄 HomeScreen - Plano não carregado ainda, recarregando...');
+          loadUserPlan();
+        }
         loadGroups();
         loadActivities(); // Carregar atividades independentemente dos grupos
       }
-    }, [signed, user])
+    }, [signed, user, userPlan])
   );
+
+  const loadUserPlan = async () => {
+    try {
+      console.log('📦 HomeScreen - Carregando plano do usuário...');
+      const result = await planService.getUserPlan();
+      
+      if (result.success && result.plan) {
+        console.log('✅ HomeScreen - Plano carregado:', result.plan.name);
+        console.log('📋 HomeScreen - Features do plano:', JSON.stringify(result.plan.features, null, 2));
+        console.log('🔍 HomeScreen - buscarCuidadores:', result.plan.features?.buscarCuidadores);
+        setUserPlan(result.plan);
+      } else {
+        console.warn('⚠️ HomeScreen - Plano não encontrado ou erro ao carregar');
+        console.warn('⚠️ HomeScreen - Result:', result);
+        setUserPlan(null);
+      }
+    } catch (error) {
+      console.error('❌ HomeScreen - Erro ao carregar plano:', error);
+      setUserPlan(null);
+    }
+  };
 
   const loadGroups = async () => {
     console.log('🔄 HomeScreen - Carregando grupos...');
@@ -285,6 +321,55 @@ const HomeScreen = ({ navigation }) => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Buscar Cuidadores - Apenas para cuidadores/amigos (NÃO para cuidador profissional) e se a feature estiver habilitada no plano */}
+        {/* Movido para o topo para aparecer antes dos grupos */}
+        {(() => {
+          const isCaregiver = user?.profile === 'caregiver' && user?.profile !== 'professional_caregiver';
+          
+          // Se o plano ainda não foi carregado, não mostrar (evita flash)
+          if (!userPlan) {
+            console.log('⏳ HomeScreen - Plano ainda não carregado, aguardando...');
+            return false;
+          }
+          
+          const featureEnabled = planService.isFeatureEnabled(userPlan, 'buscarCuidadores');
+          
+          // Log de debug apenas quando for cuidador
+          if (isCaregiver) {
+            console.log('🔍 HomeScreen - Verificação buscarCuidadores (TOP):', {
+              isCaregiver,
+              featureEnabled,
+              userProfile: user?.profile,
+              userPlanName: userPlan?.name,
+              features: userPlan?.features,
+              buscarCuidadores: userPlan?.features?.buscarCuidadores,
+              featuresType: typeof userPlan?.features,
+            });
+          }
+          
+          return isCaregiver && featureEnabled;
+        })() && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Buscar Cuidadores</Text>
+            <TouchableOpacity
+              style={styles.caregiverSearchCard}
+              onPress={() => navigation.navigate('CaregiversList')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.caregiverSearchIcon}>
+                <PeopleIcon size={32} color="#2D5016" />
+              </View>
+              <View style={styles.caregiverSearchContent}>
+                <Text style={styles.caregiverSearchTitle}>Encontrar Cuidador Profissional</Text>
+                <Text style={styles.caregiverSearchDescription}>
+                  Busque por avaliações, proximidade e disponibilidade
+                </Text>
+              </View>
+              <ChevronForwardIcon size={24} color="#2D5016" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Tabs de Grupos */}
         <View style={styles.tabsContainer}>
           <TouchableOpacity 
@@ -406,29 +491,6 @@ const HomeScreen = ({ navigation }) => {
             )
           )}
         </View>
-
-        {/* Buscar Cuidadores - Apenas para cuidadores/amigos (NÃO para cuidador profissional) */}
-        {user?.profile === 'caregiver' && user?.profile !== 'professional_caregiver' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Buscar Cuidadores</Text>
-            <TouchableOpacity
-              style={styles.caregiverSearchCard}
-              onPress={() => navigation.navigate('CaregiversList')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.caregiverSearchIcon}>
-                <PeopleIcon size={32} color="#2D5016" />
-              </View>
-              <View style={styles.caregiverSearchContent}>
-                <Text style={styles.caregiverSearchTitle}>Encontrar Cuidador Profissional</Text>
-                <Text style={styles.caregiverSearchDescription}>
-                  Busque por avaliações, proximidade e disponibilidade
-                </Text>
-              </View>
-              <ChevronForwardIcon size={24} color="#2D5016" />
-            </TouchableOpacity>
-          </View>
-        )}
 
         {/* Últimas Atualizações */}
         {(() => {

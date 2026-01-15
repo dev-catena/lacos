@@ -84,3 +84,5 @@ No web, os ícones do `@expo/vector-icons` dependem de fontes que podem não car
 
 
 
+
+

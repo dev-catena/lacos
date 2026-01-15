@@ -52,11 +52,13 @@ const DoctorsManagement = () => {
     try {
       setLoadingSpecialties(true);
       const { API_BASE_URL } = require('../config/api');
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/medical-specialties`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
         },
       });
 
@@ -180,13 +182,23 @@ const DoctorsManagement = () => {
   };
 
   const handleEdit = (doctor) => {
+    console.log('🔍 DoctorsManagement - Editando médico:', doctor);
     setEditingDoctor(doctor);
+    
+    // Extrair CPF e especialidade corretamente (pode vir de diferentes lugares)
+    const cpf = doctor.cpf || doctor.user?.cpf || '';
+    const specialtyId = doctor.specialty?.id || doctor.medical_specialty_id || doctor.user?.medical_specialty_id || '';
+    
+    console.log('🔍 DoctorsManagement - CPF extraído:', cpf);
+    console.log('🔍 DoctorsManagement - Especialidade ID extraído:', specialtyId);
+    console.log('🔍 DoctorsManagement - Especialidade objeto:', doctor.specialty);
+    
     setEditFormData({
       name: doctor.name || '',
       email: doctor.email || '',
-      cpf: doctor.cpf || '',
+      cpf: cpf,
       crm: doctor.crm || '',
-      medical_specialty_id: doctor.specialty?.id || '',
+      medical_specialty_id: specialtyId,
     });
     setEditModalVisible(true);
   };

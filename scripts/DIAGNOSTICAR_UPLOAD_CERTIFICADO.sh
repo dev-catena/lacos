@@ -39,3 +39,5 @@ echo "✅ Diagnóstico concluído!"
 
 
 
+
+

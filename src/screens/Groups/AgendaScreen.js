@@ -26,9 +26,11 @@ import {
   ArrowBackIcon,
 } from '../../components/CustomIcons';
 import appointmentService from '../../services/appointmentService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const AgendaScreen = ({ route, navigation }) => {
   let { groupId, groupName } = route.params || {};
+  const { user } = useAuth();
   
   // TEMPORÁRIO: Se groupId é um timestamp, usar o grupo de teste
   if (groupId && groupId > 999999999999) {
@@ -284,24 +286,69 @@ const AgendaScreen = ({ route, navigation }) => {
             )}
           </View>
 
-          {/* Banner de Pagamento para Teleconsultas */}
-          {item.is_teleconsultation && (
-            <TouchableOpacity
-              style={styles.paymentBanner}
+          {/* Banner de Pagamento para Teleconsultas - Só para cuidadores/amigos */}
+          {(() => {
+            const isTeleconsultation = item.is_teleconsultation;
+            const hasUser = !!user;
+            const isCaregiver = user && (
+              user.profile === 'caregiver' || 
+              user.profile === 'professional_caregiver' || 
+              user.role === 'caregiver' ||
+              user.profile === 'accompanied' // Fallback: acompanhado também pode pagar
+            );
+            const paymentPending = !item.payment_status || item.payment_status === 'pending' || item.payment_status === null;
+            
+            const shouldShowBanner = isTeleconsultation && hasUser && isCaregiver && paymentPending;
+            
+            // Debug log
+            if (isTeleconsultation) {
+              console.log('💳 AgendaScreen - Verificando banner de pagamento:', {
+                appointmentId: item.id,
+                isTeleconsultation,
+                hasUser,
+                userProfile: user?.profile,
+                userRole: user?.role,
+                isCaregiver,
+                payment_status: item.payment_status,
+                paymentPending,
+                shouldShowBanner,
+              });
+            }
+            
+            return shouldShowBanner ? (
+              <TouchableOpacity
+                style={styles.paymentBanner}
               onPress={(e) => {
                 e.stopPropagation();
-                navigation.navigate('PaymentScreen', {
+                console.log('💳 AgendaScreen - Navegando para PaymentScreen:', {
                   appointmentId: item.id,
-                  appointment: item,
                   groupId,
                 });
+                // Verificar se já foi pago - se sim, mostrar status
+                if (item.payment_status === 'paid_held' || item.payment_status === 'released') {
+                  navigation.navigate('PaymentStatus', {
+                    appointmentId: item.id,
+                    appointment: item,
+                  });
+                } else {
+                  navigation.navigate('PaymentScreen', {
+                    appointmentId: item.id,
+                    appointment: item,
+                    groupId,
+                  });
+                }
               }}
-            >
-              <Ionicons name="card-outline" size={16} color={colors.warning} />
-              <Text style={styles.paymentBannerText}>Aguarda pagamento. Clique aqui para pagar</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.warning} />
-            </TouchableOpacity>
-          )}
+              >
+                <Ionicons name="card-outline" size={16} color={colors.warning} />
+                <Text style={styles.paymentBannerText}>
+                  {item.doctorUser?.consultation_price || item.doctor?.consultation_price 
+                    ? `Aguarda pagamento (R$ ${(parseFloat(item.doctorUser?.consultation_price || item.doctor?.consultation_price || 0) * 1.2).toFixed(2).replace('.', ',')}). Clique para pagar`
+                    : 'Aguarda pagamento. Clique aqui para pagar'}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.warning} />
+              </TouchableOpacity>
+            ) : null;
+          })()}
 
           {/* Exibir médico para consultas médicas ou teleconsultas */}
           {(isMedical || item.is_teleconsultation) && (

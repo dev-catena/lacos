@@ -225,6 +225,7 @@ class PlanController extends Controller
                 'plan_id' => $plan->id ?? null,
                 'plan_name' => $plan->name ?? null,
                 'features' => $plan->features ?? null,
+                'buscarCuidadores' => $plan->features['buscarCuidadores'] ?? null,
                 'sensorQuedas' => $plan->features['sensorQuedas'] ?? null,
             ]);
 

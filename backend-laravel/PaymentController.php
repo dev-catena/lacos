@@ -214,35 +214,26 @@ class PaymentController extends Controller
 
             // Verificar status
             if ($paymentIntent->status === 'succeeded') {
-                // Atualizar appointment como pago
+                // Atualizar appointment como pago usando o serviço
                 $appointment = Appointment::findOrFail($paymentIntent->metadata->appointment_id);
                 
-                // Tentar atualizar campos de pagamento
-                // Nota: Se as colunas payment_status, payment_intent_id ou paid_at não existirem,
-                // você precisará criar uma migration para adicioná-las
-                // Por enquanto, vamos tentar atualizar e ignorar erros se as colunas não existirem
-                try {
-                    $updateData = [
-                        'payment_intent_id' => $paymentIntent->id,
-                        'paid_at' => now(),
-                    ];
-                    
-                    // Tentar atualizar (pode falhar se as colunas não existirem)
-                    $appointment->update($updateData);
-                } catch (\Exception $e) {
-                    // Se falhar, apenas logar - não é crítico para o pagamento
-                    Log::warning('Não foi possível atualizar campos de pagamento no appointment', [
-                        'appointment_id' => $appointment->id,
-                        'error' => $e->getMessage(),
-                        'note' => 'Considere criar uma migration para adicionar payment_intent_id e paid_at à tabela appointments',
-                    ]);
-                }
+                $paymentService = new \App\Services\AppointmentPaymentService();
+                $amount = $paymentIntent->amount / 100; // Converter de centavos para reais
+                $result = $paymentService->processPayment($appointment, $amount, [
+                    'payment_intent_id' => $paymentIntent->id,
+                ]);
+                
+                // Atualizar payment_id com o payment_intent_id do Stripe
+                $appointment->update([
+                    'payment_id' => $paymentIntent->id,
+                ]);
 
                 Log::info('Pagamento confirmado com sucesso', [
                     'payment_intent_id' => $paymentIntent->id,
                     'appointment_id' => $appointment->id,
                     'user_id' => $user->id,
-                    'amount' => $paymentIntent->amount,
+                    'amount' => $amount,
+                    'is_mock' => $result['is_mock'] ?? false,
                 ]);
 
                 return response()->json([

@@ -17,7 +17,7 @@ try {
 }
 
 // IP correto
-const EXPO_IP = '10.102.0.149';
+const EXPO_IP = '10.102.0.103';
 const EXPO_PORT = '8081';
 
 // Configurar TODAS as variáveis de ambiente ANTES de iniciar

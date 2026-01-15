@@ -4,7 +4,7 @@
 const { spawn } = require('child_process');
 const { Transform } = require('stream');
 
-const EXPO_IP = '10.102.0.149';
+const EXPO_IP = '10.102.0.103';
 const EXPO_PORT = '8081';
 const EXPO_URL = `exp://${EXPO_IP}:${EXPO_PORT}`;
 

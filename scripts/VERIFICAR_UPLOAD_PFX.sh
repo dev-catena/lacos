@@ -109,3 +109,5 @@ echo "✅ Verificação concluída!"
 
 
 
+
+

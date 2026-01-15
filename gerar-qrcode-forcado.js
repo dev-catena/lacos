@@ -3,7 +3,7 @@
 // Script para gerar QR code FORÇADO com URL correta
 // Pode ser executado enquanto o Expo está rodando
 
-const EXPO_IP = process.env.EXPO_IP || '10.102.0.149';
+const EXPO_IP = process.env.EXPO_IP || '10.102.0.103';
 const EXPO_PORT = process.env.EXPO_PORT || '8081';
 const EXPO_URL = `exp://${EXPO_IP}:${EXPO_PORT}`;
 

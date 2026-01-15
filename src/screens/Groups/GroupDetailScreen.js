@@ -237,9 +237,9 @@ const GroupDetailScreen = ({ route, navigation }) => {
       return true; // Mostrar todos enquanto carrega o plano
     }
     
-    // Configurações só aparece se for admin E a feature estiver habilitada
+    // Configurações só aparece se for admin (sempre habilitada para admins)
     if (item.id === 'settings') {
-      return isAdmin && planService.isFeatureEnabled(userPlan, item.featureKey);
+      return isAdmin; // Sempre mostrar para admins, independente do plano
     }
     
     // Outros itens aparecem se a feature estiver habilitada no plano

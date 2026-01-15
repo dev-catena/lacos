@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-// Script para gerar QR code com URL correta (exp://10.102.0.149:8081)
+// Script para gerar QR code com URL correta (exp://10.102.0.103:8081)
 // Pode ser executado em paralelo enquanto o Expo está rodando
 
-const EXPO_IP = '10.102.0.149';
+const EXPO_IP = '10.102.0.103';
 const EXPO_PORT = '8081';
 const EXPO_URL = `exp://${EXPO_IP}:${EXPO_PORT}`;
 

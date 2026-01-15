@@ -79,6 +79,7 @@ import MediaScreen from '../screens/Media/MediaScreen';
 
 // Importa telas de Pagamento
 import PaymentScreen from '../screens/Payment/PaymentScreen';
+import PaymentStatusScreen from '../screens/Payment/PaymentStatusScreen';
 
 // Importa telas da Loja
 import StoreScreen from '../screens/Store/StoreScreen';
@@ -197,6 +198,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="PaymentScreen" 
         component={PaymentScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PaymentStatus" 
+        component={PaymentStatusScreen}
         options={{ 
           headerShown: false 
         }}
@@ -499,6 +507,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="PaymentScreen" 
         component={PaymentScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PaymentStatus" 
+        component={PaymentStatusScreen}
         options={{ 
           headerShown: false 
         }}

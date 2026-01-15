@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Image,
   ImageBackground,
+  Vibration,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -58,6 +59,7 @@ const PatientHomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [media, setMedia] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -83,6 +85,31 @@ const PatientHomeScreen = ({ navigation }) => {
       };
     }, [groupId])
   );
+
+  // Efeito para vibrar quando houver alertas de medicamento
+  useEffect(() => {
+    const medicationAlerts = alerts.filter(alert => alert.type === 'medication');
+    
+    if (medicationAlerts.length > 0) {
+      // Vibração três vezes: vibrar 400ms, pausa 200ms, vibrar 400ms, pausa 200ms, vibrar 400ms
+      const vibrationPattern = [0, 400, 200, 400, 200, 400];
+      
+      // Verificar se Vibration está disponível
+      if (Vibration && Vibration.vibrate) {
+        Vibration.vibrate(vibrationPattern);
+        console.log('📳 Vibração acionada para alerta de medicamento');
+      } else {
+        // Fallback para versões antigas do React Native
+        try {
+          Vibration.vibrate(400);
+          setTimeout(() => Vibration.vibrate(400), 600);
+          setTimeout(() => Vibration.vibrate(400), 1200);
+        } catch (error) {
+          console.warn('⚠️ Vibração não disponível:', error);
+        }
+      }
+    }
+  }, [alerts]);
 
   // Efeito para escutar eventos WebSocket quando groupId mudar
   useEffect(() => {
@@ -253,12 +280,25 @@ const PatientHomeScreen = ({ navigation }) => {
         nextWeek.toISOString().split('T')[0]
       );
       
+      console.log('📅 PatientHomeScreen - Appointments result:', {
+        success: appointmentsResult.success,
+        dataLength: appointmentsResult.data ? (Array.isArray(appointmentsResult.data) ? appointmentsResult.data.length : 'not array') : 'null',
+        error: appointmentsResult.error
+      });
+      
       // Buscar medications
       const medicationsResult = await medicationService.getMedications(currentGroupId);
+      
+      console.log('💊 PatientHomeScreen - Medications result:', {
+        success: medicationsResult.success,
+        dataLength: medicationsResult.data ? (Array.isArray(medicationsResult.data) ? medicationsResult.data.length : 'not array') : 'null',
+        error: medicationsResult.error
+      });
       
       const upcomingEvents = [];
       
       // Processar appointments
+      const appointmentsList = [];
       if (appointmentsResult.success && appointmentsResult.data) {
         const appointments = Array.isArray(appointmentsResult.data) ? appointmentsResult.data : [];
         appointments.forEach(appointment => {
@@ -268,7 +308,7 @@ const PatientHomeScreen = ({ navigation }) => {
           const minutes = appointmentDate.getMinutes().toString().padStart(2, '0');
           const dateLabel = isToday(appointmentDate) ? 'Hoje' : isTomorrow(appointmentDate) ? 'Amanhã' : formatDate(appointmentDate);
           
-          upcomingEvents.push({
+          const appointmentEvent = {
             id: `appointment-${appointment.id}`,
             type: 'appointment',
             title: appointment.title || 'Consulta',
@@ -279,9 +319,16 @@ const PatientHomeScreen = ({ navigation }) => {
             color: appointment.is_teleconsultation ? colors.primary : colors.warning,
             appointmentTime: appointmentDate.toISOString(),
             data: appointment,
-          });
+            is_teleconsultation: appointment.is_teleconsultation || false,
+          };
+          
+          appointmentsList.push(appointmentEvent);
+          upcomingEvents.push(appointmentEvent);
         });
       }
+      
+      // Salvar appointments separadamente
+      setAppointments(appointmentsList);
       
       // Processar medications (próximas doses)
       if (medicationsResult.success && medicationsResult.data) {
@@ -313,6 +360,7 @@ const PatientHomeScreen = ({ navigation }) => {
       });
       
       console.log(`✅ PatientHomeScreen - ${upcomingEvents.length} evento(s) próximo(s) carregado(s)`);
+      console.log('📋 PatientHomeScreen - Eventos:', upcomingEvents.map(e => ({ type: e.type, title: e.title, date: e.date, time: e.time })));
       setNotifications(upcomingEvents);
     } catch (error) {
       console.error('❌ PatientHomeScreen - Erro ao carregar eventos:', error);
@@ -385,12 +433,21 @@ const PatientHomeScreen = ({ navigation }) => {
       console.log('📥 PatientHomeScreen - Carregando mídias do grupo:', currentGroupId);
       const mediaResult = await mediaService.getGroupMedia(currentGroupId);
       
+      console.log('📥 PatientHomeScreen - Media result:', {
+        success: mediaResult.success,
+        dataLength: mediaResult.data ? (Array.isArray(mediaResult.data) ? mediaResult.data.length : 'not array') : 'null',
+        error: mediaResult.error
+      });
+      
       if (mediaResult.success && mediaResult.data) {
-        console.log(`✅ PatientHomeScreen - ${mediaResult.data.length} mídia(s) carregada(s)`);
-        console.log('📋 PatientHomeScreen - IDs das mídias:', mediaResult.data.map(m => ({ id: m.id, media_id: m.media_id })));
-        setMedia(mediaResult.data);
+        const mediaArray = Array.isArray(mediaResult.data) ? mediaResult.data : [];
+        console.log(`✅ PatientHomeScreen - ${mediaArray.length} mídia(s) carregada(s)`);
+        if (mediaArray.length > 0) {
+          console.log('📋 PatientHomeScreen - IDs das mídias:', mediaArray.map(m => ({ id: m.id, media_id: m.media_id, type: m.type })));
+        }
+        setMedia(mediaArray);
       } else {
-        console.log('⚠️ PatientHomeScreen - Nenhuma mídia encontrada');
+        console.log('⚠️ PatientHomeScreen - Nenhuma mídia encontrada ou erro:', mediaResult.error);
         setMedia([]);
       }
     } catch (error) {
@@ -760,7 +817,63 @@ const PatientHomeScreen = ({ navigation }) => {
     }
   };
 
+  const handleStartVideoCall = async (appointment) => {
+    try {
+      const appointmentData = appointment.data || appointment;
+      const appointmentDate = new Date(appointmentData.appointment_date || appointmentData.scheduled_at || appointment.appointmentTime);
+      const now = new Date();
+      const minutesUntilAppointment = (appointmentDate - now) / (1000 * 60);
+      
+      // Permitir entrada 15 minutos antes da consulta
+      if (minutesUntilAppointment <= 15 && minutesUntilAppointment >= -60) {
+        // Dentro do período permitido (15 min antes até 1 hora depois)
+        navigation.navigate('PatientVideoCall', {
+          appointment: appointmentData,
+          doctorInfo: appointmentData.doctorUser || appointmentData.doctor || {
+            name: appointmentData.doctor_name || 'Médico',
+          },
+        });
+      } else if (minutesUntilAppointment > 15) {
+        // Ainda não é hora (mais de 15 minutos antes)
+        const minutes = Math.ceil(minutesUntilAppointment - 15);
+        Alert.alert(
+          'Aguarde',
+          `Você poderá entrar na videochamada em ${minutes} minuto(s).\n\nA entrada é permitida 15 minutos antes do horário da consulta.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        // Consulta já passou (mais de 1 hora depois)
+        Alert.alert(
+          'Consulta Encerrada',
+          'O horário para entrar nesta consulta já passou.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Erro ao iniciar videoconferência:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro',
+        text2: 'Não foi possível iniciar a videoconferência',
+      });
+    }
+  };
 
+  const handleStartRecording = (appointment) => {
+    try {
+      const appointmentData = appointment.data || appointment;
+      navigation.navigate('RecordingScreen', {
+        appointment: appointmentData,
+      });
+    } catch (error) {
+      console.error('Erro ao iniciar gravação:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro',
+        text2: 'Não foi possível iniciar a gravação',
+      });
+    }
+  };
 
   // Loading state
   if (loading) {
@@ -880,16 +993,96 @@ const PatientHomeScreen = ({ navigation }) => {
         </View>
 
         {/* Media Carousel */}
-        <MediaCarousel 
-          media={media}
-          onMediaPress={handleMediaPress}
-        />
+        {media && media.length > 0 ? (
+          <MediaCarousel 
+            media={media}
+            onMediaPress={handleMediaPress}
+          />
+        ) : (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Mídias</Text>
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>Nenhuma mídia disponível</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Agendas - Consultas e Teleconsultas */}
+        {appointments && appointments.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Agendas</Text>
+            
+            {appointments.map((appointment) => {
+              const appointmentDate = new Date(appointment.appointmentTime || appointment.data?.appointment_date || appointment.data?.scheduled_at);
+              const now = new Date();
+              const minutesUntilAppointment = (appointmentDate - now) / (1000 * 60);
+              const canStartVideoCall = minutesUntilAppointment <= 15 && minutesUntilAppointment >= -60;
+              
+              // Verificar is_teleconsultation em múltiplos lugares
+              const isTeleconsultation = appointment.is_teleconsultation || appointment.data?.is_teleconsultation || appointment.data?.isTeleconsultation || false;
+              
+              return (
+                <View key={appointment.id} style={styles.appointmentCard}>
+                  <View style={styles.appointmentHeader}>
+                    <View style={[styles.appointmentIcon, { backgroundColor: appointment.color + '20' }]}>
+                      {isTeleconsultation ? (
+                        <VideoCamIcon size={24} color={appointment.color} />
+                      ) : (
+                        <CalendarIcon size={24} color={appointment.color} />
+                      )}
+                    </View>
+                    <View style={styles.appointmentInfo}>
+                      <Text style={styles.appointmentTitle}>{appointment.title}</Text>
+                      <Text style={styles.appointmentDescription}>{appointment.description}</Text>
+                      <View style={styles.appointmentTimeRow}>
+                        <TimeOutlineIcon size={14} color={colors.textLight} />
+                        <Text style={styles.appointmentTimeText}>
+                          {appointment.date} - {appointment.time}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.appointmentActions}>
+                    {isTeleconsultation ? (
+                      <TouchableOpacity
+                        style={[
+                          styles.actionButton,
+                          styles.videoCallButton,
+                          !canStartVideoCall && styles.actionButtonDisabled
+                        ]}
+                        onPress={() => handleStartVideoCall(appointment)}
+                        disabled={!canStartVideoCall}
+                        activeOpacity={0.7}
+                      >
+                        <VideoCamIcon size={20} color="#FFFFFF" />
+                        <Text style={styles.actionButtonText}>
+                          {canStartVideoCall ? 'Entrar na Videoconferência' : 'Aguarde o horário'}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.recordingButton]}
+                        onPress={() => handleStartRecording(appointment)}
+                        activeOpacity={0.7}
+                      >
+                        <MicIcon size={20} color="#FFFFFF" />
+                        <Text style={styles.actionButtonText}>Gravar Áudio com Médico</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* Notifications */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Próximos Eventos</Text>
           
-          {notifications.map((notification) => {
+          {notifications && notifications.length > 0 ? (
+            notifications.map((notification) => {
             // Verificar se deve mostrar o microfone
             // REGRA: Só mostra microfone para consultas do tipo 'medical'
             let showMicrophone = false;
@@ -943,7 +1136,12 @@ const PatientHomeScreen = ({ navigation }) => {
                 )}
               </TouchableOpacity>
             );
-          })}
+            })
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>Nenhum evento próximo</Text>
+            </View>
+          )}
         </View>
 
       </ScrollView>
@@ -1160,6 +1358,95 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: colors.text,
+  },
+  appointmentCard: {
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  appointmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  appointmentIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  appointmentInfo: {
+    flex: 1,
+  },
+  appointmentTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  appointmentDescription: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 6,
+  },
+  appointmentTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  appointmentTimeText: {
+    fontSize: 13,
+    color: colors.textLight,
+  },
+  appointmentActions: {
+    marginTop: 8,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  videoCallButton: {
+    backgroundColor: colors.primary,
+  },
+  recordingButton: {
+    backgroundColor: colors.secondary,
+  },
+  actionButtonDisabled: {
+    backgroundColor: colors.gray400,
+    opacity: 0.6,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  emptyState: {
+    backgroundColor: colors.backgroundLight,
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: colors.textLight,
+    textAlign: 'center',
   },
 });
 

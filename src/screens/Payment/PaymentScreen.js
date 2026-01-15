@@ -628,6 +628,14 @@ const PaymentScreen = ({ route, navigation }) => {
     <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
+      {/* Tarja de Mockup */}
+      <View style={styles.mockupBanner}>
+        <Ionicons name="warning" size={16} color={colors.warning} />
+        <Text style={styles.mockupBannerText}>
+          MOCKUP - Sistema de pagamento em modo de teste
+        </Text>
+      </View>
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -1126,6 +1134,23 @@ const styles = StyleSheet.create({
   securityText: {
     fontSize: 12,
     color: colors.textLight,
+  },
+  mockupBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.warning + '20',
+    borderBottomWidth: 2,
+    borderBottomColor: colors.warning,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  mockupBannerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.warning,
+    textTransform: 'uppercase',
   },
 });
 
