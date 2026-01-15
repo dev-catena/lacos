@@ -17,25 +17,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  ArrowBackIcon,
-  LocationIcon,
-  CallIcon,
-  MailIcon,
-  PeopleIcon,
-  PersonIcon,
-  AddIcon,
-  FolderIcon,
-  CloseIcon,
-  AlertIcon,
-  StarIcon,
-  ReceiptIcon,
-  CalendarIcon,
-  DocumentIcon,
-  MaleIcon,
-  FemaleIcon,
-  ChevronForwardIcon,
-} from '../../components/CustomIcons';
+import SafeIcon from '../../components/SafeIcon';
+// Removidos imports de ícones SVG customizados - usando Ionicons diretamente para compatibilidade Android
 import colors from '../../constants/colors';
 import Toast from 'react-native-toast-message';
 import apiService from '../../services/apiService';
@@ -274,15 +257,15 @@ const ClientDetailsScreen = ({ route, navigation }) => {
   const getDocumentIconComponent = (type) => {
     // Usar Ionicons diretamente para garantir que os ícones apareçam
     const iconMap = {
-      prescription: 'receipt-outline',
-      medical_leave: 'calendar-outline',
-      medical_certificate: 'calendar-outline',
-      report: 'document-text-outline',
-      exam_lab: 'flask-outline',
-      exam_image: 'image-outline',
-      other: 'document-outline',
+      prescription: 'receipt',
+      medical_leave: 'calendar',
+      medical_certificate: 'calendar',
+      report: 'document-text',
+      exam_lab: 'flask',
+      exam_image: 'image',
+      other: 'document',
     };
-    return iconMap[type] || 'document-outline';
+    return iconMap[type] || 'document';
   };
 
   const getDocumentColor = (type) => {
@@ -385,20 +368,20 @@ const ClientDetailsScreen = ({ route, navigation }) => {
 
     for (let i = 0; i < fullStars; i++) {
       stars.push(
-        <StarIcon key={i} size={20} color={colors.warning} filled={true} />
+        <Ionicons key={i} name="star" size={20} color={colors.warning} />
       );
     }
 
     if (hasHalfStar) {
       stars.push(
-        <StarIcon key="half" size={20} color={colors.warning} filled={true} />
+        <Ionicons key="half" name="star-half" size={20} color={colors.warning} />
       );
     }
 
     const emptyStars = 5 - Math.ceil(rating);
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
-        <StarIcon key={`empty-${i}`} size={20} color={colors.gray400} filled={false} />
+        <Ionicons key={`empty-${i}`} name="star-outline" size={20} color={colors.gray400} />
       );
     }
 
@@ -414,10 +397,10 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           onPress={() => setReviewRating(i)}
           activeOpacity={0.7}
         >
-          <StarIcon
+          <Ionicons
+            name={i <= reviewRating ? "star" : "star-outline"}
             size={40}
             color={i <= reviewRating ? colors.warning : colors.gray400}
-            filled={i <= reviewRating}
           />
         </TouchableOpacity>
       );
@@ -430,7 +413,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
       <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
         <StatusBar style="dark" />
         <View style={styles.errorContainer}>
-          <AlertIcon size={64} color={colors.error} />
+          <Ionicons name="alert-circle" size={64} color={colors.error} />
           <Text style={styles.errorText}>Cliente não encontrado</Text>
           <TouchableOpacity
             style={styles.backButton}
@@ -488,9 +471,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
-            <ArrowBackIcon size={24} color={colors.text || '#1e293b'} />
-          </View>
+          <Ionicons name="arrow-back" size={24} color={colors.text || '#1e293b'} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {user?.profile === 'doctor' ? 'Detalhes do Paciente' : 'Detalhes do Cliente'}
@@ -514,11 +495,11 @@ const ClientDetailsScreen = ({ route, navigation }) => {
                 if (!photoUrl || photoError) {
                   const gender = client.gender || client.user?.gender;
                   if (gender === 'male' || gender === 'Masculino') {
-                    return <MaleIcon size={48} color={colors.primary} />;
+                    return <Ionicons name="male" size={48} color={colors.primary} />;
                   } else if (gender === 'female' || gender === 'Feminino') {
-                    return <FemaleIcon size={48} color={colors.primary} />;
+                    return <Ionicons name="female" size={48} color={colors.primary} />;
                   }
-                  return <PersonIcon size={48} color={colors.primary} />;
+                  return <Ionicons name="person" size={48} color={colors.primary} />;
                 }
                 
                 // Construir URL da foto
@@ -562,7 +543,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           
           {client.city && (
             <View style={styles.locationRow}>
-              <LocationIcon size={16} color={colors.textLight} />
+              <Ionicons name="location" size={16} color={colors.textLight} />
               <Text style={styles.locationText}>
                 {client.neighborhood || ''}, {client.city}
               </Text>
@@ -586,7 +567,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           <View style={styles.infoCard}>
             {client.phone && (
               <View style={styles.infoRow}>
-                <CallIcon size={20} color={colors.primary} />
+                <Ionicons name="call" size={20} color={colors.primary} />
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Telefone</Text>
                   <Text style={styles.infoValue}>{client.phone}</Text>
@@ -595,7 +576,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
             )}
             {client.email && (
               <View style={styles.infoRow}>
-                <MailIcon size={20} color={colors.primary} />
+                <Ionicons name="mail" size={20} color={colors.primary} />
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>E-mail</Text>
                   <Text style={styles.infoValue}>{client.email}</Text>
@@ -604,7 +585,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
             )}
             {client.group_name && (
               <View style={styles.infoRow}>
-                <PeopleIcon size={20} color={colors.primary} />
+                <Ionicons name="people" size={20} color={colors.primary} />
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Grupo</Text>
                   <Text style={styles.infoValue}>{client.group_name}</Text>
@@ -652,16 +633,14 @@ const ClientDetailsScreen = ({ route, navigation }) => {
             >
               <View style={[styles.filesCardHeader, documents.length > 0 && { marginBottom: 16 }]}>
                 <View style={styles.filesIconContainer}>
-                  <FolderIcon size={32} color="#9C27B0" />
+                  <SafeIcon name="folder" size={32} color="#9C27B0" />
                 </View>
                 <View style={styles.filesContent}>
                   <Text style={styles.filesCardTitle}>Arquivos</Text>
                   <Text style={styles.filesCardSubtitle}>Exames, receitas e laudos</Text>
                 </View>
                 {client.group_id && (
-                  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
-                    <ChevronForwardIcon size={24} color={colors.gray400} />
-                  </View>
+                  <SafeIcon name="chevron-forward" size={24} color={colors.gray400} />
                 )}
               </View>
 
@@ -673,7 +652,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
                 </View>
               ) : documents.length === 0 ? (
                 <View style={styles.filesEmpty} pointerEvents="none">
-                  <FolderIcon size={32} color={colors.gray300} />
+                  <SafeIcon name="folder" size={32} color={colors.gray300} />
                   <Text style={styles.filesEmptyText}>Nenhum arquivo disponível</Text>
                 </View>
               ) : (
@@ -691,7 +670,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
                       activeOpacity={0.7}
                     >
                       <View style={[styles.fileIcon, { backgroundColor: getDocumentColor(doc.type) + '20' }]}>
-                        <Ionicons 
+                        <SafeIcon 
                           name={getDocumentIconComponent(doc.type)} 
                           size={20} 
                           color={getDocumentColor(doc.type)} 
@@ -707,7 +686,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
                         </Text>
                       </View>
                       <View style={{ width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
-                        <ChevronForwardIcon size={20} color={colors.gray400} />
+                        <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -738,7 +717,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
               onPress={handleAddReview}
               activeOpacity={0.7}
             >
-              <AddIcon size={20} color="#C8A8E9" />
+              <Ionicons name="add" size={20} color="#C8A8E9" />
               <Text style={styles.addReviewButtonText}>Avaliar</Text>
             </TouchableOpacity>
           </View>
@@ -749,7 +728,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
                 <View style={styles.reviewHeader}>
                   <View style={styles.reviewAuthorInfo}>
                     <View style={styles.reviewAvatar}>
-                      <PersonIcon size={20} color={colors.primary} />
+                      <Ionicons name="person" size={20} color={colors.primary} />
                     </View>
                     <View style={styles.reviewAuthorDetails}>
                       <Text style={styles.reviewAuthorName}>{user?.name || 'Cuidador Profissional'}</Text>
@@ -795,7 +774,7 @@ const ClientDetailsScreen = ({ route, navigation }) => {
                 onPress={() => setShowReviewModal(false)}
                 activeOpacity={0.7}
               >
-                <CloseIcon size={24} color={colors.text} />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 

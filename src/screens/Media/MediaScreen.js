@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import SafeIcon from '../../components/SafeIcon';
 import { Video } from 'expo-av';
 import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
@@ -472,7 +473,7 @@ const MediaScreen = ({ navigation, route }) => {
             videoErrors[item.id] ? (
               // Fallback quando vídeo não pode ser carregado
               <View style={[styles.mediaThumbnail, { backgroundColor: colors.gray200, justifyContent: 'center', alignItems: 'center' }]}>
-                <Ionicons name="videocam-off" size={48} color={colors.gray400} />
+                <SafeIcon name="videocam-off" size={48} color={colors.gray400} />
                 <Text style={{ color: colors.gray400, marginTop: 8, fontSize: 12, textAlign: 'center', paddingHorizontal: 8 }}>
                   Vídeo não suportado
                 </Text>
@@ -509,7 +510,7 @@ const MediaScreen = ({ navigation, route }) => {
                   }}
                 />
                 <View style={styles.playIconOverlay}>
-                  <Ionicons name="play-circle" size={48} color="#FFFFFF" />
+                  <SafeIcon name="play-circle" size={48} color="#FFFFFF" />
                 </View>
               </View>
             )
@@ -525,7 +526,7 @@ const MediaScreen = ({ navigation, route }) => {
           )
         ) : (
           <View style={[styles.mediaThumbnail, { backgroundColor: colors.gray200, justifyContent: 'center', alignItems: 'center' }]}>
-            <Ionicons name={isVideo ? 'videocam-outline' : 'image-outline'} size={48} color={colors.gray400} />
+            <SafeIcon name={isVideo ? 'videocam' : 'image'} size={48} color={colors.gray400} />
             <Text style={{ color: colors.gray400, marginTop: 8, fontSize: 12 }}>URL não disponível</Text>
           </View>
         )}
@@ -543,7 +544,7 @@ const MediaScreen = ({ navigation, route }) => {
           style={styles.deleteButton}
           onPress={() => handleDeleteMedia(item.id)}
         >
-          <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+          <SafeIcon name="trash-outline" size={20} color="#FF6B6B" />
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -557,7 +558,7 @@ const MediaScreen = ({ navigation, route }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Mídias do Grupo</Text>
@@ -568,7 +569,7 @@ const MediaScreen = ({ navigation, route }) => {
 
       {/* Info Card */}
       <View style={styles.infoCard}>
-        <Ionicons name="information-circle" size={20} color={colors.primary} />
+        <SafeIcon name="information-circle" size={20} color={colors.primary} />
         <View style={styles.infoTextContainer}>
           <Text style={styles.infoText}>
             Fotos e vídeos postados aqui aparecem para o paciente por 24 horas
@@ -590,7 +591,7 @@ const MediaScreen = ({ navigation, route }) => {
           contentContainerStyle={styles.mediaList}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="images-outline" size={64} color={colors.gray300} />
+              <SafeIcon name="images" size={64} color={colors.gray300} />
               <Text style={styles.emptyText}>Nenhuma mídia postada</Text>
               <Text style={styles.emptySubtext}>
                 Toque no botão + para adicionar fotos ou vídeos
@@ -621,7 +622,7 @@ const MediaScreen = ({ navigation, route }) => {
         {uploading ? (
           <ActivityIndicator size="small" color="#FFFFFF" />
         ) : (
-          <Ionicons name="add" size={32} color="#FFFFFF" />
+          <SafeIcon name="add" size={32} color="#FFFFFF" />
         )}
       </TouchableOpacity>
 
@@ -669,7 +670,7 @@ const MediaScreen = ({ navigation, route }) => {
                   handlePickMedia('image');
                 }}
               >
-                <Ionicons name="image" size={24} color={colors.primary} />
+                <SafeIcon name="image" size={24} color={colors.primary} />
                 <Text style={styles.pickerOptionText}>Escolher Foto</Text>
               </TouchableOpacity>
               
@@ -682,7 +683,7 @@ const MediaScreen = ({ navigation, route }) => {
                   handlePickMedia('video');
                 }}
               >
-                <Ionicons name="videocam" size={24} color={colors.primary} />
+                <SafeIcon name="videocam" size={24} color={colors.primary} />
                 <Text style={styles.pickerOptionText}>Escolher Vídeo</Text>
               </TouchableOpacity>
               

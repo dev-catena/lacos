@@ -8,8 +8,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
-  Modal,
-  Pressable,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
@@ -28,7 +26,6 @@ const PrescriptionsScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAddMenu, setShowAddMenu] = useState(false);
 
   // Validar e corrigir groupId
   const validGroupId = typeof groupId === 'number' && groupId > 1000000000000
@@ -226,11 +223,6 @@ const PrescriptionsScreen = ({ route, navigation }) => {
   };
 
   const handleAddPrescription = () => {
-    setShowAddMenu(true);
-  };
-
-  const handleCreatePrescription = () => {
-    setShowAddMenu(false);
     navigation.navigate('SelectDoctor', { groupId: validGroupId, groupName });
   };
 
@@ -392,35 +384,6 @@ const PrescriptionsScreen = ({ route, navigation }) => {
         </View>
       )}
 
-      {/* Menu Suspenso de Opções */}
-      <Modal
-        visible={showAddMenu}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowAddMenu(false)}
-      >
-        <Pressable 
-          style={styles.menuOverlay}
-          onPress={() => setShowAddMenu(false)}
-        >
-          <View style={styles.menuContainer}>
-            <TouchableOpacity
-              style={styles.menuOption}
-              onPress={handleCreatePrescription}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.menuOptionIcon, { backgroundColor: colors.secondary + '20' }]}>
-                <SafeIcon name="document-text" size={24} color={colors.secondary} />
-              </View>
-              <View style={styles.menuOptionText}>
-                <Text style={styles.menuOptionTitle}>Nova Receita</Text>
-                <Text style={styles.menuOptionSubtitle}>Com prescrição médica</Text>
-              </View>
-              <SafeIcon name="chevron-forward" size={20} color={colors.gray400} />
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -641,47 +604,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  menuContainer: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    paddingHorizontal: 20,
-  },
-  menuOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
-  },
-  menuOptionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  menuOptionText: {
-    flex: 1,
-  },
-  menuOptionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  menuOptionSubtitle: {
-    fontSize: 14,
-    color: colors.gray400,
   },
 });
 

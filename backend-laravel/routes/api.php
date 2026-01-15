@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\EmergencyContactController;
 use App\Http\Controllers\Api\MedicalSpecialtyController;
 use App\Http\Controllers\Api\GroupMessageController;
+use App\Http\Controllers\Api\PaymentController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -229,5 +230,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Contatos de Emergência
     Route::apiResource('emergency-contacts', EmergencyContactController::class);
     Route::post('/emergency-contacts/{id}', [EmergencyContactController::class, 'update']); // Method spoofing
+    
+    // Pagamentos - Gateway de Pagamento (Stripe)
+    Route::post('/payments/create-intent', [PaymentController::class, 'createIntent']);
+    Route::post('/payments/confirm', [PaymentController::class, 'confirm']);
+    Route::get('/payments/status/{paymentIntentId}', [PaymentController::class, 'checkStatus']);
 });
 

@@ -1,0 +1,24 @@
+Os ícones não estão aparecendo no Android na tela [NOME_DA_TELA]. 
+
+Aplique a técnica que já funcionou antes:
+
+1. Verifique se a tela está usando Ionicons diretamente
+2. Substitua TODOS os Ionicons por SafeIcon
+3. Verifique se os nomes dos ícones usados estão mapeados no SafeIcon.js
+4. Se algum ícone não estiver mapeado, adicione o mapeamento no SafeIcon.js usando os SVGs customizados do CustomIcons.js
+
+Lembre-se: A tela de Receitas funciona porque usa SafeIcon. Compare com ela se necessário.
+
+Ícones que precisam estar mapeados no SafeIcon:
+- folder → FolderIcon
+- receipt → ReceiptIcon  
+- calendar → CalendarIcon
+- flask → FlaskIcon
+- image → ImageIcon
+- document-text → DocumentIcon
+- document → DocumentIcon
+- document-attach → DocumentAttachIcon
+- E outros conforme necessário
+
+Aplique a correção seguindo o mesmo padrão usado nas telas de Receitas e Arquivos.
+

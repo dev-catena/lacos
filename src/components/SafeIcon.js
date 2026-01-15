@@ -40,6 +40,14 @@ import {
   ImagesIcon,
   CloseCircleIcon,
   MoneyIcon,
+  FolderIcon,
+  ReceiptIcon,
+  ImageIcon,
+  MessagesIcon,
+  PulseIcon,
+  VideoIcon,
+  VideoCamIcon,
+  ImagesIcon,
 } from './CustomIcons';
 
 /**
@@ -83,6 +91,24 @@ const iconMap = {
   'add-circle': AddCircleOutlineIcon, // Para botão de adicionar
   'document-attach': DocumentAttachIcon,
   'document-text': DocumentIcon, // Para receita
+  'document-text-outline': DocumentIcon, // Para receita (outline)
+  'document': DocumentIcon, // Para documentos gerais
+  'folder': FolderIcon, // Para pastas/arquivos
+  'folder-open': FolderIcon, // Para pastas abertas (usar FolderIcon)
+  'receipt': ReceiptIcon, // Para recibos
+  'calendar': CalendarIcon, // Para calendário
+  'calendar-outline': CalendarIcon, // Para calendário (outline)
+  'flask': FlaskIcon, // Para exames laboratoriais
+  'image': ImageIcon, // Para imagens
+  'image-outline': ImageIcon, // Imagem (outline)
+  'images': ImagesIcon, // Galeria de imagens
+  'images-outline': ImagesIcon, // Galeria de imagens (outline)
+  'videocam': VideoCamIcon, // Câmera de vídeo
+  'videocam-outline': VideoCamIcon, // Câmera de vídeo (outline)
+  'videocam-off': VideoIcon, // Vídeo desligado (usar VideoIcon com off)
+  'play-circle': VideoIcon, // Play (usar VideoIcon)
+  'cloud-upload-outline': DocumentAttachIcon, // Upload (usar DocumentAttachIcon como fallback)
+  'chatbox-outline': MessagesIcon, // Chat (usar MessagesIcon como fallback)
   'time-outline': TimeOutlineIcon, // Para horários
   'archive-outline': TrashIcon, // Usar ícone de lixeira como fallback para arquivo
   'apps-outline': MedicalIcon, // Usar ícone médico como fallback para "todos"
@@ -108,6 +134,7 @@ const iconMap = {
   // Ícones adicionais para MedicationDetailsScreen
   'alert-circle': WarningIcon, // Alerta/atrasado
   'time': TimeIcon, // Horário
+  'pulse': PulseIcon, // Pulse/Batimento (sinais vitais)
   'repeat': TimeIcon, // Frequência/repetição
   'water': FlaskIcon, // Via de administração
   // Ícones para PopularPharmacies

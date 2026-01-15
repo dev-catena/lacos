@@ -19,6 +19,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
+import documentService from '../../services/documentService';
+import SafeIcon from '../../components/SafeIcon';
 
 const AddDocumentScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params || {};
@@ -192,22 +194,63 @@ const AddDocumentScreen = ({ route, navigation }) => {
 
     setLoading(true);
     try {
-      // TODO: Implementar upload
-      // const documentService = require('../../services/documentService').default;
-      // const formDataUpload = new FormData();
-      // formDataUpload.append('file', {
-      //   uri: formData.file.uri,
-      //   type: formData.file.type === 'pdf' ? 'application/pdf' : 'image/jpeg',
-      //   name: formData.file.name,
-      // });
-      // formDataUpload.append('group_id', groupId);
-      // formDataUpload.append('type', formData.type);
-      // formDataUpload.append('title', formData.title);
-      // formDataUpload.append('document_date', formData.date);
-      // formDataUpload.append('consultation_id', formData.consultation_id || '');
-      // formDataUpload.append('notes', formData.notes);
-      // 
-      // await documentService.uploadDocument(formDataUpload);
+      if (!formData.file) {
+        Toast.show({
+          type: 'error',
+          text1: 'Arquivo necessário',
+          text2: 'Por favor, selecione um arquivo',
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Determinar o tipo MIME correto
+      let mimeType = 'image/jpeg';
+      if (formData.file.name) {
+        if (formData.file.name.endsWith('.pdf')) {
+          mimeType = 'application/pdf';
+        } else if (formData.file.name.endsWith('.png')) {
+          mimeType = 'image/png';
+        } else if (formData.file.name.endsWith('.jpg') || formData.file.name.endsWith('.jpeg')) {
+          mimeType = 'image/jpeg';
+        }
+      } else if (formData.file.type === 'pdf') {
+        mimeType = 'application/pdf';
+      }
+      
+      const formDataUpload = new FormData();
+      const fileObject = {
+        uri: formData.file.uri,
+        type: mimeType,
+        name: formData.file.name || (mimeType === 'application/pdf' ? 'documento.pdf' : 'documento.jpg'),
+      };
+      formDataUpload.append('file', fileObject);
+      formDataUpload.append('group_id', String(groupId));
+      formDataUpload.append('type', formData.type);
+      formDataUpload.append('title', formData.title);
+      
+      // Formatar data corretamente (remover timezone se necessário)
+      const dateStr = formData.date.split('T')[0]; // Pegar apenas a data (YYYY-MM-DD)
+      formDataUpload.append('document_date', dateStr);
+      
+      if (formData.consultation_id) {
+        formDataUpload.append('consultation_id', String(formData.consultation_id));
+      }
+      if (formData.notes) {
+        formDataUpload.append('notes', formData.notes);
+      }
+      
+      console.log('📤 Enviando documento:', {
+        group_id: groupId,
+        type: formData.type,
+        title: formData.title,
+        document_date: dateStr,
+        file_name: formData.file.name,
+        file_type: mimeType,
+        has_consultation: !!formData.consultation_id,
+      });
+      
+      await documentService.uploadDocument(formDataUpload);
 
       Toast.show({
         type: 'success',
@@ -220,10 +263,34 @@ const AddDocumentScreen = ({ route, navigation }) => {
       }, 1000);
     } catch (error) {
       console.error('Erro ao enviar documento:', error);
+      console.error('Erro completo:', JSON.stringify(error, null, 2));
+      console.error('Response data:', error.response?.data);
+      console.error('Response status:', error.response?.status);
+      
+      // Extrair mensagem de erro mais específica
+      let errorMessage = 'Não foi possível enviar o documento';
+      if (error.response?.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.response.data.errors) {
+          // Se houver erros de validação, mostrar o primeiro
+          const firstError = Object.values(error.response.data.errors)[0];
+          if (Array.isArray(firstError)) {
+            errorMessage = firstError[0];
+          } else {
+            errorMessage = firstError;
+          }
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       Toast.show({
         type: 'error',
         text1: 'Erro ao enviar',
-        text2: 'Não foi possível enviar o documento',
+        text2: errorMessage,
       });
     } finally {
       setLoading(false);
@@ -249,7 +316,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={styles.title}>Adicionar Documento</Text>
@@ -277,7 +344,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
                 <Image source={{ uri: formData.file.uri }} style={styles.imagePreview} />
               ) : (
                 <View style={styles.pdfPreview}>
-                  <Ionicons name="document-text" size={60} color={colors.primary} />
+                  <SafeIcon name="document-text" size={60} color={colors.primary} />
                   <Text style={styles.fileName}>{formData.file.name}</Text>
                 </View>
               )}
@@ -290,7 +357,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
             </View>
           ) : (
             <TouchableOpacity style={styles.uploadButton} onPress={showUploadOptions}>
-              <Ionicons name="cloud-upload-outline" size={48} color={colors.primary} />
+              <SafeIcon name="cloud-upload-outline" size={48} color={colors.primary} />
               <Text style={styles.uploadText}>Toque para selecionar arquivo</Text>
               <Text style={styles.uploadSubtext}>Foto, imagem ou PDF</Text>
             </TouchableOpacity>
@@ -304,14 +371,14 @@ const AddDocumentScreen = ({ route, navigation }) => {
             style={styles.inputWrapper}
             onPress={() => setShowTypeModal(true)}
           >
-            <Ionicons name="folder-open" size={20} color={colors.gray400} />
+            <SafeIcon name="folder" size={20} color={colors.gray400} />
             <Text style={[
               styles.input,
               !formData.typeLabel && styles.placeholder
             ]}>
               {formData.typeLabel || 'Selecione o tipo...'}
             </Text>
-            <Ionicons name="chevron-down" size={20} color={colors.gray400} />
+            <SafeIcon name="chevron-down" size={20} color={colors.gray400} />
           </TouchableOpacity>
         </View>
 
@@ -319,7 +386,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Título do Documento *</Text>
           <View style={styles.inputWrapper}>
-            <Ionicons name="document-text-outline" size={20} color={colors.gray400} />
+            <SafeIcon name="document-text" size={20} color={colors.gray400} />
             <TextInput
               style={styles.input}
               placeholder="Ex: Hemograma Completo"
@@ -337,9 +404,9 @@ const AddDocumentScreen = ({ route, navigation }) => {
             style={styles.inputWrapper}
             onPress={() => setShowDatePicker(true)}
           >
-            <Ionicons name="calendar-outline" size={20} color={colors.gray400} />
+            <SafeIcon name="calendar" size={20} color={colors.gray400} />
             <Text style={styles.dateText}>{formatDate(formData.date)}</Text>
-            <Ionicons name="chevron-down" size={20} color={colors.gray400} />
+            <SafeIcon name="chevron-down" size={20} color={colors.gray400} />
           </TouchableOpacity>
 
           {showDatePicker && (
@@ -359,14 +426,14 @@ const AddDocumentScreen = ({ route, navigation }) => {
             style={styles.inputWrapper}
             onPress={() => setShowConsultationModal(true)}
           >
-            <Ionicons name="medical-outline" size={20} color={colors.gray400} />
+            <SafeIcon name="medical-outline" size={20} color={colors.gray400} />
             <Text style={[
               styles.input,
               !formData.consultationLabel && styles.placeholder
             ]}>
               {formData.consultationLabel || 'Selecionar consulta...'}
             </Text>
-            <Ionicons name="chevron-down" size={20} color={colors.gray400} />
+            <SafeIcon name="chevron-down" size={20} color={colors.gray400} />
           </TouchableOpacity>
         </View>
 
@@ -374,7 +441,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Observações</Text>
           <View style={[styles.inputWrapper, styles.textAreaWrapper]}>
-            <Ionicons name="chatbox-outline" size={20} color={colors.gray400} style={{ alignSelf: 'flex-start', marginTop: 12 }} />
+            <SafeIcon name="chatbox-outline" size={20} color={colors.gray400} style={{ alignSelf: 'flex-start', marginTop: 12 }} />
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Informações adicionais (opcional)..."
@@ -405,7 +472,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
                 onPress={() => setShowTypeModal(false)}
                 style={styles.modalCloseButton}
               >
-                <Ionicons name="close" size={24} color={colors.text} />
+                <SafeIcon name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -421,7 +488,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
                   ]}
                   onPress={() => handleTypeSelect(item)}
                 >
-                  <Ionicons name={item.icon} size={24} color={formData.type === item.id ? colors.primary : colors.gray600} />
+                  <SafeIcon name={item.icon} size={24} color={formData.type === item.id ? colors.primary : colors.gray600} />
                   <Text style={[
                     styles.typeItemText,
                     formData.type === item.id && styles.typeItemTextSelected
@@ -429,7 +496,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
                     {item.label}
                   </Text>
                   {formData.type === item.id && (
-                    <Ionicons name="checkmark" size={24} color={colors.primary} />
+                    <SafeIcon name="checkmark" size={24} color={colors.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -454,7 +521,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
                 onPress={() => setShowConsultationModal(false)}
                 style={styles.modalCloseButton}
               >
-                <Ionicons name="close" size={24} color={colors.text} />
+                <SafeIcon name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -477,7 +544,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
                     )}
                   </View>
                   {formData.consultation_id === item.id && (
-                    <Ionicons name="checkmark" size={24} color={colors.primary} />
+                    <SafeIcon name="checkmark" size={24} color={colors.primary} />
                   )}
                 </TouchableOpacity>
               )}

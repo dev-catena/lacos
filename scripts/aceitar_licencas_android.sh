@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Script para aceitar licenças do Android SDK
+# Execute com: sudo ./scripts/aceitar_licencas_android.sh
+
+echo "🔐 Criando licenças do Android SDK em /usr/lib/android-sdk/licenses/..."
+
+# Criar diretório se não existir
+mkdir -p /usr/lib/android-sdk/licenses
+
+# Criar arquivos de licença
+echo "24333f8a63b6825ea9ed5513679bf2a4d6c47e8c" > /usr/lib/android-sdk/licenses/android-sdk-license
+echo "84831b9409646a918e30573bab4c9c91346d8abd" > /usr/lib/android-sdk/licenses/android-sdk-preview-license
+echo "601085b94cd77f0b54ff86406957099ebe79c4d6" > /usr/lib/android-sdk/licenses/android-googletv-license
+echo "859e3179f0bea098b0c6d39015b0c5e3" > /usr/lib/android-sdk/licenses/android-sdk-arm-dbt-license
+echo "33b6a2b64607f11b759f320ef9dff4ae5c47d5a2" > /usr/lib/android-sdk/licenses/google-gdk-license
+echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > /usr/lib/android-sdk/licenses/intel-android-extra-license
+echo "8403addf88ab4874007e1c1e80a0025de11b0101" > /usr/lib/android-sdk/licenses/intel-android-sysimage-license
+
+# Licença específica do NDK (pode variar, mas este é um hash comum)
+echo "24333f8a63b6825ea9ed5513679bf2a4d6c47e8c" > /usr/lib/android-sdk/licenses/android-ndk-license
+
+echo ""
+echo "✅ Licenças criadas!"
+echo ""
+echo "📋 Arquivos criados:"
+ls -la /usr/lib/android-sdk/licenses/
+echo ""
+echo "🚀 Agora você pode tentar compilar novamente:"
+echo "   npx expo run:android"
+

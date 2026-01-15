@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
+import SafeIcon from '../../components/SafeIcon';
 
 const HistoryScreen = ({ route, navigation }) => {
   const { groupId, groupName, accompaniedName } = route.params || {};
@@ -138,7 +139,7 @@ const HistoryScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={styles.title}>Histórico</Text>
@@ -163,7 +164,7 @@ const HistoryScreen = ({ route, navigation }) => {
             ]}
             onPress={() => setFilterType(type.id)}
           >
-            <Ionicons 
+            <SafeIcon 
               name={type.icon} 
               size={16} 
               color={filterType === type.id ? colors.white : colors.gray600} 
@@ -186,7 +187,7 @@ const HistoryScreen = ({ route, navigation }) => {
         </View>
       ) : filteredEvents.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="time-outline" size={80} color={colors.gray300} />
+          <SafeIcon name="time-outline" size={80} color={colors.gray300} />
           <Text style={styles.emptyTitle}>Nenhum evento</Text>
           <Text style={styles.emptyText}>
             {filterType === 'all' 
@@ -208,7 +209,7 @@ const HistoryScreen = ({ route, navigation }) => {
               
               {/* Timeline dot/icon */}
               <View style={[styles.timelineDot, { backgroundColor: event.color }]}>
-                <Ionicons name={event.icon} size={20} color={colors.white} />
+                <SafeIcon name={event.icon} size={20} color={colors.white} />
               </View>
 
               {/* Event card */}
@@ -241,7 +242,7 @@ const HistoryScreen = ({ route, navigation }) => {
           accompaniedName
         })}
       >
-        <Ionicons name="add" size={28} color={colors.white} />
+        <SafeIcon name="add" size={28} color={colors.white} />
       </TouchableOpacity>
     </SafeAreaView>
   );

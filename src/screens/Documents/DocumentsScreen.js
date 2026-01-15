@@ -15,18 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import documentService from '../../services/documentService';
 import { useAuth } from '../../contexts/AuthContext';
-import {
-  DocumentIcon,
-  ReceiptIcon,
-  CalendarIcon,
-  WarningIcon,
-  AddIcon,
-  ArrowBackIcon,
-  PersonIcon,
-  FolderIcon,
-  FlaskIcon,
-  ImageIcon,
-} from '../../components/CustomIcons';
+import SafeIcon from '../../components/SafeIcon';
 
 const DocumentsScreen = ({ route, navigation }) => {
   const { groupId, groupName, patientId, patientName } = route.params || {};
@@ -36,14 +25,14 @@ const DocumentsScreen = ({ route, navigation }) => {
   const [filterType, setFilterType] = useState('all');
 
   const documentTypes = [
-    { id: 'all', label: 'Todos', icon: 'folder', IconComponent: FolderIcon },
-    { id: 'exam_lab', label: 'Exame Lab', icon: 'flask', IconComponent: FlaskIcon },
-    { id: 'exam_image', label: 'Imagem', icon: 'image', IconComponent: ImageIcon },
-    { id: 'prescription', label: 'Receita', icon: 'document-text', IconComponent: ReceiptIcon },
-    { id: 'medical_leave', label: 'Afastamento', icon: 'calendar', IconComponent: CalendarIcon },
-    { id: 'medical_certificate', label: 'Afastamento', icon: 'calendar', IconComponent: CalendarIcon },
-    { id: 'report', label: 'Atestado', icon: 'document', IconComponent: DocumentIcon },
-    { id: 'other', label: 'Outro', icon: 'document-attach', IconComponent: DocumentIcon },
+    { id: 'all', label: 'Todos', icon: 'folder' },
+    { id: 'exam_lab', label: 'Exame Lab', icon: 'flask' },
+    { id: 'exam_image', label: 'Imagem', icon: 'image' },
+    { id: 'prescription', label: 'Receita', icon: 'receipt' },
+    { id: 'medical_leave', label: 'Afastamento', icon: 'calendar' },
+    { id: 'medical_certificate', label: 'Afastamento', icon: 'calendar' },
+    { id: 'report', label: 'Atestado', icon: 'document-text' },
+    { id: 'other', label: 'Outro', icon: 'document' },
   ];
 
   useFocusEffect(
@@ -121,19 +110,21 @@ const DocumentsScreen = ({ route, navigation }) => {
   };
 
   const getDocumentIconComponent = (type) => {
-    const typeObj = documentTypes.find(t => t.id === type);
-    if (typeObj?.IconComponent) {
-      return typeObj.IconComponent;
-    }
-    // Mapear tipos específicos para ícones SVG
+    // Retornar null para usar Ionicons diretamente no Android
+    return null;
+  };
+
+  const getDocumentIconName = (type) => {
     const iconMap = {
-      'prescription': ReceiptIcon,
-      'medical_leave': CalendarIcon,
-      'medical_certificate': CalendarIcon,
-      'report': DocumentIcon,
-      'other': DocumentIcon,
+      'prescription': 'receipt',
+      'medical_leave': 'calendar',
+      'medical_certificate': 'calendar',
+      'report': 'document-text',
+      'exam_lab': 'flask',
+      'exam_image': 'image',
+      'other': 'document',
     };
-    return iconMap[type] || DocumentIcon;
+    return iconMap[type] || 'document';
   };
 
   const getDocumentColor = (type) => {
@@ -168,10 +159,11 @@ const DocumentsScreen = ({ route, navigation }) => {
       onPress={() => navigation.navigate('DocumentDetails', { document: item, groupId })}
     >
       <View style={[styles.docIcon, { backgroundColor: getDocumentColor(item.type) + '20' }]}>
-        {(() => {
-          const IconComponent = getDocumentIconComponent(item.type);
-          return <IconComponent size={28} color={getDocumentColor(item.type)} />;
-        })()}
+        <SafeIcon 
+          name={getDocumentIconName(item.type)} 
+          size={28} 
+          color={getDocumentColor(item.type)} 
+        />
       </View>
       
       <View style={styles.docContent}>
@@ -206,16 +198,16 @@ const DocumentsScreen = ({ route, navigation }) => {
           return null;
         })()}
         <View style={styles.docInfoRow}>
-          <CalendarIcon size={14} color={colors.gray600} />
+          <SafeIcon name="calendar" size={14} color={colors.gray600} />
           <Text style={styles.docDate}>{formatDate(item.date)}</Text>
         </View>
       </View>
 
       <View style={styles.docFileType}>
         {item.file_type === 'pdf' ? (
-          <DocumentIcon size={20} color={colors.gray400} />
+          <SafeIcon name="document-text" size={20} color={colors.gray400} />
         ) : (
-          <ImageIcon size={20} color={colors.gray400} />
+          <SafeIcon name="image" size={20} color={colors.gray400} />
         )}
       </View>
     </TouchableOpacity>
@@ -232,9 +224,7 @@ const DocumentsScreen = ({ route, navigation }) => {
           style={styles.backButton}
           activeOpacity={0.7}
         >
-          <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
-            <ArrowBackIcon size={24} color={colors.text || '#1e293b'} />
-          </View>
+          <SafeIcon name="arrow-back" size={24} color={colors.text || '#1e293b'} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={styles.title}>Arquivos</Text>
@@ -258,18 +248,11 @@ const DocumentsScreen = ({ route, navigation }) => {
               ]}
               onPress={() => setFilterType(item.id)}
             >
-              {item.IconComponent ? (
-                <item.IconComponent 
-                  size={16} 
-                  color={filterType === item.id ? '#2C5F7C' : colors.gray600} 
-                />
-              ) : (
-                <Ionicons 
-                  name={item.icon} 
-                  size={16} 
-                  color={filterType === item.id ? '#2C5F7C' : colors.gray600} 
-                />
-              )}
+              <SafeIcon 
+                name={item.icon} 
+                size={16} 
+                color={filterType === item.id ? '#2C5F7C' : colors.gray600} 
+              />
               <Text style={[
                 styles.filterChipText,
                 filterType === item.id && styles.filterChipTextActive
@@ -290,7 +273,7 @@ const DocumentsScreen = ({ route, navigation }) => {
         </View>
       ) : filteredDocuments.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <FolderIcon size={80} color={colors.gray300} />
+          <SafeIcon name="folder" size={80} color={colors.gray300} />
           <Text style={styles.emptyTitle}>Nenhum documento</Text>
           <Text style={styles.emptyText}>
             {filterType === 'all'
@@ -314,7 +297,7 @@ const DocumentsScreen = ({ route, navigation }) => {
         onPress={() => navigation.navigate('AddDocument', { groupId, groupName })}
         activeOpacity={0.8}
       >
-        <AddIcon size={28} color="#8B4A6B" />
+        <SafeIcon name="add" size={28} color="#8B4A6B" />
       </TouchableOpacity>
     </SafeAreaView>
   );
