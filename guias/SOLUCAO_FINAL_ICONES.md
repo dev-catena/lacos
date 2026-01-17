@@ -94,3 +94,8 @@ Se não quiser fazer build nativo agora, podemos manter os emojis:
 
 Mas build nativo é a solução recomendada.
 
+
+
+
+
+

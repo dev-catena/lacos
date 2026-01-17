@@ -29,3 +29,8 @@ echo ""
 echo "🚀 Agora você pode tentar compilar novamente:"
 echo "   npx expo run:android"
 
+
+
+
+
+

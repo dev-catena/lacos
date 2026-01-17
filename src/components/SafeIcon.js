@@ -47,7 +47,6 @@ import {
   PulseIcon,
   VideoIcon,
   VideoCamIcon,
-  ImagesIcon,
 } from './CustomIcons';
 
 /**

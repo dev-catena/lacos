@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\PatientAlert;
 use App\Models\MedicationLog;
+use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class AlertController extends Controller
@@ -234,7 +236,7 @@ class AlertController extends Controller
                     
                     // Se está dentro de 5 minutos do horário
                     if (abs($now->diffInMinutes($alertTime)) <= 5) {
-                        PatientAlert::create([
+                        $alert = PatientAlert::create([
                             'group_id' => $medication->group_id,
                             'patient_user_id' => $patient->id,
                             'medication_id' => $medication->id,
@@ -247,6 +249,9 @@ class AlertController extends Controller
                             'expires_at' => $alertTime->copy()->addMinutes(30),
                             'is_active' => true,
                         ]);
+                        
+                        // Enviar WhatsApp para cuidadores
+                        $this->sendWhatsAppToCaregivers($alert, $medication, $patient);
                         
                         $generatedCount++;
                     }
@@ -295,6 +300,100 @@ class AlertController extends Controller
                 'message' => 'Erro ao limpar alertas',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Enviar WhatsApp para cuidadores quando um alerta de medicamento é gerado
+     */
+    private function sendWhatsAppToCaregivers($alert, $medication, $patient)
+    {
+        try {
+            // Buscar cuidadores do grupo (membros com role 'admin' ou 'caregiver')
+            $caregivers = DB::table('group_members')
+                ->join('users', 'group_members.user_id', '=', 'users.id')
+                ->where('group_members.group_id', $alert->group_id)
+                ->whereIn('group_members.role', ['admin', 'caregiver'])
+                ->where('users.is_active', 1)
+                ->whereNotNull('users.phone')
+                ->select('users.id', 'users.name', 'users.phone')
+                ->get();
+
+            if ($caregivers->isEmpty()) {
+                \Log::info('Nenhum cuidador encontrado para enviar WhatsApp', [
+                    'group_id' => $alert->group_id,
+                ]);
+                return;
+            }
+
+            $whatsappService = new WhatsAppService();
+            
+            // Verificar se o WhatsApp está conectado
+            $connection = $whatsappService->checkConnection();
+            if (!$connection['success'] || !$connection['connected']) {
+                \Log::warning('WhatsApp não está conectado, pulando envio de mensagens', [
+                    'connection' => $connection,
+                ]);
+                return;
+            }
+
+            // Criar mensagem formatada
+            $patientName = $patient->name ?? 'Paciente';
+            $medicationName = $medication->name ?? 'Medicamento';
+            $dosage = $medication->dosage ?? '';
+            $time = $alert->time ? $alert->time->format('H:i') : 'agora';
+            
+            $message = "💊 *Lembrete de Medicamento - Laços*\n\n";
+            $message .= "Olá! Este é um lembrete automático:\n\n";
+            $message .= "👤 *Paciente:* {$patientName}\n";
+            $message .= "💊 *Medicamento:* {$medicationName}\n";
+            if ($dosage) {
+                $message .= "📏 *Dose:* {$dosage}\n";
+            }
+            $message .= "⏰ *Horário:* {$time}\n\n";
+            $message .= "Por favor, verifique se o medicamento foi administrado.\n\n";
+            $message .= "_Este é um lembrete automático do sistema Laços._";
+
+            $sentCount = 0;
+            foreach ($caregivers as $caregiver) {
+                try {
+                    $result = $whatsappService->sendMessage($caregiver->phone, $message);
+                    
+                    if ($result['success']) {
+                        $sentCount++;
+                        \Log::info('WhatsApp enviado para cuidador', [
+                            'caregiver_id' => $caregiver->id,
+                            'caregiver_name' => $caregiver->name,
+                            'phone' => $caregiver->phone,
+                            'alert_id' => $alert->id,
+                        ]);
+                    } else {
+                        \Log::warning('Falha ao enviar WhatsApp para cuidador', [
+                            'caregiver_id' => $caregiver->id,
+                            'phone' => $caregiver->phone,
+                            'error' => $result['error'] ?? 'Erro desconhecido',
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Exceção ao enviar WhatsApp para cuidador: ' . $e->getMessage(), [
+                        'caregiver_id' => $caregiver->id,
+                        'phone' => $caregiver->phone,
+                        'exception' => $e->getTraceAsString(),
+                    ]);
+                }
+            }
+
+            \Log::info('Envio de WhatsApp para cuidadores concluído', [
+                'alert_id' => $alert->id,
+                'total_caregivers' => $caregivers->count(),
+                'sent_count' => $sentCount,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Erro ao enviar WhatsApp para cuidadores: ' . $e->getMessage(), [
+                'alert_id' => $alert->id ?? null,
+                'exception' => $e->getTraceAsString(),
+            ]);
         }
     }
 }

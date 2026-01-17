@@ -89,6 +89,70 @@ class WhatsAppService
     }
 
     /**
+     * Enviar mensagem genérica via WhatsApp
+     */
+    public function sendMessage($phoneNumber, $message)
+    {
+        try {
+            // Formatar número de telefone
+            $phone = $this->formatPhoneNumber($phoneNumber);
+            
+            Log::info('Enviando mensagem WhatsApp', [
+                'phone' => $phone,
+                'instance' => $this->instanceName,
+            ]);
+
+            // Enviar mensagem via Evolution API
+            $response = Http::timeout(30)->withHeaders([
+                'apikey' => $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->post("{$this->apiUrl}/message/sendText/{$this->instanceName}", [
+                'number' => $phone,
+                'text' => $message,
+            ]);
+
+            if ($response->successful()) {
+                $responseData = $response->json();
+                
+                Log::info('WhatsApp enviado com sucesso', [
+                    'phone' => $phone,
+                    'message_id' => $responseData['key']['id'] ?? null,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message_id' => $responseData['key']['id'] ?? null,
+                    'message' => 'Mensagem enviada via WhatsApp',
+                ];
+            }
+
+            $errorMessage = $response->json('message', 'Erro desconhecido');
+            
+            Log::error('Erro ao enviar WhatsApp', [
+                'phone' => $phone,
+                'status' => $response->status(),
+                'error' => $errorMessage,
+                'response' => $response->body(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Exceção ao enviar WhatsApp: ' . $e->getMessage(), [
+                'phone' => $phoneNumber,
+                'exception' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Erro ao enviar mensagem WhatsApp: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * Verificar se a instância está conectada
      */
     public function checkConnection()

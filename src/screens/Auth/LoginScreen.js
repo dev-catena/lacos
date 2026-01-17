@@ -44,7 +44,8 @@ const LoginScreen = ({ navigation }) => {
     }
 
     if (result.requires2FA) {
-      navigation.navigate('TwoFactor', { login, password });
+      // Passar email (pode ser CPF ou email, mas vamos usar login como email)
+      navigation.navigate('TwoFactor', { email: login, password });
       return;
     }
 

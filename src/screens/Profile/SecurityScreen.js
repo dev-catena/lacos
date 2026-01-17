@@ -10,6 +10,7 @@ import {
   Alert,
   Switch,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,6 +40,10 @@ const SecurityScreen = ({ navigation }) => {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [switchValue, setSwitchValue] = useState(false);
+  const [showVerifyCode, setShowVerifyCode] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
 
   // Estado do certificado digital
   const [certificateData, setCertificateData] = useState({
@@ -55,6 +60,7 @@ const SecurityScreen = ({ navigation }) => {
 
     const enabled = !!user.two_factor_enabled;
     setTwoFactorEnabled(enabled);
+    setSwitchValue(enabled); // Sincronizar switch também
 
     // Se existir telefone específico do 2FA, preferir; senão usar telefone do perfil
     const phone = user.two_factor_phone || user.phone || '';
@@ -138,31 +144,115 @@ const SecurityScreen = ({ navigation }) => {
       const result = await userService.enable2FA('whatsapp', phoneNumber);
       
       if (result.success) {
+        // Código foi enviado, mostrar modal de verificação
+        setShow2FA(false);
+        setShowVerifyCode(true);
+        setVerificationCode('');
+        
+        Toast.show({
+          type: 'info',
+          text1: 'Código enviado',
+          text2: 'Verifique seu WhatsApp e digite o código de 6 dígitos',
+          position: 'bottom',
+        });
+      } else {
+        // Reverter switch se falhar
+        setSwitchValue(false);
+        Alert.alert('Erro', result.error || 'Não foi possível ativar a autenticação de dois fatores');
+      }
+    } catch (error) {
+      console.error('Erro ao ativar 2FA:', error);
+      // Reverter switch se houver erro
+      setSwitchValue(false);
+      Alert.alert('Erro', error.message || 'Não foi possível ativar a autenticação de dois fatores');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    const normalized = (verificationCode || '').replace(/\D/g, '');
+    if (normalized.length !== 6) {
+      Alert.alert('Atenção', 'Digite o código de 6 dígitos');
+      return;
+    }
+
+    setVerifying(true);
+    try {
+      const result = await userService.verify2FACode(normalized);
+      
+      if (result.success) {
         setTwoFactorEnabled(true);
+        setSwitchValue(true);
+        setShowVerifyCode(false);
+        setVerificationCode('');
         
         Toast.show({
           type: 'success',
           text1: '✅ 2FA ativado',
-          text2: result.message || 'Autenticação de dois fatores via WhatsApp configurada',
+          text2: 'Autenticação de dois fatores configurada com sucesso',
           position: 'bottom',
         });
 
-        setShow2FA(false);
-
-        // Atualizar usuário em memória (para refletir o toggle imediatamente)
+        // Atualizar usuário em memória
         updateUser({
           two_factor_enabled: true,
           two_factor_method: 'whatsapp',
           two_factor_phone: phoneNumber,
         });
       } else {
-        Alert.alert('Erro', result.error || 'Não foi possível ativar a autenticação de dois fatores');
+        // Verificar se é erro de autenticação
+        if (result.error && (result.error.includes('não autenticado') || result.error.includes('Sessão inválida') || result.error.includes('401'))) {
+          Alert.alert(
+            'Sessão Inválida',
+            'Sua sessão expirou. Por favor, faça login novamente.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  setShowVerifyCode(false);
+                  setSwitchValue(false);
+                  setVerificationCode('');
+                  // Navegar para login se necessário
+                  if (navigation) {
+                    navigation.navigate('Login');
+                  }
+                },
+              },
+            ]
+          );
+        } else {
+          Alert.alert('Erro', result.error || 'Código inválido ou expirado');
+        }
       }
     } catch (error) {
-      console.error('Erro ao ativar 2FA:', error);
-      Alert.alert('Erro', error.message || 'Não foi possível ativar a autenticação de dois fatores');
+      console.error('Erro ao verificar código:', error);
+      
+      // Verificar se é erro de autenticação
+      if (error.status === 401 || (error.message && (error.message.includes('não autenticado') || error.message.includes('Sessão inválida')))) {
+        Alert.alert(
+          'Sessão Inválida',
+          'Sua sessão expirou. Por favor, faça login novamente.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setShowVerifyCode(false);
+                setSwitchValue(false);
+                setVerificationCode('');
+                // Navegar para login se necessário
+                if (navigation) {
+                  navigation.navigate('Login');
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Erro', error.message || 'Erro ao verificar código');
+      }
     } finally {
-      setLoading(false);
+      setVerifying(false);
     }
   };
 
@@ -181,6 +271,7 @@ const SecurityScreen = ({ navigation }) => {
               
               if (result.success) {
                 setTwoFactorEnabled(false);
+                setSwitchValue(false); // Atualizar switch visual
                 
                 Toast.show({
                   type: 'info',
@@ -195,10 +286,14 @@ const SecurityScreen = ({ navigation }) => {
                   two_factor_phone: null,
                 });
               } else {
+                // Reverter switch se falhar
+                setSwitchValue(true);
                 Alert.alert('Erro', result.error || 'Não foi possível desativar o 2FA');
               }
             } catch (error) {
               console.error('Erro ao desativar 2FA:', error);
+              // Reverter switch se houver erro
+              setSwitchValue(true);
               Alert.alert('Erro', error.message || 'Não foi possível desativar o 2FA');
             }
           },
@@ -484,7 +579,14 @@ const SecurityScreen = ({ navigation }) => {
           <View style={styles.section}>
             <TouchableOpacity
               style={styles.sectionHeader}
-              onPress={() => setShow2FA(!show2FA)}
+              onPress={() => {
+                const newShow2FA = !show2FA;
+                setShow2FA(newShow2FA);
+                // Se fechar o modal sem ativar, reverter switch
+                if (!newShow2FA && !twoFactorEnabled) {
+                  setSwitchValue(false);
+                }
+              }}
               activeOpacity={0.7}
             >
               <View style={styles.sectionHeaderLeft}>
@@ -499,14 +601,20 @@ const SecurityScreen = ({ navigation }) => {
                 </View>
               </View>
                 <Switch
-                  value={twoFactorEnabled}
-                onValueChange={(v) => {
-                  if (v) {
-                    setShow2FA(true);
-                  } else {
-                    handleDisable2FA();
-                  }
-                }}
+                  value={switchValue}
+                  onValueChange={(v) => {
+                    // Atualizar visualmente primeiro para feedback imediato
+                    setSwitchValue(v);
+                    
+                    if (v) {
+                      // Tentando ativar: abrir modal para configurar
+                      setShow2FA(true);
+                      // Se cancelar ou falhar, o switch voltará ao estado anterior
+                    } else {
+                      // Tentando desativar: mostrar confirmação
+                      handleDisable2FA();
+                    }
+                  }}
                   trackColor={{ false: colors.gray300, true: colors.success }}
                   thumbColor={colors.textWhite}
                 />
@@ -706,6 +814,76 @@ const SecurityScreen = ({ navigation }) => {
           <View style={{ height: 40 }} />
         </View>
       </ScrollView>
+
+      {/* Modal de Verificação de Código 2FA */}
+      <Modal
+        visible={showVerifyCode}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowVerifyCode(false);
+          setSwitchValue(false);
+          setVerificationCode('');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="shield-checkmark" size={32} color={colors.primary} />
+              <Text style={styles.modalTitle}>Verificar Código</Text>
+              <Text style={styles.modalSubtitle}>
+                Digite o código de 6 dígitos enviado para{'\n'}
+                {phoneNumber || 'seu WhatsApp'}
+              </Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Código de Verificação *</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="key-outline" size={20} color={colors.gray400} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="000000"
+                  value={verificationCode}
+                  onChangeText={setVerificationCode}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus
+                />
+              </View>
+              <Text style={styles.hint}>
+                O código expira em 5 minutos
+              </Text>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => {
+                  setShowVerifyCode(false);
+                  setSwitchValue(false);
+                  setVerificationCode('');
+                }}
+                disabled={verifying}
+              >
+                <Text style={styles.modalButtonTextCancel}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm, verifying && styles.modalButtonDisabled]}
+                onPress={handleVerifyCode}
+                disabled={verifying}
+              >
+                {verifying ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.modalButtonTextConfirm}>Confirmar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -897,6 +1075,67 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 12,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: colors.gray200,
+  },
+  modalButtonConfirm: {
+    backgroundColor: colors.primary,
+  },
+  modalButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalButtonTextCancel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalButtonTextConfirm: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
   },
 });
 

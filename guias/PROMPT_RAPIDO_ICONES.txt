@@ -22,3 +22,8 @@ Lembre-se: A tela de Receitas funciona porque usa SafeIcon. Compare com ela se n
 
 Aplique a correção seguindo o mesmo padrão usado nas telas de Receitas e Arquivos.
 
+
+
+
+
+

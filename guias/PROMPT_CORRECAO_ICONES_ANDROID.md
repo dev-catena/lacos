@@ -88,3 +88,8 @@ grep -n "Ionicons" src/screens/[NOME_DA_TELA]/[ARQUIVO].js
 grep -n "nome-do-icone" src/components/SafeIcon.js
 ```
 
+
+
+
+
+

@@ -135,3 +135,8 @@ O problema pode ser:
 3. Se não funcionar, use build nativo: `npx expo run:android`
 4. Se build nativo não funcionar, considere usar emojis permanentemente
 
+
+
+
+
+
