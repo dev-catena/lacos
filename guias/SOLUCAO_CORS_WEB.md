@@ -56,7 +56,7 @@ export default {
   server: {
     proxy: {
       '/api': {
-        target: 'http://193.203.182.22',
+        target: 'http://10.102.0.103',
         changeOrigin: true,
       }
     }
@@ -83,7 +83,7 @@ Use variável de ambiente para desenvolvimento local:
 
 ```javascript
 // web/src/config/api.js
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://193.203.182.22/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://10.102.0.103/api';
 ```
 
 E criar `.env`:

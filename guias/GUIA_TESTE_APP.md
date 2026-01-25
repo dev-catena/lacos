@@ -2,7 +2,7 @@
 
 ## 🚀 Expo Iniciado!
 
-O app está rodando e conectado ao backend em: `http://193.203.182.22/api`
+O app está rodando e conectado ao backend em: `http://10.102.0.103/api`
 
 ## 📱 Como Testar
 
@@ -159,7 +159,7 @@ O app está rodando e conectado ao backend em: `http://193.203.182.22/api`
 **Causa:** Celular não consegue acessar o servidor
 **Solução:** 
 - Verifique se está na mesma rede
-- Teste acessar `http://193.203.182.22/api/user` no navegador do celular
+- Teste acessar `http://10.102.0.103/api/user` no navegador do celular
 - Se não funcionar, o firewall pode estar bloqueando
 
 ### Erro: "401 Unauthorized" ao criar grupo
@@ -172,7 +172,7 @@ O app está rodando e conectado ao backend em: `http://193.203.182.22/api`
 **Causa:** Problema no backend
 **Solução:**
 ```bash
-ssh darley@193.203.182.22 "tail -50 /var/www/lacos-backend/storage/logs/laravel.log"
+ssh darley@10.102.0.103 "tail -50 /var/www/lacos-backend/storage/logs/laravel.log"
 ```
 
 ### App trava ao fazer login
@@ -225,12 +225,12 @@ Se encontrar algum erro:
 2. **Tire screenshot** da tela com erro
 3. **Verifique logs do backend**:
    ```bash
-   ssh darley@193.203.182.22 "tail -100 /var/www/lacos-backend/storage/logs/laravel.log"
+   ssh darley@10.102.0.103 "tail -100 /var/www/lacos-backend/storage/logs/laravel.log"
    ```
 
 ---
 
-**Backend:** `http://193.203.182.22/api`  
+**Backend:** `http://10.102.0.103/api`  
 **Status:** ✅ Funcionando  
 **Última atualização:** 23/11/2025
 

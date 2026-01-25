@@ -9,7 +9,7 @@ echo "==============================="
 echo ""
 
 SERVER_USER="darley"
-SERVER_HOST="193.203.182.22"
+SERVER_HOST="10.102.0.103"
 SERVER_PORT="63022"
 BACKEND_PATH="/var/www/lacos-backend"
 

@@ -33,8 +33,8 @@ return [
         'http://localhost:5173',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:5173',
-        'http://193.203.182.22',
-        'https://193.203.182.22',
+        'http://10.102.0.103',
+        'https://10.102.0.103',
     ],
 
     'allowed_origins_patterns' => [],
@@ -196,6 +196,6 @@ echo "📝 Se CORS ainda não funcionar:"
 echo "   1. Verifique se config/cors.php foi criado: cat config/cors.php"
 echo "   2. Reinicie o servidor web: sudo systemctl restart nginx"
 echo "   3. Teste manualmente:"
-echo "      curl -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: POST' -X OPTIONS http://193.203.182.22/api/admin/login -v"
+echo "      curl -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: POST' -X OPTIONS http://10.102.0.103/api/admin/login -v"
 echo "   4. Verifique logs: tail -f storage/logs/laravel.log"
 

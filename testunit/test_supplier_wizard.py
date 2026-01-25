@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 # Configurações
-API_BASE_URL = "https://gateway.lacosapp.com/api"  # ou "http://193.203.182.22/api" para local
+API_BASE_URL = "https://gateway.lacosapp.com/api"  # ou "http://10.102.0.103/api" para local
 TEST_EMAIL = ""  # Será solicitado se não fornecido
 TEST_PASSWORD = ""  # Será solicitado se não fornecido
 

@@ -9,10 +9,10 @@ Execute estes comandos na sua máquina local (não no servidor):
 cd ~/lacos/backend-laravel
 
 # Copiar arquivos para o servidor
-scp create_plans_table.php darley@193.203.182.22:/var/www/lacos-backend/
-scp create_user_plans_table.php darley@193.203.182.22:/var/www/lacos-backend/
-scp Plan.php darley@193.203.182.22:/var/www/lacos-backend/
-scp PlanController.php darley@193.203.182.22:/var/www/lacos-backend/app/Http/Controllers/Api/
+scp create_plans_table.php darley@10.102.0.103:/var/www/lacos-backend/
+scp create_user_plans_table.php darley@10.102.0.103:/var/www/lacos-backend/
+scp Plan.php darley@10.102.0.103:/var/www/lacos-backend/
+scp PlanController.php darley@10.102.0.103:/var/www/lacos-backend/app/Http/Controllers/Api/
 ```
 
 ## Opção 2: Criar Diretamente no Servidor
@@ -20,7 +20,7 @@ scp PlanController.php darley@193.203.182.22:/var/www/lacos-backend/app/Http/Con
 Conecte-se ao servidor e crie os arquivos manualmente:
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 sudo su
 cd /var/www/lacos-backend
 ```

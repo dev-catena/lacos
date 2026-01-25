@@ -271,7 +271,7 @@ Route::post('/caregivers/{id}/reviews', [CaregiverController::class, 'createRevi
 
 ### Passo 1: Conectar ao servidor
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 ```
 
@@ -350,11 +350,11 @@ Após instalar, teste os endpoints:
 
 ```bash
 # Listar cuidadores
-curl -X GET "http://193.203.182.22/api/caregivers" \
+curl -X GET "http://10.102.0.103/api/caregivers" \
   -H "Authorization: Bearer SEU_TOKEN"
 
 # Detalhes de um cuidador
-curl -X GET "http://193.203.182.22/api/caregivers/1" \
+curl -X GET "http://10.102.0.103/api/caregivers/1" \
   -H "Authorization: Bearer SEU_TOKEN"
 ```
 

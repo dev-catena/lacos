@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SafeIcon from './SafeIcon';
 import plansService from '../services/plansService';
 import './PlanCard.css';
 
@@ -57,7 +58,8 @@ const PlanCard = ({ plan, isEditing, onEdit, onSave, onCancel }) => {
             onClick={() => onEdit(localPlan)}
             aria-label="Editar plano"
           >
-            ✏️ Editar
+            <SafeIcon name="edit" size={18} color="white" style={{ marginRight: '6px' }} />
+            Editar
           </button>
         )}
       </div>

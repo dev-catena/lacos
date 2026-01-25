@@ -2,7 +2,7 @@
 
 # Script para ver a parte do método que valida datas
 
-SERVER="darley@193.203.182.22"
+SERVER="darley@10.102.0.103"
 SSH_PORT="63022"
 BACKEND_PATH="/var/www/lacos-backend"
 

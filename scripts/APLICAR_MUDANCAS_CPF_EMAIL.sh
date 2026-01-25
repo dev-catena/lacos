@@ -3,7 +3,7 @@
 # Script para aplicar mudanças de CPF/Email no servidor
 # Envia arquivos e aplica mudanças automaticamente
 
-SERVER="darley@193.203.182.22"
+SERVER="darley@10.102.0.103"
 PORT="63022"
 PASSWORD="yhvh77"
 TMP_DIR="/tmp"

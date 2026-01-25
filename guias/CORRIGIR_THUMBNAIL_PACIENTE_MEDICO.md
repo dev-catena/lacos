@@ -15,7 +15,7 @@ Corrigir o método `getClientDetails` para construir a URL completa da foto usan
 ### Executar no servidor:
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 sudo bash /home/darley/lacos/backend-laravel/CORRIGIR_PHOTO_URL_GETCLIENTDETAILS.sh
 ```

@@ -2,7 +2,7 @@
 
 ## URL Completa
 ```
-http://193.203.182.22/api/login
+http://10.102.0.103/api/login
 ```
 
 ## Método HTTP
@@ -32,7 +32,7 @@ Accept: application/json
 
 ### cURL
 ```bash
-curl -X POST http://193.203.182.22/api/login \
+curl -X POST http://10.102.0.103/api/login \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -d '{
@@ -43,7 +43,7 @@ curl -X POST http://193.203.182.22/api/login \
 
 ### JavaScript (Fetch)
 ```javascript
-const response = await fetch('http://193.203.182.22/api/login', {
+const response = await fetch('http://10.102.0.103/api/login', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -60,7 +60,7 @@ const data = await response.json();
 
 ### JavaScript (Axios)
 ```javascript
-const response = await axios.post('http://193.203.182.22/api/login', {
+const response = await axios.post('http://10.102.0.103/api/login', {
   email: 'usuario@exemplo.com',
   password: 'senha123'
 }, {
@@ -185,7 +185,7 @@ Neste caso, é necessário chamar `/api/2fa/login/verify` com o código recebido
 ```javascript
 async function fazerLogin(email, password) {
   try {
-    const response = await fetch('http://193.203.182.22/api/login', {
+    const response = await fetch('http://10.102.0.103/api/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

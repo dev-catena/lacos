@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Script para adicionar coluna is_teleconsultation na tabela appointments
-# Servidor: 193.203.182.22
+# Servidor: 10.102.0.103
 # Usuário: darley
 # Senha: yhvh77
 
 echo "🔧 Adicionando coluna is_teleconsultation na tabela appointments..."
 
-SERVER="darley@193.203.182.22"
+SERVER="darley@10.102.0.103"
 
 sshpass -p 'yhvh77' ssh "$SERVER" bash << 'ENDSSH'
 cd /var/www/lacos-backend

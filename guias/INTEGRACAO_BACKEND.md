@@ -3,14 +3,14 @@
 ## ✅ O que foi feito
 
 ### 1. Backend Laravel 11 + MySQL
-- ✅ Servidor deployado em `193.203.182.22`
+- ✅ Servidor deployado em `10.102.0.103`
 - ✅ Banco MySQL configurado (`lacos` / `lacos` / `Lacos2025Secure`)
 - ✅ Nginx + PHP 8.2-FPM configurados
 - ✅ Todas as tabelas criadas via migrations
 - ✅ API RESTful com autenticação Sanctum
 - ✅ Rotas funcionando (testadas com curl)
 
-**URL Base da API:** `http://193.203.182.22/api`
+**URL Base da API:** `http://10.102.0.103/api`
 
 ### 2. Frontend React Native
 - ✅ AuthContext atualizado para usar API real
@@ -187,7 +187,7 @@ async function recordDose(medicationId) {
 ### 1. Testar Autenticação no Terminal
 ```bash
 # No servidor
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 
 # Registrar usuário
 curl -X POST http://localhost/api/register \
@@ -244,11 +244,11 @@ curl -X GET http://localhost/api/user \
 - Token pode ter expirado, faça login novamente
 
 ### Erro de Conexão
-- Verifique se o servidor está rodando: `ssh darley@193.203.182.22 "sudo systemctl status nginx"`
+- Verifique se o servidor está rodando: `ssh darley@10.102.0.103 "sudo systemctl status nginx"`
 - Verifique a URL da API em `src/config/api.js`
 
 ### Erro 500 Server Error
-- Verifique os logs: `ssh darley@193.203.182.22 "tail -50 /var/www/lacos-backend/storage/logs/laravel.log"`
+- Verifique os logs: `ssh darley@10.102.0.103 "tail -50 /var/www/lacos-backend/storage/logs/laravel.log"`
 
 ## 📞 Suporte
 
@@ -260,6 +260,6 @@ Para qualquer problema, verifique:
 
 ---
 
-**Backend deployado e funcionando em:** `http://193.203.182.22`
+**Backend deployado e funcionando em:** `http://10.102.0.103`
 **Última atualização:** 23/11/2025
 

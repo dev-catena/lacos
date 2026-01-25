@@ -2,7 +2,7 @@
 
 ## ✅ Deploy Concluído!
 
-Os arquivos foram instalados com sucesso no servidor **193.203.182.22**
+Os arquivos foram instalados com sucesso no servidor **10.102.0.103**
 
 ---
 
@@ -24,7 +24,7 @@ Os arquivos foram instalados com sucesso no servidor **193.203.182.22**
 
 **Conectar ao servidor:**
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 ```
 
 **Editar routes/api.php:**
@@ -97,13 +97,13 @@ Salvar e sair.
 
 **Listar mídias:**
 ```bash
-curl -X GET "http://193.203.182.22/api/groups/1/media" \
+curl -X GET "http://10.102.0.103/api/groups/1/media" \
   -H "Authorization: Bearer SEU_TOKEN_AQUI"
 ```
 
 **Listar alertas:**
 ```bash
-curl -X GET "http://193.203.182.22/api/groups/1/alerts/active" \
+curl -X GET "http://10.102.0.103/api/groups/1/alerts/active" \
   -H "Authorization: Bearer SEU_TOKEN_AQUI"
 ```
 
@@ -184,7 +184,7 @@ return [];
 ### No Servidor
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 
 # Verificar arquivos
 ls -la /var/www/lacos-backend/app/Http/Controllers/Api/

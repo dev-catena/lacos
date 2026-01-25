@@ -75,28 +75,28 @@ if ($user && $user->profile === 'doctor') {
 
 ### Listar usuários
 ```bash
-curl -X GET http://193.203.182.22/api/admin/users \
+curl -X GET http://10.102.0.103/api/admin/users \
   -H "Authorization: Bearer SEU_TOKEN" \
   -H "Accept: application/json"
 ```
 
 ### Bloquear usuário
 ```bash
-curl -X POST http://193.203.182.22/api/admin/users/1/block \
+curl -X POST http://10.102.0.103/api/admin/users/1/block \
   -H "Authorization: Bearer SEU_TOKEN" \
   -H "Accept: application/json"
 ```
 
 ### Listar médicos pendentes
 ```bash
-curl -X GET http://193.203.182.22/api/admin/doctors/pending \
+curl -X GET http://10.102.0.103/api/admin/doctors/pending \
   -H "Authorization: Bearer SEU_TOKEN" \
   -H "Accept: application/json"
 ```
 
 ### Aprovar médico
 ```bash
-curl -X POST http://193.203.182.22/api/admin/doctors/1/approve \
+curl -X POST http://10.102.0.103/api/admin/doctors/1/approve \
   -H "Authorization: Bearer SEU_TOKEN" \
   -H "Accept: application/json"
 ```

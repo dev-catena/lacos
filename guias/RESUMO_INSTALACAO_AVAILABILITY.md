@@ -18,7 +18,7 @@ Execute os seguintes comandos no servidor (como root ou com permissões adequada
 
 ### 1. Conectar ao servidor
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 ```
 
 ### 2. Adicionar método ao DoctorController
@@ -61,7 +61,7 @@ sudo php artisan cache:clear
 
 ### 6. Testar
 ```bash
-curl -H "Authorization: Bearer {seu_token}" http://193.203.182.22/api/doctors/28/availability
+curl -H "Authorization: Bearer {seu_token}" http://10.102.0.103/api/doctors/28/availability
 ```
 
 ## Estrutura de Resposta Esperada

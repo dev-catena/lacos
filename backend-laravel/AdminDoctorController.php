@@ -190,7 +190,8 @@ class AdminDoctorController extends Controller
     {
         try {
             // Sempre usar URL da API diretamente (mais confiável)
-            $baseUrl = config('app.url', 'http://193.203.182.22');
+            // Usar configuração do backend (pode ser sobrescrita via .env)
+            $baseUrl = config('backend.base_url', config('app.url', 'http://10.102.0.103:8000'));
             // Usar urlencode para garantir que caracteres especiais no token sejam tratados corretamente
             $activationUrl = $baseUrl . '/api/doctors/activate?token=' . urlencode($token);
             

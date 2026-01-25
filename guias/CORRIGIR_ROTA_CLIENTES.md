@@ -16,7 +16,7 @@ As rotas mais específicas (`/caregivers/clients`) devem vir **ANTES** das rotas
 ### Execute no servidor:
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 sudo bash /tmp/CORRIGIR_ROTAS_CLIENTES.sh
 ```
 

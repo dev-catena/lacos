@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Script para atualizar CaregiverController com filtro por especialidade e disponibilidade
-# Servidor: 193.203.182.22
+# Servidor: 10.102.0.103
 # Usuário: darley
 # Senha: yhvh77
 
 echo "🔧 Atualizando CaregiverController com filtros de especialidade e disponibilidade..."
 
 # Configurações
-SERVER="darley@193.203.182.22"
+SERVER="darley@10.102.0.103"
 SERVER_PATH="/var/www/lacos-backend"
 LOCAL_FILE="CaregiverController_COM_FILTRO_ESPECIALIDADE.php"
 REMOTE_FILE="app/Http/Controllers/Api/CaregiverController.php"

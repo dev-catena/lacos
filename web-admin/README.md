@@ -56,7 +56,7 @@ Os arquivos de produção estarão na pasta `dist/`
 
 ## 🔌 Integração com API
 
-A aplicação se conecta à API Laravel em `http://193.203.182.22/api`.
+A aplicação se conecta à API Laravel em `http://10.102.0.103/api`.
 
 ### Endpoints Esperados
 
@@ -69,6 +69,40 @@ A aplicação se conecta à API Laravel em `http://193.203.182.22/api`.
 ### Autenticação
 
 A aplicação utiliza o token armazenado em `localStorage` com a chave `@lacos:token` para autenticação nas requisições.
+
+#### 🔐 Credenciais de Acesso (Web-Admin)
+
+**Email:** `admin@lacos.com`  
+**Senha:** `admin123`
+
+**Endpoint de Login:**
+```
+POST /api/admin/login
+```
+
+**Exemplo de Requisição:**
+```json
+{
+  "email": "admin@lacos.com",
+  "password": "admin123"
+}
+```
+
+**Resposta Esperada:**
+```json
+{
+  "user": {
+    "id": 2,
+    "name": "Administrador",
+    "email": "admin@lacos.com",
+    "profile": null
+  },
+  "token": "5|fjVzjsDXhXPuUvRILwH2urvVtkE2x35bKai0e6p5ec305237",
+  "message": "Login realizado com sucesso"
+}
+```
+
+O token retornado deve ser usado no header `Authorization: Bearer {token}` para todas as requisições autenticadas.
 
 ## 📝 Notas
 

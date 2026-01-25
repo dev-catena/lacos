@@ -56,7 +56,7 @@ web/
 A URL da API está configurada em `src/services/plansService.js`:
 
 ```javascript
-const API_BASE_URL = 'http://193.203.182.22/api';
+const API_BASE_URL = 'http://10.102.0.103/api';
 ```
 
 Para alterar, edite este arquivo.

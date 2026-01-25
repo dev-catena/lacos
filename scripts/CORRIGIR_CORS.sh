@@ -44,8 +44,8 @@ return [
         'http://localhost:5173',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:5173',
-        'http://193.203.182.22',
-        'https://193.203.182.22',
+        'http://10.102.0.103',
+        'https://10.102.0.103',
     ],
 
     'allowed_origins_patterns' => [],
@@ -130,10 +130,10 @@ echo ""
 echo "📝 Origens permitidas:"
 echo "   - http://localhost:3000"
 echo "   - http://localhost:5173"
-echo "   - http://193.203.182.22"
+echo "   - http://10.102.0.103"
 echo ""
 echo "🔄 Se ainda houver erro:"
 echo "   1. Reinicie o servidor web: sudo systemctl restart nginx"
 echo "   2. Verifique se o middleware HandleCors está ativo"
-echo "   3. Teste com: curl -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: POST' -X OPTIONS http://193.203.182.22/api/admin/login -v"
+echo "   3. Teste com: curl -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: POST' -X OPTIONS http://10.102.0.103/api/admin/login -v"
 

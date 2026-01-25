@@ -1,0 +1,347 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+
+class AdminDoctorController extends Controller
+{
+    /**
+     * Listar médicos pendentes de aprovação
+     * GET /api/admin/doctors/pending
+     */
+    public function getPending()
+    {
+        if (ob_get_level()) {
+            ob_clean();
+        }
+        
+        try {
+            $doctors = User::where('profile', 'doctor')
+                ->where(function($query) {
+                    $query->whereNull('doctor_approved_at')
+                          ->orWhere('doctor_approved_at', '=', '0000-00-00 00:00:00');
+                })
+                ->where('is_blocked', false)
+                ->orderBy('users.created_at', 'desc')
+                ->get()
+                ->map(function($doctor) {
+                    // Buscar especialidade diretamente do banco se houver medical_specialty_id
+                    $specialty = null;
+                    if (isset($doctor->medical_specialty_id) && $doctor->medical_specialty_id) {
+                        $specialtyData = DB::table('medical_specialties')
+                            ->where('id', $doctor->medical_specialty_id)
+                            ->select('id', 'name')
+                            ->first();
+                        if ($specialtyData) {
+                            $specialty = [
+                                'id' => $specialtyData->id,
+                                'name' => $specialtyData->name,
+                            ];
+                        }
+                    }
+                    
+                    return [
+                        'id' => $doctor->id,
+                        'name' => $doctor->name,
+                        'email' => $doctor->email,
+                        'crm' => $doctor->crm ?? null,
+                        'cpf' => $doctor->cpf ?? null,
+                        'specialty' => $specialty,
+                        'created_at' => $doctor->created_at,
+                    ];
+                });
+
+            if (ob_get_level()) {
+                ob_clean();
+            }
+
+            return response()->json($doctors, 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Exception $e) {
+            if (ob_get_level()) {
+                ob_clean();
+            }
+            
+            return response()->json([
+                'error' => 'Erro ao buscar médicos pendentes',
+                'message' => $e->getMessage()
+            ], 500, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+
+    /**
+     * Listar todos os médicos
+     * GET /api/admin/doctors
+     */
+    public function index()
+    {
+        if (ob_get_level()) {
+            ob_clean();
+        }
+        
+        try {
+            $doctors = User::where('profile', 'doctor')
+                ->orderBy('doctor_approved_at', 'desc')
+                ->orderBy('users.created_at', 'desc')
+                ->get()
+                ->map(function($doctor) {
+                    // Buscar especialidade diretamente do banco se houver medical_specialty_id
+                    $specialty = null;
+                    if (isset($doctor->medical_specialty_id) && $doctor->medical_specialty_id) {
+                        $specialtyData = DB::table('medical_specialties')
+                            ->where('id', $doctor->medical_specialty_id)
+                            ->select('id', 'name')
+                            ->first();
+                        if ($specialtyData) {
+                            $specialty = [
+                                'id' => $specialtyData->id,
+                                'name' => $specialtyData->name,
+                            ];
+                        }
+                    }
+                    
+                    // Verificar se está ativado (approved_at existe E token é NULL)
+                    $isActivated = $doctor->doctor_approved_at && 
+                                   ($doctor->doctor_activation_token === null || $doctor->doctor_activation_token === '');
+                    
+                    return [
+                        'id' => $doctor->id,
+                        'name' => $doctor->name,
+                        'email' => $doctor->email,
+                        'crm' => $doctor->crm ?? null,
+                        'cpf' => $doctor->cpf ?? null,
+                        'specialty' => $specialty,
+                        'is_blocked' => (bool) $doctor->is_blocked,
+                        'approved_at' => $doctor->doctor_approved_at,
+                        'is_activated' => $isActivated,
+                        'created_at' => $doctor->created_at,
+                    ];
+                });
+
+            if (ob_get_level()) {
+                ob_clean();
+            }
+
+            return response()->json($doctors, 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Exception $e) {
+            if (ob_get_level()) {
+                ob_clean();
+            }
+            
+            return response()->json([
+                'error' => 'Erro ao buscar médicos',
+                'message' => $e->getMessage()
+            ], 500, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+
+    /**
+     * Aprovar médico
+     * POST /api/admin/doctors/{id}/approve
+     */
+    public function approve($id)
+    {
+        if (ob_get_level()) {
+            ob_clean();
+        }
+        
+        try {
+            $doctor = User::findOrFail($id);
+
+            if ($doctor->profile !== 'doctor') {
+                if (ob_get_level()) {
+                    ob_clean();
+                }
+                
+                return response()->json([
+                    'error' => 'Usuário não é um médico',
+                    'message' => 'Apenas médicos podem ser aprovados'
+                ], 400, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+
+            $doctor->doctor_approved_at = now();
+            $doctor->doctor_activation_token = null; // Limpar token de ativação
+            $doctor->save();
+
+            if (ob_get_level()) {
+                ob_clean();
+            }
+
+            return response()->json([
+                'message' => 'Médico aprovado com sucesso',
+                'doctor' => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->name,
+                    'email' => $doctor->email,
+                    'approved_at' => $doctor->doctor_approved_at,
+                ]
+            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Exception $e) {
+            if (ob_get_level()) {
+                ob_clean();
+            }
+            
+            return response()->json([
+                'error' => 'Erro ao aprovar médico',
+                'message' => $e->getMessage()
+            ], 500, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+
+    /**
+     * Rejeitar médico
+     * POST /api/admin/doctors/{id}/reject
+     */
+    public function reject($id)
+    {
+        if (ob_get_level()) {
+            ob_clean();
+        }
+        
+        try {
+            $doctor = User::findOrFail($id);
+
+            if ($doctor->profile !== 'doctor') {
+                if (ob_get_level()) {
+                    ob_clean();
+                }
+                
+                return response()->json([
+                    'error' => 'Usuário não é um médico',
+                    'message' => 'Apenas médicos podem ser rejeitados'
+                ], 400, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+
+            // Marcar como rejeitado (pode adicionar um campo rejected_at se necessário)
+            $doctor->doctor_approved_at = null;
+            $doctor->is_blocked = true; // Bloquear após rejeição
+            $doctor->save();
+
+            if (ob_get_level()) {
+                ob_clean();
+            }
+
+            return response()->json([
+                'message' => 'Médico rejeitado com sucesso',
+                'doctor' => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->name,
+                    'email' => $doctor->email,
+                ]
+            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Exception $e) {
+            if (ob_get_level()) {
+                ob_clean();
+            }
+            
+            return response()->json([
+                'error' => 'Erro ao rejeitar médico',
+                'message' => $e->getMessage()
+            ], 500, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+
+    /**
+     * Bloquear médico
+     * POST /api/admin/doctors/{id}/block
+     */
+    public function block($id)
+    {
+        if (ob_get_level()) {
+            ob_clean();
+        }
+        
+        try {
+            $doctor = User::findOrFail($id);
+
+            $doctor->is_blocked = true;
+            $doctor->save();
+
+            // Revogar todos os tokens do médico
+            $doctor->tokens()->delete();
+
+            if (ob_get_level()) {
+                ob_clean();
+            }
+
+            return response()->json([
+                'message' => 'Médico bloqueado com sucesso',
+                'doctor' => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->name,
+                    'email' => $doctor->email,
+                    'is_blocked' => true,
+                ]
+            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Exception $e) {
+            if (ob_get_level()) {
+                ob_clean();
+            }
+            
+            return response()->json([
+                'error' => 'Erro ao bloquear médico',
+                'message' => $e->getMessage()
+            ], 500, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+
+    /**
+     * Excluir médico
+     * DELETE /api/admin/doctors/{id}
+     */
+    public function destroy($id)
+    {
+        if (ob_get_level()) {
+            ob_clean();
+        }
+        
+        try {
+            $doctor = User::findOrFail($id);
+
+            // Revogar todos os tokens do médico antes de excluir
+            $doctor->tokens()->delete();
+
+            // Excluir o médico
+            $doctorEmail = $doctor->email;
+            $doctorName = $doctor->name;
+            $doctor->delete();
+
+            if (ob_get_level()) {
+                ob_clean();
+            }
+
+            return response()->json([
+                'message' => 'Médico excluído com sucesso',
+                'deleted_doctor' => [
+                    'id' => $id,
+                    'name' => $doctorName,
+                    'email' => $doctorEmail,
+                ]
+            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            if (ob_get_level()) {
+                ob_clean();
+            }
+            
+            return response()->json([
+                'error' => 'Médico não encontrado',
+                'message' => 'O médico com o ID informado não existe'
+            ], 404, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Exception $e) {
+            if (ob_get_level()) {
+                ob_clean();
+            }
+            
+            return response()->json([
+                'error' => 'Erro ao excluir médico',
+                'message' => $e->getMessage()
+            ], 500, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+}
+

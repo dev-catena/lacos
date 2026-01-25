@@ -2,7 +2,7 @@
 
 # Script para corrigir o método index() do GroupController para incluir todos os grupos
 
-SERVER_IP="193.203.182.22"
+SERVER_IP="10.102.0.103"
 SERVER_USER="darley"
 SERVER_PASSWORD="yhvh77"
 PORT="63022"

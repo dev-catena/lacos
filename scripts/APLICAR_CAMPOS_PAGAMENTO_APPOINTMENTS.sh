@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Script para adicionar campos de pagamento na tabela appointments
-# Servidor: 193.203.182.22
+# Servidor: 10.102.0.103
 # Usuário: darley
 # Senha: yhvh77
 
 echo "🔧 Adicionando campos de pagamento na tabela appointments..."
 
-SERVER="darley@193.203.182.22"
+SERVER="darley@10.102.0.103"
 PASSWORD="yhvh77"
 
 sshpass -p "$PASSWORD" ssh -p 63022 "$SERVER" bash << 'ENDSSH'

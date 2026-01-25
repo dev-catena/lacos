@@ -37,8 +37,18 @@ class EmergencyContactService {
       if (groupId) {
         endpoint += `?group_id=${groupId}`;
       }
-
+      
       const response = await apiService.get(endpoint);
+      
+      // Se o backend retornar 403, significa que o usuário não tem acesso ao grupo
+      if (response?.status === 403 || (response?.data?.message && response.data.message.includes('não tem acesso'))) {
+        console.warn('⚠️ Usuário não tem acesso ao grupo, retornando array vazio');
+        return {
+          success: true,
+          data: []
+        };
+      }
+      
       return { success: true, data: response };
     } catch (error) {
       console.error('Erro ao buscar contatos de emergência:', error);

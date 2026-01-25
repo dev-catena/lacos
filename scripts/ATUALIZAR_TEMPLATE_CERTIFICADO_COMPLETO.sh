@@ -4,7 +4,7 @@
 # com todos os campos necessários conforme a imagem fornecida
 
 SSH_USER="darley"
-SSH_HOST="193.203.182.22"
+SSH_HOST="10.102.0.103"
 BACKEND_DIR="/var/www/lacos-backend"
 TEMPLATE_DIR="$BACKEND_DIR/resources/views/prescriptions"
 TEMPLATE_FILE="$TEMPLATE_DIR/certificate.blade.php"

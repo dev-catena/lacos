@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Schema;
 
 class UserController extends Controller
 {
@@ -55,14 +56,19 @@ class UserController extends Controller
 
         $request->validate($rules);
 
-        $data = $request->only([
-            'name', 
-            'email', 
-            'phone', 
-            'gender', 
-            'blood_type', 
-            'birth_date',
-            // Campos de dados pessoais
+        // Construir array de dados condicionalmente baseado nas colunas existentes
+        $data = [];
+        
+        // Campos sempre presentes
+        $alwaysFields = ['name', 'email', 'phone', 'gender', 'blood_type', 'birth_date'];
+        foreach ($alwaysFields as $field) {
+            if ($request->has($field)) {
+                $data[$field] = $request->input($field);
+            }
+        }
+        
+        // Campos de dados pessoais (verificar se existem)
+        $personalFields = [
             'last_name',
             'cpf',
             'address',
@@ -71,7 +77,16 @@ class UserController extends Controller
             'city',
             'state',
             'zip_code',
-            // Campos específicos de cuidador profissional
+        ];
+        
+        foreach ($personalFields as $field) {
+            if ($request->has($field) && Schema::hasColumn('users', $field)) {
+                $data[$field] = $request->input($field);
+            }
+        }
+        
+        // Campos específicos de cuidador profissional (verificar se existem)
+        $caregiverFields = [
             'neighborhood',
             'formation_details',
             'hourly_rate',
@@ -79,7 +94,13 @@ class UserController extends Controller
             'is_available',
             'latitude',
             'longitude',
-        ]);
+        ];
+        
+        foreach ($caregiverFields as $field) {
+            if ($request->has($field) && Schema::hasColumn('users', $field)) {
+                $data[$field] = $request->input($field);
+            }
+        }
 
         // Processar cursos se fornecidos (para cuidador profissional)
         if ($request->has('courses') && is_array($request->courses)) {

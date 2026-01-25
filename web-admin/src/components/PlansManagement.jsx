@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SafeIcon from './SafeIcon';
 import PlanCard from './PlanCard';
 import plansService from '../services/plansService';
 import './PlansManagement.css';
@@ -87,13 +88,14 @@ const PlansManagement = () => {
           </p>
         </div>
         <button className="refresh-button" onClick={loadPlans}>
-          🔄 Atualizar
+          <SafeIcon name="refresh" size={18} color="#6366f1" style={{ marginRight: '8px' }} />
+          Atualizar
         </button>
       </header>
 
       {error && (
         <div className="error-banner">
-          <span>⚠️</span>
+          <SafeIcon name="warning" size={20} color="#f59e0b" style={{ marginRight: '8px' }} />
           <span>{error}</span>
         </div>
       )}
@@ -113,7 +115,7 @@ const PlansManagement = () => {
         </div>
 
         <div className="info-box">
-          <h3>ℹ️ Informações Importantes</h3>
+          <h3>Informações Importantes</h3>
           <ul>
             <li>
               <strong>Plano Básico:</strong> É o plano padrão atribuído a todos os novos usuários.

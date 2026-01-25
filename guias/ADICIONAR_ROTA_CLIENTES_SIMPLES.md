@@ -9,7 +9,7 @@ O script não encontrou a linha. Vamos fazer manualmente de forma mais simples.
 Execute no servidor:
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 ```
 

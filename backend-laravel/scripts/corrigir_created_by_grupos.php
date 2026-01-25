@@ -1,0 +1,61 @@
+<?php
+
+/**
+ * Script para corrigir grupos que não têm created_by preenchido
+ * Atualiza created_by com admin_user_id para grupos existentes
+ */
+
+require __DIR__ . '/../vendor/autoload.php';
+
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+echo "🔧 Corrigindo grupos sem created_by...\n\n";
+
+try {
+    // Buscar grupos que têm admin_user_id mas não têm created_by
+    $groups = DB::table('groups')
+        ->whereNotNull('admin_user_id')
+        ->where(function($query) {
+            $query->whereNull('created_by')
+                  ->orWhere('created_by', 0);
+        })
+        ->get();
+
+    echo "📊 Encontrados " . $groups->count() . " grupo(s) para corrigir\n\n";
+
+    $updated = 0;
+    foreach ($groups as $group) {
+        echo "  - Grupo ID: {$group->id}, Nome: {$group->name}\n";
+        echo "    admin_user_id: {$group->admin_user_id}\n";
+        echo "    created_by atual: " . ($group->created_by ?? 'NULL') . "\n";
+
+        // Atualizar created_by com admin_user_id
+        DB::table('groups')
+            ->where('id', $group->id)
+            ->update([
+                'created_by' => $group->admin_user_id,
+                'updated_at' => now()
+            ]);
+
+        echo "    ✅ Atualizado: created_by = {$group->admin_user_id}\n\n";
+        $updated++;
+    }
+
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+    echo "✅ Correção concluída!\n";
+    echo "   Total de grupos atualizados: {$updated}\n";
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+
+} catch (\Exception $e) {
+    echo "❌ Erro: " . $e->getMessage() . "\n";
+    echo "Stack trace: " . $e->getTraceAsString() . "\n";
+    exit(1);
+}
+
+
+
+

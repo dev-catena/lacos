@@ -3,7 +3,7 @@
 # Script para executar a correção remotamente com senha do sudo
 
 SSH_USER="darley"
-SSH_HOST="193.203.182.22"
+SSH_HOST="10.102.0.103"
 SSH_PORT="63022"
 SSH_PASS="yhvh77"
 SUDO_PASS="yhvh77"

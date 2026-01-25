@@ -11,7 +11,7 @@ A migration `2025_11_30_010441_create_documents_table` está tentando criar a ta
 Execute no servidor:
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 
 # Marcar migration como executada
@@ -46,7 +46,7 @@ php artisan tinker --execute="
 ### Opção 2: Executar apenas a migration de doctor_availability
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 
 # Encontrar a migration de doctor_availability
@@ -59,7 +59,7 @@ php artisan migrate --path=database/migrations/$(basename $MIGRATION_FILE)
 ### Opção 3: Pular migration problemática
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 
 # Executar migrations pulando a problemática

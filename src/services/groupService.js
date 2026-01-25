@@ -52,12 +52,50 @@ class GroupService {
   async getMyGroups() {
     try {
       const response = await apiService.get('/groups');
-      return { success: true, data: response };
+      console.log('📦 GroupService.getMyGroups - Resposta da API:', {
+        type: typeof response,
+        isArray: Array.isArray(response),
+        length: Array.isArray(response) ? response.length : 'N/A',
+        response: response
+      });
+      
+      // Garantir que sempre retornamos um array
+      let groupsArray = [];
+      
+      if (Array.isArray(response)) {
+        groupsArray = response;
+      } else if (response && typeof response === 'object') {
+        // Se response é um objeto, pode ter uma propriedade data ou ser o próprio array
+        if (Array.isArray(response.data)) {
+          groupsArray = response.data;
+        } else if (Array.isArray(response.groups)) {
+          groupsArray = response.groups;
+        } else {
+          // Se não encontrou array, tentar converter para array
+          groupsArray = [];
+        }
+      }
+      
+      console.log('📦 GroupService.getMyGroups - Grupos processados:', {
+        count: groupsArray.length,
+        firstGroup: groupsArray[0] || null
+      });
+      
+      return { 
+        success: true, 
+        data: groupsArray 
+      };
     } catch (error) {
-      console.error('Erro ao buscar grupos:', error);
+      console.error('❌ GroupService.getMyGroups - Erro ao buscar grupos:', error);
+      console.error('❌ GroupService.getMyGroups - Detalhes do erro:', {
+        message: error.message,
+        status: error.status,
+        response: error.response
+      });
       return { 
         success: false, 
-        error: error.message || 'Erro ao buscar grupos' 
+        error: error.message || 'Erro ao buscar grupos',
+        data: [] // Retornar array vazio em caso de erro
       };
     }
   }
@@ -92,19 +130,32 @@ class GroupService {
         console.log('📤 GroupService.updateGroup - Endpoint:', endpoint);
         console.log('📤 GroupService.updateGroup - FormData contém foto');
         
+        // Log detalhado do FormData
+        console.log('📤 GroupService.updateGroup - Verificando FormData...');
+        for (let pair of groupData.entries()) {
+          console.log(`📤 GroupService.updateGroup - FormData[${pair[0]}]:`, 
+            pair[1] instanceof File || (typeof pair[1] === 'object' && pair[1].uri) 
+              ? `[FILE: ${pair[1].name || 'sem nome'}]` 
+              : pair[1]
+          );
+        }
+        
         try {
           // Não passar headers manualmente - o apiService já gerencia isso
+          console.log('📤 GroupService.updateGroup - Chamando apiService.put...');
           const response = await apiService.put(endpoint, groupData);
           console.log('✅ GroupService.updateGroup - Resposta recebida:', {
             hasData: !!response,
             keys: response ? Object.keys(response) : [],
             hasPhotoUrl: !!(response?.photo_url || response?.photo || response?.url),
+            fullResponse: response,
           });
           return { success: true, data: response };
         } catch (apiError) {
           console.error('❌ GroupService.updateGroup - Erro na API:', apiError);
           console.error('❌ GroupService.updateGroup - Status:', apiError.status);
           console.error('❌ GroupService.updateGroup - Mensagem:', apiError.message);
+          console.error('❌ GroupService.updateGroup - Error completo:', JSON.stringify(apiError, null, 2));
           throw apiError;
         }
       }
@@ -142,8 +193,31 @@ class GroupService {
       if (groupData.health_info) data.health_info = typeof groupData.health_info === 'string' 
         ? groupData.health_info 
         : JSON.stringify(groupData.health_info);
+      
+      // Sinais vitais e permissões (se vierem no groupData)
+      if (groupData.monitor_blood_pressure !== undefined) data.monitor_blood_pressure = groupData.monitor_blood_pressure;
+      if (groupData.monitor_heart_rate !== undefined) data.monitor_heart_rate = groupData.monitor_heart_rate;
+      if (groupData.monitor_oxygen_saturation !== undefined) data.monitor_oxygen_saturation = groupData.monitor_oxygen_saturation;
+      if (groupData.monitor_blood_glucose !== undefined) data.monitor_blood_glucose = groupData.monitor_blood_glucose;
+      if (groupData.monitor_temperature !== undefined) data.monitor_temperature = groupData.monitor_temperature;
+      if (groupData.monitor_respiratory_rate !== undefined) data.monitor_respiratory_rate = groupData.monitor_respiratory_rate;
+      
+      // Permissões
+      if (groupData.accompanied_notify_medication !== undefined) data.accompanied_notify_medication = groupData.accompanied_notify_medication;
+      if (groupData.accompanied_notify_appointment !== undefined) data.accompanied_notify_appointment = groupData.accompanied_notify_appointment;
+      if (groupData.accompanied_access_history !== undefined) data.accompanied_access_history = groupData.accompanied_access_history;
+      if (groupData.accompanied_access_medication !== undefined) data.accompanied_access_medication = groupData.accompanied_access_medication;
+      if (groupData.accompanied_access_schedule !== undefined) data.accompanied_access_schedule = groupData.accompanied_access_schedule;
+      if (groupData.accompanied_access_chat !== undefined) data.accompanied_access_chat = groupData.accompanied_access_chat;
 
+      console.log('📤 GroupService.updateGroup - Enviando dados JSON:', data);
+      console.log('📤 GroupService.updateGroup - Endpoint:', endpoint);
       const response = await apiService.put(endpoint, data);
+      console.log('✅ GroupService.updateGroup - Resposta recebida (JSON):', {
+        hasData: !!response,
+        keys: response ? Object.keys(response) : [],
+        fullResponse: response,
+      });
       return { success: true, data: response };
     } catch (error) {
       console.error('Erro ao atualizar grupo:', error);
@@ -177,6 +251,18 @@ class GroupService {
   async joinGroup(accessCode) {
     try {
       const response = await apiService.post('/groups/join', { code: accessCode });
+      
+      // A API retorna { success: true, message: "...", data: { group: {...}, your_role: "..." } }
+      // Precisamos retornar no formato esperado pelo frontend
+      if (response && response.success && response.data) {
+        return {
+          success: true,
+          data: response.data, // Já contém { group: {...}, your_role: "..." }
+          message: response.message
+        };
+      }
+      
+      // Se a resposta não tiver a estrutura esperada, retornar como está
       return { success: true, data: response };
     } catch (error) {
       console.error('Erro ao entrar no grupo:', error);
@@ -200,6 +286,39 @@ class GroupService {
    */
   async joinWithCode(code) {
     return this.joinGroup(code);
+  }
+
+  /**
+   * Upload de foto do grupo - MÉTODO SIMPLES
+   */
+  async uploadGroupPhotoSimple(groupId, imageUri) {
+    try {
+      const formData = new FormData();
+      
+      const filename = imageUri.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      const file = {
+        uri: imageUri,
+        name: filename || `photo_${Date.now()}.jpg`,
+        type: type,
+      };
+      
+      formData.append('photo', file);
+
+      console.log('📤 GroupService.uploadGroupPhotoSimple - Enviando para /groups/' + groupId + '/photo');
+      const response = await apiService.post(`/groups/${groupId}/photo`, formData);
+
+      console.log('✅ GroupService.uploadGroupPhotoSimple - Resposta:', response);
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('❌ GroupService.uploadGroupPhotoSimple - Erro:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Erro ao fazer upload da foto' 
+      };
+    }
   }
 
   /**

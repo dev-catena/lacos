@@ -253,6 +253,18 @@ const PatientHomeScreen = ({ navigation }) => {
         }
       } else {
         console.warn('⚠️ PatientHomeScreen - Nenhum grupo encontrado para o paciente');
+        // Limpar dados do grupo anterior se existir
+        setGroupId(null);
+        setContacts([]);
+        setEvents([]);
+        setMedia([]);
+        setAlerts([]);
+        // Navegar para tela de entrar em grupo se não houver grupos
+        // Usar reset para garantir que a tela de entrar em grupo seja a única na pilha
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'PatientJoinGroup' }],
+        });
       }
     } catch (error) {
       console.error('❌ PatientHomeScreen - Erro ao carregar dados:', error);
@@ -382,21 +394,30 @@ const PatientHomeScreen = ({ navigation }) => {
       const colorOptions = [colors.primary, colors.secondary, colors.info];
       
       // Adicionar contatos de emergência (tabela emergency_contacts)
+      // NOVA LÓGICA: Carregar todos os contatos (rápidos e SOS) sem filtrar
       if (contactsResult.success && contactsResult.data) {
         const emergencyContacts = Array.isArray(contactsResult.data) ? contactsResult.data : [];
-        console.log('🔍 PatientHomeScreen - Contatos da API:', emergencyContacts);
+        console.log('🔍 PatientHomeScreen - Contatos da API:', emergencyContacts.length);
+        console.log('🔍 PatientHomeScreen - Detalhes:', emergencyContacts.map(c => ({
+          name: c.name,
+          relationship: c.relationship,
+          is_primary: c.is_primary
+        })));
+        
+        // Adicionar todos os contatos (sem filtrar por SOS ou não)
         emergencyContacts.forEach((contact, index) => {
           allContacts.push({
             id: `emergency-${contact.id}`,
             name: contact.name,
             phone: contact.phone,
-            relationship: contact.relationship || 'Contato de Emergência',
+            relationship: contact.relationship || 'Contato',
             color: colorOptions[index % colorOptions.length],
             type: 'emergency',
             photo: contact.photo,
             photo_url: contact.photo_url,
+            isSOS: contact.relationship === 'SOS' || contact.relationship === 'sos' || contact.is_primary === true,
           });
-          console.log(`📸 Contato ${contact.name}: photo=${contact.photo}, photo_url=${contact.photo_url}`);
+          console.log(`📸 Contato ${contact.name}: photo=${contact.photo}, photo_url=${contact.photo_url}, isSOS=${contact.relationship === 'SOS' || contact.is_primary === true}`);
         });
       }
       
@@ -417,11 +438,15 @@ const PatientHomeScreen = ({ navigation }) => {
         });
       }
       
-      // Limitar a 3 contatos (os 3 primeiros)
-      const quickContacts = allContacts.slice(0, 3);
+      // Limitar a 3 contatos (os 3 primeiros) - independente de serem SOS ou não
+      const displayedContacts = allContacts.slice(0, 3);
       
-      console.log(`✅ PatientHomeScreen - ${quickContacts.length} contato(s) rápido(s) carregado(s)`);
-      setContacts(quickContacts);
+      console.log(`✅ PatientHomeScreen - ${displayedContacts.length} contato(s) carregado(s)`);
+      console.log('✅ PatientHomeScreen - Contatos exibidos:', displayedContacts.map(c => ({
+        name: c.name,
+        isSOS: c.isSOS
+      })));
+      setContacts(displayedContacts);
     } catch (error) {
       console.error('❌ PatientHomeScreen - Erro ao carregar contatos:', error);
       setContacts([]);
@@ -923,7 +948,7 @@ const PatientHomeScreen = ({ navigation }) => {
 
         {/* Contact Cards */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contatos Rápidos</Text>
+          <Text style={styles.sectionTitle}>Contatos</Text>
           
           <View style={styles.cardsGrid}>
             {/* Contact Cards (max 3) */}

@@ -269,7 +269,7 @@ echo ""
 Para verificar como o email está configurado no servidor:
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 
 # Ver configurações de email

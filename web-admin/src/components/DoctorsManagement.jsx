@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SafeIcon from './SafeIcon';
 import doctorsService from '../services/doctorsService';
 import './DoctorsManagement.css';
 
@@ -175,7 +176,12 @@ const DoctorsManagement = () => {
     try {
       setError(null);
       await doctorsService.blockDoctor(doctorId);
+      // Recarregar médicos e atualizar estado
       await loadDoctors();
+      // Se estiver na aba de aprovados, mudar para bloqueados para mostrar o médico bloqueado
+      if (activeTab === 'approved') {
+        setActiveTab('blocked');
+      }
     } catch (err) {
       setError(err.message || 'Erro ao bloquear médico');
     }
@@ -222,7 +228,7 @@ const DoctorsManagement = () => {
     const doctor = doctors.find(d => d.id === doctorId) || pendingDoctors.find(d => d.id === doctorId);
     const doctorName = doctor?.name || 'este médico';
     
-    if (!window.confirm(`⚠️ ATENÇÃO: Tem certeza que deseja EXCLUIR permanentemente ${doctorName}?\n\nEsta ação não pode ser desfeita. Todos os dados do médico serão removidos.`)) {
+    if (!window.confirm(`ATENÇÃO: Tem certeza que deseja EXCLUIR permanentemente ${doctorName}?\n\nEsta ação não pode ser desfeita. Todos os dados do médico serão removidos.`)) {
       return;
     }
 
@@ -262,13 +268,14 @@ const DoctorsManagement = () => {
           </p>
         </div>
         <button className="refresh-button" onClick={loadDoctors}>
-          🔄 Atualizar
+          <SafeIcon name="refresh" size={18} color="#6366f1" style={{ marginRight: '8px' }} />
+          Atualizar
         </button>
       </header>
 
       {error && (
         <div className="error-banner">
-          <span>⚠️</span>
+          <SafeIcon name="warning" size={20} color="#f59e0b" style={{ marginRight: '8px' }} />
           <span>{error}</span>
         </div>
       )}
@@ -278,22 +285,30 @@ const DoctorsManagement = () => {
           className={`tab ${activeTab === 'pending' ? 'active' : ''}`}
           onClick={() => setActiveTab('pending')}
         >
-          ⏳ Pendentes ({pendingDoctors.length})
+          <SafeIcon name="clock" size={18} color="#6b7280" style={{ marginRight: '6px' }} />
+          Pendentes ({pendingDoctors.length})
         </button>
         <button
           className={`tab ${activeTab === 'approved' ? 'active' : ''}`}
           onClick={() => setActiveTab('approved')}
         >
-          ✅ Aprovados ({doctors.filter(d => {
+          <SafeIcon name="checkmark" size={18} color="#10b981" style={{ marginRight: '6px' }} />
+          Aprovados ({doctors.filter(d => {
             // Médico aprovado: tem approved_at e não está bloqueado (pode ainda não ter ativado via link)
-            return d.approved_at && !d.is_blocked;
+            // Verificar is_blocked de forma segura
+            const isBlocked = d.is_blocked === true || d.is_blocked === 1 || d.is_blocked === '1';
+            return d.approved_at && !isBlocked;
           }).length})
         </button>
         <button
           className={`tab ${activeTab === 'blocked' ? 'active' : ''}`}
           onClick={() => setActiveTab('blocked')}
         >
-          🚫 Bloqueados ({doctors.filter(d => d.is_blocked).length})
+          <SafeIcon name="block" size={18} color="#ef4444" style={{ marginRight: '6px' }} />
+          Bloqueados ({doctors.filter(d => {
+            // Verificar is_blocked de forma segura
+            return d.is_blocked === true || d.is_blocked === 1 || d.is_blocked === '1';
+          }).length})
         </button>
       </div>
 
@@ -312,7 +327,10 @@ const DoctorsManagement = () => {
                       <h3>{doctor.name || 'Sem nome'}</h3>
                       <p className="doctor-email">{doctor.email}</p>
                     </div>
-                    <span className="status-badge pending">⏳ Pendente</span>
+                    <span className="status-badge pending">
+                      <SafeIcon name="clock" size={16} color="#f59e0b" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                      Pendente
+                    </span>
                   </div>
                   
                   <div className="doctor-details">
@@ -335,13 +353,15 @@ const DoctorsManagement = () => {
                       className="action-btn approve-btn"
                       onClick={() => handleApprove(doctor.id)}
                     >
-                      ✅ Aprovar
+                      <SafeIcon name="checkmark" size={18} color="white" style={{ marginRight: '6px' }} />
+                      Aprovar
                     </button>
                     <button
                       className="action-btn reject-btn"
                       onClick={() => handleReject(doctor.id)}
                     >
-                      ❌ Rejeitar
+                      <SafeIcon name="close" size={18} color="white" style={{ marginRight: '6px' }} />
+                      Rejeitar
                     </button>
                   </div>
                 </div>
@@ -354,7 +374,9 @@ const DoctorsManagement = () => {
           <div className="doctors-list">
             {doctors.filter(d => {
               // Médico aprovado: tem approved_at e não está bloqueado (pode ainda não ter ativado via link)
-              return d.approved_at && !d.is_blocked;
+              // Verificar is_blocked de forma segura (pode ser undefined se a coluna não existir)
+              const isBlocked = d.is_blocked === true || d.is_blocked === 1 || d.is_blocked === '1';
+              return d.approved_at && !isBlocked;
             }).length === 0 ? (
               <div className="empty-state">
                 <p>Nenhum médico aprovado</p>
@@ -363,7 +385,9 @@ const DoctorsManagement = () => {
               doctors
                 .filter(d => {
                   // Médico aprovado: tem approved_at e não está bloqueado (pode ainda não ter ativado via link)
-                  return d.approved_at && !d.is_blocked;
+                  // Verificar is_blocked de forma segura (pode ser undefined se a coluna não existir)
+                  const isBlocked = d.is_blocked === true || d.is_blocked === 1 || d.is_blocked === '1';
+                  return d.approved_at && !isBlocked;
                 })
                 .map((doctor) => (
                   <div key={doctor.id} className="doctor-card approved">
@@ -375,11 +399,13 @@ const DoctorsManagement = () => {
                       <span className="status-badge approved">
                         {doctor.is_activated ? (
                           <>
-                            ✅ Aprovado<br />e Ativado
+                            <SafeIcon name="checkmark" size={16} color="#10b981" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                            Aprovado<br />e Ativado
                           </>
                         ) : (
                           <>
-                            ⏳ Aprovado<br />(Aguardando Ativação)
+                            <SafeIcon name="clock" size={16} color="#f59e0b" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                            Aprovado<br />(Aguardando Ativação)
                           </>
                         )}
                       </span>
@@ -400,7 +426,8 @@ const DoctorsManagement = () => {
                       </div>
                       {doctor.is_activated === false && (
                         <div className="detail-item" style={{ color: '#f59e0b', fontWeight: 'bold', marginTop: '10px' }}>
-                          ⚠️ Médico ainda não ativou a conta via link do email
+                          <SafeIcon name="warning" size={18} color="#f59e0b" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                          Médico ainda não ativou a conta via link do email
                         </div>
                       )}
                     </div>
@@ -411,13 +438,15 @@ const DoctorsManagement = () => {
                         onClick={() => handleEdit(doctor)}
                         style={{ backgroundColor: '#3b82f6', color: 'white' }}
                       >
-                        ✏️ Editar
+                        <SafeIcon name="edit" size={18} color="white" style={{ marginRight: '6px' }} />
+                        Editar
                       </button>
                       <button
                         className="action-btn block-btn"
                         onClick={() => handleBlock(doctor.id)}
                       >
-                        🚫 Bloquear
+                        <SafeIcon name="block" size={18} color="white" style={{ marginRight: '6px' }} />
+                        Bloquear
                       </button>
                     </div>
                   </div>
@@ -428,13 +457,19 @@ const DoctorsManagement = () => {
 
         {activeTab === 'blocked' && (
           <div className="doctors-list">
-            {doctors.filter(d => d.is_blocked).length === 0 ? (
+            {doctors.filter(d => {
+              // Verificar is_blocked de forma segura
+              return d.is_blocked === true || d.is_blocked === 1 || d.is_blocked === '1';
+            }).length === 0 ? (
               <div className="empty-state">
                 <p>Nenhum médico bloqueado</p>
               </div>
             ) : (
               doctors
-                .filter(d => d.is_blocked)
+                .filter(d => {
+                  // Verificar is_blocked de forma segura
+                  return d.is_blocked === true || d.is_blocked === 1 || d.is_blocked === '1';
+                })
                 .map((doctor) => (
                   <div key={doctor.id} className="doctor-card blocked">
                     <div className="doctor-header">
@@ -442,7 +477,10 @@ const DoctorsManagement = () => {
                         <h3>{doctor.name || 'Sem nome'}</h3>
                         <p className="doctor-email">{doctor.email}</p>
                       </div>
-                      <span className="status-badge blocked">🚫 Bloqueado</span>
+                      <span className="status-badge blocked">
+                        <SafeIcon name="block" size={16} color="#ef4444" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                        Bloqueado
+                      </span>
                     </div>
                     
                     <div className="doctor-details">
@@ -462,14 +500,16 @@ const DoctorsManagement = () => {
                         className="action-btn approve-btn"
                         onClick={() => handleApprove(doctor.id)}
                       >
-                        ✅ Desbloquear
+                        <SafeIcon name="unlock" size={18} color="white" style={{ marginRight: '6px' }} />
+                        Desbloquear
                       </button>
                       <button
                         className="action-btn delete-btn"
                         onClick={() => handleDelete(doctor.id)}
                         title="Excluir médico permanentemente"
                       >
-                        🗑️ Excluir
+                        <SafeIcon name="trash" size={18} color="white" style={{ marginRight: '6px' }} />
+                        Excluir
                       </button>
                     </div>
                   </div>

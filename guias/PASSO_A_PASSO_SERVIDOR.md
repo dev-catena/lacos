@@ -125,8 +125,8 @@ php artisan tinker --execute="echo 'Planos: ' . App\Models\Plan::count();"
 ```bash
 # Na sua máquina local (não no servidor):
 cd ~/lacos/backend-laravel
-scp Plan.php darley@193.203.182.22:/var/www/lacos-backend/app/Models/
-scp PlanController.php darley@193.203.182.22:/var/www/lacos-backend/app/Http/Controllers/Api/
+scp Plan.php darley@10.102.0.103:/var/www/lacos-backend/app/Models/
+scp PlanController.php darley@10.102.0.103:/var/www/lacos-backend/app/Http/Controllers/Api/
 ```
 
 Depois, edite o arquivo de rotas e adicione as rotas de planos.

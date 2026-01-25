@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Script para corrigir foreign key de doctor_id na tabela appointments
-# Servidor: 193.203.182.22
+# Servidor: 10.102.0.103
 # Usuário: darley
 # Senha: yhvh77
 
 echo "🔧 Corrigindo foreign key de doctor_id na tabela appointments..."
 
-SERVER="darley@193.203.182.22"
+SERVER="darley@10.102.0.103"
 
 sshpass -p 'yhvh77' ssh "$SERVER" bash << 'ENDSSH'
 cd /var/www/lacos-backend

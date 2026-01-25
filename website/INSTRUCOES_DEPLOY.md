@@ -4,7 +4,7 @@
 
 O site está configurado para rodar em **produção** no servidor remoto:
 - **Domínio**: `https://lacosapp.com`
-- **Servidor**: `193.203.182.22:63022`
+- **Servidor**: `10.102.0.103:63022`
 - **Usuário**: `darley`
 - **Diretório no servidor**: `/var/www/lacos-website`
 
@@ -49,7 +49,7 @@ Se preferir fazer manualmente:
 npm run build
 
 # 2. Enviar arquivos para o servidor (ajuste conforme necessário)
-scp -P 63022 -r dist/* darley@193.203.182.22:/var/www/lacos-website/
+scp -P 63022 -r dist/* darley@10.102.0.103:/var/www/lacos-website/
 
 # 3. Configurar Nginx no servidor (veja configuração abaixo)
 ```
@@ -121,30 +121,30 @@ Verifique se você tem permissão para acessar o servidor via SSH.
 ### Erro: "Nginx configuration test failed"
 Verifique os logs:
 ```bash
-ssh -p 63022 darley@193.203.182.22 'sudo nginx -t'
+ssh -p 63022 darley@10.102.0.103 'sudo nginx -t'
 ```
 
 ### Site não carrega
 1. Verifique se o Nginx está rodando:
 ```bash
-ssh -p 63022 darley@193.203.182.22 'sudo systemctl status nginx'
+ssh -p 63022 darley@10.102.0.103 'sudo systemctl status nginx'
 ```
 
 2. Verifique os logs:
 ```bash
-ssh -p 63022 darley@193.203.182.22 'sudo tail -f /var/log/nginx/lacosapp-error.log'
+ssh -p 63022 darley@10.102.0.103 'sudo tail -f /var/log/nginx/lacosapp-error.log'
 ```
 
 3. Verifique se os arquivos estão no lugar certo:
 ```bash
-ssh -p 63022 darley@193.203.182.22 'sudo ls -la /var/www/lacos-website'
+ssh -p 63022 darley@10.102.0.103 'sudo ls -la /var/www/lacos-website'
 ```
 
 ## 📝 Notas Importantes
 
 1. **API Backend**: O site está configurado para se conectar automaticamente ao backend:
    - Em produção (lacosapp.com): `https://gateway.lacosapp.com/api`
-   - Em desenvolvimento: `http://193.203.182.22/api`
+   - Em desenvolvimento: `http://10.102.0.103/api`
 
 2. **Build de Produção**: O build otimiza os arquivos para produção (minificação, tree-shaking, etc.)
 

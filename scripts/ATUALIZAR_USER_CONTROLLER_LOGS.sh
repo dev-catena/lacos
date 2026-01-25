@@ -3,7 +3,7 @@
 # Script para atualizar o UserController com logs detalhados
 
 SSH_USER="darley"
-SSH_HOST="193.203.182.22"
+SSH_HOST="10.102.0.103"
 SSH_PORT="63022"
 SSH_PASS="yhvh77"
 BACKEND_PATH="/var/www/lacos-backend"
@@ -38,7 +38,7 @@ if [ $? -eq 0 ]; then
     echo "✅ UserController atualizado com logs detalhados!"
     echo ""
     echo "📝 Agora teste o upload novamente e depois verifique os logs:"
-    echo "   sshpass -p \"yhvh77\" ssh -p 63022 darley@193.203.182.22 \"cd /var/www/lacos-backend && tail -30 storage/logs/laravel.log | grep -i 'uploadCertificate\|certificate'\""
+    echo "   sshpass -p \"yhvh77\" ssh -p 63022 darley@10.102.0.103 \"cd /var/www/lacos-backend && tail -30 storage/logs/laravel.log | grep -i 'uploadCertificate\|certificate'\""
 else
     echo "❌ Erro ao atualizar"
     exit 1

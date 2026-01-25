@@ -9,7 +9,7 @@ echo "================================"
 echo ""
 
 SERVER_USER="darley"
-SERVER_HOST="193.203.182.22"
+SERVER_HOST="10.102.0.103"
 SERVER_PORT="63022"
 BACKEND_PATH="/var/www/lacos-backend"
 
@@ -55,8 +55,8 @@ return [
         'http://127.0.0.1:19006',
         'http://10.102.0.103:8081',
         'http://10.102.0.103:19006',
-        'http://193.203.182.22',
-        'https://193.203.182.22',
+        'http://10.102.0.103',
+        'https://10.102.0.103',
     ],
     'allowed_origins_patterns' => [
         '#^http://localhost(:\d+)?$#',

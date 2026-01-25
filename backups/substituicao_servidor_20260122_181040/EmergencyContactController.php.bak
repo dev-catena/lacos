@@ -1,0 +1,203 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\EmergencyContact;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+
+class EmergencyContactController extends Controller
+{
+    /**
+     * Listar contatos de emergência
+     */
+    public function index(Request $request)
+    {
+        try {
+            $query = EmergencyContact::query();
+            
+            // Filtrar por grupo se fornecido
+            if ($request->has('group_id')) {
+                $query->where('group_id', $request->group_id);
+            }
+            
+            $contacts = $query->orderBy('is_primary', 'desc')
+                              ->orderBy('created_at', 'desc')
+                              ->get();
+            
+            // Adicionar URL completa da foto
+            $contacts = $contacts->map(function ($contact) {
+                if ($contact->photo && is_string($contact->photo)) {
+                    $contact->photo_url = url(Storage::url($contact->photo));
+                } else {
+                    $contact->photo_url = null;
+                }
+                return $contact;
+            });
+            
+            Log::info('Contatos retornados', ['count' => $contacts->count()]);
+            
+            return response()->json($contacts, 200);
+        } catch (\Exception $e) {
+            Log::error('Erro ao listar contatos de emergência', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'message' => 'Erro ao listar contatos de emergência',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Criar novo contato de emergência
+     */
+    public function store(Request $request)
+    {
+        try {
+            $validatedData = $request->validate([
+                'group_id' => 'required|exists:groups,id',
+                'name' => 'required|string|max:255',
+                'phone' => 'required|string|max:20',
+                'relationship' => 'nullable|string|max:100',
+                'is_primary' => 'boolean',
+                'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            ]);
+            
+            // Upload da foto se fornecida
+            if ($request->hasFile('photo')) {
+                $path = $request->file('photo')->store('emergency_contacts', 'public');
+                $validatedData['photo'] = $path;
+                Log::info('Foto salva ao criar contato', ['path' => $path]);
+            }
+            
+            $contact = EmergencyContact::create($validatedData);
+            
+            // Adicionar URL da foto na resposta
+            if ($contact->photo) {
+                $contact->photo_url = url(Storage::url($contact->photo));
+            }
+            
+            return response()->json($contact, 201);
+        } catch (\Exception $e) {
+            Log::error('Erro ao criar contato de emergência', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'data' => $request->except('photo')
+            ]);
+            
+            return response()->json([
+                'message' => 'Erro ao criar contato de emergência',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Exibir contato específico
+     */
+    public function show($id)
+    {
+        try {
+            $contact = EmergencyContact::findOrFail($id);
+            
+            // Adicionar URL da foto
+            if ($contact->photo) {
+                $contact->photo_url = url(Storage::url($contact->photo));
+            }
+            
+            return response()->json($contact, 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Contato de emergência não encontrado',
+                'error' => $e->getMessage()
+            ], 404);
+        }
+    }
+    
+    /**
+     * Atualizar contato de emergência
+     */
+    public function update(Request $request, $id)
+    {
+        try {
+            $contact = EmergencyContact::findOrFail($id);
+            
+            $validatedData = $request->validate([
+                'group_id' => 'sometimes|exists:groups,id',
+                'name' => 'sometimes|string|max:255',
+                'phone' => 'sometimes|string|max:20',
+                'relationship' => 'nullable|string|max:100',
+                'is_primary' => 'sometimes|boolean',
+                'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            ]);
+            
+            // Upload da nova foto se fornecida
+            if ($request->hasFile('photo')) {
+                // Deletar foto antiga se existir
+                if ($contact->photo && Storage::disk('public')->exists($contact->photo)) {
+                    Storage::disk('public')->delete($contact->photo);
+                    Log::info('Foto antiga deletada', ['path' => $contact->photo]);
+                }
+                
+                $path = $request->file('photo')->store('emergency_contacts', 'public');
+                $validatedData['photo'] = $path;
+                Log::info('Nova foto salva ao atualizar', ['path' => $path, 'contact_id' => $id]);
+            }
+            
+            $contact->update($validatedData);
+            
+            // Adicionar URL da foto na resposta
+            if ($contact->photo) {
+                $contact->photo_url = url(Storage::url($contact->photo));
+            } else {
+                $contact->photo_url = null;
+            }
+            
+            Log::info('Contato atualizado', ['id' => $id, 'photo' => $contact->photo]);
+            
+            return response()->json($contact, 200);
+        } catch (\Exception $e) {
+            Log::error('Erro ao atualizar contato de emergência', [
+                'error' => $e->getMessage(),
+                'id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'message' => 'Erro ao atualizar contato de emergência',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Deletar contato de emergência
+     */
+    public function destroy($id)
+    {
+        try {
+            $contact = EmergencyContact::findOrFail($id);
+            
+            // Deletar foto se existir
+            if ($contact->photo && Storage::disk('public')->exists($contact->photo)) {
+                Storage::disk('public')->delete($contact->photo);
+            }
+            
+            $contact->delete();
+            
+            return response()->json([
+                'message' => 'Contato de emergência deletado com sucesso'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao deletar contato de emergência',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+}

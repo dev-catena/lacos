@@ -46,7 +46,7 @@ WHATSAPP_INSTANCE_NAME=Lacos
 
 ### Teste 2: Verificar logs em tempo real
 ```bash
-ssh -p 63022 darley@193.203.182.22
+ssh -p 63022 darley@10.102.0.103
 tail -f /var/www/lacos-backend/storage/logs/laravel.log | grep -i "whatsapp\|2fa"
 ```
 

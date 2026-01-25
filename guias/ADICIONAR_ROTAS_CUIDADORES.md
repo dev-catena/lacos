@@ -9,7 +9,7 @@ A rota `/api/caregivers` não foi encontrada (404). As rotas precisam ser adicio
 ### Opção 1: Script Automatizado
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 bash /tmp/add_caregivers_routes.sh
 ```
@@ -18,7 +18,7 @@ bash /tmp/add_caregivers_routes.sh
 
 1. **Conectar ao servidor:**
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 ```
 
@@ -54,7 +54,7 @@ php artisan config:clear
 
 Após adicionar, teste:
 ```bash
-curl -X GET "http://193.203.182.22/api/caregivers" \
+curl -X GET "http://10.102.0.103/api/caregivers" \
   -H "Authorization: Bearer SEU_TOKEN" \
   -H "Accept: application/json"
 ```

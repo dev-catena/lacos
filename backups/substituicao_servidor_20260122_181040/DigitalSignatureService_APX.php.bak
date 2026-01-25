@@ -1,0 +1,197 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
+use App\Models\User;
+
+class DigitalSignatureService
+{
+    /**
+     * Assinar PDF com certificado digital do médico (.apx ou .pfx)
+     */
+    public function signPDF(string $pdfPath, User $doctor = null): string
+    {
+        try {
+            // Se médico fornecido, usar certificado dele
+            if ($doctor && $doctor->has_certificate) {
+                $certificateType = $doctor->certificate_type ?? 'pfx';
+                
+                if ($certificateType === 'apx') {
+                    // Usar certificado .apx
+                    $certificatePath = $doctor->certificate_apx_path 
+                        ? Storage::disk('local')->path($doctor->certificate_apx_path)
+                        : null;
+                } else {
+                    // Usar certificado .pfx
+                    $certificatePath = $doctor->certificate_path 
+                        ? Storage::disk('local')->path($doctor->certificate_path)
+                        : null;
+                }
+                
+                $certificatePassword = $doctor->certificate_password_encrypted 
+                    ? Crypt::decryptString($doctor->certificate_password_encrypted)
+                    : null;
+                $certificateUsername = $doctor->certificate_username;
+            } else {
+                // Fallback para certificado global (config)
+                $certificatePath = config('digital_signature.certificate_path');
+                $certificatePassword = config('digital_signature.certificate_password');
+                $certificateUsername = null;
+                $certificateType = 'pfx';
+            }
+
+            if (!$certificatePath || !file_exists($certificatePath)) {
+                Log::warning('Certificado digital não encontrado. PDF será gerado sem assinatura.', [
+                    'doctor_id' => $doctor->id ?? null,
+                    'path' => $certificatePath,
+                    'type' => $certificateType ?? 'unknown',
+                ]);
+                // Retornar PDF original se certificado não estiver configurado
+                return $pdfPath;
+            }
+
+            if (!$certificatePassword) {
+                Log::warning('Senha do certificado não configurada. PDF será gerado sem assinatura.');
+                return $pdfPath;
+            }
+
+            // Assinar PDF baseado no tipo de certificado
+            if ($certificateType === 'apx') {
+                return $this->signPDFWithAPX($pdfPath, $certificatePath, $certificatePassword);
+            } else {
+                return $this->signPDFWithPFX($pdfPath, $certificatePath, $certificatePassword, $certificateUsername);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Erro ao assinar PDF: ' . $e->getMessage(), [
+                'doctor_id' => $doctor->id ?? null,
+                'trace' => $e->getTraceAsString(),
+            ]);
+            // Retornar PDF original em caso de erro
+            return $pdfPath;
+        }
+    }
+
+    /**
+     * Assinar PDF com certificado .apx
+     */
+    private function signPDFWithAPX(string $pdfPath, string $certificatePath, string $password): string
+    {
+        try {
+            // TODO: Implementar assinatura com .apx
+            // O formato .apx pode requerer biblioteca específica ou conversão
+            // Por enquanto, vamos logar e retornar o PDF original
+            
+            Log::info('Assinando PDF com certificado .apx', [
+                'pdf_path' => $pdfPath,
+                'certificate_path' => $certificatePath,
+            ]);
+
+            // Verificar se o arquivo .apx existe
+            if (!file_exists($certificatePath)) {
+                Log::warning('Arquivo .apx não encontrado', ['path' => $certificatePath]);
+                return $pdfPath;
+            }
+
+            // Verificar se o PDF existe
+            if (!file_exists($pdfPath)) {
+                Log::warning('PDF não encontrado para assinatura', ['path' => $pdfPath]);
+                return $pdfPath;
+            }
+
+            // Por enquanto, retornar o PDF original
+            // A implementação real da assinatura com .apx requer:
+            // 1. Biblioteca específica para .apx (pode ser necessário converter para .pfx primeiro)
+            // 2. Ou usar biblioteca que suporte .apx diretamente
+            // 3. Integração com iTextSharp ou similar para assinar PDF
+            
+            Log::info('PDF assinado com certificado .apx (placeholder)', [
+                'pdf_path' => $pdfPath,
+            ]);
+
+            return $pdfPath;
+
+        } catch (\Exception $e) {
+            Log::error('Erro ao assinar PDF com .apx: ' . $e->getMessage());
+            return $pdfPath;
+        }
+    }
+
+    /**
+     * Assinar PDF com certificado .pfx
+     */
+    private function signPDFWithPFX(string $pdfPath, string $certificatePath, string $password, ?string $username = null): string
+    {
+        try {
+            Log::info('Assinando PDF com certificado .pfx', [
+                'pdf_path' => $pdfPath,
+                'certificate_path' => $certificatePath,
+            ]);
+
+            // Verificar se os arquivos existem
+            if (!file_exists($certificatePath)) {
+                Log::warning('Arquivo .pfx não encontrado', ['path' => $certificatePath]);
+                return $pdfPath;
+            }
+
+            if (!file_exists($pdfPath)) {
+                Log::warning('PDF não encontrado para assinatura', ['path' => $pdfPath]);
+                return $pdfPath;
+            }
+
+            // TODO: Implementar assinatura real com .pfx
+            // Isso requer biblioteca adicional como:
+            // - setasign/fpdi
+            // - ou integração com serviço externo de assinatura
+            
+            Log::info('PDF assinado com certificado .pfx (placeholder)', [
+                'pdf_path' => $pdfPath,
+            ]);
+
+            return $pdfPath;
+
+        } catch (\Exception $e) {
+            Log::error('Erro ao assinar PDF com .pfx: ' . $e->getMessage());
+            return $pdfPath;
+        }
+    }
+
+    /**
+     * Validar certificado .apx
+     */
+    public function validateAPXCertificate(string $certificatePath, string $password): bool
+    {
+        try {
+            if (!file_exists($certificatePath)) {
+                return false;
+            }
+
+            // TODO: Implementar validação real do certificado .apx
+            // Verificar se o arquivo pode ser aberto com a senha fornecida
+            
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Erro ao validar certificado .apx: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

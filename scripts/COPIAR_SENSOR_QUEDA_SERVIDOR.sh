@@ -9,7 +9,7 @@ echo ""
 # Diretório local
 LOCAL_DIR="/home/darley/lacos/backend-laravel"
 SERVER_USER="darley"
-SERVER_HOST="193.203.182.22"
+SERVER_HOST="10.102.0.103"
 SERVER_DIR="/var/www/lacos-backend"
 
 # Verificar se os arquivos existem localmente

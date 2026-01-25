@@ -3,7 +3,7 @@
 ## 🎉 Status da Instalação
 
 **Data:** 28/11/2025 23:56 UTC  
-**Servidor:** 193.203.182.22  
+**Servidor:** 10.102.0.103  
 **Path:** /var/www/lacos-backend
 
 ---
@@ -102,11 +102,11 @@ TOKEN="seu-token-aqui"
 
 # Testar mídias (use um groupId válido do seu usuário)
 curl -H "Authorization: Bearer $TOKEN" \
-     http://193.203.182.22/api/groups/1/media
+     http://10.102.0.103/api/groups/1/media
 
 # Testar alertas
 curl -H "Authorization: Bearer $TOKEN" \
-     http://193.203.182.22/api/groups/1/alerts/active
+     http://10.102.0.103/api/groups/1/alerts/active
 ```
 
 **Respostas Esperadas:**
@@ -161,7 +161,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 Para limpeza automática e geração de alertas:
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 crontab -e
 ```
 
@@ -217,7 +217,7 @@ Para maior performance e escalabilidade:
 
 **Ver logs em tempo real:**
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 tail -f /var/www/lacos-backend/storage/logs/laravel.log
 ```
 
@@ -234,7 +234,7 @@ tail -f /var/www/lacos-backend/storage/logs/laravel.log | grep -i "media\|alert"
 
 1. Verificar permissões:
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 sudo chmod -R 775 /var/www/lacos-backend/storage
 sudo chown -R www-data:www-data /var/www/lacos-backend/storage
 ```

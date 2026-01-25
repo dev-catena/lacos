@@ -65,7 +65,7 @@ sudo bash RESTAURAR_ROTAS_COM_BLOQUEIO.sh
 ```bash
 # Com token de um usuário bloqueado
 curl -H "Authorization: Bearer TOKEN_DO_USUARIO_BLOQUEADO" \
-     http://193.203.182.22/api/user
+     http://10.102.0.103/api/user
 ```
 
 **Resposta esperada:**

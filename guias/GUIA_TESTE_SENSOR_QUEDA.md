@@ -58,7 +58,7 @@ Deve mostrar as 4 rotas:
 
 ```bash
 # Fazer login e obter token
-curl -X POST http://193.203.182.22/api/login \
+curl -X POST http://10.102.0.103/api/login \
   -H "Content-Type: application/json" \
   -d '{"email":"seu_email@exemplo.com","password":"sua_senha"}'
 ```
@@ -72,7 +72,7 @@ Copie o `token` da resposta.
 TOKEN="seu_token_aqui"
 GROUP_ID=1
 
-curl -X POST "http://193.203.182.22/api/groups/${GROUP_ID}/fall-sensor/data" \
+curl -X POST "http://10.102.0.103/api/groups/${GROUP_ID}/fall-sensor/data" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -103,21 +103,21 @@ curl -X POST "http://193.203.182.22/api/groups/${GROUP_ID}/fall-sensor/data" \
 ### 2.3 Testar Buscar Histórico
 
 ```bash
-curl -X GET "http://193.203.182.22/api/groups/${GROUP_ID}/fall-sensor/history?limit=10" \
+curl -X GET "http://10.102.0.103/api/groups/${GROUP_ID}/fall-sensor/history?limit=10" \
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
 ### 2.4 Testar Buscar Última Postura
 
 ```bash
-curl -X GET "http://193.203.182.22/api/groups/${GROUP_ID}/fall-sensor/latest" \
+curl -X GET "http://10.102.0.103/api/groups/${GROUP_ID}/fall-sensor/latest" \
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
 ### 2.5 Testar Buscar Alertas de Queda
 
 ```bash
-curl -X GET "http://193.203.182.22/api/groups/${GROUP_ID}/fall-sensor/alerts?hours=24" \
+curl -X GET "http://10.102.0.103/api/groups/${GROUP_ID}/fall-sensor/alerts?hours=24" \
   -H "Authorization: Bearer ${TOKEN}"
 ```
 

@@ -44,7 +44,7 @@ Sistema completo de aprovação e ativação de contas de médicos com as seguin
 
 **Email Enviado**:
 - Assunto: "Ative sua conta de médico - Laços"
-- Link: `http://193.203.182.22/api/doctors/activate?token=xxx`
+- Link: `http://10.102.0.103/api/doctors/activate?token=xxx`
 - Válido por 7 dias
 
 ---
@@ -151,7 +151,7 @@ O script:
 ### 1. Criar Conta de Médico
 
 ```bash
-curl -X POST http://193.203.182.22/api/register \
+curl -X POST http://10.102.0.103/api/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Dr. Teste",
@@ -181,7 +181,7 @@ curl -X POST http://193.203.182.22/api/register \
 ### 2. Tentar Login (Deve Falhar)
 
 ```bash
-curl -X POST http://193.203.182.22/api/login \
+curl -X POST http://10.102.0.103/api/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "teste@medico.com",
@@ -202,7 +202,7 @@ curl -X POST http://193.203.182.22/api/login \
 ### 3. Root Aprova Médico
 
 ```bash
-curl -X POST http://193.203.182.22/api/admin/doctors/{id}/approve \
+curl -X POST http://10.102.0.103/api/admin/doctors/{id}/approve \
   -H "Authorization: Bearer {token_root}" \
   -H "Content-Type: application/json"
 ```
@@ -217,13 +217,13 @@ curl -X POST http://193.203.182.22/api/admin/doctors/{id}/approve \
 
 **Email Enviado** com link:
 ```
-http://193.203.182.22/api/doctors/activate?token=xxx
+http://10.102.0.103/api/doctors/activate?token=xxx
 ```
 
 ### 4. Tentar Login (Ainda Deve Falhar - Não Ativado)
 
 ```bash
-curl -X POST http://193.203.182.22/api/login \
+curl -X POST http://10.102.0.103/api/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "teste@medico.com",
@@ -244,7 +244,7 @@ curl -X POST http://193.203.182.22/api/login \
 ### 5. Ativar Conta via Link
 
 ```bash
-curl "http://193.203.182.22/api/doctors/activate?token=xxx"
+curl "http://10.102.0.103/api/doctors/activate?token=xxx"
 ```
 
 **Resposta Esperada**:
@@ -259,7 +259,7 @@ curl "http://193.203.182.22/api/doctors/activate?token=xxx"
 ### 6. Login (Agora Deve Funcionar)
 
 ```bash
-curl -X POST http://193.203.182.22/api/login \
+curl -X POST http://10.102.0.103/api/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "teste@medico.com",

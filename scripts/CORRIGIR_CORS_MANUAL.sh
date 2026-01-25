@@ -5,7 +5,7 @@
 
 set -e
 
-SERVER_HOST="193.203.182.22"
+SERVER_HOST="10.102.0.103"
 SERVER_PORT="63022"
 SERVER_USER="darley"
 SERVER_PASS="yhvh77"
@@ -29,8 +29,8 @@ return [
         'http://127.0.0.1:3000',
         'http://127.0.0.1:5173',
         'http://127.0.0.1:8081',
-        'http://193.203.182.22',
-        'https://193.203.182.22',
+        'http://10.102.0.103',
+        'https://10.102.0.103',
         'http://admin.lacosapp.com',
         'https://admin.lacosapp.com',
         'http://lacosapp.com',

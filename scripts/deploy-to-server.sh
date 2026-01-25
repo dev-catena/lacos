@@ -6,7 +6,7 @@
 ##############################################
 
 # Configurações do servidor
-SERVER="193.203.182.22"
+SERVER="10.102.0.103"
 USER="darley"
 PASSWORD="yhvh77"
 REMOTE_PATH="/var/www/lacos-backend"

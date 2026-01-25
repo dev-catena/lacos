@@ -4,7 +4,7 @@
 
 set -e
 
-SERVER="193.203.182.22"
+SERVER="10.102.0.103"
 USER="darley"
 PASSWORD="yhvh77"
 PORT="63022"
@@ -43,8 +43,8 @@ return [
         'http://localhost:5173',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:5173',
-        'http://193.203.182.22',
-        'https://193.203.182.22',
+        'http://10.102.0.103',
+        'https://10.102.0.103',
         'http://admin.lacosapp.com',
         'https://admin.lacosapp.com',
         'http://lacosapp.com',
@@ -90,7 +90,7 @@ CORS_EOF
     echo "   - https://admin.lacosapp.com"
     echo "   - http://lacosapp.com"
     echo "   - https://lacosapp.com"
-    echo "   - http://193.203.182.22"
+    echo "   - http://10.102.0.103"
     echo "   - E outros domínios locais"
 REMOTE_SCRIPT
 

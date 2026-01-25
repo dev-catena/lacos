@@ -79,22 +79,72 @@ class PanicController extends Controller
             ]);
 
             // Buscar contatos de emergência do grupo
+            // PRIORIDADE: Contatos SOS da tabela emergency_contacts (is_primary=true ou relationship='SOS')
             $emergencyContacts = [];
-            if (Schema::hasTable('group_members')) {
-                $emergencyContacts = DB::table('group_members')
+            
+            // 1. Buscar contatos SOS da tabela emergency_contacts
+            if (Schema::hasTable('emergency_contacts')) {
+                $sosContacts = DB::table('emergency_contacts')
+                    ->where('group_id', $groupId)
+                    ->where(function($q) {
+                        $q->where('is_primary', true)
+                          ->orWhere('relationship', 'SOS')
+                          ->orWhere('relationship', 'sos');
+                    })
+                    ->orderBy('is_primary', 'desc')
+                    ->orderBy('created_at', 'asc')
+                    ->get()
+                    ->map(function ($contact) {
+                        return [
+                            'id' => $contact->id,
+                            'type' => 'emergency_contact',
+                            'is_emergency_contact' => true,
+                            'user' => [
+                                'id' => null,
+                                'name' => $contact->name,
+                                'phone' => $contact->phone,
+                                'email' => null,
+                            ],
+                            'emergency_contact' => [
+                                'id' => $contact->id,
+                                'name' => $contact->name,
+                                'phone' => $contact->phone,
+                                'relationship' => $contact->relationship,
+                                'is_primary' => $contact->is_primary,
+                            ],
+                        ];
+                    });
+                
+                $emergencyContacts = $sosContacts->toArray();
+                
+                Log::info('Contatos SOS encontrados', [
+                    'group_id' => $groupId,
+                    'count' => count($emergencyContacts)
+                ]);
+            }
+            
+            // 2. Se não houver contatos SOS, buscar membros do grupo como fallback
+            if (empty($emergencyContacts) && Schema::hasTable('group_members')) {
+                $query = DB::table('group_members')
                     ->join('users', 'group_members.user_id', '=', 'users.id')
                     ->where('group_members.group_id', $groupId)
-                    ->where(function($query) {
+                    ->where(function($q) {
                         // Se a coluna is_emergency_contact existe, usar ela
                         if (Schema::hasColumn('group_members', 'is_emergency_contact')) {
-                            $query->where('group_members.is_emergency_contact', true)
-                                  ->orWhere('group_members.role', 'admin');
+                            $q->where('group_members.is_emergency_contact', true)
+                              ->orWhere('group_members.role', 'admin');
                         } else {
                             // Caso contrário, usar apenas admins
-                            $query->where('group_members.role', 'admin');
+                            $q->where('group_members.role', 'admin');
                         }
-                    })
-                    ->where('users.is_active', 1)
+                    });
+                
+                // Verificar se a coluna is_active existe antes de usar
+                if (Schema::hasColumn('users', 'is_active')) {
+                    $query->where('users.is_active', 1);
+                }
+                
+                $memberContacts = $query
                     ->select(
                         'group_members.id',
                         'group_members.user_id',
@@ -103,13 +153,20 @@ class PanicController extends Controller
                         'users.name',
                         'users.phone',
                         'users.email'
-                    )
-                    ->orderBy('group_members.is_emergency_contact', 'desc')
+                    );
+                
+                // Ordenar apenas se a coluna existir
+                if (Schema::hasColumn('group_members', 'is_emergency_contact')) {
+                    $memberContacts = $memberContacts->orderBy('group_members.is_emergency_contact', 'desc');
+                }
+                
+                $memberContacts = $memberContacts
                     ->orderBy('group_members.role', 'desc')
                     ->get()
                     ->map(function ($contact) {
                         return [
                             'id' => $contact->id,
+                            'type' => 'group_member',
                             'user_id' => $contact->user_id,
                             'is_emergency_contact' => true,
                             'user' => [
@@ -120,6 +177,13 @@ class PanicController extends Controller
                             ],
                         ];
                     });
+                
+                $emergencyContacts = $memberContacts->toArray();
+                
+                Log::info('Contatos de membros do grupo usados como fallback', [
+                    'group_id' => $groupId,
+                    'count' => count($emergencyContacts)
+                ]);
             }
 
             // Buscar evento criado
@@ -332,19 +396,24 @@ class PanicController extends Controller
             // Contar contatos de emergência
             $emergencyContactsCount = 0;
             if (Schema::hasTable('group_members')) {
-                $emergencyContactsCount = DB::table('group_members')
+                $query = DB::table('group_members')
                     ->join('users', 'group_members.user_id', '=', 'users.id')
                     ->where('group_members.group_id', $groupId)
-                    ->where(function($query) {
+                    ->where(function($q) {
                         if (Schema::hasColumn('group_members', 'is_emergency_contact')) {
-                            $query->where('group_members.is_emergency_contact', true)
-                                  ->orWhere('group_members.role', 'admin');
+                            $q->where('group_members.is_emergency_contact', true)
+                              ->orWhere('group_members.role', 'admin');
                         } else {
-                            $query->where('group_members.role', 'admin');
+                            $q->where('group_members.role', 'admin');
                         }
-                    })
-                    ->where('users.is_active', 1)
-                    ->count();
+                    });
+                
+                // Verificar se a coluna is_active existe antes de usar
+                if (Schema::hasColumn('users', 'is_active')) {
+                    $query->where('users.is_active', 1);
+                }
+                
+                $emergencyContactsCount = $query->count();
             }
 
             return response()->json([

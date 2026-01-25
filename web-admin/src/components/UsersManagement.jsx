@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import SafeIcon from './SafeIcon';
 import usersService from '../services/usersService';
 import authService from '../services/authService';
 import './UsersManagement.css';
@@ -78,7 +79,7 @@ const UsersManagement = ({ currentUser, onLogout }) => {
     const user = users.find(u => u.id === userId);
     const userName = user?.name || 'este usuário';
     
-    if (!window.confirm(`⚠️ ATENÇÃO: Tem certeza que deseja EXCLUIR permanentemente ${userName}?\n\nEsta ação não pode ser desfeita. Todos os dados do usuário serão removidos.`)) {
+    if (!window.confirm(`ATENÇÃO: Tem certeza que deseja EXCLUIR permanentemente ${userName}?\n\nEsta ação não pode ser desfeita. Todos os dados do usuário serão removidos.`)) {
       return;
     }
 
@@ -214,13 +215,14 @@ const UsersManagement = ({ currentUser, onLogout }) => {
           </p>
         </div>
         <button className="refresh-button" onClick={loadUsers}>
-          🔄 Atualizar
+          <SafeIcon name="refresh" size={18} color="#6366f1" style={{ marginRight: '8px' }} />
+          Atualizar
         </button>
       </header>
 
       {error && (
         <div className="error-banner">
-          <span>⚠️</span>
+          <SafeIcon name="warning" size={20} color="#f59e0b" style={{ marginRight: '8px' }} />
           <span>{error}</span>
         </div>
       )}
@@ -230,7 +232,7 @@ const UsersManagement = ({ currentUser, onLogout }) => {
         <input
           type="text"
           className="search-input"
-          placeholder="🔍 Buscar por nome..."
+          placeholder="Buscar por nome..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
@@ -356,7 +358,17 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                   </td>
                   <td>
                     <span className={`status-badge ${user.is_blocked ? 'blocked' : 'active'}`}>
-                      {user.is_blocked ? '🚫 Bloqueado' : '✅ Ativo'}
+                      {user.is_blocked ? (
+                        <>
+                          <SafeIcon name="block" size={16} color="#ef4444" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                          Bloqueado
+                        </>
+                      ) : (
+                        <>
+                          <SafeIcon name="checkmark" size={16} color="#10b981" style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                          Ativo
+                        </>
+                      )}
                     </span>
                   </td>
                   <td>
@@ -383,7 +395,8 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                         onClick={() => handleDeleteUser(user.id)}
                         title="Excluir usuário permanentemente"
                       >
-                        🗑️ Excluir
+                        <SafeIcon name="trash" size={18} color="white" style={{ marginRight: '6px' }} />
+                        Excluir
                       </button>
                     </div>
                   </td>

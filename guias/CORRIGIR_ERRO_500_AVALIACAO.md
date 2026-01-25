@@ -19,7 +19,7 @@ O método `createClientReview` provavelmente não existe no `CaregiverController
 Conecte ao servidor e verifique:
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 grep -n "createClientReview" app/Http/Controllers/Api/CaregiverController.php
 ```
@@ -31,7 +31,7 @@ grep -n "createClientReview" app/Http/Controllers/Api/CaregiverController.php
 Se o método não existir, execute o script de correção:
 
 ```bash
-# No servidor (193.203.182.22)
+# No servidor (10.102.0.103)
 cd /var/www/lacos-backend
 sudo bash /home/darley/lacos/scripts/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh
 ```
@@ -40,10 +40,10 @@ sudo bash /home/darley/lacos/scripts/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh
 
 ```bash
 # No seu computador local
-scp /home/darley/lacos/scripts/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh darley@193.203.182.22:/tmp/
+scp /home/darley/lacos/scripts/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh darley@10.102.0.103:/tmp/
 
 # Depois no servidor
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 sudo bash /tmp/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh
 ```
 
@@ -99,7 +99,7 @@ php artisan route:clear
 Execute tudo de uma vez:
 
 ```bash
-ssh darley@193.203.182.22 << 'EOF'
+ssh darley@10.102.0.103 << 'EOF'
 cd /var/www/lacos-backend
 
 # 1. Verificar se método existe

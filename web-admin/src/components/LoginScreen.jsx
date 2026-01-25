@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import SafeIcon from './SafeIcon';
 import { API_BASE_URL } from '../config/api';
 import './LoginScreen.css';
 
@@ -116,7 +117,7 @@ const LoginScreen = ({ onLogin }) => {
         <form onSubmit={handleSubmit} className="login-form">
           {error && (
             <div className="error-message">
-              <span>⚠️</span>
+              <SafeIcon name="warning" size={20} color="#f59e0b" style={{ marginRight: '8px' }} />
               <span>{error}</span>
             </div>
           )}
@@ -154,7 +155,7 @@ const LoginScreen = ({ onLogin }) => {
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={loading}
               >
-                {showPassword ? '👁️' : '👁️‍🗨️'}
+                <SafeIcon name="eye" size={20} color="#6b7280" />
               </button>
             </div>
           </div>

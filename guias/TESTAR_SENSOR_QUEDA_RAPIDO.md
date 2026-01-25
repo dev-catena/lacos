@@ -30,12 +30,12 @@ Ou teste manualmente:
 
 ```bash
 # 1. Login
-curl -X POST http://193.203.182.22/api/login \
+curl -X POST http://10.102.0.103/api/login \
   -H "Content-Type: application/json" \
   -d '{"email":"SEU_EMAIL","password":"SUA_SENHA"}'
 
 # 2. Copie o token e teste salvar dados
-curl -X POST "http://193.203.182.22/api/groups/1/fall-sensor/data" \
+curl -X POST "http://10.102.0.103/api/groups/1/fall-sensor/data" \
   -H "Authorization: Bearer SEU_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

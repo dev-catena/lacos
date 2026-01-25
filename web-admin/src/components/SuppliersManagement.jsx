@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SafeIcon from './SafeIcon';
 import suppliersService from '../services/suppliersService';
 import './SuppliersManagement.css';
 
@@ -145,7 +146,10 @@ const SuppliersManagement = () => {
   return (
     <div className="suppliers-management">
       <div className="suppliers-header">
-        <h1>🏪 Gestão de Fornecedores</h1>
+        <h1>
+          <SafeIcon name="store" size={28} color="#10b981" style={{ marginRight: '10px', verticalAlign: 'middle' }} />
+          Gestão de Fornecedores
+        </h1>
         <p>Gerencie os cadastros de fornecedores do LaçosApp</p>
       </div>
 
@@ -169,17 +173,22 @@ const SuppliersManagement = () => {
             onChange={(e) => setSearchText(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
           />
-          <button onClick={handleSearch}>🔍 Buscar</button>
+          <button onClick={handleSearch}>
+            <SafeIcon name="search" size={18} color="white" style={{ marginRight: '6px' }} />
+            Buscar
+          </button>
         </div>
 
         <button onClick={loadSuppliers} className="btn-refresh">
-          🔄 Atualizar
+          <SafeIcon name="refresh" size={18} color="#6366f1" style={{ marginRight: '8px' }} />
+          Atualizar
         </button>
       </div>
 
       {error && (
         <div className="error-message">
-          ⚠️ {error}
+          <SafeIcon name="warning" size={20} color="#f59e0b" style={{ marginRight: '8px' }} />
+          {error}
         </div>
       )}
 
@@ -279,7 +288,8 @@ const SuppliersManagement = () => {
                           className="btn-reject"
                           title="Suspender"
                         >
-                          ⚠ Suspender
+                          <SafeIcon name="warning" size={18} color="white" style={{ marginRight: '6px' }} />
+                          Suspender
                         </button>
                       )}
                       <button
@@ -287,7 +297,8 @@ const SuppliersManagement = () => {
                         className="btn-delete"
                         title="Excluir"
                       >
-                        🗑 Excluir
+                        <SafeIcon name="trash" size={18} color="white" style={{ marginRight: '6px' }} />
+                        Excluir
                       </button>
                     </div>
                   </td>

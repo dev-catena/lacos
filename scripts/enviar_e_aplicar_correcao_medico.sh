@@ -6,7 +6,7 @@ set -e
 
 # Configurações
 SERVER_USER="darley"
-SERVER_HOST="193.203.182.22"
+SERVER_HOST="10.102.0.103"
 SERVER_PASS="yhvh77"
 SCRIPT_NAME="aplicar_correcao_servidor.sh"
 

@@ -1,0 +1,75 @@
+<?php
+
+// Script para adicionar campos de pagamento na tabela appointments
+// Executar: php add_payment_fields.php
+
+require __DIR__.'/vendor/autoload.php';
+
+$app = require_once __DIR__.'/bootstrap/app.php';
+$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+echo "🔧 Adicionando campos de pagamento na tabela appointments...\n\n";
+
+$columns = [
+    'payment_status' => "ENUM('pending', 'paid_held', 'released', 'refunded') DEFAULT 'pending'",
+    'amount' => 'DECIMAL(10, 2) NULL',
+    'payment_id' => 'VARCHAR(255) NULL',
+    'payment_hold_id' => 'VARCHAR(255) NULL',
+    'refund_id' => 'VARCHAR(255) NULL',
+    'paid_at' => 'DATETIME NULL',
+    'held_at' => 'DATETIME NULL',
+    'released_at' => 'DATETIME NULL',
+    'refunded_at' => 'DATETIME NULL',
+    'confirmed_at' => 'DATETIME NULL',
+    'confirmed_by' => "ENUM('patient', 'system_auto', 'system_doctor_absence', 'system_patient_absence') NULL",
+    'cancelled_by' => "ENUM('doctor', 'patient', 'system_doctor_absence', 'system_patient_absence') NULL",
+    'doctor_amount' => 'DECIMAL(10, 2) NULL',
+    'platform_amount' => 'DECIMAL(10, 2) NULL',
+];
+
+$afterColumn = 'status';
+foreach ($columns as $columnName => $columnDefinition) {
+    try {
+        if (Schema::hasColumn('appointments', $columnName)) {
+            echo "⏭️  Campo {$columnName} já existe, pulando...\n";
+            continue;
+        }
+        
+        DB::statement("ALTER TABLE appointments ADD COLUMN {$columnName} {$columnDefinition} AFTER {$afterColumn}");
+        echo "✅ Campo {$columnName} adicionado com sucesso\n";
+        $afterColumn = $columnName;
+    } catch (\Exception $e) {
+        echo "❌ Erro ao adicionar campo {$columnName}: " . $e->getMessage() . "\n";
+    }
+}
+
+// Adicionar índices
+try {
+    $indexes = ['payment_status', 'scheduled_at'];
+    foreach ($indexes as $indexColumn) {
+        $indexName = 'idx_' . $indexColumn;
+        $indexes = DB::select("SHOW INDEX FROM appointments WHERE Key_name = '{$indexName}'");
+        if (empty($indexes)) {
+            DB::statement("CREATE INDEX {$indexName} ON appointments({$indexColumn})");
+            echo "✅ Índice {$indexName} criado\n";
+        } else {
+            echo "⏭️  Índice {$indexName} já existe\n";
+        }
+    }
+} catch (\Exception $e) {
+    echo "⚠️  Erro ao criar índices: " . $e->getMessage() . "\n";
+}
+
+echo "\n✅ Concluído!\n";
+
+
+
+
+
+
+
+
+

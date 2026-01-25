@@ -47,6 +47,13 @@ import {
   PulseIcon,
   VideoIcon,
   VideoCamIcon,
+  MicIcon,
+  HomeIcon,
+  SettingsIcon,
+  NotificationIcon,
+  NotificationsOutlineIcon,
+  LogOutOutlineIcon,
+  HelpCircleOutlineIcon,
 } from './CustomIcons';
 
 /**
@@ -63,6 +70,7 @@ const iconMap = {
   'checkmark-done-circle': CheckmarkCircleIcon, // Para status concluído
   'checkmark-done-circle-outline': CheckmarkCircleIcon, // Para estado vazio
   'key': KeyOutlineIcon,
+  'key-outline': KeyOutlineIcon, // Para código/chave
   'share-social-outline': ShareIcon,
   'warning': WarningIcon,
   'call': CallIcon,
@@ -131,6 +139,7 @@ const iconMap = {
   // Ícones de dinheiro/preço
   'cash-outline': MoneyIcon, // Dinheiro/preço
   // Ícones adicionais para MedicationDetailsScreen
+  'alert': WarningIcon, // Alerta simples
   'alert-circle': WarningIcon, // Alerta/atrasado
   'time': TimeIcon, // Horário
   'pulse': PulseIcon, // Pulse/Batimento (sinais vitais)
@@ -147,6 +156,26 @@ const iconMap = {
   'card-outline': DocumentIcon, // Cartão/documento
   'navigate-outline': LocationOutlineIcon, // Navegação
   'star': CheckmarkCircleIcon, // Estrela/favorito
+  // Ícones para PanicSettingsScreen
+  'mic-outline': MicIcon, // Microfone
+  'hand-left-outline': PersonIcon, // Mão (usar PersonIcon como fallback)
+  'checkmark-circle-outline': CheckmarkCircleIcon, // Checkmark círculo outline
+  // Ícones para EditPersonalDataScreen
+  'home-outline': HomeIcon, // Casa/endereço
+  // Ícones para NotificationPreferencesScreen
+  'settings': SettingsIcon, // Configurações
+  'notifications': NotificationIcon, // Notificações
+  'notifications-outline': NotificationsOutlineIcon, // Notificações outline
+  'alarm': TimeIcon, // Alarme (usar TimeIcon como fallback)
+  'bulb': WarningIcon, // Lâmpada/dica (usar WarningIcon como fallback)
+  'cloud-download': DocumentAttachIcon, // Download (usar DocumentAttachIcon como fallback)
+  'person-add': PersonIcon, // Adicionar pessoa (usar PersonIcon como fallback)
+  'create': CreateOutlineIcon, // Criar/editar
+  // Ícones para PatientJoinGroupScreen
+  'log-out-outline': LogOutOutlineIcon, // Sair/logout
+  'log-in-outline': LogOutOutlineIcon, // Entrar/login (usar LogOutOutlineIcon como fallback)
+  'qr-code-outline': KeyOutlineIcon, // QR Code (usar KeyOutlineIcon como fallback)
+  'help-circle-outline': HelpCircleOutlineIcon, // Ajuda
 };
 
 /**

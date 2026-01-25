@@ -3,7 +3,7 @@
 # Script simplificado para enviar arquivos para o servidor
 # Execute manualmente com a senha quando solicitado
 
-SERVER="darley@193.203.182.22"
+SERVER="darley@10.102.0.103"
 PORT="63022"
 TMP_DIR="/tmp"
 

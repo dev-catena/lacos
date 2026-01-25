@@ -11,12 +11,12 @@ Erro ao gerar atestado: Error: Erro ao gerar atestado: Erro ao salvar PDF: arqui
 
 1. **Copie o script para o servidor:**
    ```bash
-   scp -P 63022 scripts/CORRIGIR_PDF_SERVIDOR_DIRETO.sh darley@193.203.182.22:/tmp/
+   scp -P 63022 scripts/CORRIGIR_PDF_SERVIDOR_DIRETO.sh darley@10.102.0.103:/tmp/
    ```
 
 2. **Conecte-se ao servidor:**
    ```bash
-   ssh -p 63022 darley@193.203.182.22
+   ssh -p 63022 darley@10.102.0.103
    ```
 
 3. **Execute o script:**
@@ -31,7 +31,7 @@ Se preferir executar manualmente, siga estes passos no servidor:
 
 ```bash
 # 1. Conectar ao servidor
-ssh -p 63022 darley@193.203.182.22
+ssh -p 63022 darley@10.102.0.103
 
 # 2. Criar diretórios necessários
 mkdir -p /var/www/lacos-backend/storage/app/temp

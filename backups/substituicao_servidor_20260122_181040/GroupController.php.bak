@@ -1,0 +1,684 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Group;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+
+class GroupController extends Controller
+{
+    /**
+     * Listar grupos do usuário autenticado
+     * GET /api/groups
+     * 
+     * Retorna todos os grupos onde o usuário está associado:
+     * - Grupos que ele criou (created_by = user.id)
+     * - Grupos onde ele é membro (via tabela group_members)
+     */
+    public function index(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Usuário não autenticado'
+                ], 401);
+            }
+
+            Log::info("Buscando grupos para usuário ID: {$user->id} ({$user->email})");
+
+            // Buscar grupos de múltiplas formas:
+            // 1. Grupos onde o usuário é admin (admin_user_id)
+            // 2. Grupos onde o usuário é membro (via tabela group_members)
+            // 3. Grupos onde o usuário tem atividades (group_activities)
+            // 4. Grupos onde o usuário tem documentos (documents)
+            // 5. Grupos onde o usuário tem medicamentos (medications)
+            
+            // Buscar grupos onde o usuário é admin
+            $adminGroups = DB::table('groups')
+                ->where('admin_user_id', $user->id)
+                ->pluck('id')
+                ->toArray();
+            
+            Log::info("Grupos onde usuário {$user->id} é admin: " . count($adminGroups) . " - IDs: " . implode(', ', $adminGroups));
+
+            // Buscar grupos via tabela pivot group_members (se existir)
+            $memberGroups = [];
+            try {
+                if (Schema::hasTable('group_members')) {
+                    $memberGroups = DB::table('group_members')
+                        ->where('user_id', $user->id)
+                        ->pluck('group_id')
+                        ->toArray();
+                    Log::info("Grupos via group_members para usuário {$user->id}: " . count($memberGroups) . " - IDs: " . implode(', ', $memberGroups));
+                } else {
+                    Log::info("Tabela group_members não existe");
+                }
+            } catch (\Exception $e) {
+                Log::warning("Erro ao buscar group_members: " . $e->getMessage());
+            }
+
+            // Buscar grupos via atividades
+            $activityGroups = [];
+            try {
+                if (Schema::hasTable('group_activities')) {
+                    $activityGroups = DB::table('group_activities')
+                        ->where('user_id', $user->id)
+                        ->distinct()
+                        ->pluck('group_id')
+                        ->toArray();
+                    Log::info("Grupos via atividades para usuário {$user->id}: " . count($activityGroups) . " - IDs: " . implode(', ', $activityGroups));
+                }
+            } catch (\Exception $e) {
+                Log::warning("Erro ao buscar grupos via atividades: " . $e->getMessage());
+            }
+
+            // Buscar grupos via documentos
+            $documentGroups = [];
+            try {
+                if (Schema::hasTable('documents')) {
+                    $documentGroups = DB::table('documents')
+                        ->where('user_id', $user->id)
+                        ->distinct()
+                        ->pluck('group_id')
+                        ->toArray();
+                    Log::info("Grupos via documentos para usuário {$user->id}: " . count($documentGroups) . " - IDs: " . implode(', ', $documentGroups));
+                }
+            } catch (\Exception $e) {
+                Log::warning("Erro ao buscar grupos via documentos: " . $e->getMessage());
+            }
+
+            // Buscar grupos via medicamentos (se o usuário é médico)
+            $medicationGroups = [];
+            try {
+                if (Schema::hasTable('medications')) {
+                    $medicationGroups = DB::table('medications')
+                        ->where('doctor_id', $user->id)
+                        ->distinct()
+                        ->pluck('group_id')
+                        ->toArray();
+                    Log::info("Grupos via medicamentos para usuário {$user->id}: " . count($medicationGroups) . " - IDs: " . implode(', ', $medicationGroups));
+                }
+            } catch (\Exception $e) {
+                Log::warning("Erro ao buscar grupos via medicamentos: " . $e->getMessage());
+            }
+
+            // Combinar todos os IDs únicos
+            $allGroupIds = array_unique(array_merge(
+                $adminGroups,
+                $memberGroups,
+                $activityGroups,
+                $documentGroups,
+                $medicationGroups
+            ));
+
+            Log::info("Total de grupos únicos encontrados para usuário {$user->id}: " . count($allGroupIds) . " - IDs: " . implode(', ', $allGroupIds));
+            
+            // Se não encontrou nenhum grupo, logar para debug e retornar vazio
+            if (empty($allGroupIds)) {
+                Log::warning("Nenhum grupo encontrado para usuário {$user->id} ({$user->email})");
+                try {
+                    $allGroups = DB::table('groups')->pluck('id')->toArray();
+                    Log::info("Total de grupos no sistema: " . count($allGroups));
+                    if (count($allGroups) > 0) {
+                        Log::warning("Existem " . count($allGroups) . " grupos no sistema, mas nenhum associado ao usuário {$user->id}");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("Erro ao contar grupos: " . $e->getMessage());
+                }
+                return response()->json([]);
+            }
+
+            // Buscar grupos completos com relacionamentos
+            try {
+                $groups = DB::table('groups')
+                    ->whereIn('id', $allGroupIds)
+                    ->get()
+                    ->map(function ($group) use ($user) {
+                    // Buscar informações do membro na tabela pivot (se existir)
+                    $memberInfo = null;
+                    $members = [];
+                    
+                    if (Schema::hasTable('group_members')) {
+                        try {
+                            $memberInfo = DB::table('group_members')
+                                ->where('group_id', $group->id)
+                                ->where('user_id', $user->id)
+                                ->first();
+
+                            // Buscar membros do grupo
+                            $userColumns = ['users.id as user_id', 'users.name', 'users.email', 'group_members.role'];
+                            if (Schema::hasColumn('users', 'profile')) {
+                                $userColumns[] = 'users.profile';
+                            }
+                            
+                            $members = DB::table('group_members')
+                                ->where('group_id', $group->id)
+                                ->join('users', 'group_members.user_id', '=', 'users.id')
+                                ->select($userColumns)
+                                ->get()
+                                ->map(function($m) {
+                                    return [
+                                        'user_id' => $m->user_id,
+                                        'name' => $m->name,
+                                        'email' => $m->email,
+                                        'profile' => $m->profile ?? null,
+                                        'role' => $m->role,
+                                        'is_admin' => ($m->role === 'admin')
+                                    ];
+                                })
+                                ->toArray();
+                        } catch (\Exception $e) {
+                            Log::warning("Erro ao buscar membros do grupo: " . $e->getMessage());
+                        }
+                    }
+
+                    // Determinar se é admin/criador
+                    // Verificar se é criador: usar created_by se existir, senão usar admin_user_id (compatibilidade)
+                    $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+                    $isCreator = $createdBy && $createdBy == $user->id;
+                    
+                    // is_admin deve ser true se for criador OU se tiver role='admin' na tabela group_members
+                    $isAdmin = $isCreator || ($memberInfo && $memberInfo->role === 'admin');
+
+                    // Construir resposta
+                    $groupData = [
+                        'id' => $group->id,
+                        'name' => $group->name,
+                        'description' => $group->description,
+                        'accompanied_name' => $group->accompanied_name,
+                        'accompanied_age' => $group->accompanied_age,
+                        'accompanied_gender' => $group->accompanied_gender,
+                        'accompanied_photo' => $group->accompanied_photo ?? null,
+                        'health_info' => isset($group->health_info) && $group->health_info ? json_decode($group->health_info, true) : null,
+                        'photo' => $group->photo ?? null,
+                        'photo_url' => isset($group->photo) && $group->photo ? asset('storage/' . $group->photo) : null,
+                        'code' => $group->code ?? null,
+                'access_code' => $group->code ?? null,
+                        'admin_user_id' => $group->admin_user_id ?? null,
+                        'created_by' => $createdBy, // Usar created_by se existir, senão admin_user_id
+                        'created_at' => $group->created_at,
+                        'updated_at' => $group->updated_at,
+                        // Informações do usuário atual no grupo
+                        'is_creator' => $isCreator,
+                        'is_admin' => $isAdmin, // Criador OU role='admin' na tabela group_members
+                        'role' => $isAdmin ? 'admin' : ($memberInfo ? $memberInfo->role : null),
+                        // Membros do grupo
+                        'group_members' => $members,
+                    ];
+
+                        return $groupData;
+                    })
+                    ->values()
+                    ->toArray();
+
+                Log::info("Retornando " . count($groups) . " grupo(s) para usuário {$user->id}");
+
+                return response()->json($groups);
+            } catch (\Exception $e) {
+                Log::error("Erro ao buscar grupos completos: " . $e->getMessage());
+                Log::error("Stack trace: " . $e->getTraceAsString());
+                
+                // Retornar pelo menos os grupos admin mesmo se houver erro
+                try {
+                    $fallbackGroups = DB::table('groups')
+                        ->whereIn('id', $adminGroups)
+                        ->get()
+                        ->map(function ($group) use ($user) {
+                            return [
+                                'id' => $group->id,
+                                'name' => $group->name,
+                                'description' => $group->description,
+                                'is_creator' => true,
+                                'is_admin' => false,
+                                'admin_user_id' => $group->admin_user_id ?? null,
+                                'created_by' => $group->admin_user_id ?? null, // Compatibilidade
+                            ];
+                        })
+                        ->values()
+                        ->toArray();
+                    
+                    Log::info("Retornando grupos criados como fallback: " . count($fallbackGroups));
+                    return response()->json($fallbackGroups);
+                } catch (\Exception $fallbackError) {
+                    Log::error("Erro no fallback: " . $fallbackError->getMessage());
+                    return response()->json([
+                        'message' => 'Erro ao buscar grupos',
+                        'error' => $e->getMessage()
+                    ], 500);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error("Erro ao buscar grupos: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
+            
+            return response()->json([
+                'message' => 'Erro ao buscar grupos',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Criar novo grupo
+     * POST /api/groups
+     */
+    public function store(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Usuário não autenticado'
+                ], 401);
+            }
+
+            // Verificar se colunas existem
+            $hasCodeColumn = Schema::hasColumn('groups', 'code');
+            $hasPhotoColumn = Schema::hasColumn('groups', 'photo');
+
+            // Validação base
+            $validationRules = [
+                'name' => 'required|string|max:255',
+                'description' => 'nullable|string',
+            ];
+
+            // Adicionar validação de foto se coluna existir
+            if ($hasPhotoColumn) {
+                $validationRules['photo'] = 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048';
+            }
+
+            // Adicionar validação de código se coluna existir
+            if ($hasCodeColumn) {
+                $validationRules['code'] = 'nullable|string|max:20|unique:groups,code';
+            }
+
+            $validated = $request->validate($validationRules);
+
+            // Preparar dados para inserção
+            $data = [
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'admin_user_id' => $user->id,
+                'type' => 'care', // Padrão
+                'is_active' => true,
+            ];
+            
+            // Definir created_by se a coluna existir
+            if (Schema::hasColumn('groups', 'created_by')) {
+                $data['created_by'] = $user->id;
+            }
+
+            // Gerar código de acesso se coluna existir
+            $generatedCode = null;
+            if ($hasCodeColumn) {
+                if (!empty($validated['code'] ?? null)) {
+                    $data['code'] = $validated['code'];
+                    $generatedCode = $validated['code'];
+                } else {
+                    // Gerar código único de 8 caracteres
+                    do {
+                        $code = strtoupper(substr(md5(uniqid(rand(), true)), 0, 8));
+                        $exists = DB::table('groups')->where('code', $code)->exists();
+                    } while ($exists);
+                    $data['code'] = $code;
+                    $generatedCode = $code;
+                }
+            }
+
+            // Upload de foto se fornecida e se coluna existir
+            $photoPath = null;
+            if ($request->hasFile('photo') && $hasPhotoColumn) {
+                $photo = $request->file('photo');
+                $photoPath = $photo->store('groups', 'public');
+                $data['photo'] = $photoPath;
+            }
+
+            // Inserir grupo
+            $groupId = DB::table('groups')->insertGetId($data);
+
+            // Buscar grupo criado
+            $group = DB::table('groups')->where('id', $groupId)->first();
+
+            // Adicionar criador como membro admin (se tabela group_members existir)
+            if (Schema::hasTable('group_members')) {
+                try {
+                    DB::table('group_members')->insert([
+                        'group_id' => $groupId,
+                        'user_id' => $user->id,
+                        'role' => 'admin',
+                        'joined_at' => now(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } catch (\Exception $e) {
+                    Log::warning("Erro ao adicionar criador como membro: " . $e->getMessage());
+                }
+            }
+
+            // Preparar resposta
+            $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+            $response = [
+                'id' => $group->id,
+                'name' => $group->name,
+                'description' => $group->description,
+                'admin_user_id' => $group->admin_user_id ?? null,
+                'created_by' => $createdBy, // Usar created_by se existir, senão admin_user_id
+                'type' => $group->type ?? null,
+                'is_active' => $group->is_active ?? true,
+                'created_at' => $group->created_at,
+                'updated_at' => $group->updated_at,
+                'is_creator' => true,
+                'is_admin' => true,
+                'role' => 'admin',
+            ];
+
+            // Adicionar código se existir
+            if ($hasCodeColumn) {
+                $response['code'] = $group->code ?? $generatedCode;
+                $response['access_code'] = $group->code ?? $generatedCode;
+            }
+
+            // Adicionar foto se existir
+            if ($photoPath) {
+                $response['photo'] = $photoPath;
+                $response['photo_url'] = asset('storage/' . $photoPath);
+            } elseif ($hasPhotoColumn && isset($group->photo) && $group->photo) {
+                $response['photo'] = $group->photo;
+                $response['photo_url'] = asset('storage/' . $group->photo);
+            }
+
+            Log::info("Grupo criado com sucesso", [
+                'group_id' => $groupId,
+                'user_id' => $user->id,
+                'name' => $group->name,
+            ]);
+
+            return response()->json($response, 201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Dados inválidos',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error("Erro ao criar grupo: " . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Erro ao criar grupo',
+                'error' => config('app.debug') ? $e->getMessage() : 'Erro interno do servidor'
+            ], 500);
+        }
+    }
+
+    /**
+     * Obter detalhes de um grupo específico
+     * GET /api/groups/{id}
+     */
+    public function show($id)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Usuário não autenticado'
+                ], 401);
+            }
+
+            // Buscar o grupo
+            $group = DB::table('groups')->where('id', $id)->first();
+            
+            if (!$group) {
+                return response()->json([
+                    'message' => 'Grupo não encontrado'
+                ], 404);
+            }
+
+            // Verificar se o usuário tem acesso ao grupo
+            $hasAccess = false;
+            
+            // 1. Verificar se é admin/criador (usar created_by se existir, senão admin_user_id)
+            $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+            if ($createdBy && $createdBy == $user->id) {
+                $hasAccess = true;
+            }
+            
+            // 2. Verificar via group_members
+            if (!$hasAccess && Schema::hasTable('group_members')) {
+                $hasAccess = DB::table('group_members')
+                    ->where('user_id', $user->id)
+                    ->where('group_id', $id)
+                    ->exists();
+            }
+            
+            // 3. Verificar via atividades, documentos, medicamentos, etc.
+            if (!$hasAccess) {
+                $hasActivities = Schema::hasTable('group_activities') && 
+                    DB::table('group_activities')
+                        ->where('group_id', $id)
+                        ->where('user_id', $user->id)
+                        ->exists();
+                
+                $hasDocuments = Schema::hasTable('documents') && 
+                    DB::table('documents')
+                        ->where('group_id', $id)
+                        ->where('user_id', $user->id)
+                        ->exists();
+                
+                $hasMedications = Schema::hasTable('medications') && 
+                    DB::table('medications')
+                        ->where('group_id', $id)
+                        ->where('user_id', $user->id)
+                        ->exists();
+                
+                $hasAppointments = Schema::hasTable('appointments') && 
+                    DB::table('appointments')
+                        ->where('group_id', $id)
+                        ->where('user_id', $user->id)
+                        ->exists();
+                
+                $hasAccess = $hasActivities || $hasDocuments || $hasMedications || $hasAppointments;
+            }
+            
+            if (!$hasAccess) {
+                return response()->json([
+                    'message' => 'Você não tem acesso a este grupo'
+                ], 403);
+            }
+
+            // Buscar informações do membro
+            $memberInfo = null;
+            $members = [];
+            
+            if (Schema::hasTable('group_members')) {
+                $memberInfo = DB::table('group_members')
+                    ->where('group_id', $id)
+                    ->where('user_id', $user->id)
+                    ->first();
+
+                // Construir select dinamicamente baseado nas colunas disponíveis
+                $userColumns = ['users.id as user_id', 'users.name', 'users.email', 'group_members.role'];
+                if (Schema::hasColumn('users', 'profile')) {
+                    $userColumns[] = 'users.profile';
+                }
+                
+                $members = DB::table('group_members')
+                    ->where('group_id', $id)
+                    ->join('users', 'group_members.user_id', '=', 'users.id')
+                    ->select($userColumns)
+                    ->get()
+                    ->map(function($m) {
+                        return [
+                            'user_id' => $m->user_id,
+                            'name' => $m->name,
+                            'email' => $m->email,
+                            'profile' => $m->profile ?? null,
+                            'role' => $m->role,
+                            'is_admin' => ($m->role === 'admin')
+                        ];
+                    })
+                    ->toArray();
+            }
+
+            // Verificar se é criador: usar created_by se existir, senão usar admin_user_id (compatibilidade)
+            $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+            $isCreator = $createdBy && (int)$createdBy == (int)$user->id;
+            
+            // is_admin deve ser true se for criador OU se tiver role='admin' na tabela group_members
+            $hasAdminRole = $memberInfo && $memberInfo->role === 'admin';
+            $isAdmin = $isCreator || $hasAdminRole;
+
+            // Log para debug
+            Log::info('GroupController::show - Verificação de admin', [
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'group_id' => $group->id,
+                'group_name' => $group->name,
+                'created_by' => $createdBy,
+                'created_by_type' => gettype($createdBy),
+                'user_id_type' => gettype($user->id),
+                'isCreator' => $isCreator,
+                'memberInfo' => $memberInfo ? [
+                    'user_id' => $memberInfo->user_id,
+                    'role' => $memberInfo->role
+                ] : null,
+                'hasAdminRole' => $hasAdminRole,
+                'is_admin' => $isAdmin
+            ]);
+
+            $groupData = [
+                'id' => $group->id,
+                'name' => $group->name ?? null,
+                'description' => $group->description ?? null,
+                'accompanied_name' => $group->accompanied_name ?? null,
+                'accompanied_age' => $group->accompanied_age ?? null,
+                'accompanied_gender' => $group->accompanied_gender ?? null,
+                'accompanied_photo' => $group->accompanied_photo ?? null,
+                'health_info' => isset($group->health_info) && $group->health_info ? json_decode($group->health_info, true) : null,
+                'photo' => $group->photo ?? null,
+                'photo_url' => isset($group->photo) && $group->photo ? asset('storage/' . $group->photo) : null,
+                'code' => $group->code ?? null,
+                'access_code' => $group->code ?? null,
+                'admin_user_id' => $group->admin_user_id ?? null,
+                'created_by' => $createdBy, // Usar created_by se existir, senão admin_user_id
+                'created_at' => $group->created_at ?? null,
+                'updated_at' => $group->updated_at ?? null,
+                'is_creator' => $isCreator,
+                'is_admin' => $isAdmin, // Criador OU role='admin' na tabela group_members
+                'role' => $isAdmin ? 'admin' : ($memberInfo ? $memberInfo->role : null),
+                'group_members' => $members,
+            ];
+
+            return response()->json($groupData);
+        } catch (\Exception $e) {
+            Log::error('Erro ao buscar grupo: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Erro ao buscar grupo',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Atualizar grupo
+     * PUT /api/groups/{id}
+     */
+    public function update(Request $request, $id)
+    {
+        // Implementação do update se necessário
+        return response()->json([
+            'message' => 'Método não implementado'
+        ], 501);
+    }
+
+    /**
+     * Deletar grupo
+     * DELETE /api/groups/{id}
+     */
+    public function destroy($id)
+    {
+        // Implementação do destroy se necessário
+        return response()->json([
+            'message' => 'Método não implementado'
+        ], 501);
+    }
+
+    public function members($id) {
+        try {
+            $user = Auth::user();
+            if (!$user) return response()->json(["success" => false, "message" => "Usuário não autenticado"], 401);
+            $group = DB::table("groups")->where("id", $id)->first();
+            if (!$group) return response()->json(["success" => false, "message" => "Grupo não encontrado"], 404);
+            // Verificar se é admin/criador (usar created_by se existir, senão admin_user_id)
+            $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+            $hasAccess = $createdBy && $createdBy == $user->id;
+            if (!$hasAccess && Schema::hasTable("group_members")) {
+                $hasAccess = DB::table("group_members")->where("user_id", $user->id)->where("group_id", $id)->exists();
+            }
+            if (!$hasAccess) return response()->json(["success" => false, "message" => "Você não tem acesso"], 403);
+            $members = [];
+            if (Schema::hasTable("group_members")) {
+                $memberColumns = ["users.id", "users.name", "users.email", "users.phone", "users.photo", "users.photo_url", "group_members.role", "group_members.joined_at"];
+                if (Schema::hasColumn('users', 'profile')) {
+                    $memberColumns[] = "users.profile";
+                }
+                
+                $members = DB::table("group_members")
+                    ->join("users", "group_members.user_id", "=", "users.id")
+                    ->where("group_members.group_id", $id)
+                    ->where("users.is_active", 1)
+                    ->select($memberColumns)
+                    ->get()
+                    ->map(function ($m) {
+                        return [
+                            "id" => $m->id, 
+                            "user_id" => $m->id, 
+                            "name" => $m->name, 
+                            "email" => $m->email, 
+                            "phone" => $m->phone ?? null, 
+                            "photo" => $m->photo ?? null, 
+                            "photo_url" => $m->photo_url || ($m->photo ? asset("storage/" . $m->photo) : null), 
+                            "role" => $m->role, 
+                            "is_admin" => ($m->role === "admin"), 
+                            "profile" => $m->profile ?? null, 
+                            "joined_at" => $m->joined_at
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+            }
+            // Usar created_by se existir, senão admin_user_id (compatibilidade)
+            $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+            if ($createdBy) {
+                $found = false;
+                foreach ($members as $m) {
+                    if (($m["id"] ?? null) == $createdBy || ($m["user_id"] ?? null) == $createdBy) {
+                        $found = true;
+                        break;
+                    }
+                }
+                if (!$found) {
+                    $creator = DB::table("users")->where("id", $createdBy)->first();
+                    if ($creator) {
+                        $members[] = ["id" => $creator->id, "user_id" => $creator->id, "name" => $creator->name, "email" => $creator->email, "phone" => $creator->phone, "photo" => $creator->photo, "photo_url" => $creator->photo_url || ($creator->photo ? asset("storage/" . $creator->photo) : null), "role" => "admin", "is_admin" => true, "profile" => $creator->profile, "joined_at" => $group->created_at];
+                    }
+                }
+            }
+            return response()->json(["success" => true, "data" => $members]);
+        } catch (\Exception $e) {
+            Log::error("Erro ao buscar membros: " . $e->getMessage());
+            return response()->json(["success" => false, "message" => "Erro ao buscar membros", "error" => $e->getMessage()], 500);
+        }
+    }
+
+}

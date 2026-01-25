@@ -3,7 +3,7 @@
 # Script para adicionar método saveAvailability ao DoctorController
 # e garantir que a rota POST está configurada
 
-SERVER="darley@193.203.182.22"
+SERVER="darley@10.102.0.103"
 SSH_PORT="63022"
 BACKEND_PATH="/var/www/lacos-backend"
 

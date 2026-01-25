@@ -26,6 +26,8 @@ import {
   CloseIcon 
 } from '../../components/CustomIcons';
 import groupService from '../../services/groupService';
+import API_CONFIG from '../../config/api';
+import { BACKEND_HOST, BACKEND_PORT } from '../../config/env';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -66,7 +68,8 @@ const GroupsScreen = ({ navigation, route }) => {
   
   // Função para testar deep link manualmente (útil para Expo Go)
   const testDeepLink = () => {
-    const testUrl = 'http://10.102.0.103/grupo/TESTE123';
+    // Usar configuração centralizada do backend
+    const testUrl = `http://${BACKEND_HOST}:${BACKEND_PORT}/grupo/TESTE123`;
     console.log('🧪 Testando deep link manualmente:', testUrl);
     // Simular processamento de deep link
     const code = 'TESTE123';
@@ -243,16 +246,41 @@ const GroupsScreen = ({ navigation, route }) => {
                 activeOpacity={0.7}
               >
             <View style={styles.groupHeader}>
-              {group.photo_url ? (
-                <Image 
-                  source={{ uri: group.photo_url }} 
-                  style={styles.groupPhoto}
-                />
-              ) : (
-                <View style={styles.groupIconContainer}>
-                  <PersonIcon size={28} color={colors.primary} />
-                </View>
-              )}
+              {(() => {
+                const photoUrl = group.photo_url || group.photo;
+                
+                if (photoUrl) {
+                  // Construir URL completa
+                  let fullPhotoUrl = photoUrl;
+                  
+                  // Se não é URL completa, construir
+                  if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+                    const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+                    fullPhotoUrl = photoUrl.startsWith('/') 
+                      ? `${baseUrl}${photoUrl}` 
+                      : `${baseUrl}/${photoUrl}`;
+                  }
+                  
+                  return (
+                    <Image 
+                      source={{ uri: fullPhotoUrl }} 
+                      style={styles.groupPhoto}
+                      onError={(error) => {
+                        console.log('❌ GroupsScreen - Erro ao carregar foto do grupo:', error);
+                        console.log('❌ GroupsScreen - URI tentada:', fullPhotoUrl);
+                      }}
+                      resizeMode="cover"
+                    />
+                  );
+                }
+                
+                // Se não há foto, mostrar ícone
+                return (
+                  <View style={styles.groupIconContainer}>
+                    <PersonIcon size={28} color={colors.primary} />
+                  </View>
+                );
+              })()}
               <View style={styles.groupContent}>
                     <Text style={styles.groupName}>{group.name}</Text>
                     <View style={styles.groupMembersRow}>
@@ -363,16 +391,41 @@ const GroupsScreen = ({ navigation, route }) => {
                 activeOpacity={0.7}
               >
                 <View style={styles.groupCardHeader}>
-                  {group.photo_url ? (
-                    <Image 
-                      source={{ uri: group.photo_url }} 
-                      style={styles.groupPhotoSmall}
-                    />
-                  ) : (
-                    <View style={styles.groupIconContainer}>
-                      <PersonIcon size={24} color={colors.primary} />
-                    </View>
-                  )}
+                  {(() => {
+                    const photoUrl = group.photo_url || group.photo;
+                    
+                    if (photoUrl) {
+                      // Construir URL completa
+                      let fullPhotoUrl = photoUrl;
+                      
+                      // Se não é URL completa, construir
+                      if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+                        const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+                        fullPhotoUrl = photoUrl.startsWith('/') 
+                          ? `${baseUrl}${photoUrl}` 
+                          : `${baseUrl}/${photoUrl}`;
+                      }
+                      
+                      return (
+                        <Image 
+                          source={{ uri: fullPhotoUrl }} 
+                          style={styles.groupPhotoSmall}
+                          onError={(error) => {
+                            console.log('❌ GroupsScreen - Erro ao carregar foto do grupo:', error);
+                            console.log('❌ GroupsScreen - URI tentada:', fullPhotoUrl);
+                          }}
+                          resizeMode="cover"
+                        />
+                      );
+                    }
+                    
+                    // Se não há foto, mostrar ícone
+                    return (
+                      <View style={styles.groupIconContainer}>
+                        <PersonIcon size={24} color={colors.primary} />
+                      </View>
+                    );
+                  })()}
                   <View style={styles.groupInfo}>
                     <Text style={styles.groupName}>{group.name}</Text>
                     {group.accompanied_name && (

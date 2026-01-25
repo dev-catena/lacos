@@ -6,7 +6,7 @@
 set -e
 
 # Configurações do servidor
-SERVER_HOST="193.203.182.22"
+SERVER_HOST="10.102.0.103"
 SERVER_PORT="63022"
 SERVER_USER="darley"
 SERVER_PASS="yhvh77"

@@ -15,7 +15,7 @@
 Edite o arquivo `.env` no servidor e configure:
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 nano .env  # ou vim .env
 ```

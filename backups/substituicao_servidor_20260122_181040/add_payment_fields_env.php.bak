@@ -1,0 +1,121 @@
+<?php
+
+// Script para adicionar campos de pagamento usando credenciais do .env
+// Executar: php add_payment_fields_env.php
+
+// Ler .env usando exec para contornar problemas de permissão
+$envFile = __DIR__ . '/.env';
+$dbUser = 'lacos';
+$dbPass = 'Lacos2025Secure';
+$dbName = 'lacos';
+$dbHost = '127.0.0.1';
+
+// Tentar ler do .env se possível
+if (file_exists($envFile) && is_readable($envFile)) {
+    $env = parse_ini_file($envFile);
+    $dbUser = $env['DB_USERNAME'] ?? $dbUser;
+    $dbPass = $env['DB_PASSWORD'] ?? $dbPass;
+    $dbName = $env['DB_DATABASE'] ?? $dbName;
+    $dbHost = $env['DB_HOST'] ?? $dbHost;
+} else {
+    // Tentar ler com cat via exec
+    $output = [];
+    exec("sudo cat {$envFile} 2>/dev/null", $output);
+    if (!empty($output)) {
+        foreach ($output as $line) {
+            if (preg_match('/^DB_USERNAME=(.+)$/', $line, $matches)) {
+                $dbUser = trim($matches[1]);
+            } elseif (preg_match('/^DB_PASSWORD=(.+)$/', $line, $matches)) {
+                $dbPass = trim($matches[1]);
+            } elseif (preg_match('/^DB_DATABASE=(.+)$/', $line, $matches)) {
+                $dbName = trim($matches[1]);
+            } elseif (preg_match('/^DB_HOST=(.+)$/', $line, $matches)) {
+                $dbHost = trim($matches[1]);
+            }
+        }
+    }
+}
+
+echo "🔧 Adicionando campos de pagamento na tabela appointments...\n";
+echo "📋 Usando: DB_USER=$dbUser, DB_NAME=$dbName, DB_HOST=$dbHost\n\n";
+
+try {
+    $pdo = new PDO("mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4", $dbUser, $dbPass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    
+    $columns = [
+        'payment_status' => "ENUM('pending', 'paid_held', 'released', 'refunded') DEFAULT 'pending'",
+        'amount' => 'DECIMAL(10, 2) NULL',
+        'payment_id' => 'VARCHAR(255) NULL',
+        'payment_hold_id' => 'VARCHAR(255) NULL',
+        'refund_id' => 'VARCHAR(255) NULL',
+        'paid_at' => 'DATETIME NULL',
+        'held_at' => 'DATETIME NULL',
+        'released_at' => 'DATETIME NULL',
+        'refunded_at' => 'DATETIME NULL',
+        'confirmed_at' => 'DATETIME NULL',
+        'confirmed_by' => "ENUM('patient', 'system_auto', 'system_doctor_absence', 'system_patient_absence') NULL",
+        'cancelled_by' => "ENUM('doctor', 'patient', 'system_doctor_absence', 'system_patient_absence') NULL",
+        'doctor_amount' => 'DECIMAL(10, 2) NULL',
+        'platform_amount' => 'DECIMAL(10, 2) NULL',
+    ];
+    
+    $afterColumn = 'status';
+    foreach ($columns as $columnName => $columnDefinition) {
+        // Verificar se coluna existe
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as count 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE table_schema = ? 
+            AND table_name = 'appointments' 
+            AND column_name = ?
+        ");
+        $stmt->execute([$dbName, $columnName]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($result['count'] > 0) {
+            echo "⏭️  Campo {$columnName} já existe, pulando...\n";
+            continue;
+        }
+        
+        // Adicionar coluna
+        $sql = "ALTER TABLE appointments ADD COLUMN {$columnName} {$columnDefinition} AFTER {$afterColumn}";
+        $pdo->exec($sql);
+        echo "✅ Campo {$columnName} adicionado com sucesso\n";
+        $afterColumn = $columnName;
+    }
+    
+    // Criar índices
+    $indexes = [
+        'idx_payment_status' => 'payment_status',
+        'idx_scheduled_at' => 'scheduled_at',
+    ];
+    
+    foreach ($indexes as $indexName => $indexColumn) {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as count 
+            FROM INFORMATION_SCHEMA.STATISTICS 
+            WHERE table_schema = ? 
+            AND table_name = 'appointments' 
+            AND index_name = ?
+        ");
+        $stmt->execute([$dbName, $indexName]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($result['count'] > 0) {
+            echo "⏭️  Índice {$indexName} já existe\n";
+            continue;
+        }
+        
+        $sql = "CREATE INDEX {$indexName} ON appointments({$indexColumn})";
+        $pdo->exec($sql);
+        echo "✅ Índice {$indexName} criado\n";
+    }
+    
+    echo "\n✅ Todos os campos foram adicionados com sucesso!\n";
+    
+} catch (PDOException $e) {
+    echo "❌ Erro: " . $e->getMessage() . "\n";
+    exit(1);
+}
+

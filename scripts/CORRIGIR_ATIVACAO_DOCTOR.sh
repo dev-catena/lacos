@@ -34,7 +34,7 @@ elif [ -f "$WORKSPACE_FILE" ]; then
 else
     echo "⚠️ Arquivo AdminDoctorController.php não encontrado em /tmp nem no workspace!"
     echo "📝 Você precisa copiar o arquivo corrigido para /tmp primeiro:"
-    echo "   scp -P 63022 /caminho/local/AdminDoctorController.php root@193.203.182.22:/tmp/"
+    echo "   scp -P 63022 /caminho/local/AdminDoctorController.php root@10.102.0.103:/tmp/"
     echo ""
     echo "Ou edite o arquivo manualmente no servidor."
     exit 1

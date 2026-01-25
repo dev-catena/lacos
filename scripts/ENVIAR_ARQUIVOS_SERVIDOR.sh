@@ -4,7 +4,7 @@
 # Requer SSH_PASS como variável de ambiente
 
 SSH_USER="darley"
-SSH_HOST="193.203.182.22"
+SSH_HOST="10.102.0.103"
 SSH_PORT="63022"
 REMOTE_PATH="/var/www/lacos-backend"
 LOCAL_PATH="$(pwd)"

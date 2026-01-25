@@ -33,3 +33,5 @@ web-build/
 *.swn
 *.swr
 
+backend-laravel/.env.backup.*
+backups/**/*.bak

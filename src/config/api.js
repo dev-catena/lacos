@@ -1,7 +1,13 @@
 // Configurações da API
+import { BACKEND_BASE_URL } from './env';
+
 const API_CONFIG = {
   // URL base da API - Backend Laravel no servidor
-  BASE_URL: 'http://193.203.182.22/api',
+  // Configurado via variável de ambiente (src/config/env.js)
+  // Para Android: usar IP da máquina em vez de localhost
+  // Para iOS Simulator: pode usar localhost
+  // Para dispositivo físico: usar IP da máquina
+  BASE_URL: BACKEND_BASE_URL,
   
   // Timeout para requisições (em ms)
   TIMEOUT: 30000,

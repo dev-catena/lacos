@@ -1,4 +1,6 @@
 // Configuração da API - detecta automaticamente o host
+import { BACKEND_BASE_URL, BACKEND_HOST } from './env';
+
 const getApiBaseUrl = () => {
   // Se estiver em desenvolvimento ou acessando via IP local
   const hostname = window.location.hostname;
@@ -7,11 +9,17 @@ const getApiBaseUrl = () => {
   
   console.log('🌐 Detectando ambiente:', { hostname, protocol, port });
   
-  // Se for localhost ou IP local, usar o mesmo host para a API
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.')) {
-    // Usar o IP do servidor backend (193.203.182.22)
-    const apiUrl = 'http://193.203.182.22/api';
-    console.log('📍 Ambiente local detectado, usando backend remoto:', apiUrl);
+  // Se for localhost ou IP local, usar backend local
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    const apiUrl = 'http://localhost:8000/api';
+    console.log('📍 Ambiente local detectado (localhost), usando backend local:', apiUrl);
+    return apiUrl;
+  }
+  
+  // Se for IP local (10.x, 192.168.x), usar o mesmo IP para o backend
+  if (hostname.startsWith('10.') || hostname.startsWith('192.168.')) {
+    const apiUrl = `http://${hostname}:8000/api`;
+    console.log('📍 Ambiente local detectado (IP), usando backend no mesmo IP:', apiUrl);
     return apiUrl;
   }
   
@@ -23,24 +31,22 @@ const getApiBaseUrl = () => {
       console.log('📍 Domínio de produção detectado (HTTPS), usando gateway HTTPS:', apiUrl);
       return apiUrl;
     } else {
-      // HTTP: usar IP do backend diretamente
-      const apiUrl = 'http://193.203.182.22/api';
-      console.log('📍 Domínio de produção detectado (HTTP), usando backend no IP:', apiUrl);
-      return apiUrl;
+      // HTTP: usar IP configurado em env.js
+      console.log('📍 Domínio de produção detectado (HTTP), usando backend configurado:', BACKEND_BASE_URL);
+      return BACKEND_BASE_URL;
     }
   }
   
-  // Se for o IP do servidor, usar o mesmo
-  if (hostname === '193.203.182.22') {
-    const apiUrl = `${protocol}//${hostname}/api`;
-    console.log('📍 IP do servidor detectado:', apiUrl);
+  // Se for o IP configurado, usar o mesmo
+  if (hostname === BACKEND_HOST) {
+    const apiUrl = `${protocol}//${hostname}:8000/api`;
+    console.log('📍 IP configurado detectado:', apiUrl);
     return apiUrl;
   }
   
-  // Default: usar o IP do servidor
-  const apiUrl = 'http://193.203.182.22/api';
-  console.log('📍 Usando URL padrão do backend:', apiUrl);
-  return apiUrl;
+  // Default: usar IP configurado em env.js
+  console.log('📍 Usando URL padrão do backend configurado:', BACKEND_BASE_URL);
+  return BACKEND_BASE_URL;
 };
 
 export const API_BASE_URL = getApiBaseUrl();

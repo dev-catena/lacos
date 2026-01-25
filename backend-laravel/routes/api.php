@@ -59,6 +59,13 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 // Logout Admin - Requer autenticação
 Route::middleware('auth:sanctum')->post('/admin/logout', [AdminAuthController::class, 'logout']);
 
+// Especialidades Médicas (públicas para permitir seleção no registro)
+Route::get('/medical-specialties', [MedicalSpecialtyController::class, 'index']);
+Route::get('/medical-specialties/{id}', [MedicalSpecialtyController::class, 'show']);
+
+// Ativação de médico via token (rota pública - link do email)
+Route::get('/doctors/activate', [AdminDoctorController::class, 'activate']);
+
 // ==================== ROTAS ADMIN AUTENTICADAS ====================
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     // Gestão de Usuários (apenas root/admin)
@@ -74,7 +81,9 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/doctors/pending', [AdminDoctorController::class, 'getPending']);
     Route::post('/doctors/{id}/approve', [AdminDoctorController::class, 'approve']);
     Route::post('/doctors/{id}/reject', [AdminDoctorController::class, 'reject']);
+    Route::post('/doctors/{id}/block', [AdminDoctorController::class, 'block']);
     Route::put('/doctors/{id}', [AdminDoctorController::class, 'update']);
+    Route::delete('/doctors/{id}', [AdminDoctorController::class, 'destroy']);
 });
 
 // ==================== ROTAS AUTENTICADAS ====================
@@ -143,9 +152,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/groups', [GroupController::class, 'index']);
     Route::get('/groups/{id}', [GroupController::class, 'show']);
     Route::post('/groups', [GroupController::class, 'store']);
+    Route::post('/groups/join', [GroupController::class, 'join']);
     Route::put('/groups/{id}', [GroupController::class, 'update']);
+    Route::post('/groups/{id}/photo', [GroupController::class, 'uploadPhoto']);
     Route::delete('/groups/{id}', [GroupController::class, 'destroy']);
     Route::get('/groups/{id}/members', [GroupController::class, 'members']);
+    Route::put('/groups/{groupId}/members/{memberId}/role', [GroupController::class, 'updateMemberRole']);
+    Route::delete('/groups/{groupId}/members/{memberId}', [GroupController::class, 'removeMember']);
     
     // Mídias - Mídias dos Grupos
     Route::get('/groups/{groupId}/media', [MediaController::class, 'index']);
@@ -176,18 +189,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/medications/{id}', [MedicationController::class, 'destroy']);
     Route::patch('/medications/{id}/toggle-active', [MedicationController::class, 'toggleActive']);
     
-    // Médicos - Gestão de Médicos do Grupo
+    // Médicos - Gestão de Médicos do Grupo e Agenda
     Route::get('/doctors', [DoctorController::class, 'index']);
-    Route::post('/doctors', [DoctorController::class, 'store']);
-    Route::get('/doctors/{id}', [DoctorController::class, 'show']);
-    Route::put('/doctors/{id}', [DoctorController::class, 'update']);
-    Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
     Route::get('/doctors/{id}/availability', [DoctorController::class, 'getAvailability']);
     Route::post('/doctors/{id}/availability', [DoctorController::class, 'saveAvailability']);
-    
-    // Especialidades Médicas
-    Route::get('/medical-specialties', [MedicalSpecialtyController::class, 'index']);
-    Route::get('/medical-specialties/{id}', [MedicalSpecialtyController::class, 'show']);
     
     // Documentos - Gestão de Documentos do Grupo
     Route::get('/documents', [DocumentController::class, 'index']);
@@ -198,16 +203,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/documents/{id}/download', [DocumentController::class, 'download']);
     
     // Cuidadores Profissionais - Busca de cuidadores
-    Route::get('/caregivers', [CaregiverController::class, 'index']);
-    Route::get('/caregivers/{id}', [CaregiverController::class, 'show']);
+    // IMPORTANTE: Rotas específicas devem vir ANTES das rotas com parâmetros dinâmicos
     Route::get('/caregivers/clients', [CaregiverController::class, 'getClients']);
     Route::get('/caregivers/clients/{id}', [CaregiverController::class, 'getClientDetails']);
+    Route::get('/caregivers', [CaregiverController::class, 'index']);
+    Route::get('/caregivers/{id}', [CaregiverController::class, 'show']);
     
     // Mensagens - Chat entre usuários
-    Route::get('/messages/conversation/{userId}', [MessageController::class, 'getConversation']);
-    Route::post('/messages', [MessageController::class, 'sendMessage']);
-    Route::post('/messages/image', [MessageController::class, 'sendImage']);
-    Route::post('/messages/{id}/read', [MessageController::class, 'markAsRead']);
+    // TODO: Descomentar quando MessageController for criado
+    // Route::get('/messages/conversation/{userId}', [MessageController::class, 'getConversation']);
+    // Route::post('/messages', [MessageController::class, 'sendMessage']);
+    // Route::post('/messages/image', [MessageController::class, 'sendImage']);
+    // Route::post('/messages/{id}/read', [MessageController::class, 'markAsRead']);
     
     // Mensagens de Grupo - Chat do grupo
     Route::get('/messages/group/{groupId}', [GroupMessageController::class, 'getGroupMessages']);
@@ -227,13 +234,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/panic', [PanicController::class, 'index']);
     Route::get('/panic/config/{groupId}', [PanicController::class, 'checkConfig']);
     
-    // Contatos de Emergência
-    Route::apiResource('emergency-contacts', EmergencyContactController::class);
-    Route::post('/emergency-contacts/{id}', [EmergencyContactController::class, 'update']); // Method spoofing
-    
     // Pagamentos - Gateway de Pagamento (Stripe)
     Route::post('/payments/create-intent', [PaymentController::class, 'createIntent']);
     Route::post('/payments/confirm', [PaymentController::class, 'confirm']);
     Route::get('/payments/status/{paymentIntentId}', [PaymentController::class, 'checkStatus']);
+    
+    Route::get('/messages/conversation/{userId}', [MessageController::class, 'getConversation']);
+    Route::post('/messages', [MessageController::class, 'sendMessage']);
+    Route::post('/messages/image', [MessageController::class, 'sendImage']);
+    Route::post('/messages/{id}/read', [MessageController::class, 'markAsRead']);
+    Route::apiResource('emergency-contacts', EmergencyContactController::class);
+    Route::post('/emergency-contacts/{id}', [EmergencyContactController::class, 'update']); // Method spoofing
+
 });
 

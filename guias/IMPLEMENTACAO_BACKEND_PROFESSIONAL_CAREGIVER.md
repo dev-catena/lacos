@@ -19,7 +19,7 @@
 
 1. Conecte-se ao servidor:
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 ```
 
 2. Execute o script com sudo:
@@ -36,7 +36,7 @@ grep "professional_caregiver" /var/www/lacos-backend/app/Http/Controllers/Api/Au
 
 1. Conecte-se ao servidor:
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 ```
 
 2. Faça backup do arquivo:
@@ -73,7 +73,7 @@ grep "professional_caregiver" /var/www/lacos-backend/app/Http/Controllers/Api/Au
 
 2. **Testar o registro via API:**
 ```bash
-curl -X POST http://193.203.182.22/api/register \
+curl -X POST http://10.102.0.103/api/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Teste Profissional",

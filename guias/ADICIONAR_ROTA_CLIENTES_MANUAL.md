@@ -11,7 +11,7 @@ ERROR  ❌ API Error: The route api/caregivers/clients could not be found.
 Execute no servidor:
 
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 ```
 

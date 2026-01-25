@@ -196,6 +196,12 @@ const ClientsListScreen = ({ navigation }) => {
         </View>
         <View style={styles.clientInfo}>
           <Text style={styles.clientName}>{client.name}</Text>
+          {client.patient && client.patient.name && (
+            <View style={styles.patientRow}>
+              <Text style={styles.patientLabel}>Paciente:</Text>
+              <Text style={styles.patientName}>{client.patient.name}</Text>
+            </View>
+          )}
           <View style={styles.locationRow}>
             <LocationIcon size={14} color={colors.textLight} />
             <Text style={styles.locationText}>
@@ -424,6 +430,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 4,
+  },
+  patientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: colors.secondary + '15',
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  patientLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.secondary,
+  },
+  patientName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.secondary,
   },
   locationRow: {
     flexDirection: 'row',

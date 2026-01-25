@@ -4,7 +4,7 @@
 # Este script será executado diretamente no servidor
 
 SSH_USER="darley"
-SSH_HOST="193.203.182.22"
+SSH_HOST="10.102.0.103"
 SSH_PORT="63022"
 SSH_PASS="yhvh77"
 BACKEND_PATH="/var/www/lacos-backend"
@@ -72,7 +72,7 @@ if [ $? -eq 0 ]; then
     echo "✅ Script enviado para /tmp/corrigir_user_endpoint.sh no servidor"
     echo ""
     echo "📋 Para executar no servidor:"
-    echo "   1. Conecte-se: ssh -p 63022 darley@193.203.182.22"
+    echo "   1. Conecte-se: ssh -p 63022 darley@10.102.0.103"
     echo "   2. Execute: sudo bash /tmp/corrigir_user_endpoint.sh"
     echo ""
     echo "   OU execute diretamente:"

@@ -1,0 +1,56 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class Group extends Model {
+    use HasFactory;
+    
+    protected $fillable = [
+        'name',
+        'description',
+        'code',
+        'photo',
+        'panic_enabled',
+        'accompanied_name',
+        'accompanied_age',
+        'accompanied_gender',
+        'accompanied_photo',
+        'health_info',
+        'created_by',
+        'is_active',
+    ];
+    
+    protected $appends = ['photo_url'];
+
+    protected $casts = [
+        'panic_enabled' => 'boolean',
+        'is_active' => 'boolean',
+        'health_info' => 'array',
+    ];
+    
+    // Relação: membros do grupo
+    public function members() {
+        return $this->hasMany(GroupMember::class);
+    }
+    
+    // Alias para compatibilidade com controller
+    public function groupMembers() {
+        return $this->hasMany(GroupMember::class);
+    }
+    
+    // Relação: criador do grupo
+    public function creator() {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+    
+    // Acessor para URL da foto
+    public function getPhotoUrlAttribute() {
+        if ($this->photo) {
+            return asset('storage/' . $this->photo);
+        }
+        return null;
+    }
+}

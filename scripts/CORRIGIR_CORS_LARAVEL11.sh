@@ -24,7 +24,7 @@ return [
         'http://localhost:5173',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:5173',
-        'http://193.203.182.22',
+        'http://10.102.0.103',
     ],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
@@ -106,5 +106,5 @@ echo ""
 echo "📝 Se ainda houver erro CORS:"
 echo "   1. Verifique bootstrap/app.php: cat bootstrap/app.php | grep -A 5 HandleCors"
 echo "   2. Reinicie nginx: sudo systemctl restart nginx"
-echo "   3. Teste: curl -H 'Origin: http://localhost:3000' -X OPTIONS http://193.203.182.22/api/admin/login -v"
+echo "   3. Teste: curl -H 'Origin: http://localhost:3000' -X OPTIONS http://10.102.0.103/api/admin/login -v"
 

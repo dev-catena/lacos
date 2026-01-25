@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Script para adicionar método sendMessage ao WhatsAppService no servidor
-# Servidor: 193.203.182.22 (porta 63022)
+# Servidor: 10.102.0.103 (porta 63022)
 
 set -e
 
-SERVER="193.203.182.22"
+SERVER="10.102.0.103"
 PORT="63022"
 USER="darley"
 PASSWORD="yhvh77"

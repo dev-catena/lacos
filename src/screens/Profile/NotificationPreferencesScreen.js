@@ -9,7 +9,7 @@ import {
   Switch,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import SafeIcon from '../../components/SafeIcon';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 
@@ -79,7 +79,7 @@ const NotificationPreferencesScreen = ({ navigation }) => {
   const NotificationToggle = ({ icon, title, subtitle, value, onToggle, color = colors.primary }) => (
     <View style={styles.toggleItem}>
       <View style={[styles.toggleIcon, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon} size={20} color={color} />
+        <SafeIcon name={icon} size={20} color={color} />
       </View>
       <View style={styles.toggleContent}>
         <Text style={styles.toggleTitle}>{title}</Text>
@@ -104,7 +104,7 @@ const NotificationPreferencesScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Notificações</Text>
@@ -125,7 +125,7 @@ const NotificationPreferencesScreen = ({ navigation }) => {
           {/* Medicamentos */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="medical" size={24} color={colors.secondary} />
+              <SafeIcon name="medical" size={24} color={colors.secondary} />
               <Text style={styles.sectionTitle}>Medicamentos</Text>
             </View>
             <View style={styles.sectionContent}>
@@ -159,7 +159,7 @@ const NotificationPreferencesScreen = ({ navigation }) => {
           {/* Consultas e Compromissos */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="calendar" size={24} color={colors.warning} />
+              <SafeIcon name="calendar" size={24} color={colors.warning} />
               <Text style={styles.sectionTitle}>Consultas e Compromissos</Text>
             </View>
             <View style={styles.sectionContent}>
@@ -193,7 +193,7 @@ const NotificationPreferencesScreen = ({ navigation }) => {
           {/* Sinais Vitais */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="pulse" size={24} color={colors.success} />
+              <SafeIcon name="pulse" size={24} color={colors.success} />
               <Text style={styles.sectionTitle}>Sinais Vitais</Text>
             </View>
             <View style={styles.sectionContent}>
@@ -227,7 +227,7 @@ const NotificationPreferencesScreen = ({ navigation }) => {
           {/* Atualizações do Grupo */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="people" size={24} color={colors.primary} />
+              <SafeIcon name="people" size={24} color={colors.primary} />
               <Text style={styles.sectionTitle}>Atualizações do Grupo</Text>
             </View>
             <View style={styles.sectionContent}>
@@ -261,7 +261,7 @@ const NotificationPreferencesScreen = ({ navigation }) => {
           {/* Sistema */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="settings" size={24} color={colors.text} />
+              <SafeIcon name="settings" size={24} color={colors.text} />
               <Text style={styles.sectionTitle}>Sistema</Text>
             </View>
             <View style={styles.sectionContent}>
@@ -294,7 +294,7 @@ const NotificationPreferencesScreen = ({ navigation }) => {
 
           {/* Info Card */}
           <View style={styles.infoCard}>
-            <Ionicons name="information-circle" size={24} color={colors.info} />
+            <SafeIcon name="information-circle" size={24} color={colors.info} />
             <Text style={styles.infoText}>
               Você pode gerenciar notificações críticas (como lembretes de medicação) diretamente nas configurações do seu dispositivo.
             </Text>

@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import SafeIcon from '../../components/SafeIcon';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -397,7 +397,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Dados Pessoais</Text>
@@ -414,7 +414,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Nome *</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="person-outline" size={20} color={colors.gray400} />
+                <SafeIcon name="person-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   placeholder="Seu nome"
@@ -427,7 +427,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Sobrenome</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="person-outline" size={20} color={colors.gray400} />
+                <SafeIcon name="person-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   placeholder="Seu sobrenome"
@@ -440,7 +440,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>E-mail *</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="mail-outline" size={20} color={colors.gray400} />
+                <SafeIcon name="mail-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   placeholder="seu@email.com"
@@ -455,7 +455,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Telefone</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="call-outline" size={20} color={colors.gray400} />
+                <SafeIcon name="call-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   placeholder="+55 (11) 99999-9999"
@@ -473,7 +473,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>CPF</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="card-outline" size={20} color={colors.gray400} />
+                <SafeIcon name="card-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   placeholder="000.000.000-00"
@@ -488,7 +488,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Data de Nascimento</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="calendar-outline" size={20} color={colors.gray400} />
+                <SafeIcon name="calendar-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   placeholder="DD/MM/AAAA"
@@ -508,7 +508,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>CEP</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="location-outline" size={20} color={colors.gray400} />
+                <SafeIcon name="location-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   placeholder="00000-000"
@@ -523,7 +523,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Endereço</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="home-outline" size={20} color={colors.gray400} />
+                <SafeIcon name="home-outline" size={20} color={colors.gray400} />
                 <TextInput
                   style={styles.input}
                   placeholder="Rua, Avenida, etc"
@@ -602,7 +602,7 @@ const EditPersonalDataScreen = ({ navigation }) => {
             onPress={handleSave}
             disabled={loading}
           >
-            <Ionicons name="checkmark-circle" size={24} color={colors.textWhite} />
+            <SafeIcon name="checkmark-circle" size={24} color={colors.textWhite} />
             <Text style={styles.saveButtonText}>
               {loading ? 'Salvando...' : 'Salvar Alterações'}
             </Text>

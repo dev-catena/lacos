@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Script para atualizar UserController com processamento de cursos
-# Servidor: 193.203.182.22
+# Servidor: 10.102.0.103
 # Usuário: darley
 # Senha: yhvh77
 
 echo "🔧 Atualizando UserController com processamento de cursos..."
 
 # Configurações
-SERVER="darley@193.203.182.22"
+SERVER="darley@10.102.0.103"
 SERVER_PATH="/var/www/lacos-backend"
 LOCAL_FILE="UserController_COM_DOENCAS_ALERGIAS.php"
 REMOTE_FILE="app/Http/Controllers/Api/UserController.php"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Execute este script NO SERVIDOR (193.203.182.22)
+# Execute este script NO SERVIDOR (10.102.0.103)
 
 cd /var/www/lacos-backend || exit 1
 

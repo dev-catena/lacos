@@ -152,7 +152,7 @@ Se o novo projeto estiver em outro servidor:
 WHATSAPP_API_URL=http://localhost:8080
 
 # ✅ CORRETO
-WHATSAPP_API_URL=http://193.203.182.22:8080
+WHATSAPP_API_URL=http://10.102.0.103:8080
 ```
 
 ### 3. Firewall
@@ -166,7 +166,7 @@ Certifique-se de que a porta 8080 (ou 8081) está aberta no firewall do servidor
 
 1. **Criar instância no mesmo container:**
 ```bash
-curl -X POST http://193.203.182.22:8080/instance/create \
+curl -X POST http://10.102.0.103:8080/instance/create \
   -H "apikey: 34385147c5995b4098452a02ad86cd771b5d1dc5761198a48df5a9baecbc30f7" \
   -H "Content-Type: application/json" \
   -d '{
@@ -177,7 +177,7 @@ curl -X POST http://193.203.182.22:8080/instance/create \
 
 2. **Configurar no projeto de aniversários:**
 ```env
-WHATSAPP_API_URL=http://193.203.182.22:8080
+WHATSAPP_API_URL=http://10.102.0.103:8080
 WHATSAPP_API_KEY=34385147c5995b4098452a02ad86cd771b5d1dc5761198a48df5a9baecbc30f7
 WHATSAPP_INSTANCE_NAME=aniversarios
 ```

@@ -23,10 +23,10 @@ bash scripts/ADICIONAR_CONSULTATION_PRICE.sh
 
 ```bash
 # 1. Copiar o script para o servidor
-scp scripts/ADICIONAR_CONSULTATION_PRICE_LOCAL.sh darley@193.203.182.22:/tmp/
+scp scripts/ADICIONAR_CONSULTATION_PRICE_LOCAL.sh darley@10.102.0.103:/tmp/
 
 # 2. Conectar ao servidor
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 
 # 3. Executar o script
 sudo bash /tmp/ADICIONAR_CONSULTATION_PRICE_LOCAL.sh

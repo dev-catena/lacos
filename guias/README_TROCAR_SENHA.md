@@ -18,7 +18,7 @@ Este script adiciona a funcionalidade de trocar senha ao backend Laravel.
 ./ENVIAR_SCRIPT_TROCAR_SENHA.sh usuario@servidor
 
 # Exemplo:
-./ENVIAR_SCRIPT_TROCAR_SENHA.sh root@193.203.182.22
+./ENVIAR_SCRIPT_TROCAR_SENHA.sh root@10.102.0.103
 ```
 
 ### Opção 2: Enviar manualmente via SCP
@@ -28,7 +28,7 @@ Este script adiciona a funcionalidade de trocar senha ao backend Laravel.
 scp backend-laravel/ADICIONAR_TROCAR_SENHA.sh usuario@servidor:/tmp/
 
 # Exemplo:
-scp backend-laravel/ADICIONAR_TROCAR_SENHA.sh root@193.203.182.22:/tmp/
+scp backend-laravel/ADICIONAR_TROCAR_SENHA.sh root@10.102.0.103:/tmp/
 ```
 
 ### Opção 3: Executar diretamente no servidor

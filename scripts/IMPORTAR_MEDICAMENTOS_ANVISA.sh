@@ -2,12 +2,12 @@
 
 # Script para importar medicamentos da ANVISA para o banco de dados
 # 
-# ⚠️  ATENÇÃO: Este script deve ser executado NO SERVIDOR (193.203.182.22)
+# ⚠️  ATENÇÃO: Este script deve ser executado NO SERVIDOR (10.102.0.103)
 #    O banco de dados está no servidor, não localmente!
 #
 # Para executar no servidor:
-#   1. Copie o CSV para o servidor: scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@193.203.182.22:/var/www/lacos-backend/
-#   2. Conecte ao servidor: ssh usuario@193.203.182.22
+#   1. Copie o CSV para o servidor: scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@10.102.0.103:/var/www/lacos-backend/
+#   2. Conecte ao servidor: ssh usuario@10.102.0.103
 #   3. Execute: cd /var/www/lacos-backend && php artisan medications:import DADOS_ABERTOS_MEDICAMENTOS.csv --chunk=1000
 #
 # Ou use o script: IMPORTAR_MEDICAMENTOS_ANVISA_SERVIDOR.sh (copie para o servidor)
@@ -16,16 +16,16 @@ set -e
 
 echo "⚠️  ATENÇÃO: Este script deve ser executado NO SERVIDOR!"
 echo ""
-echo "📋 A importação deve acontecer no servidor (193.203.182.22)"
+echo "📋 A importação deve acontecer no servidor (10.102.0.103)"
 echo "   porque o banco de dados está lá."
 echo ""
 echo "📝 Para importar no servidor:"
 echo ""
 echo "   1. Copiar CSV para o servidor:"
-echo "      scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@193.203.182.22:/var/www/lacos-backend/"
+echo "      scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@10.102.0.103:/var/www/lacos-backend/"
 echo ""
 echo "   2. Conectar ao servidor:"
-echo "      ssh usuario@193.203.182.22"
+echo "      ssh usuario@10.102.0.103"
 echo ""
 echo "   3. Executar no servidor:"
 echo "      cd /var/www/lacos-backend"

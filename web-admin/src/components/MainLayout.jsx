@@ -1,12 +1,13 @@
 import React from 'react';
+import SafeIcon from './SafeIcon';
 import './MainLayout.css';
 
 const MainLayout = ({ activeSection, onSectionChange, children, user, onLogout }) => {
   const sections = [
-    { id: 'users', label: '👥 Usuários', icon: '👥' },
-    { id: 'doctors', label: '👨‍⚕️ Médicos', icon: '👨‍⚕️' },
-    { id: 'plans', label: '📋 Planos', icon: '📋' },
-    { id: 'suppliers', label: '🏪 Fornecedores', icon: '🏪' },
+    { id: 'users', label: 'Usuários', icon: 'people' },
+    { id: 'doctors', label: 'Médicos', icon: 'medical' },
+    { id: 'plans', label: 'Planos', icon: 'receipt' },
+    { id: 'suppliers', label: 'Fornecedores', icon: 'store' },
   ];
 
   return (
@@ -23,7 +24,9 @@ const MainLayout = ({ activeSection, onSectionChange, children, user, onLogout }
               className={`nav-item ${activeSection === section.id ? 'active' : ''}`}
               onClick={() => onSectionChange(section.id)}
             >
-              <span className="nav-icon">{section.icon}</span>
+              <span className="nav-icon">
+                <SafeIcon name={section.icon} size={24} color="rgba(255, 255, 255, 0.85)" />
+              </span>
               <span className="nav-label">{section.label}</span>
             </button>
           ))}
@@ -34,7 +37,8 @@ const MainLayout = ({ activeSection, onSectionChange, children, user, onLogout }
             <span className="user-email">{user?.email || ''}</span>
           </div>
           <button className="logout-button" onClick={onLogout}>
-            🚪 Sair
+            <SafeIcon name="logout" size={18} color="rgba(255, 255, 255, 0.85)" style={{ marginRight: '8px' }} />
+            Sair
           </button>
         </div>
       </aside>

@@ -16,10 +16,10 @@ Erro 500 (Server Error) ao acessar `/api/caregivers/clients`
 
 ```bash
 # 1. Copiar script para o servidor
-scp backend-laravel/corrigir_getClients.sh darley@193.203.182.22:/tmp/
+scp backend-laravel/corrigir_getClients.sh darley@10.102.0.103:/tmp/
 
 # 2. Conectar ao servidor
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 
 # 3. Executar o script
 sudo bash /tmp/corrigir_getClients.sh
@@ -29,7 +29,7 @@ sudo bash /tmp/corrigir_getClients.sh
 
 #### Passo 1: Conectar ao servidor
 ```bash
-ssh darley@193.203.182.22
+ssh darley@10.102.0.103
 cd /var/www/lacos-backend
 ```
 
@@ -125,7 +125,7 @@ Após aplicar a correção, teste no app React Native:
 4. Teste a rota diretamente:
    ```bash
    curl -H "Authorization: Bearer SEU_TOKEN" \
-        http://193.203.182.22/api/caregivers/clients
+        http://10.102.0.103/api/caregivers/clients
    ```
 
 

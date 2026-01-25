@@ -12,12 +12,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import { LacosLogoFull } from '../../components/LacosLogo';
 import groupService from '../../services/groupService';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../contexts/AuthContext';
+import SafeIcon from '../../components/SafeIcon';
 
 const PatientJoinGroupScreen = ({ navigation }) => {
   const { signOut } = useAuth();
@@ -137,7 +137,7 @@ const PatientJoinGroupScreen = ({ navigation }) => {
           onPress={handleLogout}
           disabled={loading}
         >
-          <Ionicons name="log-out-outline" size={22} color={colors.danger} />
+          <SafeIcon name="log-out-outline" size={22} color={colors.danger} />
           <Text style={styles.logoutButtonText}>Sair</Text>
         </TouchableOpacity>
       </View>
@@ -151,7 +151,7 @@ const PatientJoinGroupScreen = ({ navigation }) => {
           <View style={styles.header}>
             <LacosLogoFull width={180} height={56} />
             <View style={styles.iconCircle}>
-              <Ionicons name="qr-code-outline" size={64} color={colors.primary} />
+              <SafeIcon name="qr-code-outline" size={64} color={colors.primary} />
             </View>
             <Text style={styles.title}>Bem-vindo!</Text>
             <Text style={styles.description}>
@@ -163,7 +163,7 @@ const PatientJoinGroupScreen = ({ navigation }) => {
           <View style={styles.form}>
             <Text style={styles.label}>Código de Convite *</Text>
             <View style={styles.codeInputContainer}>
-              <Ionicons name="key-outline" size={22} color={colors.gray400} />
+              <SafeIcon name="key-outline" size={22} color={colors.gray400} />
               <TextInput
                 style={styles.codeInput}
                 placeholder="Ex: ABC123XYZ"
@@ -186,7 +186,7 @@ const PatientJoinGroupScreen = ({ navigation }) => {
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <>
-                  <Ionicons name="log-in-outline" size={22} color={colors.white} />
+                  <SafeIcon name="log-in-outline" size={22} color={colors.white} />
                   <Text style={styles.joinButtonText}>Entrar no Grupo</Text>
                 </>
               )}
@@ -195,7 +195,7 @@ const PatientJoinGroupScreen = ({ navigation }) => {
 
           {/* Info Box */}
           <View style={styles.infoBox}>
-            <Ionicons name="information-circle-outline" size={24} color={colors.info} />
+            <SafeIcon name="information-circle-outline" size={24} color={colors.info} />
             <Text style={styles.infoText}>
               Peça ao seu cuidador para criar um grupo e compartilhar o código de convite com você.
             </Text>
@@ -203,7 +203,7 @@ const PatientJoinGroupScreen = ({ navigation }) => {
 
           {/* Ajuda */}
           <View style={styles.helpBox}>
-            <Ionicons name="help-circle-outline" size={20} color={colors.gray600} />
+            <SafeIcon name="help-circle-outline" size={20} color={colors.gray600} />
             <Text style={styles.helpText}>
               Não recebeu o código? Entre em contato com seu cuidador.
             </Text>

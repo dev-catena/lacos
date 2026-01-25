@@ -171,8 +171,17 @@ const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
         // Iniciar chamada para o primeiro contato de emergência
         if (response.data.emergency_contacts.length > 0) {
           const firstContact = response.data.emergency_contacts[0];
-          if (firstContact.user?.phone) {
-            makeEmergencyCall(firstContact.user.phone);
+          // Pode vir de emergency_contacts (tem emergency_contact.phone) ou group_members (tem user.phone)
+          const phoneNumber = firstContact.user?.phone || firstContact.emergency_contact?.phone;
+          if (phoneNumber) {
+            console.log('📞 PanicButton - Ligando para contato SOS:', {
+              name: firstContact.user?.name || firstContact.emergency_contact?.name,
+              phone: phoneNumber,
+              type: firstContact.type || 'unknown'
+            });
+            makeEmergencyCall(phoneNumber);
+          } else {
+            console.warn('⚠️ PanicButton - Contato SOS sem telefone:', firstContact);
           }
         }
 
@@ -268,7 +277,7 @@ const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
             <Text style={styles.callActiveTitle}>Chamada de Emergência Ativa</Text>
             <Text style={styles.callActiveSubtitle}>
               {emergencyContacts.length > 0
-                ? `Conectado: ${emergencyContacts[0].user?.name || 'Contato de emergência'}`
+                ? `Conectado: ${emergencyContacts[0].user?.name || emergencyContacts[0].emergency_contact?.name || 'Contato de emergência'}`
                 : 'Conectando...'}
             </Text>
             <TouchableOpacity

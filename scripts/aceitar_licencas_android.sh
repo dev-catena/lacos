@@ -34,3 +34,7 @@ echo "   npx expo run:android"
 
 
 
+
+
+
+

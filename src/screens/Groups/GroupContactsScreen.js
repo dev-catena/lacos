@@ -10,10 +10,11 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Switch,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import SafeIcon from '../../components/SafeIcon';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
@@ -25,31 +26,48 @@ const GroupContactsScreen = ({ route, navigation }) => {
   const [groupName, setGroupName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Agora temos apenas 3 contatos, cada um com toggle SOS
   const [contacts, setContacts] = useState([
     { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
     { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
     { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
   ]);
-  const [sosContacts, setSosContacts] = useState([
-    { id: null, name: '', phone: '+55', relationship: 'SOS', photo: null, photoUri: null },
-    { id: null, name: '', phone: '+55', relationship: 'SOS', photo: null, photoUri: null },
-  ]);
 
   // Função para formatar telefone: +55(00)00000-0000
   const formatPhoneNumber = (text) => {
-    // Se o texto não começar com +55, garantir que comece
-    let cleanText = text;
-    if (!text || !text.startsWith('+55')) {
-      // Se não começar com +55, adicionar
-      const digits = text ? text.replace(/\D/g, '') : '';
-      cleanText = '+55' + digits;
+    if (!text) return '+55';
+    
+    console.log('📞 [GroupContacts] formatPhoneNumber - Entrada:', text);
+    
+    // Primeiro, remover TODA a formatação e extrair apenas os dígitos
+    const allDigits = text.replace(/\D/g, '');
+    
+    console.log('📞 [GroupContacts] formatPhoneNumber - Dígitos extraídos:', allDigits);
+    
+    // Se não tiver dígitos, retornar +55
+    if (allDigits.length === 0) {
+      console.log('📞 [GroupContacts] formatPhoneNumber - Sem dígitos, retornando +55');
+      return '+55';
     }
     
-    // Remove o +55 temporariamente para processar apenas os dígitos
-    const digitsOnly = cleanText.replace(/\+55/g, '').replace(/\D/g, '');
+    // Remover código do país (55) se estiver presente
+    // Pode ter múltiplos 55 no início se o telefone estava mal formatado
+    let digits = allDigits;
+    while (digits.startsWith('55') && digits.length > 11) {
+      digits = digits.substring(2);
+      console.log('📞 [GroupContacts] formatPhoneNumber - Removendo código do país 55, restante:', digits);
+    }
     
-    // Limita a 11 dígitos (DDD + número)
-    const limitedDigits = digitsOnly.slice(0, 11);
+    // Se ainda tiver mais de 11 dígitos após remover 55, pegar os últimos 11
+    if (digits.length > 11) {
+      digits = digits.slice(-11);
+      console.log('📞 [GroupContacts] formatPhoneNumber - Limitando a 11 dígitos:', digits);
+    }
+    
+    // Limitar a 11 dígitos (DDD de 2 dígitos + número de 9 dígitos)
+    const limitedDigits = digits.slice(0, 11);
+    
+    console.log('📞 [GroupContacts] formatPhoneNumber - Dígitos finais:', limitedDigits, 'Tamanho:', limitedDigits.length);
     
     // Sempre começa com +55
     let formatted = '+55';
@@ -65,6 +83,8 @@ const GroupContactsScreen = ({ route, navigation }) => {
     if (limitedDigits.length > 7) {
       formatted += `-${limitedDigits.slice(7, 11)}`;
     }
+    
+    console.log('📞 [GroupContacts] formatPhoneNumber - Resultado formatado:', formatted);
     
     return formatted;
   };
@@ -94,47 +114,146 @@ const GroupContactsScreen = ({ route, navigation }) => {
       if (contactsResponse?.success && contactsResponse.data) {
         const apiContacts = Array.isArray(contactsResponse.data) ? contactsResponse.data : [];
         console.log('✅ [GroupContacts] Contatos carregados:', apiContacts.length);
+        console.log('📋 [GroupContacts] Detalhes dos contatos da API:', apiContacts.map(c => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          phoneType: typeof c.phone,
+          relationship: c.relationship,
+          is_primary: c.is_primary,
+          photo: c.photo,
+          photo_url: c.photo_url
+        })));
         
-        // Separar contatos rápidos e SOS
-        const quickContacts = apiContacts.filter(c => c.relationship !== 'SOS').slice(0, 3);
-        const sosContactsList = apiContacts.filter(c => c.relationship === 'SOS').slice(0, 2);
+        // NOVA LÓGICA: Carregar os 3 primeiros contatos (sem separar em rápidos e SOS)
+        // Cada contato terá um toggle isSOS baseado em relationship === 'SOS' ou is_primary === true
+        // IMPORTANTE: Ordenar por ID para garantir ordem consistente
+        const sortedContacts = [...apiContacts].sort((a, b) => (a.id || 0) - (b.id || 0));
+        const allContacts = sortedContacts.slice(0, 3); // Pegar apenas os 3 primeiros
+        
+        console.log('📋 [GroupContacts] Contatos ordenados e selecionados:', allContacts.map(c => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone
+        })));
         
         // Função auxiliar para formatar telefone vindo da API
         const formatPhoneFromAPI = (phone) => {
-          if (!phone) return '+55';
-          // Se já começar com +55, formatar normalmente
-          if (phone.startsWith('+55')) {
-            return formatPhoneNumber(phone);
+          console.log('📞 [GroupContacts] formatPhoneFromAPI - Telefone recebido da API:', phone, 'Tipo:', typeof phone);
+          
+          if (!phone) {
+            console.log('📞 [GroupContacts] formatPhoneFromAPI - Telefone vazio, retornando +55');
+            return '+55';
           }
-          // Se não começar com +55, adicionar
-          const digits = phone.replace(/\D/g, '');
-          return formatPhoneNumber('+55' + digits);
+          
+          // Converter para string se necessário
+          const phoneStr = String(phone);
+          
+          // Usar a função formatPhoneNumber que já lida com formatação incorreta
+          // Ela remove toda formatação e reconstrói corretamente
+          const formatted = formatPhoneNumber(phoneStr);
+          console.log('📞 [GroupContacts] formatPhoneFromAPI - Telefone formatado:', {
+            original: phoneStr,
+            formatted
+          });
+          return formatted;
         };
         
-        // Preencher contatos rápidos (sempre 3 slots)
-        const filledQuickContacts = [
-          quickContacts[0] ? {...quickContacts[0], phone: formatPhoneFromAPI(quickContacts[0].phone), photoUri: null} : { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
-          quickContacts[1] ? {...quickContacts[1], phone: formatPhoneFromAPI(quickContacts[1].phone), photoUri: null} : { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
-          quickContacts[2] ? {...quickContacts[2], phone: formatPhoneFromAPI(quickContacts[2].phone), photoUri: null} : { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
+        // Função auxiliar para obter a URL da foto
+        const getPhotoUri = (contact) => {
+          // Priorizar photo_url (URL completa da API)
+          if (contact?.photo_url) {
+            console.log('📸 [GroupContacts] Foto encontrada (photo_url):', contact.photo_url);
+            return contact.photo_url;
+          }
+          // Se não tiver photo_url, tentar usar photo se for uma URL completa
+          if (contact?.photo) {
+            // Se já for uma URL completa, usar diretamente
+            if (contact.photo.startsWith('http://') || contact.photo.startsWith('https://')) {
+              console.log('📸 [GroupContacts] Foto encontrada (photo como URL):', contact.photo);
+              return contact.photo;
+            }
+            // Se for um caminho relativo, a API deveria ter retornado photo_url
+            console.warn('⚠️ [GroupContacts] Foto encontrada mas sem photo_url:', contact.photo);
+          }
+          console.log('📸 [GroupContacts] Nenhuma foto encontrada para contato:', contact?.name);
+          return null;
+        };
+        
+        // Preencher os 3 contatos com toggle SOS
+        const filledContacts = [
+          allContacts[0] ? {
+            ...allContacts[0], 
+            phone: formatPhoneFromAPI(allContacts[0].phone), 
+            photoUri: getPhotoUri(allContacts[0]), // Mapear photo_url para photoUri
+            isSOS: allContacts[0].relationship === 'SOS' || 
+                   allContacts[0].relationship === 'sos' || 
+                   allContacts[0].is_primary === true
+          } : { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
+          allContacts[1] ? {
+            ...allContacts[1], 
+            phone: formatPhoneFromAPI(allContacts[1].phone), 
+            photoUri: getPhotoUri(allContacts[1]), // Mapear photo_url para photoUri
+            isSOS: allContacts[1].relationship === 'SOS' || 
+                   allContacts[1].relationship === 'sos' || 
+                   allContacts[1].is_primary === true
+          } : { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
+          allContacts[2] ? {
+            ...allContacts[2], 
+            phone: formatPhoneFromAPI(allContacts[2].phone), 
+            photoUri: getPhotoUri(allContacts[2]), // Mapear photo_url para photoUri
+            isSOS: allContacts[2].relationship === 'SOS' || 
+                   allContacts[2].relationship === 'sos' || 
+                   allContacts[2].is_primary === true
+          } : { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
         ];
         
-        // Preencher contatos SOS (sempre 2 slots)
-        const filledSosContacts = [
-          sosContactsList[0] ? {...sosContactsList[0], phone: formatPhoneFromAPI(sosContactsList[0].phone), photoUri: null} : { id: null, name: '', phone: '+55', relationship: 'SOS', photo: null, photoUri: null },
-          sosContactsList[1] ? {...sosContactsList[1], phone: formatPhoneFromAPI(sosContactsList[1].phone), photoUri: null} : { id: null, name: '', phone: '+55', relationship: 'SOS', photo: null, photoUri: null },
-        ];
-        
-        setContacts(filledQuickContacts);
-        setSosContacts(filledSosContacts);
+        setContacts(filledContacts);
         
         console.log('✅ [GroupContacts] Contatos configurados:', {
-          quick: filledQuickContacts.length,
-          sos: filledSosContacts.length
+          total: filledContacts.filter(c => c.name).length,
+          contacts: filledContacts.map(c => ({
+            name: c.name,
+            phone: c.phone,
+            phoneOriginal: allContacts.find(ac => ac.id === c.id)?.phone,
+            isSOS: c.isSOS,
+            hasPhoto: !!c.photoUri,
+            photoUri: c.photoUri
+          }))
+        });
+        
+        // Log detalhado de cada contato
+        filledContacts.forEach((contact, index) => {
+          if (contact.name) {
+            const originalContact = allContacts[index];
+            console.log(`📋 [GroupContacts] Contato ${index + 1}:`, {
+              name: contact.name,
+              phoneOriginal: originalContact?.phone,
+              phoneFormatted: contact.phone,
+              id: contact.id
+            });
+          }
         });
       } else {
         console.log('ℹ️ [GroupContacts] Nenhum contato encontrado, usando padrão');
       }
     } catch (error) {
+      // Se o erro for 403 (sem acesso ao grupo), limpar contatos e mostrar mensagem
+      if (error.status === 403 || (error.message && error.message.includes('não tem acesso'))) {
+        console.warn('⚠️ [GroupContacts] Usuário não tem acesso ao grupo, limpando contatos');
+        setContacts([
+          { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
+          { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
+          { id: null, name: '', phone: '+55', relationship: '', photo: null, photoUri: null, isSOS: false },
+        ]);
+        Toast.show({
+          type: 'error',
+          text1: 'Acesso Negado',
+          text2: 'Você não tem mais acesso a este grupo',
+        });
+        navigation.goBack();
+        return;
+      }
       console.error('❌ [GroupContacts] Erro ao carregar contatos:', error);
       Toast.show({
         type: 'error',
@@ -147,53 +266,71 @@ const GroupContactsScreen = ({ route, navigation }) => {
   };
 
   // Handler para mudança do campo telefone
-  const handlePhoneChange = (text, index, isSOS = false) => {
-    // Se o texto estiver vazio ou não começar com +55, garantir +55
-    if (!text || text.length === 0) {
-      if (isSOS) {
-        updateSOSContact(index, 'phone', '+55');
-      } else {
-        updateContact(index, 'phone', '+55');
-      }
-      return;
-    }
+  // PERMITE EDIÇÃO LIVRE - não formata durante a digitação
+  // A formatação acontece apenas quando o campo perde o foco (onBlur)
+  const handlePhoneChange = (text, index) => {
+    console.log('📞 [GroupContacts] handlePhoneChange chamado:', { text, index, textLength: text?.length });
     
-    // Se o usuário tentar apagar o +55, restaurar
-    if (!text.startsWith('+55')) {
-      // Se não começar com +55, adicionar +55 e formatar
-      const digits = text.replace(/\D/g, '');
-      const formatted = formatPhoneNumber('+55' + digits);
-      if (isSOS) {
-        updateSOSContact(index, 'phone', formatted);
-      } else {
-        updateContact(index, 'phone', formatted);
-      }
-      return;
-    }
-    
-    // Formatar o telefone mantendo o +55
-    const formatted = formatPhoneNumber(text);
-    if (isSOS) {
-      updateSOSContact(index, 'phone', formatted);
-    } else {
-      updateContact(index, 'phone', formatted);
-    }
+    // Permitir edição livre - apenas atualizar o valor sem formatar
+    // A formatação será feita no onBlur
+    updateContact(index, 'phone', text || '');
   };
 
   const updateContact = (index, field, value) => {
+    console.log('🔄 [GroupContacts] updateContact chamado:', { index, field, value });
+    setContacts(prev => {
+      // Criar novo array para garantir que o React detecte a mudança
+      const updated = prev.map((contact, idx) => {
+        if (idx === index) {
+          // Verificar se o valor realmente mudou
+          if (contact[field] === value) {
+            console.log('⚠️ [GroupContacts] Valor não mudou, mas atualizando mesmo assim:', { field, value });
+          }
+          const newContact = { ...contact, [field]: value };
+          console.log('🔄 [GroupContacts] Contato atualizado:', { 
+            index: idx, 
+            field, 
+            oldValue: contact[field], 
+            newValue: value,
+            fullContact: newContact 
+          });
+          return newContact;
+        }
+        return contact;
+      });
+      console.log('🔄 [GroupContacts] Estado atualizado, novo estado:', updated.map(c => ({ name: c.name, phone: c.phone })));
+      return updated;
+    });
+  };
+
+  // Função para toggle SOS
+  const toggleSOS = (index) => {
     setContacts(prev => prev.map((contact, idx) => 
-      idx === index ? { ...contact, [field]: value } : contact
+      idx === index ? { ...contact, isSOS: !contact.isSOS } : contact
     ));
   };
 
-  const updateSOSContact = (index, field, value) => {
-    setSosContacts(prev => prev.map((contact, idx) => 
-      idx === index ? { ...contact, [field]: value } : contact
-    ));
+  // Handler para quando o campo de telefone perde o foco (onBlur)
+  // Formata o telefone quando o usuário termina de editar
+  const handlePhoneBlur = (index) => {
+    const contact = contacts[index];
+    if (!contact || !contact.phone) {
+      // Se estiver vazio, definir +55
+      updateContact(index, 'phone', '+55');
+      return;
+    }
+    
+    // Formatar o telefone quando o usuário terminar de editar
+    const formatted = formatPhoneNumber(contact.phone);
+    console.log('📞 [GroupContacts] handlePhoneBlur - Formatando telefone ao sair do campo:', {
+      original: contact.phone,
+      formatted
+    });
+    updateContact(index, 'phone', formatted);
   };
 
   // Função para selecionar foto de contato
-  const pickImage = async (index, isSOSContact = false) => {
+  const pickImage = async (index) => {
     try {
       // Solicitar permissão
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -219,15 +356,9 @@ const GroupContactsScreen = ({ route, navigation }) => {
         console.log('📸 [GroupContacts] Foto selecionada:', imageUri);
         
         // Atualizar o contato com a URI da foto
-        if (isSOSContact) {
-          setSosContacts(prev => prev.map((contact, idx) => 
-            idx === index ? { ...contact, photoUri: imageUri } : contact
-          ));
-        } else {
-          setContacts(prev => prev.map((contact, idx) => 
-            idx === index ? { ...contact, photoUri: imageUri } : contact
-          ));
-        }
+        setContacts(prev => prev.map((contact, idx) => 
+          idx === index ? { ...contact, photoUri: imageUri } : contact
+        ));
       }
     } catch (error) {
       console.error('❌ [GroupContacts] Erro ao selecionar imagem:', error);
@@ -236,9 +367,20 @@ const GroupContactsScreen = ({ route, navigation }) => {
   };
 
   const validatePhoneNumber = (phone) => {
+    if (!phone) {
+      console.warn('⚠️ [GroupContacts] validatePhoneNumber: telefone vazio');
+      return false;
+    }
     // Remove formatação e valida se tem pelo menos 10 dígitos
     const cleaned = phone.replace(/\D/g, '');
-    return cleaned.length >= 10;
+    const isValid = cleaned.length >= 10;
+    console.log('📞 [GroupContacts] validatePhoneNumber:', { 
+      original: phone, 
+      cleaned, 
+      length: cleaned.length, 
+      isValid 
+    });
+    return isValid;
   };
 
 
@@ -246,20 +388,20 @@ const GroupContactsScreen = ({ route, navigation }) => {
     try {
       setSaving(true);
       
-      // Validar que pelo menos um contato rápido está preenchido
-      const validQuickContacts = contacts.filter(c => c.name && c.phone);
+      // Validar que pelo menos um contato está preenchido
+      const validContacts = contacts.filter(c => c.name && c.phone);
       
-      if (validQuickContacts.length === 0) {
+      if (validContacts.length === 0) {
         Alert.alert(
           'Contatos Incompletos',
-          'Preencha pelo menos um contato rápido com nome e telefone.'
+          'Preencha pelo menos um contato com nome e telefone.'
         );
         setSaving(false);
         return;
       }
 
       // Validar números de telefone
-      for (const contact of validQuickContacts) {
+      for (const contact of validContacts) {
         if (!validatePhoneNumber(contact.phone)) {
           Alert.alert(
             'Telefone Inválido',
@@ -270,38 +412,33 @@ const GroupContactsScreen = ({ route, navigation }) => {
         }
       }
 
-      // Validar contatos SOS
-      const validSOSContacts = sosContacts.filter(c => c.name && c.phone);
-      for (const contact of validSOSContacts) {
-        if (!validatePhoneNumber(contact.phone)) {
-          Alert.alert(
-            'Telefone SOS Inválido',
-            `O telefone SOS de ${contact.name} está incompleto.`
-          );
-          setSaving(false);
-          return;
-        }
-      }
-
       // Salvar na API
       console.log('💾 [GroupContacts] Salvando contatos na API...');
-      console.log('💾 [GroupContacts] Quick Contacts válidos:', validQuickContacts.length);
-      console.log('💾 [GroupContacts] SOS Contacts válidos:', validSOSContacts.length);
+      console.log('💾 [GroupContacts] Contatos válidos:', validContacts.length);
       
       let successCount = 0;
       let errorCount = 0;
       
-      // Salvar/atualizar contatos rápidos
-      for (const contact of validQuickContacts) {
-        // Preparar FormData se houver foto
+      // Salvar/atualizar todos os contatos (com toggle SOS)
+      for (const contact of validContacts) {
+        // Preparar FormData se houver foto NOVA (URI local)
+        // Se photoUri for uma URL remota (http/https), não fazer upload novamente
         let contactData;
-        if (contact.photoUri) {
+        const isSOS = contact.isSOS === true;
+        
+        // Verificar se photoUri é uma URL local (do dispositivo) ou remota (da API)
+        const isLocalPhoto = contact.photoUri && 
+                             !contact.photoUri.startsWith('http://') && 
+                             !contact.photoUri.startsWith('https://');
+        
+        if (isLocalPhoto) {
+          // Foto nova selecionada do dispositivo - fazer upload
           contactData = new FormData();
           contactData.append('group_id', groupId);
           contactData.append('name', contact.name);
           contactData.append('phone', contact.phone.replace(/\D/g, ''));
-          contactData.append('relationship', contact.relationship || 'Contato Rápido');
-          contactData.append('is_primary', '0');
+          contactData.append('relationship', isSOS ? 'SOS' : (contact.relationship || 'Contato'));
+          contactData.append('is_primary', isSOS ? '1' : '0');
           
           // Adicionar foto
           const filename = contact.photoUri.split('/').pop();
@@ -314,15 +451,33 @@ const GroupContactsScreen = ({ route, navigation }) => {
             type: type,
           });
           
-          console.log('📸 [GroupContacts] Upload de foto incluído:', filename);
+          console.log('📸 [GroupContacts] Upload de foto nova incluído:', filename);
         } else {
+          // Sem foto nova ou foto já existe no servidor - não enviar foto
+          // IMPORTANTE: Limpar formatação do telefone mas garantir que tenha pelo menos 10 dígitos
+          const cleanedPhone = contact.phone ? contact.phone.replace(/\D/g, '') : '';
+          
+          console.log('📞 [GroupContacts] Preparando dados para atualização (sem foto):', {
+            name: contact.name,
+            phoneOriginal: contact.phone,
+            phoneCleaned: cleanedPhone,
+            phoneLength: cleanedPhone.length,
+            isSOS: isSOS
+          });
+          
           contactData = {
             group_id: groupId,
             name: contact.name,
-            phone: contact.phone.replace(/\D/g, ''), // Remove formatação
-            relationship: contact.relationship || 'Contato Rápido',
-            is_primary: false,
+            phone: cleanedPhone, // Remove formatação
+            relationship: isSOS ? 'SOS' : (contact.relationship || 'Contato'),
+            is_primary: isSOS,
           };
+          
+          if (contact.photoUri) {
+            console.log('📸 [GroupContacts] Foto já existe no servidor, não reenviando:', contact.photoUri);
+          } else {
+            console.log('📸 [GroupContacts] Nenhuma foto para este contato');
+          }
         }
         
         try {
@@ -340,28 +495,59 @@ const GroupContactsScreen = ({ route, navigation }) => {
           }
           
           console.log('📤 [GroupContacts] Enviando contato:', {
+            id: contact.id,
             name: contact.name,
             phone: contact.phone,
+            phoneCleaned: contact.phone.replace(/\D/g, ''),
+            isSOS: isSOS,
             hasPhoto: !!contact.photoUri,
             contactData: contactData instanceof FormData ? 'FormData' : contactData
           });
           
+          // Log detalhado do que será enviado
+          if (contactData instanceof FormData) {
+            console.log('📤 [GroupContacts] FormData será enviado (com foto)');
+          } else {
+            console.log('📤 [GroupContacts] JSON será enviado:', JSON.stringify(contactData, null, 2));
+          }
+          
           if (contact.id) {
             // Atualizar contato existente
+            console.log('🔄 [GroupContacts] Atualizando contato existente:', {
+              id: contact.id,
+              name: contact.name,
+              phone: contact.phone,
+              phoneCleaned: contact.phone.replace(/\D/g, ''),
+              contactData: contactData instanceof FormData ? 'FormData' : contactData
+            });
+            
             const result = await emergencyContactService.updateEmergencyContact(contact.id, contactData);
+            
             if (result.success) {
               successCount++;
-              console.log('✅ [GroupContacts] Contato atualizado:', contact.name);
+              console.log('✅ [GroupContacts] Contato atualizado com sucesso:', {
+                name: contact.name,
+                phone: contact.phone,
+                response: result.data
+              });
+              
+              // Verificar se o telefone foi atualizado na resposta
+              if (result.data && result.data.phone) {
+                console.log('✅ [GroupContacts] Telefone na resposta da API:', result.data.phone);
+              } else {
+                console.warn('⚠️ [GroupContacts] Telefone não encontrado na resposta da API');
+              }
             } else {
               errorCount++;
               console.error('❌ [GroupContacts] Erro ao atualizar:', contact.name, result.error);
+              console.error('❌ [GroupContacts] Dados que foram enviados:', contactData instanceof FormData ? 'FormData' : JSON.stringify(contactData, null, 2));
             }
           } else {
             // Criar novo contato
             const result = await emergencyContactService.createEmergencyContact(contactData);
             if (result.success) {
               successCount++;
-              console.log('✅ [GroupContacts] Contato criado:', contact.name);
+              console.log('✅ [GroupContacts] Contato criado:', contact.name, isSOS ? '(SOS)' : '');
             } else {
               errorCount++;
               console.error('❌ [GroupContacts] Erro ao criar:', contact.name, result.error);
@@ -375,68 +561,6 @@ const GroupContactsScreen = ({ route, navigation }) => {
         }
       }
       
-      // Salvar/atualizar contatos SOS
-      for (const contact of validSOSContacts) {
-        // Preparar FormData se houver foto
-        let contactData;
-        if (contact.photoUri) {
-          contactData = new FormData();
-          contactData.append('group_id', groupId);
-          contactData.append('name', contact.name);
-          contactData.append('phone', contact.phone.replace(/\D/g, ''));
-          contactData.append('relationship', 'SOS');
-          contactData.append('is_primary', '1');
-          
-          // Adicionar foto
-          const filename = contact.photoUri.split('/').pop();
-          const match = /\.(\w+)$/.exec(filename);
-          const type = match ? `image/${match[1]}` : 'image/jpeg';
-          
-          contactData.append('photo', {
-            uri: contact.photoUri,
-            name: filename,
-            type: type,
-          });
-          
-          console.log('📸 [GroupContacts] Upload de foto SOS incluído:', filename);
-        } else {
-          contactData = {
-            group_id: groupId,
-            name: contact.name,
-            phone: contact.phone.replace(/\D/g, ''), // Remove formatação
-            relationship: 'SOS',
-            is_primary: true,
-          };
-        }
-        
-        try {
-          if (contact.id) {
-            // Atualizar contato existente
-            const result = await emergencyContactService.updateEmergencyContact(contact.id, contactData);
-            if (result.success) {
-              successCount++;
-              console.log('✅ [GroupContacts] Contato SOS atualizado:', contact.name);
-            } else {
-              errorCount++;
-              console.error('❌ [GroupContacts] Erro ao atualizar SOS:', contact.name, result.error);
-            }
-          } else {
-            // Criar novo contato
-            const result = await emergencyContactService.createEmergencyContact(contactData);
-            if (result.success) {
-              successCount++;
-              console.log('✅ [GroupContacts] Contato SOS criado:', contact.name);
-            } else {
-              errorCount++;
-              console.error('❌ [GroupContacts] Erro ao criar SOS:', contact.name, result.error);
-            }
-          }
-        } catch (error) {
-          errorCount++;
-          console.error('❌ [GroupContacts] Erro ao salvar contato SOS:', contact.name, error);
-        }
-      }
-      
       console.log(`✅ [GroupContacts] Salvamento concluído: ${successCount} sucesso, ${errorCount} erros`);
       
       if (successCount > 0) {
@@ -446,6 +570,10 @@ const GroupContactsScreen = ({ route, navigation }) => {
           text2: `${successCount} contato(s) salvo(s)${errorCount > 0 ? `, ${errorCount} erro(s)` : ''}`,
         });
 
+        // Recarregar contatos antes de voltar para garantir que os dados estão atualizados
+        console.log('🔄 [GroupContacts] Recarregando contatos após salvar...');
+        await loadGroupContacts();
+        
         // Aguardar um pouco e voltar
         setTimeout(() => {
           navigation.goBack();
@@ -476,7 +604,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Contatos do Grupo</Text>
@@ -494,7 +622,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Info Card */}
           <View style={styles.infoCard}>
-            <Ionicons name="information-circle" size={24} color={colors.info} />
+            <SafeIcon name="information-circle" size={24} color={colors.info} />
             <View style={styles.infoContent}>
               <Text style={styles.infoTitle}>Configuração de Contatos</Text>
               <Text style={styles.infoText}>
@@ -503,23 +631,49 @@ const GroupContactsScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-          {/* Quick Contacts Section */}
+          {/* Contatos Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="call" size={24} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Contatos Rápidos (3)</Text>
+              <SafeIcon name="call" size={24} color={colors.primary} />
+              <Text style={styles.sectionTitle}>Contatos (3)</Text>
             </View>
             <Text style={styles.sectionDescription}>
-              Configure até 3 contatos para ligação rápida
+              Configure até 3 contatos. Ative o toggle SOS para marcar como contato de emergência.
             </Text>
 
             {contacts.map((contact, index) => (
-              <View key={`quick-${index}`} style={styles.contactCard}>
+              <View 
+                key={`contact-${contact.id || index}-${contact.name || 'empty'}`} 
+                style={[
+                  styles.contactCard,
+                  contact.isSOS && styles.sosContactCard
+                ]}
+              >
                 <View style={styles.contactHeader}>
-                  <View style={styles.contactNumber}>
-                    <Text style={styles.contactNumberText}>{index + 1}</Text>
+                  <View style={[
+                    styles.contactNumber,
+                    contact.isSOS && styles.sosContactNumber
+                  ]}>
+                    {contact.isSOS ? (
+                      <SafeIcon name="alert-circle" size={16} color={colors.textWhite} />
+                    ) : (
+                      <Text style={styles.contactNumberText}>{index + 1}</Text>
+                    )}
                   </View>
-                  <Text style={styles.contactLabel}>Contato {index + 1}</Text>
+                  <Text style={styles.contactLabel}>
+                    Contato {index + 1}
+                  </Text>
+                  {/* Toggle SOS */}
+                  <View style={styles.sosToggleContainer}>
+                    <Text style={styles.sosToggleLabel}>SOS</Text>
+                    <Switch
+                      value={contact.isSOS}
+                      onValueChange={() => toggleSOS(index)}
+                      trackColor={{ false: colors.gray300, true: colors.error + '80' }}
+                      thumbColor={contact.isSOS ? colors.error : colors.white}
+                      ios_backgroundColor={colors.gray300}
+                    />
+                  </View>
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -540,8 +694,16 @@ const GroupContactsScreen = ({ route, navigation }) => {
                     placeholder="+55(00)00000-0000"
                     placeholderTextColor={colors.placeholder}
                     value={contact.phone || '+55'}
-                    onChangeText={(text) => handlePhoneChange(text, index, false)}
+                    onChangeText={(text) => {
+                      console.log('📱 [GroupContacts] TextInput onChangeText:', { text, index, currentValue: contact.phone });
+                      handlePhoneChange(text, index);
+                    }}
+                    onBlur={() => {
+                      console.log('📱 [GroupContacts] TextInput onBlur:', { index });
+                      handlePhoneBlur(index);
+                    }}
                     keyboardType="phone-pad"
+                    editable={!saving}
                   />
                   <Text style={styles.hint}>
                     Formato: +55(DDD)XXXXX-XXXX (11 dígitos)
@@ -553,7 +715,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
                   <Text style={styles.inputLabel}>Foto (Opcional)</Text>
                   <TouchableOpacity 
                     style={styles.photoButton}
-                    onPress={() => pickImage(index, false)}
+                    onPress={() => pickImage(index)}
                   >
                     {contact.photoUri || contact.photo ? (
                       <Image 
@@ -562,76 +724,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
                       />
                     ) : (
                       <View style={styles.photoPlaceholder}>
-                        <Ionicons name="camera" size={32} color={colors.textLight} />
-                        <Text style={styles.photoPlaceholderText}>Adicionar Foto</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* SOS Contacts Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="alert-circle" size={24} color={colors.error} />
-              <Text style={styles.sectionTitle}>Contatos SOS</Text>
-            </View>
-            <Text style={styles.sectionDescription}>
-              Contatos que serão chamados em caso de emergência
-            </Text>
-
-            {sosContacts.map((contact, index) => (
-              <View key={`sos-${index}`} style={[styles.contactCard, styles.sosContactCard]}>
-                <View style={styles.contactHeader}>
-                  <View style={[styles.contactNumber, styles.sosContactNumber]}>
-                    <Ionicons name="alert" size={16} color={colors.textWhite} />
-                  </View>
-                  <Text style={styles.contactLabel}>SOS {index + 1}</Text>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Nome</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Ex: Maria Santos"
-                    placeholderTextColor={colors.placeholder}
-                    value={contact.name}
-                    onChangeText={(text) => updateSOSContact(index, 'name', text)}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Telefone</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="+55(00)00000-0000"
-                    placeholderTextColor={colors.placeholder}
-                    value={contact.phone || '+55'}
-                    onChangeText={(text) => handlePhoneChange(text, index, true)}
-                    keyboardType="phone-pad"
-                  />
-                  <Text style={styles.hint}>
-                    Formato: +55(DDD)XXXXX-XXXX (11 dígitos)
-                  </Text>
-                </View>
-
-                {/* Foto do Contato SOS */}
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Foto (Opcional)</Text>
-                  <TouchableOpacity 
-                    style={styles.photoButton}
-                    onPress={() => pickImage(index, true)}
-                  >
-                    {contact.photoUri || contact.photo ? (
-                      <Image 
-                        source={{ uri: contact.photoUri || contact.photo }} 
-                        style={styles.photoPreview}
-                      />
-                    ) : (
-                      <View style={styles.photoPlaceholder}>
-                        <Ionicons name="camera" size={32} color={colors.textLight} />
+                        <SafeIcon name="camera" size={32} color={colors.textLight} />
                         <Text style={styles.photoPlaceholderText}>Adicionar Foto</Text>
                       </View>
                     )}
@@ -654,7 +747,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
               </>
             ) : (
               <>
-                <Ionicons name="checkmark-circle" size={24} color={colors.textWhite} />
+                <SafeIcon name="checkmark-circle" size={24} color={colors.textWhite} />
                 <Text style={styles.saveButtonText}>Salvar Contatos</Text>
               </>
             )}
@@ -779,6 +872,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     gap: 12,
+    justifyContent: 'space-between',
+  },
+  sosToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 'auto',
+  },
+  sosToggleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
   },
   contactNumber: {
     width: 32,

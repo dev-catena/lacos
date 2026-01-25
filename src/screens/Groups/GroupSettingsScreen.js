@@ -118,6 +118,28 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         setEditedGroupName(result.data.name || '');
         setEditedDescription(result.data.description || '');
         
+        // Carregar configurações de sinais vitais
+        if (result.data) {
+          setVitalSigns({
+            monitor_blood_pressure: result.data.monitor_blood_pressure || false,
+            monitor_heart_rate: result.data.monitor_heart_rate || false,
+            monitor_oxygen_saturation: result.data.monitor_oxygen_saturation || false,
+            monitor_blood_glucose: result.data.monitor_blood_glucose || false,
+            monitor_temperature: result.data.monitor_temperature || false,
+            monitor_respiratory_rate: result.data.monitor_respiratory_rate || false,
+          });
+          
+          // Carregar permissões do acompanhado
+          setPermissions({
+            accompanied_notify_medication: result.data.accompanied_notify_medication !== undefined ? result.data.accompanied_notify_medication : true,
+            accompanied_notify_appointment: result.data.accompanied_notify_appointment !== undefined ? result.data.accompanied_notify_appointment : true,
+            accompanied_access_history: result.data.accompanied_access_history !== undefined ? result.data.accompanied_access_history : true,
+            accompanied_access_medication: result.data.accompanied_access_medication !== undefined ? result.data.accompanied_access_medication : true,
+            accompanied_access_schedule: result.data.accompanied_access_schedule !== undefined ? result.data.accompanied_access_schedule : true,
+            accompanied_access_chat: result.data.accompanied_access_chat !== undefined ? result.data.accompanied_access_chat : false,
+          });
+        }
+        
         // Adicionar cache-busting na URL da foto para forçar reload
         // Sempre atualizar groupPhotoUrl com a foto do servidor
         const photoUrl = result.data.photo_url;
@@ -159,10 +181,10 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           // Atualizar imageSource para forçar remount
           setImageSource({ uri: newPhotoUrl, cache: 'reload' });
           
-          // Se newGroupPhoto existe mas a URL do servidor mudou, limpar newGroupPhoto
-          if (newGroupPhoto && currentUrlWithoutTimestamp !== newUrlWithoutTimestamp) {
-            console.log('📸 GroupSettings.loadGroupData - URL mudou e newGroupPhoto existe, limpando newGroupPhoto');
-            setNewGroupPhoto(null);
+          // NÃO limpar newGroupPhoto automaticamente - deixar o usuário decidir se quer salvar ou não
+          // Se newGroupPhoto existe, manter para que o usuário possa salvar
+          if (newGroupPhoto) {
+            console.log('📸 GroupSettings.loadGroupData - newGroupPhoto existe, mantendo para salvar');
           }
         } else {
           console.log('📸 GroupSettings.loadGroupData - Sem photo_url, limpando groupPhotoUrl');
@@ -284,6 +306,8 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   };
 
   const pickGroupPhoto = async () => {
+    console.log('📸 GroupSettings.pickGroupPhoto - INICIANDO seleção de foto');
+    console.log('📸 GroupSettings.pickGroupPhoto - newGroupPhoto atual:', newGroupPhoto);
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
@@ -303,11 +327,146 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        setNewGroupPhoto(result.assets[0].uri);
+        const selectedPhotoUri = result.assets[0].uri;
+        console.log('📸 GroupSettings.pickGroupPhoto - ✅ Foto selecionada!');
+        console.log('📸 GroupSettings.pickGroupPhoto - selectedPhotoUri:', selectedPhotoUri);
+        console.log('📸 GroupSettings - Limpando imageSource para forçar uso da nova foto');
+        // Limpar imageSource para garantir que a nova foto seja exibida
+        setImageSource(null);
+        // Atualizar photoKey para forçar remount do componente Image
+        setPhotoKey(Date.now());
+        // Definir a nova foto
+        setNewGroupPhoto(selectedPhotoUri);
+        console.log('📸 GroupSettings.pickGroupPhoto - newGroupPhoto será definido para:', selectedPhotoUri);
+        console.log('📸 GroupSettings - Estados atualizados: newGroupPhoto definido, imageSource limpo');
       }
     } catch (error) {
-      console.error('Erro ao selecionar imagem:', error);
+      console.error('❌ GroupSettings.pickGroupPhoto - Erro ao selecionar imagem:', error);
       Alert.alert('Erro', 'Não foi possível selecionar a imagem');
+    }
+  };
+
+  // Função SIMPLES apenas para salvar a foto
+  const savePhotoOnly = async () => {
+    if (!newGroupPhoto) {
+      Alert.alert('Atenção', 'Selecione uma foto primeiro');
+      return;
+    }
+
+    console.log('📸 SAVE PHOTO ONLY - Iniciando upload simples da foto');
+    console.log('📸 SAVE PHOTO ONLY - Grupo ID:', groupId);
+    console.log('📸 SAVE PHOTO ONLY - Foto URI:', newGroupPhoto);
+
+    // Guardar a URI da foto selecionada antes de enviar
+    const photoToSave = newGroupPhoto;
+
+    try {
+      setSaving(true);
+
+      const formData = new FormData();
+      const filename = photoToSave.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      const photoFile = {
+        uri: photoToSave,
+        name: filename || `group_photo_${Date.now()}.jpg`,
+        type: type,
+      };
+
+      formData.append('photo', photoFile);
+      formData.append('name', groupData?.name || '');
+      formData.append('description', groupData?.description || '');
+
+      console.log('📸 SAVE PHOTO ONLY - Tentando método SIMPLES primeiro...');
+      
+      // Tentar método simples primeiro
+      let result = await groupService.uploadGroupPhotoSimple(groupId, photoToSave);
+      
+      console.log('📸 SAVE PHOTO ONLY - Resultado do método simples:', {
+        success: result.success,
+        hasData: !!result.data,
+        photo_url: result.data?.photo_url,
+        photo: result.data?.photo,
+        fullData: result.data,
+      });
+      
+      // Se falhar, tentar método antigo
+      if (!result.success) {
+        console.log('📸 SAVE PHOTO ONLY - Método simples falhou, tentando método completo...');
+        result = await groupService.updateGroup(groupId, formData);
+      }
+
+      if (result.success) {
+        console.log('✅ SAVE PHOTO ONLY - Foto salva com sucesso!');
+        console.log('✅ SAVE PHOTO ONLY - Resposta completa:', JSON.stringify(result.data, null, 2));
+
+        // Obter a nova URL da foto do servidor - tentar vários campos
+        const newPhotoUrl = result.data?.photo_url || 
+                           result.data?.photo || 
+                           (result.data?.photo && typeof result.data.photo === 'string' && result.data.photo.startsWith('http') ? result.data.photo : null);
+        
+        console.log('📸 SAVE PHOTO ONLY - newPhotoUrl extraído:', newPhotoUrl);
+        
+        if (newPhotoUrl) {
+          // Construir URL completa
+          let fullPhotoUrl = newPhotoUrl;
+          if (!fullPhotoUrl.startsWith('http')) {
+            const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+            fullPhotoUrl = fullPhotoUrl.startsWith('/') 
+              ? `${baseUrl}${fullPhotoUrl}` 
+              : `${baseUrl}/${fullPhotoUrl}`;
+          }
+          
+          // Adicionar cache-busting
+          const timestamp = Date.now();
+          const photoUrlWithCache = `${fullPhotoUrl}?t=${timestamp}`;
+          
+          // Atualizar estados - IMPORTANTE: NÃO limpar newGroupPhoto ainda
+          // Manter newGroupPhoto visível até a foto do servidor carregar completamente
+          setGroupPhotoUrl(photoUrlWithCache);
+          setPhotoKey(timestamp);
+          setImageSource({ uri: photoUrlWithCache, cache: 'reload' });
+          
+          console.log('✅ SAVE PHOTO ONLY - Estados atualizados com nova foto do servidor');
+          console.log('✅ SAVE PHOTO ONLY - Mantendo newGroupPhoto visível até foto do servidor carregar');
+          console.log('✅ SAVE PHOTO ONLY - Nova URL do servidor:', photoUrlWithCache);
+          
+          // Limpar newGroupPhoto imediatamente e recarregar dados do grupo
+          setNewGroupPhoto(null);
+          
+          // Recarregar dados do grupo para garantir que temos a foto mais recente
+          setTimeout(async () => {
+            console.log('🔄 SAVE PHOTO ONLY - Recarregando dados do grupo...');
+            await loadGroupData();
+            // Forçar atualização da imagem
+            setPhotoKey(Date.now());
+          }, 500);
+        } else {
+          // Se não veio URL na resposta, recarregar dados
+          console.log('⚠️ SAVE PHOTO ONLY - URL não veio na resposta, recarregando...');
+          // Limpar newGroupPhoto e recarregar
+          setNewGroupPhoto(null);
+          setTimeout(async () => {
+            await loadGroupData();
+          }, 1000);
+        }
+
+        Toast.show({
+          type: 'success',
+          text1: 'Sucesso!',
+          text2: 'Foto atualizada com sucesso',
+        });
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível salvar a foto');
+        // Em caso de erro, manter a foto selecionada
+      }
+    } catch (error) {
+      console.error('❌ SAVE PHOTO ONLY - Erro:', error);
+      Alert.alert('Erro', 'Não foi possível salvar a foto');
+      // Em caso de erro, manter a foto selecionada
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -330,6 +489,13 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   };
 
   const saveGroupBasicInfo = async () => {
+    console.log('💾 GroupSettings.saveGroupBasicInfo - FUNÇÃO CHAMADA');
+    console.log('💾 GroupSettings.saveGroupBasicInfo - Grupo ID:', groupId);
+    console.log('💾 GroupSettings.saveGroupBasicInfo - newGroupPhoto existe?', !!newGroupPhoto);
+    console.log('💾 GroupSettings.saveGroupBasicInfo - editedGroupName:', editedGroupName);
+    console.log('💾 GroupSettings.saveGroupBasicInfo - editedDescription:', editedDescription);
+    console.log('💾 GroupSettings.saveGroupBasicInfo - saving:', saving);
+    
     try {
       setSaving(true);
 
@@ -356,6 +522,16 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         const formData = new FormData();
         formData.append('name', editedGroupName);
         formData.append('description', editedDescription || '');
+        
+        // Adicionar configurações de sinais vitais
+        Object.keys(vitalSigns).forEach(key => {
+          formData.append(key, vitalSigns[key] ? '1' : '0');
+        });
+        
+        // Adicionar permissões do acompanhado
+        Object.keys(permissions).forEach(key => {
+          formData.append(key, permissions[key] ? '1' : '0');
+        });
 
         const filename = newGroupPhoto.split('/').pop();
         const match = /\.(\w+)$/.exec(filename);
@@ -381,8 +557,16 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         });
 
         console.log('📤 GroupSettings - Chamando groupService.updateGroup...');
-        const result = await groupService.updateGroup(groupId, formData);
-        console.log('📤 GroupSettings - Resposta recebida:', result);
+        console.log('📤 GroupSettings - Grupo ID:', groupId);
+        console.log('📤 GroupSettings - FormData preparado, enviando...');
+        try {
+          const result = await groupService.updateGroup(groupId, formData);
+          console.log('📤 GroupSettings - Resposta recebida:', result);
+        } catch (error) {
+          console.error('❌ GroupSettings - ERRO ao chamar updateGroup:', error);
+          console.error('❌ GroupSettings - Erro completo:', JSON.stringify(error, null, 2));
+          throw error;
+        }
         
         if (result.success) {
           console.log('✅ GroupSettings - Dados e foto salvos!');
@@ -484,15 +668,54 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           }
           
           // Recarregar dados do servidor para garantir sincronização completa
+          // IMPORTANTE: Aguardar mais tempo para garantir que o backend processou o upload
           setTimeout(async () => {
             console.log('🔄 GroupSettings - Recarregando dados do grupo após salvar foto...');
-            await loadGroupData();
+            console.log('🔄 GroupSettings - Grupo ID:', groupId);
+            const reloadResult = await groupService.getGroup(groupId);
+            console.log('🔄 GroupSettings - Dados recarregados:', {
+              success: reloadResult.success,
+              hasPhotoUrl: !!reloadResult.data?.photo_url,
+              photoUrl: reloadResult.data?.photo_url,
+              photo: reloadResult.data?.photo,
+              groupId: reloadResult.data?.id,
+              groupName: reloadResult.data?.name,
+            });
             
-            // Forçar outro reload da imagem após recarregar dados
-            setTimeout(() => {
-              setPhotoKey(Date.now());
-            }, 300);
-          }, 1500);
+            // VERIFICAÇÃO CRÍTICA: Verificar se o grupo retornado é o correto
+            if (reloadResult.data?.id !== groupId) {
+              console.error('❌ GroupSettings - ERRO: Grupo retornado não corresponde!', {
+                esperado: groupId,
+                recebido: reloadResult.data?.id,
+              });
+            }
+            
+            if (reloadResult.success && reloadResult.data) {
+              const reloadedPhotoUrl = reloadResult.data.photo_url;
+              if (reloadedPhotoUrl) {
+                // Construir URL completa se necessário
+                let fullPhotoUrl = reloadedPhotoUrl;
+                if (!reloadedPhotoUrl.startsWith('http')) {
+                  const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+                  fullPhotoUrl = reloadedPhotoUrl.startsWith('/') 
+                    ? `${baseUrl}${reloadedPhotoUrl}` 
+                    : `${baseUrl}/${reloadedPhotoUrl}`;
+                }
+                
+                // Adicionar cache-busting
+                const separator = fullPhotoUrl.includes('?') ? '&' : '?';
+                const timestamp = Date.now();
+                const newPhotoUrl = `${fullPhotoUrl}${separator}t=${timestamp}`;
+                
+                console.log('🔄 GroupSettings - Atualizando com foto recarregada:', newPhotoUrl);
+                console.log('🔄 GroupSettings - Verificando se é a foto correta do grupo', groupId);
+                setGroupPhotoUrl(newPhotoUrl);
+                setPhotoKey(timestamp);
+                setImageSource({ uri: newPhotoUrl, cache: 'reload' });
+                setNewGroupPhoto(null); // Garantir que newGroupPhoto está limpo
+              }
+            }
+          }, 2000);
         } else {
           console.error('❌ GroupSettings - Erro ao salvar:', result.error);
           console.error('❌ GroupSettings - Detalhes do erro:', JSON.stringify(result, null, 2));
@@ -503,14 +726,47 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         }
       } else {
         // Sem foto nova, enviar apenas os dados
+        console.log('💾 GroupSettings.saveGroupBasicInfo - Sem foto nova, verificando mudanças nos dados...');
         const nameChanged = editedGroupName !== groupData?.name;
         const descChanged = editedDescription !== (groupData?.description || '');
         
-        if (nameChanged || descChanged) {
-          const result = await groupService.updateGroup(groupId, {
+        console.log('💾 GroupSettings.saveGroupBasicInfo - Verificando mudanças:', {
+          nameChanged,
+          descChanged,
+          name: editedGroupName,
+          currentName: groupData?.name,
+        });
+        
+        // Verificar se há mudanças (incluindo sinais vitais e permissões)
+        const vitalSignsChanged = Object.keys(vitalSigns).some(key => {
+          const currentValue = groupData?.[key] || false;
+          return vitalSigns[key] !== currentValue;
+        });
+        const permissionsChanged = Object.keys(permissions).some(key => {
+          const currentValue = groupData?.[key] !== undefined ? groupData[key] : (key === 'accompanied_access_chat' ? false : true);
+          return permissions[key] !== currentValue;
+        });
+        
+        console.log('💾 GroupSettings.saveGroupBasicInfo - Mudanças detectadas:', {
+          nameChanged,
+          descChanged,
+          vitalSignsChanged,
+          permissionsChanged,
+        });
+        
+        if (nameChanged || descChanged || vitalSignsChanged || permissionsChanged) {
+          console.log('💾 GroupSettings.saveGroupBasicInfo - Há mudanças, salvando...');
+          const updateData = {
             name: editedGroupName,
             description: editedDescription,
-          });
+            ...vitalSigns,
+            ...permissions,
+          };
+          
+          console.log('💾 GroupSettings.saveGroupBasicInfo - Dados para enviar:', updateData);
+          console.log('💾 GroupSettings.saveGroupBasicInfo - Chamando groupService.updateGroup...');
+          const result = await groupService.updateGroup(groupId, updateData);
+          console.log('💾 GroupSettings.saveGroupBasicInfo - Resultado recebido:', result);
           
           if (result.success) {
             Toast.show({
@@ -797,35 +1053,154 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   };
 
   const handleSave = async () => {
-    // Validar se pelo menos um sinal vital está habilitado
-    const hasAnyVitalSignEnabled = Object.values(vitalSigns).some(v => v);
+    console.log('💾 GroupSettings.handleSave - ==========================================');
+    console.log('💾 GroupSettings.handleSave - INICIANDO salvamento de configurações');
+    console.log('💾 GroupSettings.handleSave - ==========================================');
+    console.log('💾 GroupSettings.handleSave - Grupo ID:', groupId);
+    console.log('💾 GroupSettings.handleSave - Sinais vitais:', vitalSigns);
+    console.log('💾 GroupSettings.handleSave - Permissões:', permissions);
+    console.log('💾 GroupSettings.handleSave - newGroupPhoto existe?', !!newGroupPhoto);
+    console.log('💾 GroupSettings.handleSave - newGroupPhoto URI:', newGroupPhoto);
+    console.log('💾 GroupSettings.handleSave - typeof newGroupPhoto:', typeof newGroupPhoto);
     
-    if (!hasAnyVitalSignEnabled) {
-      Alert.alert(
-        'Atenção',
-        'Selecione pelo menos um sinal vital para ativar a funcionalidade'
-      );
-      return;
-    }
-
     setSaving(true);
     try {
-      // TODO: Implementar chamada à API
-      Alert.alert(
-        'Em Desenvolvimento',
-        `Configurações salvas!\n\n` +
-        `Sinais vitais ativos: ${Object.keys(vitalSigns).filter(k => vitalSigns[k]).length}\n` +
-        `Permissões do acompanhado configuradas\n\n` +
-        `Integração com API em desenvolvimento.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
+      // Se houver uma nova foto, salvar junto com as configurações
+      console.log('💾 GroupSettings.handleSave - Verificando se há foto nova antes de salvar...');
+      console.log('💾 GroupSettings.handleSave - newGroupPhoto:', newGroupPhoto);
+      console.log('💾 GroupSettings.handleSave - !!newGroupPhoto:', !!newGroupPhoto);
+      
+      if (newGroupPhoto) {
+        console.log('💾 GroupSettings.handleSave - ✅ HÁ FOTO NOVA! Salvando foto e configurações juntas...');
+        console.log('💾 GroupSettings.handleSave - newGroupPhoto URI completo:', newGroupPhoto);
+        
+        // Usar saveGroupBasicInfo que já tem a lógica de upload de foto
+        // Mas primeiro adicionar as configurações ao FormData
+        const formData = new FormData();
+        formData.append('name', editedGroupName || groupData?.name || '');
+        formData.append('description', editedDescription || groupData?.description || '');
+        
+        // Adicionar permissões do acompanhado
+        Object.keys(permissions).forEach(key => {
+          formData.append(key, permissions[key] ? '1' : '0');
+        });
+        
+        // Adicionar foto - IMPORTANTE: usar o formato correto para React Native
+        const filename = newGroupPhoto.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        
+        console.log('💾 GroupSettings.handleSave - Preparando arquivo:', {
+          filename,
+          type,
+          uri: newGroupPhoto,
+        });
+        
+        const photoFile = {
+          uri: newGroupPhoto,
+          name: filename || `group_photo_${Date.now()}.jpg`,
+          type: type,
+        };
+        
+        formData.append('photo', photoFile);
+        
+        // Log do FormData para debug
+        console.log('💾 GroupSettings.handleSave - FormData preparado:');
+        for (let pair of formData.entries()) {
+          if (pair[1] && typeof pair[1] === 'object' && pair[1].uri) {
+            console.log(`  - ${pair[0]}: [FILE] ${pair[1].name} (${pair[1].type})`);
+          } else {
+            console.log(`  - ${pair[0]}: ${pair[1]}`);
+          }
+        }
+        
+        console.log('💾 GroupSettings.handleSave - Chamando groupService.updateGroup com FormData...');
+        const result = await groupService.updateGroup(groupId, formData);
+        console.log('💾 GroupSettings.handleSave - Resultado do updateGroup:', {
+          success: result.success,
+          hasData: !!result.data,
+          photo_url: result.data?.photo_url,
+          photo: result.data?.photo,
+        });
+        
+        if (result.success) {
+          Toast.show({
+            type: 'success',
+            text1: 'Sucesso!',
+            text2: 'Configurações e foto salvas com sucesso',
+          });
+          
+          // Limpar newGroupPhoto e atualizar groupPhotoUrl
+          if (result.data?.photo_url) {
+            const photoUrl = result.data.photo_url;
+            let fullPhotoUrl = photoUrl;
+            if (!photoUrl.startsWith('http')) {
+              const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+              fullPhotoUrl = photoUrl.startsWith('/') 
+                ? `${baseUrl}${photoUrl}` 
+                : `${baseUrl}/${photoUrl}`;
+            }
+            const separator = fullPhotoUrl.includes('?') ? '&' : '?';
+            const timestamp = Date.now();
+            const newPhotoUrl = `${fullPhotoUrl}${separator}t=${timestamp}`;
+            setNewGroupPhoto(null);
+            setGroupPhotoUrl(newPhotoUrl);
+            setPhotoKey(timestamp);
+            setImageSource({ uri: newPhotoUrl, cache: 'reload' });
+          }
+          
+          setTimeout(() => {
+            console.log('💾 GroupSettings.handleSave - Recarregando dados do grupo...');
+            loadGroupData();
+          }, 500);
+          return;
+        } else {
+          Alert.alert('Erro', result.error || 'Não foi possível salvar as configurações');
+          return;
+        }
+      }
+      
+      // Sem foto nova, salvar apenas configurações
+      console.log('💾 GroupSettings.handleSave - ⚠️ NÃO HÁ FOTO NOVA, salvando apenas configurações...');
+      console.log('💾 GroupSettings.handleSave - newGroupPhoto:', newGroupPhoto);
+      console.log('💾 GroupSettings.handleSave - typeof newGroupPhoto:', typeof newGroupPhoto);
+      
+      const updateData = {
+        ...permissions,
+      };
+      
+      console.log('💾 GroupSettings.handleSave - Dados para enviar:', updateData);
+      console.log('💾 GroupSettings.handleSave - Chamando groupService.updateGroup...');
+      
+      const result = await groupService.updateGroup(groupId, updateData);
+      
+      console.log('💾 GroupSettings.handleSave - Resultado recebido:', {
+        success: result.success,
+        hasData: !!result.data,
+        error: result.error,
+        fullResult: result,
+      });
+      
+      if (result.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Sucesso!',
+          text2: 'Configurações salvas com sucesso',
+        });
+        
+        // Recarregar dados do grupo
+        setTimeout(() => {
+          console.log('💾 GroupSettings.handleSave - Recarregando dados do grupo...');
+          loadGroupData();
+        }, 500);
+      } else {
+        console.error('❌ GroupSettings.handleSave - Erro ao salvar:', result.error);
+        Alert.alert('Erro', result.error || 'Não foi possível salvar as configurações');
+      }
     } catch (error) {
-      Alert.alert('Erro', 'Erro ao salvar configurações');
+      console.error('❌ GroupSettings.handleSave - Erro ao salvar configurações:', error);
+      console.error('❌ GroupSettings.handleSave - Stack trace:', error.stack);
+      Alert.alert('Erro', 'Erro ao salvar configurações: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setSaving(false);
     }
@@ -949,8 +1324,8 @@ const GroupSettingsScreen = ({ route, navigation }) => {
               {(newGroupPhoto || groupPhotoUrl) ? (
                 <View style={styles.photoContainer}>
                   <Image 
-                    key={`photo-${photoKey}-${newGroupPhoto ? 'local-' + newGroupPhoto.substring(newGroupPhoto.length - 10) : 'server-' + (groupPhotoUrl ? groupPhotoUrl.split('/').pop() : 'none')}`}
-                    source={newGroupPhoto && !imageSource
+                    key={`photo-${photoKey}-${newGroupPhoto ? 'local-' + Date.now() : 'server-' + (groupPhotoUrl ? groupPhotoUrl.split('/').pop() : 'none')}`}
+                    source={newGroupPhoto 
                       ? { uri: newGroupPhoto, cache: 'reload' }
                       : (imageSource || { uri: groupPhotoUrl, cache: 'reload' })
                     } 
@@ -958,6 +1333,8 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                     onError={(error) => {
                       console.error('❌ Erro ao carregar imagem:', error);
                       console.error('❌ URI tentada:', newGroupPhoto || groupPhotoUrl);
+                      console.error('❌ newGroupPhoto existe?', !!newGroupPhoto);
+                      console.error('❌ groupPhotoUrl:', groupPhotoUrl);
                       // Se a foto do servidor falhar e tiver foto local, usar a local
                       if (!newGroupPhoto && groupPhotoUrl) {
                         console.log('⚠️ Tentando recarregar foto do servidor...');
@@ -969,6 +1346,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                     onLoad={() => {
                       console.log('✅ Imagem carregada com sucesso');
                       console.log('✅ URI carregada:', newGroupPhoto || groupPhotoUrl);
+                      console.log('✅ newGroupPhoto existe?', !!newGroupPhoto);
                     }}
                   />
                   <View style={styles.photoActions}>
@@ -980,6 +1358,19 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                       <SafeIcon name="camera" size={20} color={colors.primary} />
                       <Text style={styles.photoActionText}>Trocar</Text>
                     </TouchableOpacity>
+                    {newGroupPhoto && (
+                      <TouchableOpacity
+                        style={[styles.photoActionButton, { backgroundColor: colors.success }]}
+                        onPress={savePhotoOnly}
+                        activeOpacity={0.7}
+                        disabled={saving}
+                      >
+                        <SafeIcon name="checkmark-circle" size={20} color={colors.textWhite} />
+                        <Text style={[styles.photoActionText, { color: colors.textWhite }]}>
+                          {saving ? 'Salvando...' : 'Salvar Foto'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity
                       style={[styles.photoActionButton, styles.photoRemoveButton]}
                       onPress={removeGroupPhoto}
@@ -1030,10 +1421,27 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             />
           </View>
 
-          {isAdmin && (editedGroupName !== groupData?.name || editedDescription !== groupData?.description || newGroupPhoto) && (
+          {(() => {
+            const hasChanges = editedGroupName !== groupData?.name || editedDescription !== (groupData?.description || '') || newGroupPhoto;
+            console.log('🔘 GroupSettings - Verificando se botão deve aparecer:', {
+              isAdmin,
+              hasChanges,
+              editedGroupName,
+              currentName: groupData?.name,
+              editedDescription,
+              currentDescription: groupData?.description,
+              newGroupPhoto: !!newGroupPhoto,
+            });
+            return null; // Não renderizar nada aqui, apenas logar
+          })()}
+          {isAdmin && (editedGroupName !== groupData?.name || editedDescription !== (groupData?.description || '') || newGroupPhoto) && (
             <TouchableOpacity
               style={[styles.saveBasicInfoButton, saving && styles.saveBasicInfoButtonDisabled]}
-              onPress={saveGroupBasicInfo}
+              onPress={() => {
+                console.log('🔘 GroupSettings - Botão "Salvar Alterações" CLICADO!');
+                console.log('🔘 GroupSettings - newGroupPhoto:', newGroupPhoto);
+                saveGroupBasicInfo();
+              }}
               disabled={saving}
               activeOpacity={0.8}
             >
@@ -1050,49 +1458,55 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         </View>
 
         {/* Código do Grupo para Compartilhar */}
-        {(groupData?.code || groupData?.access_code) && (
-          <View style={styles.codeSection}>
-            <View style={styles.codeHeader}>
-              <SafeIcon name="key" size={24} color={colors.secondary} />
-              <Text style={styles.codeHeaderTitle}>Código do Grupo</Text>
-            </View>
-            <Text style={styles.codeDescription}>
-              Compartilhe este código com participantes que querem entrar no grupo
-            </Text>
-            
-            <View style={styles.codeCard}>
-              <View style={styles.codeDisplay}>
-                <Text style={styles.codeLabel}>Código:</Text>
-                <Text style={styles.codeText}>{groupData.code || groupData.access_code || 'N/A'}</Text>
+        {(() => {
+          const code = groupData?.code || groupData?.access_code;
+          const hasCode = code && code !== 'NULL' && code !== 'null' && String(code).trim() !== '';
+          if (!hasCode) return null;
+          
+          return (
+            <View style={styles.codeSection}>
+              <View style={styles.codeHeader}>
+                <SafeIcon name="key" size={24} color={colors.secondary} />
+                <Text style={styles.codeHeaderTitle}>Código do Grupo</Text>
               </View>
-              
-              <View style={styles.codeActions}>
-                <TouchableOpacity
-                  style={styles.codeActionButton}
-                  onPress={copyCodeToClipboard}
-                >
-                  <SafeIcon name="copy-outline" size={20} color={colors.primary} />
-                  <Text style={styles.codeActionText}>Copiar</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.codeActionButton, styles.shareButton]}
-                  onPress={shareCode}
-                >
-                  <SafeIcon name="share-social-outline" size={20} color={colors.textWhite} />
-                  <Text style={[styles.codeActionText, styles.shareButtonText]}>Compartilhar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.codeInfoCard}>
-              <SafeIcon name="information-circle" size={20} color={colors.info} />
-              <Text style={styles.codeInfoText}>
-                Os participantes devem usar este código para entrar no grupo através da opção "Entrar com Código"
+              <Text style={styles.codeDescription}>
+                Compartilhe este código com participantes que querem entrar no grupo
               </Text>
+              
+              <View style={styles.codeCard}>
+                <View style={styles.codeDisplay}>
+                  <Text style={styles.codeLabel}>Código:</Text>
+                  <Text style={styles.codeText}>{code || 'N/A'}</Text>
+                </View>
+                
+                <View style={styles.codeActions}>
+                  <TouchableOpacity
+                    style={styles.codeActionButton}
+                    onPress={copyCodeToClipboard}
+                  >
+                    <SafeIcon name="copy-outline" size={20} color={colors.primary} />
+                    <Text style={styles.codeActionText}>Copiar</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.codeActionButton, styles.shareButton]}
+                    onPress={shareCode}
+                  >
+                    <SafeIcon name="share-social-outline" size={20} color={colors.textWhite} />
+                    <Text style={[styles.codeActionText, styles.shareButtonText]}>Compartilhar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.codeInfoCard}>
+                <SafeIcon name="information-circle" size={20} color={colors.info} />
+                <Text style={styles.codeInfoText}>
+                  Os participantes devem usar este código para entrar no grupo através da opção "Entrar com Código"
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        })()}
 
         {/* Botão de Pânico */}
         <TouchableOpacity
@@ -1323,52 +1737,6 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-        {/* Sinais Vitais */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
-              <VitalSignsIcon size={24} color={colors.primary} />
-            </View>
-            <Text style={styles.sectionTitle}>Sinais Vitais</Text>
-          </View>
-          <Text style={styles.sectionDescription}>
-            Selecione os sinais que deseja monitorar. Alertas serão enviados quando os valores
-            estiverem fora dos limites.
-          </Text>
-
-          {vitalSignsConfig.map((item) => (
-            <View key={item.key} style={styles.settingCard}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: item.color + '20' }]}>
-                  <SafeIcon name={item.icon} size={24} color={item.color} />
-                </View>
-                <View style={styles.settingContent}>
-                  <Text style={styles.settingLabel}>{item.label}</Text>
-                  <Text style={styles.settingDescription}>{item.description}</Text>
-                </View>
-              </View>
-              <Switch
-                value={vitalSigns[item.key]}
-                onValueChange={() => toggleVitalSign(item.key)}
-                trackColor={{ false: colors.gray200, true: item.color + '60' }}
-                thumbColor={vitalSigns[item.key] ? item.color : colors.gray400}
-              />
-            </View>
-          ))}
-        </View>
-
-        {/* Info Card */}
-        <View style={styles.infoCard}>
-          <SafeIcon name="information-circle" size={24} color={colors.info} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Limites Automáticos</Text>
-            <Text style={styles.infoText}>
-              Os limites iniciais são baseados em valores recomendados. Após coletar dados
-              históricos, o sistema calculará os valores basais personalizados do paciente (±20%).
-            </Text>
-          </View>
-        </View>
-
         {/* Permissões do Acompanhado */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -1409,11 +1777,26 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         </View>
 
         {/* Botão Salvar */}
+        {(() => {
+          console.log('🔘 GroupSettings - Renderizando botão "Salvar Configurações"');
+          console.log('🔘 GroupSettings - saving:', saving);
+          console.log('🔘 GroupSettings - isAdmin:', isAdmin);
+          console.log('🔘 GroupSettings - newGroupPhoto:', newGroupPhoto);
+          return null;
+        })()}
         <View style={styles.saveContainer}>
           <TouchableOpacity
             style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-            onPress={handleSave}
+            onPress={() => {
+              console.log('🔘 GroupSettings - Botão "Salvar Configurações" CLICADO!');
+              console.log('🔘 GroupSettings - newGroupPhoto antes de chamar handleSave:', newGroupPhoto);
+              console.log('🔘 GroupSettings - vitalSigns:', vitalSigns);
+              console.log('🔘 GroupSettings - permissions:', permissions);
+              handleSave();
+            }}
             disabled={saving}
+            activeOpacity={0.7}
+            testID="save-configurations-button"
           >
             {saving ? (
               <Text style={styles.saveButtonText}>Salvando...</Text>

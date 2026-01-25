@@ -75,7 +75,7 @@ Se firewall está bloqueando:
 
 **No servidor:**
 ```bash
-ssh -p 63022 darley@193.203.182.22
+ssh -p 63022 darley@10.102.0.103
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw reload
@@ -87,7 +87,7 @@ Se nginx/apache não está rodando:
 
 **No servidor:**
 ```bash
-ssh -p 63022 darley@193.203.182.22
+ssh -p 63022 darley@10.102.0.103
 sudo systemctl status nginx
 # ou
 sudo systemctl status apache2

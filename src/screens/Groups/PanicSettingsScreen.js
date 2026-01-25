@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import SafeIcon from '../../components/SafeIcon';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import panicService from '../../services/panicService';
@@ -143,7 +143,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
     <View style={styles.memberCard}>
       <View style={styles.memberInfo}>
         <View style={styles.memberAvatar}>
-          <Ionicons name="person" size={24} color={colors.primary} />
+          <SafeIcon name="person" size={24} color={colors.primary} />
         </View>
         <View style={styles.memberDetails}>
           <Text style={styles.memberName}>{item.user?.name || item.name}</Text>
@@ -165,7 +165,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
     <View style={styles.eventCard}>
       <View style={styles.eventHeader}>
         <View style={styles.eventIconContainer}>
-          <Ionicons name="warning" size={24} color={colors.error} />
+          <SafeIcon name="warning" size={24} color={colors.error} />
         </View>
         <View style={styles.eventInfo}>
           <Text style={styles.eventTitle}>Pânico Acionado</Text>
@@ -187,7 +187,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
       <View style={styles.eventDetails}>
         {item.user && (
           <View style={styles.eventDetailRow}>
-            <Ionicons name="person-outline" size={16} color={colors.gray400} />
+            <SafeIcon name="person-outline" size={16} color={colors.gray400} />
             <Text style={styles.eventDetailText}>
               Acionado por: {item.user.name}
             </Text>
@@ -196,7 +196,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
 
         {item.trigger_type && (
           <View style={styles.eventDetailRow}>
-            <Ionicons 
+            <SafeIcon 
               name={item.trigger_type === 'voice' ? 'mic-outline' : 'hand-left-outline'} 
               size={16} 
               color={colors.gray400} 
@@ -209,7 +209,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
 
         {item.call_duration && (
           <View style={styles.eventDetailRow}>
-            <Ionicons name="time-outline" size={16} color={colors.gray400} />
+            <SafeIcon name="time-outline" size={16} color={colors.gray400} />
             <Text style={styles.eventDetailText}>
               Duração: {formatDuration(item.call_duration)}
             </Text>
@@ -218,7 +218,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
 
         {item.location_address && (
           <View style={styles.eventDetailRow}>
-            <Ionicons name="location-outline" size={16} color={colors.gray400} />
+            <SafeIcon name="location-outline" size={16} color={colors.gray400} />
             <Text style={styles.eventDetailText} numberOfLines={2}>
               {item.location_address}
             </Text>
@@ -238,7 +238,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Botão de Pânico</Text>
@@ -260,7 +260,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
             <View style={styles.settingRow}>
               <View style={styles.settingInfo}>
                 <View style={styles.settingIconContainer}>
-                  <Ionicons name="warning" size={24} color={colors.error} />
+                  <SafeIcon name="warning" size={24} color={colors.error} />
                 </View>
                 <View style={styles.settingTextContainer}>
                   <Text style={styles.settingTitle}>Habilitar Botão de Pânico</Text>
@@ -280,7 +280,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
 
           {!panicEnabled && (
             <View style={styles.warningBox}>
-              <Ionicons name="information-circle" size={20} color={colors.warning} />
+              <SafeIcon name="information-circle" size={20} color={colors.warning} />
               <Text style={styles.warningText}>
                 O botão de pânico está desabilitado. O paciente não poderá acionar emergências.
               </Text>
@@ -297,7 +297,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
 
           {members.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color={colors.gray300} />
+              <SafeIcon name="people-outline" size={48} color={colors.gray300} />
               <Text style={styles.emptyStateText}>
                 Nenhum membro no grupo
               </Text>
@@ -314,7 +314,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
 
           {emergencyContacts.length === 0 && members.length > 0 && (
             <View style={styles.warningBox}>
-              <Ionicons name="alert-circle" size={20} color={colors.error} />
+              <SafeIcon name="alert-circle" size={20} color={colors.error} />
               <Text style={styles.warningText}>
                 ⚠️ Nenhum contato de emergência definido! Configure ao menos um.
               </Text>
@@ -328,7 +328,7 @@ const PanicSettingsScreen = ({ route, navigation }) => {
           
           {panicEvents.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="checkmark-circle-outline" size={48} color={colors.success} />
+              <SafeIcon name="checkmark-circle-outline" size={48} color={colors.success} />
               <Text style={styles.emptyStateText}>
                 Nenhum acionamento registrado
               </Text>

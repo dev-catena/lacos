@@ -21,7 +21,7 @@ sudo mysql $DB_NAME -e "SELECT id as group_id, name as nome FROM \`groups\` ORDE
 ### 1. Fazer login e obter token:
 
 ```bash
-TOKEN=$(curl -s -X POST "http://193.203.182.22/api/login" \
+TOKEN=$(curl -s -X POST "http://10.102.0.103/api/login" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -d '{"email":"seu_email@exemplo.com","password":"sua_senha"}' \
@@ -31,7 +31,7 @@ TOKEN=$(curl -s -X POST "http://193.203.182.22/api/login" \
 ### 2. Listar grupos do usuário:
 
 ```bash
-curl -X GET "http://193.203.182.22/api/groups" \
+curl -X GET "http://10.102.0.103/api/groups" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Accept: application/json" \
   | python3 -m json.tool

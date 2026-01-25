@@ -8,7 +8,7 @@ echo "📤 ENVIANDO E EXECUTANDO CRIAR_PDF_SERVICE.sh"
 echo "=============================================="
 echo ""
 
-SSH_HOST="193.203.182.22"
+SSH_HOST="10.102.0.103"
 SSH_PORT="63022"
 SSH_USER="darley"
 SCRIPT_LOCAL="scripts/CRIAR_PDF_SERVICE.sh"

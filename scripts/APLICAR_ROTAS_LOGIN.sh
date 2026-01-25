@@ -2,7 +2,7 @@
 
 # Script para aplicar rotas de login no servidor
 
-SERVER_IP="193.203.182.22"
+SERVER_IP="10.102.0.103"
 SERVER_USER="darley"
 SERVER_PASSWORD="yhvh77"
 PORT="63022"
@@ -42,7 +42,7 @@ echo "3. Verificar rotas:"
 echo "   sudo php artisan route:list | grep login"
 echo ""
 echo "4. Testar o login:"
-echo "   curl -X POST http://193.203.182.22/api/login -H 'Content-Type: application/json' -d '{\"login\":\"71533028672\",\"password\":\"111111\"}'"
+echo "   curl -X POST http://10.102.0.103/api/login -H 'Content-Type: application/json' -d '{\"login\":\"71533028672\",\"password\":\"111111\"}'"
 echo ""
 
 

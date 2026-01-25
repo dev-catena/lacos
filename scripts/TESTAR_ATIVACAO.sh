@@ -23,7 +23,7 @@ echo "✅ Token encontrado: ${TOKEN:0:20}..."
 echo ""
 
 # Testar URL de ativação
-ACTIVATION_URL="http://193.203.182.22/api/doctors/activate?token=$TOKEN"
+ACTIVATION_URL="http://10.102.0.103/api/doctors/activate?token=$TOKEN"
 
 echo "📡 Testando URL de ativação..."
 echo "URL: $ACTIVATION_URL"
