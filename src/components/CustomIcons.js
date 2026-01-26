@@ -1618,6 +1618,13 @@ export default {
   // Checkmark (para confirmação)
   CheckmarkIcon,
   
+  // Play/Pause (para áudio)
+  PlayIcon,
+  PauseIcon,
+  PlayCircleIcon,
+  PauseCircleIcon,
+  MusicalNotesIcon,
+  
   // Fitness Outline (para fisioterapia)
   FitnessOutlineIcon,
   
@@ -2085,6 +2092,69 @@ export const AlertCircleIcon = ({ size = 24, color = '#ef4444' }) => (
         strokeWidth="2"
         strokeLinecap="round"
       />
+    </Svg>
+  </View>
+);
+
+// ▶️ Ícone de Play
+export const PlayIcon = ({ size = 24, color = '#6366f1' }) => (
+  <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M8 5v14l11-7z"
+        fill={color}
+      />
+    </Svg>
+  </View>
+);
+
+// ⏸️ Ícone de Pause
+export const PauseIcon = ({ size = 24, color = '#6366f1' }) => (
+  <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="6" y="4" width="4" height="16" fill={color} rx="1" />
+      <Rect x="14" y="4" width="4" height="16" fill={color} rx="1" />
+    </Svg>
+  </View>
+);
+
+// 🎵 Ícone de Notas Musicais
+export const MusicalNotesIcon = ({ size = 24, color = '#6366f1' }) => (
+  <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M9 18V5l12-2v13"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle cx="6" cy="18" r="3" fill={color} />
+      <Circle cx="18" cy="16" r="3" fill={color} />
+    </Svg>
+  </View>
+);
+
+// ▶️ Ícone de Play Circle (círculo com play)
+export const PlayCircleIcon = ({ size = 24, color = '#6366f1' }) => (
+  <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="2" />
+      <Path
+        d="M10 8v8l6-4z"
+        fill={color}
+      />
+    </Svg>
+  </View>
+);
+
+// ⏸️ Ícone de Pause Circle (círculo com pause)
+export const PauseCircleIcon = ({ size = 24, color = '#6366f1' }) => (
+  <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="2" />
+      <Rect x="9" y="8" width="2" height="8" fill={color} rx="1" />
+      <Rect x="13" y="8" width="2" height="8" fill={color} rx="1" />
     </Svg>
   </View>
 );

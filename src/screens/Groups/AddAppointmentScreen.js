@@ -133,14 +133,47 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     try {
       console.log(`🔄 AddAppointmentScreen - Iniciando carregamento de especialidades... (tentativa ${retryCount + 1})`);
       const response = await medicalSpecialtyService.getSpecialties();
-      console.log('📋 AddAppointmentScreen - Resposta recebida:', response);
+      console.log('📋 AddAppointmentScreen - Resposta recebida:', JSON.stringify(response, null, 2));
+      console.log('📋 AddAppointmentScreen - Tipo da resposta:', typeof response);
+      console.log('📋 AddAppointmentScreen - É array?', Array.isArray(response));
+      console.log('📋 AddAppointmentScreen - Tem success?', response?.success);
+      console.log('📋 AddAppointmentScreen - Tem data?', !!response?.data);
+      console.log('📋 AddAppointmentScreen - Data é array?', Array.isArray(response?.data));
       
-      if (response && response.success && response.data && Array.isArray(response.data)) {
+      let specialtiesData = [];
+      
+      // Tratar diferentes formatos de resposta
+      if (Array.isArray(response)) {
+        // Resposta é um array direto
+        specialtiesData = response;
+        console.log('✅ AddAppointmentScreen - Resposta é array direto, especialidades:', specialtiesData.length);
+      } else if (response && response.success && response.data && Array.isArray(response.data)) {
+        // Formato padrão: {success: true, data: [...]}
+        specialtiesData = response.data;
+        console.log('✅ AddAppointmentScreen - Dados extraídos de response.data:', specialtiesData.length);
+      } else if (response && response.data && Array.isArray(response.data)) {
+        // Formato alternativo: {data: [...]}
+        specialtiesData = response.data;
+        console.log('✅ AddAppointmentScreen - Dados extraídos de response.data (sem success):', specialtiesData.length);
+      } else if (response && response.success === false) {
+        // Erro na resposta
+        console.warn('⚠️ AddAppointmentScreen - Resposta com success=false:', response);
+        throw new Error(response.message || 'Erro ao buscar especialidades');
+      } else {
+        console.warn('⚠️ AddAppointmentScreen - Formato de resposta não reconhecido:', response);
+        throw new Error('Formato de resposta inválido');
+      }
+      
+      if (specialtiesData.length > 0) {
         // Remover duplicatas por nome (caso o backend ainda retorne)
-        const uniqueSpecialties = response.data.reduce((acc, current) => {
-          const existing = acc.find(item => item.name === current.name);
+        const uniqueSpecialties = specialtiesData.reduce((acc, current) => {
+          if (!current || !current.id || !current.name) {
+            console.warn('⚠️ AddAppointmentScreen - Item inválido ignorado:', current);
+            return acc;
+          }
+          const existing = acc.find(item => item.id === current.id || item.name === current.name);
           if (!existing) {
-            acc.push(current);
+            acc.push({ id: current.id, name: current.name });
           }
           return acc;
         }, []);
@@ -166,7 +199,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           }
         }
       } else {
-        console.warn('⚠️ AddAppointmentScreen - Resposta inválida ou sem dados:', response);
+        console.warn('⚠️ AddAppointmentScreen - Nenhuma especialidade encontrada na resposta');
         // Tentar novamente se ainda houver tentativas
         if (retryCount < MAX_RETRIES) {
           console.log(`🔄 AddAppointmentScreen - Tentando novamente em 1 segundo... (${retryCount + 1}/${MAX_RETRIES})`);
@@ -178,7 +211,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           Toast.show({
             type: 'error',
             text1: 'Erro ao carregar especialidades',
-            text2: 'Verifique sua conexão e tente novamente',
+            text2: 'Nenhuma especialidade encontrada',
           });
         }
       }

@@ -13,13 +13,16 @@ import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../../constants/colors';
-import medicationService from '../../services/medicationService';
+import prescriptionService from '../../services/prescriptionService';
 import SafeIcon from '../../components/SafeIcon';
 import Toast from 'react-native-toast-message';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 
 moment.locale('pt-br');
+
+// Cor azul pastel para componentes
+const PASTEL_BLUE = '#93C5FD';
 
 const PrescriptionsScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params || {};
@@ -41,153 +44,36 @@ const PrescriptionsScreen = ({ route, navigation }) => {
   const loadPrescriptions = async () => {
     try {
       setLoading(true);
-      const result = await medicationService.getMedications(validGroupId);
+      const result = await prescriptionService.getPrescriptions(validGroupId);
+      
+      console.log('📋 PrescriptionsScreen - Resultado do serviço:', {
+        success: result.success,
+        hasData: !!result.data,
+        dataType: typeof result.data,
+        isArray: Array.isArray(result.data),
+        dataKeys: result.data ? Object.keys(result.data) : null,
+      });
       
       if (result.success && result.data) {
-        // Filtrar apenas medicamentos com doctor_id (receitas)
-        const medicationsWithDoctor = result.data.filter(med => med.doctor_id);
+        // Garantir que result.data é um array
+        const prescriptionsData = Array.isArray(result.data) ? result.data : [];
         
-        // Debug: verificar dados recebidos do backend
-        const firstMedWithDoctor = medicationsWithDoctor[0];
+        console.log('📋 PrescriptionsScreen - Prescrições processadas:', prescriptionsData.length);
         
-        // Procurar especificamente por Ariadna
-        const ariadnaMed = medicationsWithDoctor.find(med => 
-          med.doctor && med.doctor.name && med.doctor.name.includes('Ariadna')
-        );
-        
-        console.log('📋 PrescriptionsScreen - Dados recebidos do backend:', {
-          total: result.data.length,
-          totalWithDoctor: medicationsWithDoctor.length,
-          firstMedWithDoctor: firstMedWithDoctor ? {
-            id: firstMedWithDoctor.id,
-            name: firstMedWithDoctor.name,
-            doctor_id: firstMedWithDoctor.doctor_id,
-            doctor: firstMedWithDoctor.doctor ? {
-              id: firstMedWithDoctor.doctor.id,
-              name: firstMedWithDoctor.doctor.name,
-              medical_specialty: firstMedWithDoctor.doctor.medical_specialty,
-              medical_specialty_id: firstMedWithDoctor.doctor.medical_specialty_id,
-              user_id: firstMedWithDoctor.doctor.user_id,
-              keys: Object.keys(firstMedWithDoctor.doctor),
-              doctorFull: JSON.stringify(firstMedWithDoctor.doctor, null, 2),
-            } : null,
-          } : null,
-        });
-        
-        // Log específico para Ariadna
-        if (ariadnaMed) {
-          console.log('🔍🔍🔍 ARIADNA ENCONTRADA NO BACKEND:', {
-            medication_id: ariadnaMed.id,
-            medication_name: ariadnaMed.name,
-            doctor: ariadnaMed.doctor ? {
-              id: ariadnaMed.doctor.id,
-              name: ariadnaMed.doctor.name,
-              medical_specialty: ariadnaMed.doctor.medical_specialty,
-              medical_specialty_type: typeof ariadnaMed.doctor.medical_specialty,
-              medical_specialty_id: ariadnaMed.doctor.medical_specialty_id,
-              all_keys: Object.keys(ariadnaMed.doctor),
-              doctor_full_json: JSON.stringify(ariadnaMed.doctor, null, 2),
-            } : 'SEM DOCTOR',
-          });
-        } else {
-          console.log('⚠️ ARIADNA NÃO ENCONTRADA nos medicamentos com doctor');
-        }
-        
-        // Agrupar medicamentos por receita (médico + data de prescrição)
-        const prescriptionsMap = new Map();
-        
-        medicationsWithDoctor.forEach(med => {
-          const doctorId = med.doctor_id;
-          const prescriptionDate = med.start_date || med.created_at;
-          
-          // Criar chave única para a receita: doctor_id + data (apenas data, sem hora)
-          const dateKey = prescriptionDate 
-            ? moment(prescriptionDate).format('YYYY-MM-DD')
-            : moment(med.created_at).format('YYYY-MM-DD');
-          
-          const prescriptionKey = `${doctorId}_${dateKey}`;
-          
-          if (!prescriptionsMap.has(prescriptionKey)) {
-            // Extrair especialidade do médico
-            let doctorSpecialty = null;
-            
-            if (med.doctor) {
-              // Log detalhado para Ariadna
-              if (med.doctor.name && med.doctor.name.includes('Ariadna')) {
-                console.log('🔍 ARIADNA - Dados completos do doctor:', JSON.stringify(med.doctor, null, 2));
-                console.log('🔍 ARIADNA - medical_specialty:', med.doctor.medical_specialty);
-                console.log('🔍 ARIADNA - medical_specialty_id:', med.doctor.medical_specialty_id);
-                console.log('🔍 ARIADNA - Todas as chaves:', Object.keys(med.doctor));
-              }
-              
-              // Extrair especialidade - tentar todas as formas possíveis
-              if (med.doctor.medical_specialty) {
-                if (typeof med.doctor.medical_specialty === 'object') {
-                  doctorSpecialty = med.doctor.medical_specialty.name || 
-                                   med.doctor.medical_specialty.title || 
-                                   med.doctor.medical_specialty.label ||
-                                   null;
-                  
-                  // Log para Ariadna
-                  if (med.doctor.name && med.doctor.name.includes('Ariadna')) {
-                    console.log('🔍 ARIADNA - Especialidade extraída do objeto:', doctorSpecialty);
-                  }
-                } else if (typeof med.doctor.medical_specialty === 'string') {
-                  doctorSpecialty = med.doctor.medical_specialty;
-                  
-                  // Log para Ariadna
-                  if (med.doctor.name && med.doctor.name.includes('Ariadna')) {
-                    console.log('🔍 ARIADNA - Especialidade extraída da string:', doctorSpecialty);
-                  }
-                }
-              }
-              
-              // Se ainda não encontrou, verificar outras propriedades possíveis
-              if (!doctorSpecialty) {
-                doctorSpecialty = med.doctor.specialty || 
-                                 med.doctor.specialty_name ||
-                                 med.doctor.medicalSpecialty ||
-                                 null;
-                
-                // Log para Ariadna
-                if (med.doctor.name && med.doctor.name.includes('Ariadna')) {
-                  console.log('⚠️ ARIADNA - Especialidade NÃO encontrada após todas as tentativas');
-                }
-              }
-            }
-            
-            // Criar nova receita
-            prescriptionsMap.set(prescriptionKey, {
-              id: prescriptionKey, // ID composto para a receita
-              doctorId: doctorId,
-              doctorName: med.doctor?.name || 'Médico não informado',
-              doctorCrm: med.doctor?.crm || null,
-              doctorSpecialty: doctorSpecialty,
-              prescriptionDate: prescriptionDate || med.created_at,
-              medications: [],
-            });
-          }
-          
-          // Adicionar medicamento à receita
-          const prescription = prescriptionsMap.get(prescriptionKey);
-          prescription.medications.push({
-            id: med.id,
-            name: med.name,
-            form: med.pharmaceutical_form || med.form,
-            dosage: med.dosage,
-            unit: med.unit,
-            isActive: med.is_active,
-            createdAt: med.created_at,
-            startDate: med.start_date,
-          });
-        });
-        
-        // Converter Map para Array e ordenar por data (mais recentes primeiro)
-        const prescriptionsList = Array.from(prescriptionsMap.values())
+        // Ordenar receitas por data (mais recentes primeiro)
+        const prescriptionsList = prescriptionsData
           .map(prescription => ({
-            ...prescription,
-            medicationCount: prescription.medications.length,
-            hasActiveMedications: prescription.medications.some(m => m.isActive),
+            id: prescription.id,
+            doctorId: prescription.doctor_id,
+            doctorName: prescription.doctor_name || 'Médico não informado',
+            doctorSpecialty: prescription.doctor_specialty,
+            doctorCrm: prescription.doctor_crm,
+            prescriptionDate: prescription.prescription_date,
+            notes: prescription.notes,
+            medicationCount: prescription.medication_count,
+            medications: prescription.medications || [],
+            hasActiveMedications: (prescription.medications || []).some(m => m.is_active),
+            createdAt: prescription.created_at,
           }))
           .sort((a, b) => {
             const dateA = new Date(a.prescriptionDate);
@@ -195,15 +81,7 @@ const PrescriptionsScreen = ({ route, navigation }) => {
             return dateB - dateA; // Mais recentes primeiro
           });
         
-        // Debug: verificar receitas agrupadas antes de setar
-        console.log('📋 PrescriptionsScreen - Receitas agrupadas:', prescriptionsList.map(p => ({
-          id: p.id,
-          doctorName: p.doctorName,
-          doctorSpecialty: p.doctorSpecialty,
-          prescriptionDate: p.prescriptionDate,
-          medicationCount: p.medicationCount,
-        })));
-        
+        console.log('📋 PrescriptionsScreen - Receitas carregadas:', prescriptionsList.length);
         setPrescriptions(prescriptionsList);
       } else {
         console.error('Erro ao carregar receitas:', result.error);
@@ -222,96 +100,50 @@ const PrescriptionsScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleAddPrescription = () => {
-    navigation.navigate('SelectDoctor', { groupId: validGroupId, groupName });
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return 'Data não informada';
     return moment(dateString).format('DD/MM/YYYY');
   };
-  
-  const formatPrescriptionTitle = (prescription) => {
-    const date = formatDate(prescription.prescriptionDate);
-    const specialty = prescription.doctorSpecialty || '';
-    const doctorName = prescription.doctorName || 'Médico não informado';
-    
-    // Debug
-    console.log('📝 formatPrescriptionTitle - Dados:', {
-      date,
-      specialty,
-      doctorName,
-      prescriptionKeys: Object.keys(prescription),
-      doctorSpecialty: prescription.doctorSpecialty,
+
+  const handleAddPrescription = () => {
+    navigation.navigate('AddPrescription', {
+      groupId: validGroupId,
+      groupName,
     });
-    
-    // Formato: data, especialidade, nome do médico
-    let title = date;
-    if (specialty) {
-      title += `, ${specialty}`;
-    }
-    title += `, Dr(a). ${doctorName}`;
-    
-    console.log('📝 formatPrescriptionTitle - Título final:', title);
-    return title;
   };
+  
+  const renderPrescriptionItem = ({ item }) => {
+    const date = formatDate(item.prescriptionDate);
+    const doctorName = item.doctorName || 'Médico não informado';
+    const specialty = item.doctorSpecialty || 'Especialidade não informada';
 
-  const renderPrescriptionItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.prescriptionCard}
-      onPress={() => {
-        // Navegar para detalhes da receita (mostrar todos os medicamentos)
-        navigation.navigate('PrescriptionDetails', {
-          prescription: item,
-          groupId: validGroupId,
-          groupName,
-        });
-      }}
-      activeOpacity={0.7}
-    >
-      <View style={styles.prescriptionHeader}>
-        <View style={styles.prescriptionIcon}>
-          <SafeIcon name="document-text" size={24} color={colors.primary} />
-        </View>
-        <View style={styles.prescriptionInfo}>
-          <Text style={styles.prescriptionTitle} numberOfLines={2}>
-            {formatPrescriptionTitle(item)}
-          </Text>
-          <View style={styles.medicationCountContainer}>
-            <SafeIcon name="medical-outline" size={14} color={colors.gray400} />
-            <Text style={styles.medicationCount}>
-              {item.medicationCount} {item.medicationCount === 1 ? 'medicamento' : 'medicamentos'}
-            </Text>
+    return (
+      <TouchableOpacity
+        style={styles.prescriptionCard}
+        onPress={() => {
+          navigation.navigate('AddPrescription', {
+            prescriptionId: item.id,
+            prescription: item,
+            groupId: validGroupId,
+            groupName,
+            isEditing: true,
+          });
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={styles.prescriptionHeader}>
+          <View style={styles.prescriptionIcon}>
+            <SafeIcon name="document-text" size={24} color={colors.primary} />
+          </View>
+          <View style={styles.prescriptionInfo}>
+            <Text style={styles.prescriptionDate}>{date}</Text>
+            <Text style={styles.doctorName}>{doctorName}</Text>
+            <Text style={styles.doctorSpecialty}>{specialty}</Text>
           </View>
         </View>
-        {item.hasActiveMedications && (
-          <View style={styles.activeBadge}>
-            <Text style={styles.activeBadgeText}>Ativa</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.prescriptionDetails}>
-        {/* Lista de medicamentos (máximo 3, depois "e mais X") */}
-        <View style={styles.medicationsList}>
-          {item.medications.slice(0, 3).map((med, index) => (
-            <View key={med.id} style={styles.medicationItem}>
-              <SafeIcon name="ellipse" size={6} color={colors.primary} />
-              <Text style={styles.medicationItemText} numberOfLines={1}>
-                {med.name}
-                {med.dosage && ` - ${med.dosage}${med.unit || ''}`}
-              </Text>
-            </View>
-          ))}
-          {item.medications.length > 3 && (
-            <Text style={styles.moreMedicationsText}>
-              e mais {item.medications.length - 3} medicamento{item.medications.length - 3 > 1 ? 's' : ''}
-            </Text>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -359,30 +191,14 @@ const PrescriptionsScreen = ({ route, navigation }) => {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Botão Flutuante */}
-      {prescriptions.length > 0 && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={handleAddPrescription}
-          activeOpacity={0.8}
-        >
-          <SafeIcon name="add" size={28} color={colors.textWhite} />
-        </TouchableOpacity>
-      )}
-
-      {/* Botão de Adicionar quando vazio */}
-      {prescriptions.length === 0 && !loading && (
-        <View style={styles.emptyButtonContainer}>
-          <TouchableOpacity
-            style={styles.emptyButton}
-            onPress={handleAddPrescription}
-            activeOpacity={0.8}
-          >
-            <SafeIcon name="add" size={24} color={colors.white} />
-            <Text style={styles.emptyButtonText}>Cadastrar Primeira Receita</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Botão Flutuante para Adicionar Receita */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={handleAddPrescription}
+        activeOpacity={0.8}
+      >
+        <SafeIcon name="add" size={28} color={colors.white} />
+      </TouchableOpacity>
 
     </SafeAreaView>
   );
@@ -472,42 +288,19 @@ const styles = StyleSheet.create({
   prescriptionInfo: {
     flex: 1,
   },
-  medicationName: {
+  prescriptionDate: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   doctorName: {
-    fontSize: 14,
-    color: colors.gray600,
-  },
-  prescriptionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
     color: colors.text,
     marginBottom: 4,
   },
-  activeBadge: {
-    backgroundColor: colors.success + '20',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  activeBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.success,
-  },
-  prescriptionDetails: {
-    gap: 8,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  detailText: {
+  doctorSpecialty: {
     fontSize: 14,
     color: colors.gray600,
   },
@@ -540,55 +333,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 22,
   },
-  medicationCountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  medicationCount: {
-    fontSize: 13,
-    color: colors.gray600,
-  },
-  medicationsList: {
-    marginTop: 8,
-    gap: 6,
-  },
-  medicationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  medicationItemText: {
-    fontSize: 13,
-    color: colors.gray600,
-    flex: 1,
-  },
-  moreMedicationsText: {
-    fontSize: 12,
-    color: colors.gray400,
-    fontStyle: 'italic',
-    marginTop: 2,
-  },
-  emptyButtonContainer: {
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 20,
-  },
-  emptyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 8,
-  },
-  emptyButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.white,
-  },
   fab: {
     position: 'absolute',
     bottom: 24,
@@ -596,7 +340,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.primary,
+    backgroundColor: PASTEL_BLUE,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

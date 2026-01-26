@@ -80,8 +80,7 @@ class GroupMessageController extends Controller
                     'group_messages.is_read',
                     'group_messages.created_at',
                     'users.name as sender_name',
-                    'users.photo as sender_photo',
-                    'users.photo_url as sender_photo_url'
+                    'users.profile_photo as sender_photo'
                 )
                 ->orderBy('group_messages.created_at', 'asc')
                 ->get()
@@ -93,6 +92,13 @@ class GroupMessageController extends Controller
                         $imageUrl = url($imageUrl);
                     }
                     
+                    // Converter URL relativa em URL completa se necessário
+                    $photoUrl = $message->sender_photo;
+                    if ($photoUrl && !filter_var($photoUrl, FILTER_VALIDATE_URL)) {
+                        // Se for URL relativa, converter para URL completa
+                        $photoUrl = url(Storage::url($photoUrl));
+                    }
+                    
                     return [
                         'id' => $message->id,
                         'group_id' => $message->group_id,
@@ -100,8 +106,8 @@ class GroupMessageController extends Controller
                         'sender' => [
                             'id' => $message->sender_id,
                             'name' => $message->sender_name,
-                            'photo' => $message->sender_photo,
-                            'photo_url' => $message->sender_photo_url,
+                            'photo' => $photoUrl,
+                            'photo_url' => $photoUrl,
                         ],
                         'message' => $message->message,
                         'type' => $message->type ?? 'text',
@@ -240,8 +246,7 @@ class GroupMessageController extends Controller
                     'group_messages.is_read',
                     'group_messages.created_at',
                     'users.name as sender_name',
-                    'users.photo as sender_photo',
-                    'users.photo_url as sender_photo_url'
+                    'users.profile_photo as sender_photo'
                 )
                 ->first();
 
@@ -250,6 +255,13 @@ class GroupMessageController extends Controller
             if ($imageUrl && !filter_var($imageUrl, FILTER_VALIDATE_URL)) {
                 // Se for URL relativa, converter para URL completa
                 $imageUrl = url($imageUrl);
+            }
+            
+            // Converter URL relativa da foto do usuário em URL completa se necessário
+            $photoUrl = $message->sender_photo;
+            if ($photoUrl && !filter_var($photoUrl, FILTER_VALIDATE_URL)) {
+                // Se for URL relativa, converter para URL completa
+                $photoUrl = url(Storage::url($photoUrl));
             }
 
             return response()->json([
@@ -261,8 +273,8 @@ class GroupMessageController extends Controller
                     'sender' => [
                         'id' => $message->sender_id,
                         'name' => $message->sender_name,
-                        'photo' => $message->sender_photo,
-                        'photo_url' => $message->sender_photo_url,
+                        'photo' => $photoUrl,
+                        'photo_url' => $photoUrl,
                     ],
                     'message' => $message->message,
                     'type' => $message->type,

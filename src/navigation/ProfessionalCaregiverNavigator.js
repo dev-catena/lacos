@@ -20,6 +20,7 @@ import GroupContactsScreen from '../screens/Groups/GroupContactsScreen';
 import EditPatientDataScreen from '../screens/Groups/EditPatientDataScreen';
 import PanicSettingsScreen from '../screens/Groups/PanicSettingsScreen';
 import AddVitalSignsScreen from '../screens/Groups/AddVitalSignsScreen';
+import VitalSignsDetailScreen from '../screens/VitalSigns/VitalSignsDetailScreen';
 import AgendaScreen from '../screens/Groups/AgendaScreen';
 import AddAppointmentScreen from '../screens/Groups/AddAppointmentScreen';
 import AppointmentDetailsScreen from '../screens/Groups/AppointmentDetailsScreen';
@@ -36,6 +37,7 @@ import AddMedicationScreen from '../screens/Medications/AddMedicationScreen';
 import MedicationDetailsScreen from '../screens/Medications/MedicationDetailsScreen';
 import PrescriptionsScreen from '../screens/Prescriptions/PrescriptionsScreen';
 import PrescriptionDetailsScreen from '../screens/Prescriptions/PrescriptionDetailsScreen';
+import AddPrescriptionScreen from '../screens/Prescriptions/AddPrescriptionScreen';
 import ConsultationsScreen from '../screens/Consultations/ConsultationsScreen';
 import AddConsultationScreen from '../screens/Consultations/AddConsultationScreen';
 import ConsultationDetailsScreen from '../screens/Consultations/ConsultationDetailsScreen';
@@ -135,6 +137,13 @@ const HomeStack = () => {
         }}
       />
       <Stack.Screen 
+        name="VitalSignsDetail" 
+        component={VitalSignsDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Agenda" 
         component={AgendaScreen}
         options={{ 
@@ -186,6 +195,27 @@ const HomeStack = () => {
       <Stack.Screen 
         name="MedicationDetails" 
         component={MedicationDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Prescriptions" 
+        component={PrescriptionsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PrescriptionDetails" 
+        component={PrescriptionDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddPrescription" 
+        component={AddPrescriptionScreen}
         options={{ 
           headerShown: false 
         }}
@@ -402,6 +432,13 @@ const GroupsStack = () => {
         }}
       />
       <Stack.Screen 
+        name="VitalSignsDetail" 
+        component={VitalSignsDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Agenda" 
         component={AgendaScreen}
         options={{ 
@@ -453,6 +490,27 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="MedicationDetails" 
         component={MedicationDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Prescriptions" 
+        component={PrescriptionsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PrescriptionDetails" 
+        component={PrescriptionDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddPrescription" 
+        component={AddPrescriptionScreen}
         options={{ 
           headerShown: false 
         }}

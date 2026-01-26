@@ -102,7 +102,28 @@ const FREQUENCIES = [
 
 const AddMedicationScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
-  let { groupId, groupName, prescriptionId, doctorId, doctorName, prescriptionImage, medicationId, medication } = route.params;
+  let { groupId, groupName, prescriptionId: initialPrescriptionId, doctorId, doctorName, prescriptionImage: initialPrescriptionImage, medicationId, medication } = route.params;
+  
+  // Usar useState para manter prescriptionImage persistente durante a sessão
+  const [prescriptionImage, setPrescriptionImage] = useState(initialPrescriptionImage);
+  const [prescriptionId, setPrescriptionId] = useState(initialPrescriptionId);
+  
+  // Atualizar prescriptionImage quando route.params mudar (mas manter se já existir)
+  useEffect(() => {
+    if (initialPrescriptionImage && !prescriptionImage) {
+      setPrescriptionImage(initialPrescriptionImage);
+    }
+  }, [initialPrescriptionImage]);
+  
+  // Se não houver prescriptionId mas houver prescriptionImage, criar um ID único para esta sessão de receita
+  // Isso permite agrupar medicamentos da mesma receita
+  useEffect(() => {
+    if (!prescriptionId && prescriptionImage) {
+      const newPrescriptionId = `prescription_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setPrescriptionId(newPrescriptionId);
+      console.log('📋 AddMedicationScreen - Criando nova sessão de receita:', newPrescriptionId);
+    }
+  }, [prescriptionImage, prescriptionId]);
   
   // TEMPORÁRIO: Se groupId é um timestamp, usar o grupo de teste
   if (groupId && groupId > 999999999999) {
@@ -137,8 +158,20 @@ const AddMedicationScreen = ({ route, navigation }) => {
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef(null);
 
+  // Log quando o componente monta
+  useEffect(() => {
+    console.log('🔄 AddMedicationScreen - Componente montado', {
+      groupId,
+      doctorId,
+      doctorName,
+      prescriptionImage: !!prescriptionImage,
+      isEditing,
+    });
+  }, []);
+
   // Buscar sugestões de medicamentos
   const handleNameChange = async (text) => {
+    console.log('🔍 AddMedicationScreen - handleNameChange chamado com:', text);
     // Atualizar o nome
     setName(text);
     
@@ -352,6 +385,11 @@ const AddMedicationScreen = ({ route, navigation }) => {
       formData.append('document_date', new Date().toISOString());
       // consultation_id pode ser null se não houver consulta vinculada
       formData.append('consultation_id', '');
+      // Adicionar doctor_id se houver (pode ser de doctors ou users com profile='doctor')
+      if (doctorId) {
+        formData.append('doctor_id', doctorId.toString());
+        console.log('📋 AddMedicationScreen - Salvando receita com doctor_id:', doctorId, 'doctorName:', doctorName);
+      }
       formData.append('notes', doctorName 
         ? `Receita médica prescrita por ${doctorName} com medicamentos cadastrados`
         : 'Receita médica com medicamentos cadastrados');
@@ -382,7 +420,12 @@ const AddMedicationScreen = ({ route, navigation }) => {
 
   const handleSave = async () => {
     // Validações
-    if (!name.trim()) {
+    console.log('🔍 AddMedicationScreen - handleSave chamado');
+    console.log('🔍 AddMedicationScreen - name:', name, 'type:', typeof name, 'trimmed:', name?.trim());
+    console.log('🔍 AddMedicationScreen - form:', form, 'dosage:', dosage, 'doseQuantity:', doseQuantity);
+    
+    if (!name || !name.trim()) {
+      console.warn('⚠️ AddMedicationScreen - Nome do medicamento vazio');
       Alert.alert('Erro', 'Digite o nome do medicamento');
       return;
     }
@@ -442,7 +485,18 @@ const AddMedicationScreen = ({ route, navigation }) => {
         firstDoseAt: `${new Date().toISOString().split('T')[0]} ${firstDoseTime}:00`,
         durationType: durationType,
         durationValue: durationType === 'temporario' ? parseInt(durationDays) : null,
-        notes: instructions.trim() || null,
+        notes: (() => {
+          // Se houver prescriptionId, adicionar ao notes para agrupar medicamentos da mesma receita
+          let notesValue = instructions.trim() || '';
+          if (prescriptionId) {
+            // Adicionar prescriptionId no início das notes com um prefixo especial
+            // Formato: [PRESCRIPTION_ID:prescription_xxx] notas do usuário
+            const prescriptionMarker = `[PRESCRIPTION_ID:${prescriptionId}]`;
+            notesValue = notesValue ? `${prescriptionMarker} ${notesValue}` : prescriptionMarker;
+            console.log('📋 AddMedicationScreen - Adicionando prescriptionId ao medicamento:', prescriptionId);
+          }
+          return notesValue || null;
+        })(),
         isActive: true,
         startDate: calculatedStartDate, // Data inicial para dias intercalados
         endDate: calculatedEndDate, // Data final calculada para dias intercalados
@@ -469,71 +523,109 @@ const AddMedicationScreen = ({ route, navigation }) => {
           // Não bloqueia o salvamento
         }
 
-        Toast.show({
-          type: 'success',
-          text1: isEditing ? 'Medicamento atualizado' : 'Medicamento cadastrado',
-          text2: isEditing ? `${name} foi atualizado com sucesso` : `${name} foi adicionado com sucesso`,
-          position: 'bottom',
-        });
-
         // Se for edição, voltar para a tela de detalhes
         if (isEditing) {
+          Toast.show({
+            type: 'success',
+            text1: 'Medicamento atualizado',
+            text2: `${name} foi atualizado com sucesso`,
+            position: 'bottom',
+          });
           navigation.goBack();
           return;
         }
 
+        // Debug: verificar se prescriptionImage existe
+        console.log('📋 AddMedicationScreen - Após salvar medicamento:', {
+          prescriptionImage: !!prescriptionImage,
+          prescriptionImageValue: prescriptionImage,
+          prescriptionId,
+          doctorId,
+          doctorName,
+        });
+
         // Se estiver cadastrando uma receita (com prescriptionImage), oferecer opção de adicionar mais
         if (prescriptionImage) {
-          Alert.alert(
-            'Medicamento cadastrado!',
-            'Deseja adicionar outro medicamento desta receita?',
-            [
-              {
-                text: 'Finalizar Receita',
-                style: 'default',
-                onPress: async () => {
-                  // Salvar a receita como documento antes de finalizar
-                  await savePrescriptionAsDocument();
-                  // Voltar para a lista de medicamentos
-                  navigation.navigate('Medications', { groupId, groupName });
+          console.log('📋 AddMedicationScreen - prescriptionImage existe, mostrando Alert para adicionar mais medicamentos');
+          // Usar setTimeout para garantir que o Alert apareça após o Toast
+          setTimeout(() => {
+            Alert.alert(
+              'Medicamento cadastrado!',
+              'Deseja adicionar outro medicamento desta receita?',
+              [
+                {
+                  text: 'Finalizar Receita',
+                  style: 'default',
+                  onPress: async () => {
+                    // Salvar a receita como documento antes de finalizar
+                    await savePrescriptionAsDocument();
+                    Toast.show({
+                      type: 'success',
+                      text1: 'Receita finalizada',
+                      text2: 'Todos os medicamentos foram cadastrados',
+                      position: 'bottom',
+                    });
+                    // Voltar para a lista de medicamentos
+                    navigation.navigate('Medications', { groupId, groupName });
+                  },
                 },
-              },
-              {
-                text: 'Adicionar Outro',
-                style: 'default',
-                onPress: () => {
-                  // Limpar formulário mas manter dados da receita
-                  setName('');
-                  setForm('');
-                  setDosage('');
-                  setUnit('mg');
-                  setDoseQuantity('');
-                  setDoseQuantityUnit('');
-                  setAdministrationRoute('Oral');
-                  setFrequency('24');
-                  setFirstDoseTime('08:00');
-                  setInstructions('');
-                  setDurationType('continuo');
-                  setDurationDays('');
-                  setAdvancedFrequency(null);
-                  setIsFarmaciaPopular(false);
-                  
-                  // Manter na mesma tela para adicionar outro medicamento
-                  Toast.show({
-                    type: 'info',
-                    text1: 'Adicione o próximo medicamento',
-                    text2: 'Preencha os dados do próximo medicamento da receita',
-                    position: 'bottom',
-                  });
+                {
+                  text: 'Adicionar Outro',
+                  style: 'default',
+                  onPress: () => {
+                    console.log('📋 AddMedicationScreen - Usuário escolheu "Adicionar Outro", mantendo prescriptionImage e prescriptionId');
+                    // Limpar formulário mas manter dados da receita (incluindo prescriptionId e prescriptionImage)
+                    setName('');
+                    setForm('');
+                    setDosage('');
+                    setUnit('mg');
+                    setDoseQuantity('');
+                    setDoseQuantityUnit('');
+                    setAdministrationRoute('Oral');
+                    setFrequency('24');
+                    setFirstDoseTime('08:00');
+                    setInstructions('');
+                    setDurationType('continuo');
+                    setDurationDays('');
+                    setAdvancedFrequency(null);
+                    setIsFarmaciaPopular(false);
+                    
+                    // IMPORTANTE: prescriptionImage e prescriptionId são mantidos automaticamente
+                    // porque são variáveis do componente que não são resetadas
+                    // Manter na mesma tela para adicionar outro medicamento
+                    Toast.show({
+                      type: 'info',
+                      text1: 'Adicione o próximo medicamento',
+                      text2: 'Preencha os dados do próximo medicamento da receita',
+                      position: 'bottom',
+                    });
+                  },
                 },
-              },
-            ],
-            { cancelable: false }
-          );
+              ],
+              { cancelable: false }
+            );
+          }, 500); // Aguardar 500ms para o Toast aparecer primeiro
+          
+          // Mostrar Toast de sucesso
+          Toast.show({
+            type: 'success',
+            text1: 'Medicamento cadastrado',
+            text2: `${name} foi adicionado com sucesso`,
+            position: 'bottom',
+          });
         } else {
-          // Se não for receita, voltar normalmente
-          navigation.goBack();
-          navigation.goBack(); // Voltar para a tela de medicamentos
+          // Se não for receita, mostrar Toast e voltar normalmente
+          Toast.show({
+            type: 'success',
+            text1: 'Medicamento cadastrado',
+            text2: `${name} foi adicionado com sucesso`,
+            position: 'bottom',
+          });
+          // Aguardar um pouco antes de voltar para o Toast aparecer
+          setTimeout(() => {
+            navigation.goBack();
+            navigation.goBack(); // Voltar para a tela de medicamentos
+          }, 1000);
         }
       } else {
         Alert.alert('Erro', result.error || 'Não foi possível salvar o medicamento');

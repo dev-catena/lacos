@@ -695,6 +695,85 @@ class AdminDoctorController extends Controller
     }
 
     /**
+     * Obter dados completos do médico (ficha técnica)
+     * GET /api/admin/doctors/{id}
+     */
+    public function show($id)
+    {
+        try {
+            $doctor = User::where('id', $id)
+                ->where('profile', 'doctor')
+                ->firstOrFail();
+
+            // Buscar especialidade
+            $specialty = null;
+            if ($doctor->medical_specialty_id) {
+                $specialtyData = DB::table('medical_specialties')
+                    ->where('id', $doctor->medical_specialty_id)
+                    ->select('id', 'name')
+                    ->first();
+                if ($specialtyData) {
+                    $specialty = [
+                        'id' => $specialtyData->id,
+                        'name' => $specialtyData->name,
+                    ];
+                }
+            }
+
+            // Retornar todos os dados do médico (pessoais + profissionais)
+            return response()->json([
+                'id' => $doctor->id,
+                // Dados Pessoais
+                'name' => $doctor->name,
+                'last_name' => $doctor->last_name ?? null,
+                'email' => $doctor->email,
+                'phone' => $doctor->phone ?? null,
+                'cpf' => $doctor->cpf ?? null,
+                'birth_date' => $doctor->birth_date ?? null,
+                'gender' => $doctor->gender ?? null,
+                'address' => $doctor->address ?? null,
+                'address_number' => $doctor->address_number ?? null,
+                'address_complement' => $doctor->address_complement ?? null,
+                'city' => $doctor->city ?? null,
+                'state' => $doctor->state ?? null,
+                'zip_code' => $doctor->zip_code ?? null,
+                'neighborhood' => $doctor->neighborhood ?? null,
+                'photo' => $doctor->photo ?? null,
+                'photo_url' => $doctor->photo_url ?? null,
+                // Dados Profissionais
+                'crm' => $doctor->crm ?? null,
+                'medical_specialty_id' => $doctor->medical_specialty_id ?? null,
+                'medical_specialty' => $specialty,
+                'formation_details' => $doctor->formation_details ?? null,
+                'formation_description' => $doctor->formation_description ?? null,
+                'hourly_rate' => $doctor->hourly_rate ?? null,
+                'consultation_price' => $doctor->consultation_price ?? null,
+                'availability' => $doctor->availability ?? null,
+                'is_available' => $doctor->is_available ?? false,
+                'latitude' => $doctor->latitude ?? null,
+                'longitude' => $doctor->longitude ?? null,
+                // Status
+                'is_blocked' => (bool) ($doctor->is_blocked ?? false),
+                'approved_at' => $doctor->doctor_approved_at ?? null,
+                'is_activated' => $doctor->doctor_approved_at && 
+                                 ($doctor->doctor_activation_token === null || $doctor->doctor_activation_token === ''),
+                'created_at' => $doctor->created_at,
+                'updated_at' => $doctor->updated_at,
+            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'error' => 'Médico não encontrado',
+                'message' => 'O médico com o ID informado não existe'
+            ], 404, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Erro ao buscar dados do médico',
+                'message' => $e->getMessage()
+            ], 500, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+
+    /**
      * Excluir médico
      * DELETE /api/admin/doctors/{id}
      */

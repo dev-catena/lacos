@@ -16,7 +16,8 @@ return new class extends Migration
         Schema::table('documents', function (Blueprint $table) {
             // Adicionar colunas se não existirem
             if (!Schema::hasColumn('documents', 'doctor_id')) {
-                $table->foreignId('doctor_id')->nullable()->after('user_id')->constrained('doctors')->onDelete('set null');
+                // doctor_id sem foreign key para permitir apontar para doctors OU users (profile='doctor')
+                $table->unsignedBigInteger('doctor_id')->nullable()->after('user_id');
             }
             
             if (!Schema::hasColumn('documents', 'consultation_id')) {

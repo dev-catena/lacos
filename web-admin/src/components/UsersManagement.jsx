@@ -8,10 +8,22 @@ const UsersManagement = ({ currentUser, onLogout }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all'); // all, active, blocked
+  
+  // Carregar filtro salvo do localStorage ou usar 'all' como padrão
+  const getInitialFilter = () => {
+    const savedFilter = localStorage.getItem('@lacos:usersFilter');
+    return savedFilter || 'all';
+  };
+  
+  const [filter, setFilter] = useState(getInitialFilter()); // all, active, blocked
   const [searchText, setSearchText] = useState('');
   const [sortColumn, setSortColumn] = useState('name'); // Coluna para ordenar
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' ou 'desc'
+
+  // Salvar filtro no localStorage sempre que mudar
+  useEffect(() => {
+    localStorage.setItem('@lacos:usersFilter', filter);
+  }, [filter]);
 
   useEffect(() => {
     loadUsers();

@@ -1,35 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
+import consultationService from '../../services/consultationService';
 
 const ConsultationDetailsScreen = ({ route, navigation }) => {
   const { consultationId, groupId, groupName } = route.params || {};
+  const [consultation, setConsultation] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data
-  const [consultation] = useState({
-    id: consultationId,
-    type: 'medical',
-    title: 'Consulta Cardiologista',
-    doctorName: 'Dr. João Silva',
-    date: '2025-11-23T14:30:00',
-    location: 'Hospital Santa Casa',
-    summary: 'Avaliação cardiovascular de rotina',
-    diagnosis: 'Pressão arterial ligeiramente elevada',
-    treatment: 'Losartana 50mg - 1x ao dia',
-    notes: 'Retorno em 3 meses',
-    audios: [],
-    documents: [],
-    exams: [],
-  });
+  useFocusEffect(
+    React.useCallback(() => {
+      loadConsultation();
+    }, [consultationId])
+  );
+
+  const loadConsultation = async () => {
+    if (!consultationId) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await consultationService.getConsultation(consultationId);
+      
+      if (result.success && result.data) {
+        setConsultation(result.data);
+      } else {
+        console.error('Erro ao carregar consulta:', result.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar consulta:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = () => {
+    if (consultation) {
+      navigation.navigate('AddConsultation', {
+        consultationId: consultation.id,
+        consultation: consultation,
+        groupId,
+        groupName,
+      });
+    }
+  };
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
@@ -55,12 +82,25 @@ const ConsultationDetailsScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detalhes da Consulta</Text>
-        <TouchableOpacity style={styles.editButton}>
+        <TouchableOpacity 
+          style={styles.editButton}
+          onPress={handleEdit}
+        >
           <Ionicons name="create-outline" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : !consultation ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="document-text-outline" size={64} color={colors.gray300} />
+          <Text style={styles.emptyText}>Consulta não encontrada</Text>
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
         {/* Título e Data */}
         <View style={styles.section}>
           <Text style={styles.title}>{consultation.title}</Text>
@@ -141,7 +181,8 @@ const ConsultationDetailsScreen = ({ route, navigation }) => {
         </View>
 
         <View style={{ height: 40 }} />
-      </ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };

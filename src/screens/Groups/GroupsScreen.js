@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Pressable,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -520,52 +521,59 @@ const GroupsScreen = ({ navigation, route }) => {
         animationType="slide"
         transparent={true}
         onRequestClose={() => setInviteModalVisible(false)}
+        statusBarTranslucent={true}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        <TouchableOpacity 
+          activeOpacity={1}
           style={styles.modalOverlay}
+          onPress={() => setInviteModalVisible(false)}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Entrar no Grupo</Text>
-              <TouchableOpacity
-                onPress={() => setInviteModalVisible(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalBody}>
-              <Text style={styles.modalLabel}>
-                Digite o código de convite que você recebeu:
-              </Text>
-              
-              <View style={styles.codeInputContainer}>
-                <Ionicons name="key-outline" size={20} color={colors.gray400} />
-                <TextInput
-                  style={styles.codeInput}
-                  placeholder="Ex: ABC123XYZ"
-                  placeholderTextColor={colors.gray400}
-                  value={inviteCode}
-                  onChangeText={setInviteCode}
-                  autoCapitalize="characters"
-                  maxLength={20}
-                />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Entrar no Grupo</Text>
+                <TouchableOpacity
+                  onPress={() => setInviteModalVisible(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
               </View>
 
-              <TouchableOpacity
-                style={[styles.joinButton, joiningGroup && styles.joinButtonDisabled]}
-                onPress={handleJoinWithCode}
-                disabled={joiningGroup}
-              >
-                <Text style={styles.joinButtonText}>
-                  {joiningGroup ? 'Entrando...' : 'Entrar no Grupo'}
+              <View style={styles.modalBody}>
+                <Text style={styles.modalLabel}>
+                  Digite o código de convite que você recebeu:
                 </Text>
-              </TouchableOpacity>
+                
+                <View style={styles.codeInputContainer}>
+                  <Ionicons name="key-outline" size={20} color={colors.gray400} />
+                  <TextInput
+                    style={styles.codeInput}
+                    placeholder="Ex: ABC123XYZ"
+                    placeholderTextColor={colors.gray400}
+                    value={inviteCode}
+                    onChangeText={setInviteCode}
+                    autoCapitalize="characters"
+                    maxLength={20}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.joinButton, joiningGroup && styles.joinButtonDisabled]}
+                  onPress={handleJoinWithCode}
+                  disabled={joiningGroup}
+                >
+                  <Text style={styles.joinButtonText}>
+                    {joiningGroup ? 'Entrando...' : 'Entrar no Grupo'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -812,10 +820,11 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    zIndex: 1000,
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
@@ -823,11 +832,14 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
     overflow: 'hidden',
+    zIndex: 1001,
+    minHeight: 200,
+    position: 'relative',
   },
   modalHeader: {
     flexDirection: 'row',

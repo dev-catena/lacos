@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,21 +7,60 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../../constants/colors';
 import SafeIcon from '../../components/SafeIcon';
+import prescriptionService from '../../services/prescriptionService';
+import Toast from 'react-native-toast-message';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 
 moment.locale('pt-br');
 
 const PrescriptionDetailsScreen = ({ route, navigation }) => {
-  const { prescription, groupId, groupName } = route.params || {};
+  const { prescription, prescriptionId, groupId, groupName } = route.params || {};
   const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(false);
+  const [prescriptionData, setPrescriptionData] = useState(prescription);
 
-  if (!prescription) {
+  useEffect(() => {
+    // Se tiver prescriptionId mas não tiver prescription, buscar da API
+    if (prescriptionId && !prescription) {
+      loadPrescription();
+    }
+  }, [prescriptionId]);
+
+  const loadPrescription = async () => {
+    try {
+      setLoading(true);
+      const result = await prescriptionService.getPrescription(prescriptionId);
+      if (result.success && result.data) {
+        setPrescriptionData(result.data);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Erro ao carregar receita',
+          text2: result.error || 'Tente novamente',
+        });
+        navigation.goBack();
+      }
+    } catch (error) {
+      console.error('Erro ao carregar receita:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro ao carregar receita',
+        text2: error.message || 'Tente novamente',
+      });
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!prescriptionData) {
     return (
       <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
         <StatusBar style="dark" />
@@ -36,7 +75,11 @@ const PrescriptionDetailsScreen = ({ route, navigation }) => {
           <View style={styles.placeholder} />
         </View>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Receita não encontrada</Text>
+          {loading ? (
+            <ActivityIndicator size="large" color={colors.primary} />
+          ) : (
+            <Text style={styles.emptyText}>Receita não encontrada</Text>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -83,7 +126,20 @@ const PrescriptionDetailsScreen = ({ route, navigation }) => {
           <Text style={styles.headerTitle}>Receita Médica</Text>
           <Text style={styles.headerSubtitle}>{groupName}</Text>
         </View>
-        <View style={styles.placeholder} />
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => {
+            navigation.navigate('AddPrescription', {
+              prescriptionId: prescriptionData.id,
+              prescription: prescriptionData,
+              groupId,
+              groupName,
+              isEditing: true,
+            });
+          }}
+        >
+          <SafeIcon name="create-outline" size={24} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -101,7 +157,7 @@ const PrescriptionDetailsScreen = ({ route, navigation }) => {
           </View>
           <View style={styles.sectionContent}>
             <Text style={styles.prescriptionTitle}>
-              {formatPrescriptionTitle(prescription)}
+              {formatPrescriptionTitle(prescriptionData)}
             </Text>
           </View>
         </View>
@@ -114,11 +170,11 @@ const PrescriptionDetailsScreen = ({ route, navigation }) => {
               <SafeIcon name="medical-outline" size={20} color={colors.primary} />
             </View>
             <Text style={styles.sectionTitle}>
-              Medicamentos ({prescription.medications.length})
+              Medicamentos ({(prescriptionData.medications || []).length})
             </Text>
           </View>
           <View style={styles.medicationsContainer}>
-            {prescription.medications.map((medication, index) => (
+            {(prescriptionData.medications || []).map((medication, index) => (
               <TouchableOpacity
                 key={medication.id}
                 style={styles.medicationCard}
@@ -203,6 +259,12 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
+  },
+  editButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,

@@ -195,17 +195,33 @@ class DocumentController extends Controller
             }
 
             // Processar doctor_id (pode vir como string vazia)
+            // Pode ser da tabela doctors ou users com profile='doctor'
             $doctorId = $request->input('doctor_id');
             if ($doctorId === '' || $doctorId === null || $doctorId === '0') {
                 $doctorId = null;
             } else {
                 $doctorId = (int) $doctorId;
-                // Verificar se o doctor existe (se a tabela existir)
+                $doctorExists = false;
+                
+                // Verificar se o doctor existe na tabela doctors
                 if (\Schema::hasTable('doctors')) {
                     $doctorExists = \DB::table('doctors')->where('id', $doctorId)->exists();
-                    if (!$doctorExists) {
-                        $doctorId = null; // Se não existir, definir como null
-                    }
+                }
+                
+                // Se não encontrou em doctors, verificar se é médico da plataforma (users com profile='doctor')
+                if (!$doctorExists && \Schema::hasTable('users')) {
+                    $doctorExists = \DB::table('users')
+                        ->where('id', $doctorId)
+                        ->where('profile', 'doctor')
+                        ->exists();
+                }
+                
+                // Se não encontrou em nenhum lugar, definir como null
+                if (!$doctorExists) {
+                    \Log::warning('DocumentController.store - doctor_id não encontrado em doctors nem em users: ' . $doctorId);
+                    $doctorId = null;
+                } else {
+                    \Log::info('DocumentController.store - doctor_id válido encontrado: ' . $doctorId);
                 }
             }
 
@@ -224,9 +240,11 @@ class DocumentController extends Controller
                 'notes' => $request->input('notes'),
             ];
             
-            // Adicionar doctor_id apenas se a coluna existir
+            // Adicionar doctor_id se for válido (pode ser de doctors ou users com profile='doctor')
+            // A foreign key foi removida, então podemos salvar IDs de ambas as tabelas
             if ($doctorId !== null) {
                 $documentData['doctor_id'] = $doctorId;
+                \Log::info('DocumentController.store - doctor_id salvo: ' . $doctorId . ' (pode ser de doctors ou users)');
             }
             
             // Adicionar consultation_id se fornecido

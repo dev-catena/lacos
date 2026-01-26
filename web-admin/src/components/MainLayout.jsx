@@ -8,6 +8,7 @@ const MainLayout = ({ activeSection, onSectionChange, children, user, onLogout }
     { id: 'doctors', label: 'Médicos', icon: 'medical' },
     { id: 'plans', label: 'Planos', icon: 'receipt' },
     { id: 'suppliers', label: 'Fornecedores', icon: 'store' },
+    { id: 'recording', label: 'Gravação', icon: 'mic' },
   ];
 
   return (

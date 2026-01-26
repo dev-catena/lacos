@@ -36,6 +36,7 @@ import {
   FlaskOutlineIcon,
   FitnessOutlineIcon,
   EyeIcon,
+  EyeOffIcon,
   SearchIcon,
   ImagesIcon,
   CloseCircleIcon,
@@ -54,6 +55,11 @@ import {
   NotificationsOutlineIcon,
   LogOutOutlineIcon,
   HelpCircleOutlineIcon,
+  PlayIcon,
+  PauseIcon,
+  PlayCircleIcon,
+  PauseCircleIcon,
+  MusicalNotesIcon,
 } from './CustomIcons';
 
 /**
@@ -132,6 +138,8 @@ const iconMap = {
   'cube-outline': MedicalIcon, // Supositório/Óvulo - usar ícone médico como fallback
   'airplane-outline': MedicalIcon, // Spray/Inalável - usar ícone médico como fallback
   'eye-outline': EyeIcon, // Colírio - usar ícone de olho
+  'eye': EyeIcon, // Olho aberto - mostrar senha
+  'eye-off': EyeOffIcon, // Olho fechado - ocultar senha
   // Ícones de busca e mídia
   'search': SearchIcon, // Lupa para busca
   'images': ImagesIcon, // Galeria de imagens
@@ -158,8 +166,15 @@ const iconMap = {
   'star': CheckmarkCircleIcon, // Estrela/favorito
   // Ícones para PanicSettingsScreen
   'mic-outline': MicIcon, // Microfone
+  'mic': MicIcon, // Microfone (preenchido)
   'hand-left-outline': PersonIcon, // Mão (usar PersonIcon como fallback)
   'checkmark-circle-outline': CheckmarkCircleIcon, // Checkmark círculo outline
+  // Ícones de áudio/playback
+  'play': PlayIcon, // Play
+  'pause': PauseIcon, // Pause
+  'play-circle': PlayCircleIcon, // Play em círculo
+  'pause-circle': PauseCircleIcon, // Pause em círculo
+  'musical-notes': MusicalNotesIcon, // Notas musicais
   // Ícones para EditPersonalDataScreen
   'home-outline': HomeIcon, // Casa/endereço
   // Ícones para NotificationPreferencesScreen

@@ -39,25 +39,78 @@ const SelectDoctorScreen = ({ route, navigation }) => {
   // Recarregar médicos quando a tela ganhar foco (após cadastrar novo médico)
   useFocusEffect(
     React.useCallback(() => {
+      console.log('🔄 SelectDoctorScreen - useFocusEffect acionado, recarregando médicos...');
       loadDoctors();
     }, [groupId])
   );
 
+  // Também carregar quando o componente montar
+  useEffect(() => {
+    console.log('🔄 SelectDoctorScreen - useEffect acionado, carregando médicos...');
+    loadDoctors();
+  }, [groupId]);
+
   const loadDoctors = async () => {
     try {
       setLoading(true);
-      const response = await doctorService.getDoctors(groupId);
+      console.log('🔍 SelectDoctorScreen - Carregando médicos para grupo:', groupId);
       
-      if (response && response.success && response.data) {
-        setAllDoctors(response.data);
-        filterDoctors(response.data, searchQuery);
-        console.log(`✅ SelectDoctorScreen - ${response.data.length} médico(s) carregado(s)`);
-      } else {
+      if (!groupId) {
+        console.warn('⚠️ SelectDoctorScreen - groupId não fornecido');
         setAllDoctors([]);
         setDoctors([]);
+        setLoading(false);
+        return;
       }
+      
+      // O backend já retorna médicos do grupo E médicos da plataforma em uma única resposta
+      const response = await doctorService.getDoctors(groupId);
+      
+      console.log('📥 SelectDoctorScreen - Resposta completa:', JSON.stringify(response, null, 2));
+      
+      // Tratar diferentes formatos de resposta
+      let doctorsList = [];
+      
+      if (Array.isArray(response)) {
+        doctorsList = response;
+        console.log('✅ SelectDoctorScreen - Resposta é array direto, médicos:', doctorsList.length);
+      } else if (response && response.success && response.data) {
+        if (Array.isArray(response.data)) {
+          doctorsList = response.data;
+          console.log('✅ SelectDoctorScreen - Dados recebidos do formato padrão:', doctorsList.length);
+        } else {
+          console.warn('⚠️ SelectDoctorScreen - response.data não é array:', typeof response.data);
+        }
+      } else if (response && response.data && Array.isArray(response.data)) {
+        doctorsList = response.data;
+        console.log('✅ SelectDoctorScreen - Dados recebidos do formato alternativo:', doctorsList.length);
+      }
+      
+      // Ordenar: médico assistente primeiro (is_primary=true), depois por nome
+      const allDoctors = doctorsList.sort((a, b) => {
+        // Ordenar: médicos principais (is_primary=true) primeiro
+        if (a.is_primary && !b.is_primary) return -1;
+        if (!a.is_primary && b.is_primary) return 1;
+        // Depois ordenar por nome
+        return a.name.localeCompare(b.name);
+      });
+      
+      console.log('✅ SelectDoctorScreen - Total de médicos processados:', allDoctors.length);
+      console.log('✅ SelectDoctorScreen - Médicos ordenados:', allDoctors.map(d => ({
+        id: d.id,
+        name: d.name,
+        is_primary: d.is_primary,
+        is_group_doctor: d.is_group_doctor,
+        is_platform_doctor: d.is_platform_doctor
+      })));
+      
+      setAllDoctors(allDoctors);
+      filterDoctors(allDoctors, searchQuery);
+      console.log(`✅ SelectDoctorScreen - ${allDoctors.length} médico(s) carregado(s) e exibidos`);
     } catch (error) {
       console.error('❌ SelectDoctorScreen - Erro ao carregar médicos:', error);
+      console.error('❌ SelectDoctorScreen - Stack trace:', error.stack);
+      console.error('❌ SelectDoctorScreen - Error message:', error.message);
       setAllDoctors([]);
       setDoctors([]);
     } finally {
@@ -164,15 +217,34 @@ const SelectDoctorScreen = ({ route, navigation }) => {
   };
 
   const handleSelectDoctor = (doctor) => {
-    // Navegar direto para cadastro de medicamento com o médico selecionado e a imagem da receita
-    navigation.navigate('AddMedication', { 
-      groupId, 
-      groupName, 
-      prescriptionId: null,
-      doctorId: doctor.id,
-      doctorName: doctor.name,
-      prescriptionImage: prescriptionImage, // Passar a imagem da receita
-    });
+    const { returnTo } = route.params || {};
+    
+    // Se houver returnTo, retornar o médico selecionado para a tela anterior
+    if (returnTo === 'AddPrescription') {
+      navigation.navigate(returnTo, {
+        groupId,
+        groupName,
+        selectedDoctor: doctor,
+      });
+    } else if (prescriptionImage) {
+      // Navegar direto para cadastro de medicamento com o médico selecionado e a imagem da receita
+      navigation.navigate('AddMedication', { 
+        groupId, 
+        groupName, 
+        prescriptionId: null,
+        doctorId: doctor.id,
+        doctorName: doctor.name,
+        prescriptionImage: prescriptionImage, // Passar a imagem da receita
+      });
+    } else {
+      // Comportamento padrão: navegar para AddMedication
+      navigation.navigate('AddMedication', { 
+        groupId, 
+        groupName, 
+        doctorId: doctor.id,
+        doctorName: doctor.name,
+      });
+    }
   };
 
   const handleAddNewDoctor = () => {
@@ -287,14 +359,24 @@ const SelectDoctorScreen = ({ route, navigation }) => {
               {doctors.map((doctor) => (
                 <TouchableOpacity
                   key={doctor.id}
-                  style={styles.doctorCard}
+                  style={[styles.doctorCard, doctor.is_primary && styles.doctorCardPrimary]}
                   onPress={() => handleSelectDoctor(doctor)}
                 >
                   <View style={styles.doctorIcon}>
-                    <SafeIcon name="medical" size={32} color={colors.secondary} />
+                    <SafeIcon name="medical" size={32} color={doctor.is_primary ? colors.primary : colors.secondary} />
                   </View>
                   <View style={styles.doctorInfo}>
-                    <Text style={styles.doctorName}>{doctor.name}</Text>
+                    <View style={styles.doctorNameRow}>
+                      <Text style={[styles.doctorName, doctor.is_primary && styles.doctorNamePrimary]}>
+                        {doctor.name}
+                      </Text>
+                      {doctor.is_primary && (
+                        <View style={styles.primaryBadge}>
+                          <SafeIcon name="star" size={14} color={colors.primary} />
+                          <Text style={styles.primaryBadgeText}>Assistente</Text>
+                        </View>
+                      )}
+                    </View>
                     {doctor.medical_specialty?.name && (
                       <Text style={styles.doctorSpecialty}>{doctor.medical_specialty.name}</Text>
                     )}
@@ -400,6 +482,11 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  doctorCardPrimary: {
+    backgroundColor: colors.primary + '08',
+    borderColor: colors.primary + '30',
+    borderWidth: 1.5,
+  },
   doctorIcon: {
     width: 56,
     height: 56,
@@ -412,11 +499,35 @@ const styles = StyleSheet.create({
   doctorInfo: {
     flex: 1,
   },
+  doctorNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+    flexWrap: 'wrap',
+  },
   doctorName: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 4,
+  },
+  doctorNamePrimary: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  primaryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary + '15',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  primaryBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primary,
   },
   doctorSpecialty: {
     fontSize: 14,

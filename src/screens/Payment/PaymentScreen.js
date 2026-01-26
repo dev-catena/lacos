@@ -1,871 +1,373 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../../constants/colors';
-import { ArrowBackIcon } from '../../components/CustomIcons';
-import doctorService from '../../services/doctorService';
-import userService from '../../services/userService';
-import appointmentService from '../../services/appointmentService';
+import SafeIcon from '../../components/SafeIcon';
 import paymentService from '../../services/paymentService';
-import { validateCardNumber, validateExpiry, validateCvv, getCardBrand } from '../../config/stripe';
+import Toast from 'react-native-toast-message';
+import moment from 'moment';
+import 'moment/locale/pt-br';
 
+moment.locale('pt-br');
+
+/**
+ * [MOCK] Tela de Pagamento - Mockup para testes
+ * 
+ * Esta tela simula o processo de pagamento de uma teleconsulta.
+ * Em produção, esta tela deve ser substituída pela integração real com gateway de pagamento.
+ * 
+ * TAG: [MOCK]
+ */
 const PaymentScreen = ({ route, navigation }) => {
-  const { appointmentId, appointment, groupId } = route.params || {};
+  const { appointment, groupId, groupName } = route.params || {};
+  const insets = useSafeAreaInsets();
+
   const [loading, setLoading] = useState(false);
-  const [loadingPrice, setLoadingPrice] = useState(true);
+  const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [cardNumber, setCardNumber] = useState('');
   const [cardName, setCardName] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
   const [installments, setInstallments] = useState(1);
-  const [consultationPrice, setConsultationPrice] = useState(0);
-  const [finalPrice, setFinalPrice] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(10 * 60); // 10 minutos em segundos
-  const [timeExpired, setTimeExpired] = useState(false);
 
-  useEffect(() => {
-    loadDoctorPrice();
-    startPaymentTimer();
+  // Calcular valor total da consulta (valor do médico + 20% da plataforma)
+  // SEMPRE calcular baseado no consultation_price do médico, não confiar no amount
+  const calculateTotalAmount = () => {
+    // Buscar o valor original da consulta do médico
+    const consultationPrice = appointment?.doctorUser?.consultation_price || 
+                              appointment?.doctor?.consultation_price || 
+                              100.00;
     
-    // Cleanup do timer quando o componente desmontar
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, []);
-
-  const timerRef = useRef(null);
-
-  const startPaymentTimer = () => {
-    // Obter a data de criação do appointment
-    // Priorizar created_at que é quando o appointment foi realmente criado
-    const appointmentCreatedAt = appointment?.created_at || appointment?.scheduled_at;
-    
-    if (!appointmentCreatedAt) {
-      console.warn('⚠️ PaymentScreen - Não foi possível obter data de criação, iniciando com 10 minutos');
-      setTimeRemaining(10 * 60);
-      startCountdown();
-      return;
-    }
-    
-    // Criar objeto Date a partir da string (pode estar em UTC)
-    const createdAt = new Date(appointmentCreatedAt);
-    const now = new Date();
-    
-    // Verificar se as datas são válidas
-    if (isNaN(createdAt.getTime())) {
-      console.error('❌ PaymentScreen - Data de criação inválida:', appointmentCreatedAt);
-      setTimeRemaining(10 * 60);
-      startCountdown();
-      return;
-    }
-    
-    // Calcular o tempo decorrido desde a criação (em segundos)
-    const elapsedSeconds = Math.floor((now - createdAt) / 1000);
-    const PAYMENT_TIMEOUT_SECONDS = 10 * 60; // 10 minutos = 600 segundos
-    const initialTimeRemaining = Math.max(0, PAYMENT_TIMEOUT_SECONDS - elapsedSeconds);
-    
-    console.log('⏰ PaymentScreen - Iniciando timer de pagamento:', {
-      appointmentCreatedAt,
-      createdAt: createdAt.toISOString(),
-      createdAtLocal: createdAt.toLocaleString('pt-BR'),
-      now: now.toISOString(),
-      nowLocal: now.toLocaleString('pt-BR'),
-      elapsedSeconds,
-      elapsedMinutes: (elapsedSeconds / 60).toFixed(2),
-      PAYMENT_TIMEOUT_SECONDS,
-      initialTimeRemaining,
-      initialTimeRemainingMinutes: (initialTimeRemaining / 60).toFixed(2),
-      formattedTime: formatTime(initialTimeRemaining),
-    });
-    
-    if (initialTimeRemaining <= 0) {
-      console.log('⏰ PaymentScreen - Tempo já expirado ao iniciar');
-      setTimeExpired(true);
-      handleTimeExpired();
-      return;
-    }
-    
-    setTimeRemaining(initialTimeRemaining);
-    startCountdown();
+    // Calcular valor total: consultation_price * 1.20 (consulta + 20% taxa da plataforma)
+    return Math.round(consultationPrice * 1.20 * 100) / 100;
   };
+  
+  const amount = calculateTotalAmount();
 
-  const startCountdown = () => {
-    // Atualizar o timer a cada segundo
-    timerRef.current = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          setTimeExpired(true);
-          handleTimeExpired();
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const handleTimeExpired = async () => {
-    try {
-      console.log('⏰ PaymentScreen - Tempo de pagamento expirado, desbloqueando horário...');
-      
-      // Cancelar o appointment para liberar o horário
-      if (appointmentId) {
-        const appointmentService = (await import('../../services/appointmentService')).default;
-        const result = await appointmentService.deleteAppointment(appointmentId);
-        if (!result.success) {
-          console.error('❌ PaymentScreen - Erro ao deletar appointment:', result.error);
-        }
-      }
-      
-      Alert.alert(
-        'Tempo Esgotado',
-        'O tempo para realizar o pagamento expirou. O horário foi liberado para outros pacientes.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              navigation.goBack();
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('❌ PaymentScreen - Erro ao desbloquear horário:', error);
-      Alert.alert(
-        'Tempo Esgotado',
-        'O tempo para realizar o pagamento expirou. O horário foi liberado.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              navigation.goBack();
-            },
-          },
-        ]
-      );
-    }
-  };
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
-  const loadDoctorPrice = async () => {
-    try {
-      setLoadingPrice(true);
-      
-      // Primeiro, tentar buscar o appointment completo pelo ID para obter mais dados
-      let fullAppointment = appointment;
-      if (appointmentId && appointment) {
-        try {
-          console.log('💳 PaymentScreen - Buscando appointment completo pelo ID:', appointmentId);
-          const appointmentResult = await appointmentService.getAppointment(appointmentId);
-          if (appointmentResult && appointmentResult.success && appointmentResult.data) {
-            fullAppointment = appointmentResult.data;
-            console.log('✅ PaymentScreen - Appointment completo obtido:', {
-              hasDoctorUser: !!fullAppointment?.doctorUser,
-              doctorUserKeys: fullAppointment?.doctorUser ? Object.keys(fullAppointment.doctorUser) : [],
-              consultation_price: fullAppointment?.doctorUser?.consultation_price,
-            });
-          }
-        } catch (error) {
-          console.warn('⚠️ PaymentScreen - Erro ao buscar appointment completo:', error);
-        }
-      }
-      
-      // Obter o ID do médico do appointment
-      const doctorId = 
-        fullAppointment?.doctor_id || 
-        fullAppointment?.doctorUser?.id || 
-        fullAppointment?.doctor?.id ||
-        fullAppointment?.doctor?.user_id;
-
-      console.log('💳 PaymentScreen - Iniciando busca de preço:', {
-        doctorId,
-        appointmentId: fullAppointment?.id,
-        hasAppointment: !!fullAppointment,
-        appointmentKeys: fullAppointment ? Object.keys(fullAppointment) : [],
-      });
-
-      if (!doctorId) {
-        console.warn('⚠️ PaymentScreen - ID do médico não encontrado no appointment');
-        console.warn('⚠️ PaymentScreen - Appointment completo:', JSON.stringify(fullAppointment, null, 2));
-        // Usar valor padrão se não encontrar o médico
-        const defaultPrice = 150;
-        setConsultationPrice(defaultPrice);
-        setFinalPrice(calculateFinalPrice(defaultPrice));
-        setLoadingPrice(false);
-        return;
-      }
-
-      let doctor = null;
-      let consultationPriceFound = false;
-
-      // Verificar primeiro se o appointment completo já traz consultation_price
-      // Tentar appointment.doctor.user.consultation_price (novo formato do backend)
-      if (fullAppointment?.doctor?.user?.consultation_price !== undefined && 
-          fullAppointment?.doctor?.user?.consultation_price !== null) {
-        doctor = fullAppointment.doctor.user;
-        consultationPriceFound = true;
-        console.log('✅ PaymentScreen - consultation_price encontrado no appointment.doctor.user:', {
-          consultation_price: doctor.consultation_price,
-        });
-      } else if (fullAppointment?.doctor_user?.consultation_price !== undefined && 
-                 fullAppointment?.doctor_user?.consultation_price !== null) {
-        // Verificar se doctor_user é um objeto ou apenas um ID
-        if (typeof fullAppointment.doctor_user === 'object' && fullAppointment.doctor_user !== null) {
-          doctor = fullAppointment.doctor_user;
-          consultationPriceFound = true;
-          console.log('✅ PaymentScreen - consultation_price encontrado no appointment.doctor_user (objeto):', {
-            consultation_price: doctor.consultation_price,
-          });
-        }
-      } else if (fullAppointment?.doctorUser?.consultation_price !== undefined && 
-                 fullAppointment?.doctorUser?.consultation_price !== null) {
-        doctor = fullAppointment.doctorUser;
-        consultationPriceFound = true;
-        console.log('✅ PaymentScreen - consultation_price encontrado no appointment.doctorUser:', {
-          consultation_price: doctor.consultation_price,
-        });
-      } else if (fullAppointment?.doctor?.consultation_price !== undefined && 
-                 fullAppointment?.doctor?.consultation_price !== null) {
-        doctor = fullAppointment.doctor;
-        consultationPriceFound = true;
-        console.log('✅ PaymentScreen - consultation_price encontrado no appointment.doctor:', {
-          consultation_price: doctor.consultation_price,
-        });
-      }
-      
-      // Log detalhado do appointment para debug
-      console.log('💳 PaymentScreen - Estrutura completa do appointment:', {
-        hasDoctor: !!fullAppointment?.doctor,
-        doctorKeys: fullAppointment?.doctor ? Object.keys(fullAppointment.doctor) : [],
-        hasDoctorUser: !!fullAppointment?.doctorUser,
-        doctorUserKeys: fullAppointment?.doctorUser ? Object.keys(fullAppointment.doctorUser) : [],
-        hasDoctor_user: !!fullAppointment?.doctor_user,
-        doctor_userType: typeof fullAppointment?.doctor_user,
-        doctor_userKeys: fullAppointment?.doctor_user && typeof fullAppointment.doctor_user === 'object' ? Object.keys(fullAppointment.doctor_user) : [],
-        allAppointmentKeys: fullAppointment ? Object.keys(fullAppointment) : [],
-      });
-
-      // Se não encontrou, tentar buscar appointments do mesmo médico para pegar consultation_price
-      if (!consultationPriceFound && doctorId) {
-        try {
-          console.log('💳 PaymentScreen - Buscando outros appointments do mesmo médico para obter consultation_price');
-          const today = new Date();
-          const startDate = new Date(today);
-          startDate.setDate(today.getDate() - 30);
-          const endDate = new Date(today);
-          endDate.setDate(today.getDate() + 90);
-          
-          const appointmentsResult = await appointmentService.getAppointments(
-            null, // groupId = null para buscar todas
-            startDate.toISOString().split('T')[0],
-            endDate.toISOString().split('T')[0]
-          );
-          
-          if (appointmentsResult.success && appointmentsResult.data) {
-            // Procurar um appointment do mesmo médico que tenha consultation_price
-            const doctorAppointment = appointmentsResult.data.find(apt => {
-              const aptDoctorId = apt.doctor_id || apt.doctorUser?.id || apt.doctor?.id || apt.doctor?.user_id;
-              return aptDoctorId === doctorId && 
-                     (apt.doctor?.user?.consultation_price !== undefined && apt.doctor?.user?.consultation_price !== null ||
-                      apt.doctorUser?.consultation_price !== undefined && apt.doctorUser?.consultation_price !== null ||
-                      apt.doctor?.consultation_price !== undefined && apt.doctor?.consultation_price !== null);
-            });
-            
-            if (doctorAppointment) {
-              // Priorizar doctor.user.consultation_price (novo formato do backend)
-              if (doctorAppointment.doctor?.user?.consultation_price !== undefined && 
-                  doctorAppointment.doctor?.user?.consultation_price !== null) {
-                doctor = { ...doctor, ...doctorAppointment.doctor.user };
-                consultationPriceFound = true;
-                console.log('✅ PaymentScreen - consultation_price encontrado em outro appointment.doctor.user:', {
-                  consultation_price: doctor.consultation_price,
-                });
-              } else if (doctorAppointment.doctorUser?.consultation_price !== undefined && 
-                         doctorAppointment.doctorUser?.consultation_price !== null) {
-                doctor = { ...doctor, ...doctorAppointment.doctorUser };
-                consultationPriceFound = true;
-                console.log('✅ PaymentScreen - consultation_price encontrado em outro appointment.doctorUser:', {
-                  consultation_price: doctor.consultation_price,
-                });
-              } else if (doctorAppointment.doctor?.consultation_price !== undefined && 
-                         doctorAppointment.doctor?.consultation_price !== null) {
-                doctor = { ...doctor, ...doctorAppointment.doctor };
-                consultationPriceFound = true;
-                console.log('✅ PaymentScreen - consultation_price encontrado em outro appointment.doctor:', {
-                  consultation_price: doctor.consultation_price,
-                });
-              }
-            } else {
-              console.warn('⚠️ PaymentScreen - Nenhum appointment do mesmo médico encontrado com consultation_price');
-            }
-          }
-        } catch (appointmentsError) {
-          console.warn('⚠️ PaymentScreen - Erro ao buscar appointments:', appointmentsError);
-        }
-      }
-
-      // Se ainda não encontrou, tentar buscar pelo endpoint /doctors (pode ter relação com User)
-      if (!consultationPriceFound && doctorId) {
-        try {
-          console.log('💳 PaymentScreen - Tentando buscar pelo endpoint /doctors/' + doctorId);
-          const doctorResult = await doctorService.getDoctor(doctorId);
-          
-          if (doctorResult && doctorResult.success && doctorResult.data) {
-            console.log('💳 PaymentScreen - Resposta do /doctors:', {
-              hasData: !!doctorResult.data,
-              dataKeys: Object.keys(doctorResult.data),
-              consultation_price: doctorResult.data.consultation_price,
-              user: doctorResult.data.user,
-              user_consultation_price: doctorResult.data.user?.consultation_price,
-            });
-            
-            // Verificar se tem user dentro do doctor
-            if (doctorResult.data.user?.consultation_price !== undefined && 
-                doctorResult.data.user?.consultation_price !== null) {
-              doctor = doctorResult.data.user;
-              consultationPriceFound = true;
-              console.log('✅ PaymentScreen - consultation_price encontrado em doctor.user:', {
-                consultation_price: doctor.consultation_price,
-              });
-            } else {
-              // Mesclar dados do /doctors
-              doctor = { ...doctor, ...doctorResult.data };
-            }
-          }
-        } catch (doctorError) {
-          console.error('❌ PaymentScreen - Erro ao buscar pelo endpoint /doctors:', doctorError);
-        }
-      }
-
-      // Se ainda não encontrou, mesclar dados do appointment original
-      if (fullAppointment?.doctorUser) {
-        console.log('💳 PaymentScreen - Mesclando dados do appointment.doctorUser:', {
-          doctorUserKeys: Object.keys(fullAppointment.doctorUser),
-          consultation_price: fullAppointment.doctorUser.consultation_price,
-        });
-        doctor = { ...doctor, ...fullAppointment.doctorUser };
-      } else if (fullAppointment?.doctor) {
-        console.log('💳 PaymentScreen - Mesclando dados do appointment.doctor:', {
-          doctorKeys: Object.keys(fullAppointment.doctor),
-          consultation_price: fullAppointment.doctor.consultation_price,
-        });
-        doctor = { ...doctor, ...fullAppointment.doctor };
-      }
-      
-      console.log('💳 PaymentScreen - Dados finais do médico:', {
-        consultation_price: doctor?.consultation_price,
-        teleconsultation_price: doctor?.teleconsultation_price,
-        appointment_price: doctor?.appointment_price,
-        price: doctor?.price,
-        hourly_rate: doctor?.hourly_rate,
-        allKeys: doctor ? Object.keys(doctor) : [],
-        doctorData: JSON.stringify(doctor, null, 2),
-      });
-      
-      // Tentar obter o valor da consulta - priorizar consultation_price que é o campo do perfil do médico
-      const doctorPrice = 
-        (doctor?.consultation_price !== undefined && doctor?.consultation_price !== null) ? doctor.consultation_price :
-        doctor?.teleconsultation_price || 
-        doctor?.appointment_price ||
-        doctor?.price ||
-        doctor?.hourly_rate || // Fallback para cuidador profissional
-        null;
-
-      if (doctorPrice !== null && doctorPrice !== undefined && !isNaN(parseFloat(doctorPrice)) && parseFloat(doctorPrice) > 0) {
-        const basePrice = parseFloat(doctorPrice);
-        console.log('✅ PaymentScreen - Valor da consulta encontrado:', {
-          basePrice,
-          field: (doctor?.consultation_price !== undefined && doctor?.consultation_price !== null) ? 'consultation_price' :
-                 doctor?.teleconsultation_price ? 'teleconsultation_price' :
-                 doctor?.appointment_price ? 'appointment_price' :
-                 doctor?.price ? 'price' :
-                 doctor?.hourly_rate ? 'hourly_rate' : 'unknown',
-          rawValue: doctorPrice,
-        });
-        setConsultationPrice(basePrice);
-        setFinalPrice(calculateFinalPrice(basePrice));
-      } else {
-        // Se não encontrar, usar valor padrão
-        console.warn('⚠️ PaymentScreen - Valor da consulta não encontrado no perfil do médico, usando valor padrão', {
-          doctorPrice,
-          consultation_price: doctor?.consultation_price,
-          type: typeof doctor?.consultation_price,
-          isNaN: isNaN(parseFloat(doctorPrice)),
-          parsed: parseFloat(doctorPrice),
-        });
-        const defaultPrice = 150;
-        setConsultationPrice(defaultPrice);
-        setFinalPrice(calculateFinalPrice(defaultPrice));
-      }
-    } catch (error) {
-      console.error('❌ PaymentScreen - Erro ao buscar valor da consulta:', error);
-      console.error('❌ PaymentScreen - Stack trace:', error.stack);
-      // Em caso de erro, usar valor padrão
-      const defaultPrice = 150;
-      setConsultationPrice(defaultPrice);
-      setFinalPrice(calculateFinalPrice(defaultPrice));
-    } finally {
-      setLoadingPrice(false);
-    }
-  };
-
-  const calculateFinalPrice = (basePrice) => {
-    // Adicionar 20% ao valor base
-    const finalPrice = basePrice * 1.2;
-    return Math.round(finalPrice * 100) / 100; // Arredondar para 2 casas decimais
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
   };
 
   const formatCardNumber = (text) => {
-    // Remove tudo que não é dígito
+    // Remover caracteres não numéricos
     const cleaned = text.replace(/\D/g, '');
-    // Limita a 16 dígitos
-    const limited = cleaned.substring(0, 16);
-    // Adiciona espaços a cada 4 dígitos
-    const formatted = limited.replace(/(.{4})/g, '$1 ').trim();
-    return formatted;
+    // Limitar a 16 dígitos
+    const limited = cleaned.slice(0, 16);
+    // Adicionar espaços a cada 4 dígitos
+    return limited.replace(/(.{4})/g, '$1 ').trim();
   };
 
   const formatExpiry = (text) => {
-    // Remove tudo que não é dígito
-    const cleaned = text.replace(/\D/g, '');
-    // Limita a 4 dígitos
-    const limited = cleaned.substring(0, 4);
-    // Adiciona barra após 2 dígitos
-    if (limited.length >= 2) {
-      return limited.substring(0, 2) + '/' + limited.substring(2, 4);
+    const cleaned = text.replace(/\D/g, '').slice(0, 4);
+    if (cleaned.length >= 2) {
+      return cleaned.slice(0, 2) + '/' + cleaned.slice(2);
     }
-    return limited;
-  };
-
-  const formatCvv = (text) => {
-    // Remove tudo que não é dígito e limita a 3 dígitos
-    return text.replace(/\D/g, '').substring(0, 3);
+    return cleaned;
   };
 
   const handlePayment = async () => {
-    // Verificar se o tempo expirou
-    if (timeExpired || timeRemaining <= 0) {
-      Alert.alert(
-        'Tempo Esgotado',
-        'O tempo para realizar o pagamento expirou. O horário foi liberado para outros pacientes.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
-      return;
-    }
-
     // Validações básicas
-    const cleanedCardNumber = cardNumber.replace(/\s/g, '');
-    if (!cleanedCardNumber || cleanedCardNumber.length < 13) {
-      Alert.alert('Erro', 'Por favor, informe um número de cartão válido');
-      return;
-    }
-
-    if (!cardName || cardName.trim().length < 3) {
-      Alert.alert('Erro', 'Por favor, informe o nome completo do titular do cartão');
-      return;
-    }
-
-    if (!cardExpiry || cardExpiry.length < 5) {
-      Alert.alert('Erro', 'Por favor, informe a data de validade do cartão');
-      return;
-    }
-
-    if (!cardCvv || cardCvv.length < 3) {
-      Alert.alert('Erro', 'Por favor, informe o CVV do cartão');
-      return;
-    }
-
-    // Validações com Stripe
-    if (!validateCardNumber(cleanedCardNumber)) {
-      Alert.alert('Erro', 'Número de cartão inválido. Por favor, verifique os dados.');
-      return;
-    }
-
-    const cardBrand = getCardBrand(cleanedCardNumber);
-    if (!validateCvv(cardCvv, cardBrand)) {
-      Alert.alert('Erro', 'CVV inválido. Por favor, verifique os dados.');
-      return;
-    }
-
-    if (!validateExpiry(cardExpiry)) {
-      Alert.alert('Erro', 'Data de validade inválida ou expirada. Por favor, verifique os dados.');
-      return;
-    }
-
-    if (!appointmentId) {
-      Alert.alert('Erro', 'ID do compromisso não encontrado');
-      return;
-    }
-
-    if (finalPrice <= 0) {
-      Alert.alert('Erro', 'Valor inválido para pagamento');
-      return;
+    if (paymentMethod === 'credit_card' || paymentMethod === 'debit_card') {
+      if (!cardNumber || cardNumber.replace(/\s/g, '').length < 16) {
+        Toast.show({
+          type: 'error',
+          text1: 'Cartão inválido',
+          text2: 'Digite um número de cartão válido',
+        });
+        return;
+      }
+      if (!cardName || cardName.length < 3) {
+        Toast.show({
+          type: 'error',
+          text1: 'Nome inválido',
+          text2: 'Digite o nome completo do portador',
+        });
+        return;
+      }
+      if (!cardExpiry || cardExpiry.length < 5) {
+        Toast.show({
+          type: 'error',
+          text1: 'Validade inválida',
+          text2: 'Digite a validade no formato MM/AA',
+        });
+        return;
+      }
+      if (!cardCvv || cardCvv.length < 3) {
+        Toast.show({
+          type: 'error',
+          text1: 'CVV inválido',
+          text2: 'Digite o código de segurança',
+        });
+        return;
+      }
     }
 
     setLoading(true);
-    
-    // Parar o timer ao iniciar o pagamento
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
 
     try {
-      console.log('💳 PaymentScreen - Iniciando processamento de pagamento com Stripe');
+      // Gerar token mock do cartão
+      const cardToken = `card_mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // Processar pagamento via Stripe
-      const result = await paymentService.processPayment(
-        appointmentId,
-        finalPrice,
-        {
-          cardNumber: cleanedCardNumber,
-          cardName: cardName.trim(),
-          cardExpiry: cardExpiry,
-          cardCvv: cardCvv,
-        },
-        installments
-      );
+      const result = await paymentService.processPayment(appointment.id, {
+        payment_method: paymentMethod,
+        card_token: cardToken,
+        installments: installments,
+      });
 
       if (result.success) {
-        console.log('✅ PaymentScreen - Pagamento processado com sucesso:', result);
-        
-        Alert.alert(
-          'Pagamento Processado',
-          'Seu pagamento foi processado com sucesso! A teleconsulta está confirmada.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                navigation.goBack();
-              },
-            },
-          ]
-        );
-      } else {
-        console.error('❌ PaymentScreen - Erro no pagamento:', result.error);
-        
-        // Mensagens de erro mais específicas
-        let errorMessage = 'Não foi possível processar o pagamento.';
-        
-        if (result.error) {
-          if (result.error.includes('card_declined')) {
-            errorMessage = 'Cartão recusado. Verifique os dados ou entre em contato com seu banco.';
-          } else if (result.error.includes('insufficient_funds')) {
-            errorMessage = 'Saldo insuficiente. Verifique sua conta.';
-          } else if (result.error.includes('expired_card')) {
-            errorMessage = 'Cartão expirado. Use outro cartão.';
-          } else if (result.error.includes('incorrect_cvc')) {
-            errorMessage = 'CVV incorreto. Verifique os dados do cartão.';
-          } else {
-            errorMessage = result.error;
-          }
-        }
+        Toast.show({
+          type: 'success',
+          text1: 'Pagamento processado!',
+          text2: 'Sua consulta foi confirmada e o pagamento está em hold',
+        });
 
-        Alert.alert(
-          'Erro no Pagamento',
-          errorMessage
-        );
+        // Navegar de volta e recarregar a lista
+        navigation.goBack();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Erro no pagamento',
+          text2: result.error || 'Não foi possível processar o pagamento',
+        });
       }
     } catch (error) {
-      console.error('❌ PaymentScreen - Erro ao processar pagamento:', error);
-      Alert.alert(
-        'Erro no Pagamento',
-        error.message || 'Não foi possível processar o pagamento. Por favor, tente novamente.'
-      );
+      console.error('Erro ao processar pagamento:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro no pagamento',
+        text2: 'Tente novamente mais tarde',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const getAppointmentInfo = () => {
-    if (!appointment) return null;
-
-    const dateStr = appointment.appointment_date || appointment.scheduled_at;
-    const date = dateStr ? new Date(dateStr) : null;
-    const doctorName = 
-      appointment.doctorUser?.name || 
-      appointment.doctor?.name || 
-      appointment.doctor_name || 
-      'Médico não informado';
-
-    return {
-      title: appointment.title || 'Teleconsulta',
-      doctorName,
-      date: date ? date.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-      }) : 'Data não informada',
-      time: date ? date.toLocaleTimeString('pt-BR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      }) : 'Horário não informado',
-    };
-  };
-
-  const appointmentInfo = getAppointmentInfo();
-
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar style="dark" />
       
-      {/* Tarja de Mockup */}
-      <View style={styles.mockupBanner}>
-        <Ionicons name="warning" size={16} color={colors.warning} />
-        <Text style={styles.mockupBannerText}>
-          MOCKUP - Sistema de pagamento em modo de teste
-        </Text>
-      </View>
-      
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <ArrowBackIcon size={24} color={colors.text} />
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Pagamento</Text>
-          <Text style={styles.headerSubtitle}>Teleconsulta</Text>
-        </View>
+        <Text style={styles.headerTitle}>Pagamento</Text>
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView 
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* Badge MOCK */}
+      <View style={styles.mockBadge}>
+        <Text style={styles.mockBadgeText}>🔧 [MOCK] Tela de Pagamento - Apenas para Testes</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
         {/* Informações da Consulta */}
-        {appointmentInfo && (
-          <View style={styles.appointmentInfoCard}>
-            <View style={styles.appointmentInfoHeader}>
-              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-              <Text style={styles.appointmentInfoTitle}>Informações da Consulta</Text>
-            </View>
-            <View style={styles.appointmentInfoRow}>
-              <Text style={styles.appointmentInfoLabel}>Título:</Text>
-              <Text style={styles.appointmentInfoValue}>{appointmentInfo.title}</Text>
-            </View>
-            <View style={styles.appointmentInfoRow}>
-              <Text style={styles.appointmentInfoLabel}>Médico:</Text>
-              <Text style={styles.appointmentInfoValue}>Dr(a). {appointmentInfo.doctorName}</Text>
-            </View>
-            <View style={styles.appointmentInfoRow}>
-              <Text style={styles.appointmentInfoLabel}>Data:</Text>
-              <Text style={styles.appointmentInfoValue}>{appointmentInfo.date}</Text>
-            </View>
-            <View style={styles.appointmentInfoRow}>
-              <Text style={styles.appointmentInfoLabel}>Horário:</Text>
-              <Text style={styles.appointmentInfoValue}>{appointmentInfo.time}</Text>
-            </View>
-          </View>
-        )}
+        <View style={styles.appointmentCard}>
+          <Text style={styles.sectionTitle}>Consulta</Text>
+          <Text style={styles.appointmentTitle}>{appointment?.title || 'Teleconsulta'}</Text>
+          {appointment?.doctorUser?.name || appointment?.doctor?.name ? (
+            <Text style={styles.appointmentDoctor}>
+              Dr(a). {appointment?.doctorUser?.name || appointment?.doctor?.name}
+            </Text>
+          ) : null}
+          <Text style={styles.appointmentDate}>
+            {moment(appointment?.scheduled_at || appointment?.appointment_date).format('DD/MM/YYYY [às] HH:mm')}
+          </Text>
+        </View>
 
-        {/* Cronômetro de Pagamento */}
-        {!timeExpired && (
-          <View style={[
-            styles.timerCard,
-            timeRemaining <= 300 && styles.timerCardWarning, // 5 minutos restantes
-            timeRemaining <= 60 && styles.timerCardDanger, // 1 minuto restante
-          ]}>
-            <Ionicons 
-              name="time-outline" 
-              size={24} 
-              color={timeRemaining <= 60 ? colors.error : timeRemaining <= 300 ? colors.warning : colors.primary} 
+        {/* Valor */}
+        <View style={styles.amountCard}>
+          <Text style={styles.amountLabel}>Valor Total</Text>
+          <Text style={styles.amountValue}>{formatCurrency(amount)}</Text>
+          {(() => {
+            const consultationPrice = appointment?.doctorUser?.consultation_price || 
+                                      appointment?.doctor?.consultation_price;
+            if (consultationPrice && amount !== consultationPrice) {
+              const platformFee = amount - consultationPrice;
+              return (
+                <View style={styles.amountBreakdown}>
+                  <Text style={styles.amountBreakdownText}>
+                    Consulta: {formatCurrency(consultationPrice)}
+                  </Text>
+                  <Text style={styles.amountBreakdownText}>
+                    Taxa da plataforma (20%): {formatCurrency(platformFee)}
+                  </Text>
+                </View>
+              );
+            }
+            return null;
+          })()}
+        </View>
+
+        {/* Método de Pagamento */}
+        <View style={styles.paymentMethodCard}>
+          <Text style={styles.sectionTitle}>Método de Pagamento</Text>
+          
+          <TouchableOpacity
+            style={[
+              styles.paymentMethodOption,
+              paymentMethod === 'credit_card' && styles.paymentMethodOptionActive,
+            ]}
+            onPress={() => setPaymentMethod('credit_card')}
+          >
+            <SafeIcon
+              name={paymentMethod === 'credit_card' ? 'radio-button-on' : 'radio-button-off'}
+              size={20}
+              color={paymentMethod === 'credit_card' ? colors.primary : colors.gray400}
             />
-            <View style={styles.timerContent}>
-              <Text style={styles.timerLabel}>Tempo restante para pagamento</Text>
-              <Text style={[
-                styles.timerValue,
-                timeRemaining <= 60 && styles.timerValueDanger,
-                timeRemaining <= 300 && timeRemaining > 60 && styles.timerValueWarning,
-              ]}>
-                {formatTime(timeRemaining)}
-              </Text>
-              <Text style={styles.timerSubtext}>
-                Após este tempo, o horário será liberado para outros pacientes
-              </Text>
+            <Text style={styles.paymentMethodText}>Cartão de Crédito</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.paymentMethodOption,
+              paymentMethod === 'debit_card' && styles.paymentMethodOptionActive,
+            ]}
+            onPress={() => setPaymentMethod('debit_card')}
+          >
+            <SafeIcon
+              name={paymentMethod === 'debit_card' ? 'radio-button-on' : 'radio-button-off'}
+              size={20}
+              color={paymentMethod === 'debit_card' ? colors.primary : colors.gray400}
+            />
+            <Text style={styles.paymentMethodText}>Cartão de Débito</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.paymentMethodOption,
+              paymentMethod === 'pix' && styles.paymentMethodOptionActive,
+            ]}
+            onPress={() => setPaymentMethod('pix')}
+          >
+            <SafeIcon
+              name={paymentMethod === 'pix' ? 'radio-button-on' : 'radio-button-off'}
+              size={20}
+              color={paymentMethod === 'pix' ? colors.primary : colors.gray400}
+            />
+            <Text style={styles.paymentMethodText}>PIX</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Dados do Cartão (se crédito ou débito) */}
+        {(paymentMethod === 'credit_card' || paymentMethod === 'debit_card') && (
+          <View style={styles.cardDataCard}>
+            <Text style={styles.sectionTitle}>Dados do Cartão</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Número do Cartão</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0000 0000 0000 0000"
+                value={cardNumber}
+                onChangeText={(text) => setCardNumber(formatCardNumber(text))}
+                keyboardType="numeric"
+                maxLength={19}
+              />
             </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Nome no Cartão</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="NOME COMPLETO"
+                value={cardName}
+                onChangeText={setCardName}
+                autoCapitalize="characters"
+              />
+            </View>
+
+            <View style={styles.row}>
+              <View style={[styles.inputGroup, styles.inputGroupHalf]}>
+                <Text style={styles.label}>Validade</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="MM/AA"
+                  value={cardExpiry}
+                  onChangeText={(text) => setCardExpiry(formatExpiry(text))}
+                  keyboardType="numeric"
+                  maxLength={5}
+                />
+              </View>
+
+              <View style={[styles.inputGroup, styles.inputGroupHalf]}>
+                <Text style={styles.label}>CVV</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="123"
+                  value={cardCvv}
+                  onChangeText={(text) => setCardCvv(text.replace(/\D/g, '').slice(0, 4))}
+                  keyboardType="numeric"
+                  maxLength={4}
+                  secureTextEntry
+                />
+              </View>
+            </View>
+
+            {paymentMethod === 'credit_card' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Parcelas</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="1"
+                  value={installments.toString()}
+                  onChangeText={(text) => {
+                    const num = parseInt(text.replace(/\D/g, '')) || 1;
+                    setInstallments(Math.min(Math.max(num, 1), 12));
+                  }}
+                  keyboardType="numeric"
+                />
+              </View>
+            )}
           </View>
         )}
 
-        {timeExpired && (
-          <View style={styles.expiredCard}>
-            <Ionicons name="close-circle" size={32} color={colors.error} />
-            <Text style={styles.expiredText}>Tempo de pagamento expirado</Text>
-            <Text style={styles.expiredSubtext}>
-              O horário foi liberado para outros pacientes
+        {/* Informação PIX (se PIX) */}
+        {paymentMethod === 'pix' && (
+          <View style={styles.pixInfoCard}>
+            <Text style={styles.sectionTitle}>Pagamento via PIX</Text>
+            <Text style={styles.pixInfoText}>
+              O código PIX será gerado após confirmar o pagamento.
             </Text>
           </View>
         )}
 
-        {/* Valor */}
-        <View style={styles.amountCard}>
-          <Text style={styles.amountLabel}>Valor da Teleconsulta</Text>
-          {loadingPrice ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <>
-              <Text style={styles.amountValue}>
-                R$ {finalPrice.toFixed(2).replace('.', ',')}
-              </Text>
-              {consultationPrice > 0 && (
-                <Text style={styles.amountSubtext}>
-                  Valor base: R$ {consultationPrice.toFixed(2).replace('.', ',')} + 20% taxa
-                </Text>
-              )}
-            </>
-          )}
-        </View>
-
-        {/* Formulário de Pagamento */}
-        <View style={styles.paymentForm}>
-          <Text style={styles.sectionTitle}>Dados do Cartão</Text>
-
-          {/* Número do Cartão */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Número do Cartão</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0000 0000 0000 0000"
-              placeholderTextColor={colors.gray400}
-              value={cardNumber}
-              onChangeText={(text) => setCardNumber(formatCardNumber(text))}
-              keyboardType="numeric"
-              maxLength={19}
-            />
-          </View>
-
-          {/* Nome do Titular */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Nome do Titular</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nome como está no cartão"
-              placeholderTextColor={colors.gray400}
-              value={cardName}
-              onChangeText={(text) => setCardName(text.toUpperCase())}
-              autoCapitalize="words"
-            />
-          </View>
-
-          {/* Validade e CVV */}
-          <View style={styles.rowInputs}>
-            <View style={[styles.inputGroup, styles.inputGroupHalf]}>
-              <Text style={styles.inputLabel}>Validade</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="MM/AA"
-                placeholderTextColor={colors.gray400}
-                value={cardExpiry}
-                onChangeText={(text) => setCardExpiry(formatExpiry(text))}
-                keyboardType="numeric"
-                maxLength={5}
-              />
-            </View>
-            <View style={[styles.inputGroup, styles.inputGroupHalf]}>
-              <Text style={styles.inputLabel}>CVV</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="123"
-                placeholderTextColor={colors.gray400}
-                value={cardCvv}
-                onChangeText={(text) => setCardCvv(formatCvv(text))}
-                keyboardType="numeric"
-                maxLength={3}
-                secureTextEntry
-              />
-            </View>
-          </View>
-
-          {/* Parcelas */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Parcelas</Text>
-            <View style={styles.installmentsContainer}>
-              {[1, 2, 3, 4, 5, 6].map((num) => (
-                <TouchableOpacity
-                  key={num}
-                  style={[
-                    styles.installmentButton,
-                    installments === num && styles.installmentButtonActive,
-                  ]}
-                  onPress={() => setInstallments(num)}
-                >
-                  <Text
-                    style={[
-                      styles.installmentButtonText,
-                      installments === num && styles.installmentButtonTextActive,
-                    ]}
-                  >
-                    {num}x
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {installments > 1 && (
-              <Text style={styles.installmentValue}>
-                {installments}x de R$ {(finalPrice / installments).toFixed(2).replace('.', ',')}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Botão de Pagamento */}
+        {/* Botão de Pagar */}
         <TouchableOpacity
-          style={[
-            styles.paymentButton, 
-            (loading || loadingPrice || timeExpired) && styles.paymentButtonDisabled
-          ]}
+          style={[styles.payButton, loading && styles.payButtonDisabled]}
           onPress={handlePayment}
-          disabled={loading || loadingPrice || timeExpired}
+          disabled={loading}
         >
           {loading ? (
             <ActivityIndicator size="small" color={colors.textWhite} />
-          ) : loadingPrice ? (
-            <ActivityIndicator size="small" color={colors.textWhite} />
-          ) : timeExpired ? (
-            <>
-              <Ionicons name="close-circle" size={20} color={colors.textWhite} />
-              <Text style={styles.paymentButtonText}>Tempo Esgotado</Text>
-            </>
           ) : (
             <>
-              <Ionicons name="lock-closed" size={20} color={colors.textWhite} />
-              <Text style={styles.paymentButtonText}>
-                Pagar R$ {finalPrice.toFixed(2).replace('.', ',')}
+              <SafeIcon name="card" size={20} color={colors.textWhite} />
+              <Text style={styles.payButtonText}>
+                Pagar {formatCurrency(amount)}
               </Text>
             </>
           )}
         </TouchableOpacity>
 
-        {/* Informações de Segurança */}
-        <View style={styles.securityInfo}>
-          <Ionicons name="shield-checkmark" size={16} color={colors.success} />
-          <Text style={styles.securityText}>
-            Seus dados estão protegidos e criptografados
-          </Text>
-        </View>
+        {/* Aviso de Segurança */}
+        <Text style={styles.securityText}>
+          🔒 Seus dados estão seguros. Este é um ambiente de teste [MOCK].
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -878,93 +380,86 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.gray200,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.backgroundLight,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitleContainer: {
-    flex: 1,
-    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.text,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: colors.textLight,
-    marginTop: 2,
+    flex: 1,
+    textAlign: 'center',
   },
   placeholder: {
     width: 40,
   },
+  mockBadge: {
+    backgroundColor: colors.warning + '20',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.warning,
+  },
+  mockBadgeText: {
+    fontSize: 12,
+    color: colors.warning,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
   content: {
-    flex: 1,
-  },
-  contentContainer: {
     padding: 20,
-    paddingBottom: 40,
   },
-  appointmentInfoCard: {
-    backgroundColor: colors.backgroundLight,
+  appointmentCard: {
+    backgroundColor: colors.white,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  appointmentInfoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray600,
     marginBottom: 12,
   },
-  appointmentInfoTitle: {
-    fontSize: 16,
+  appointmentTitle: {
+    fontSize: 18,
     fontWeight: '600',
     color: colors.text,
-  },
-  appointmentInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  appointmentInfoLabel: {
-    fontSize: 14,
-    color: colors.textLight,
-    fontWeight: '500',
-  },
-  appointmentInfoValue: {
-    fontSize: 14,
+  appointmentDoctor: {
+    fontSize: 16,
     color: colors.text,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
+    marginBottom: 4,
+  },
+  appointmentDate: {
+    fontSize: 14,
+    color: colors.gray600,
   },
   amountCard: {
-    backgroundColor: colors.primary + '15',
+    backgroundColor: colors.primary + '10',
     borderRadius: 12,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 16,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.primary + '30',
   },
   amountLabel: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.gray600,
     marginBottom: 8,
   },
   amountValue: {
@@ -972,83 +467,52 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.primary,
   },
-  amountSubtext: {
+  amountBreakdown: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.primary + '30',
+    width: '100%',
+    alignItems: 'center',
+  },
+  amountBreakdownText: {
     fontSize: 12,
-    color: colors.textLight,
+    color: colors.gray600,
     marginTop: 4,
   },
-  timerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary + '15',
+  paymentMethodCard: {
+    backgroundColor: colors.white,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: colors.primary + '40',
-    gap: 12,
-  },
-  timerCardWarning: {
-    backgroundColor: colors.warning + '15',
-    borderColor: colors.warning + '40',
-  },
-  timerCardDanger: {
-    backgroundColor: colors.error + '15',
-    borderColor: colors.error + '40',
-  },
-  timerContent: {
-    flex: 1,
-  },
-  timerLabel: {
-    fontSize: 12,
-    color: colors.textLight,
-    marginBottom: 4,
-  },
-  timerValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.primary,
-    marginBottom: 4,
-  },
-  timerValueWarning: {
-    color: colors.warning,
-  },
-  timerValueDanger: {
-    color: colors.error,
-  },
-  timerSubtext: {
-    fontSize: 11,
-    color: colors.textLight,
-  },
-  expiredCard: {
-    alignItems: 'center',
-    backgroundColor: colors.error + '15',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: colors.error + '40',
-  },
-  expiredText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.error,
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  expiredSubtext: {
-    fontSize: 14,
-    color: colors.textLight,
-    textAlign: 'center',
-  },
-  paymentForm: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  paymentMethodOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  paymentMethodOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '10',
+  },
+  paymentMethodText: {
+    fontSize: 16,
+    color: colors.text,
+    marginLeft: 12,
+  },
+  cardDataCard: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   inputGroup: {
     marginBottom: 16,
@@ -1057,7 +521,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  inputLabel: {
+  row: {
+    flexDirection: 'row',
+  },
+  label: {
     fontSize: 14,
     fontWeight: '500',
     color: colors.text,
@@ -1065,94 +532,50 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: colors.backgroundLight,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  rowInputs: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  installmentsContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  installmentButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: colors.backgroundLight,
+  pixInfoCard: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  installmentButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  installmentButtonText: {
+  pixInfoText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
+    color: colors.gray600,
+    lineHeight: 20,
   },
-  installmentButtonTextActive: {
-    color: colors.textWhite,
-  },
-  installmentValue: {
-    fontSize: 12,
-    color: colors.textLight,
-    marginTop: 8,
-  },
-  paymentButton: {
+  payButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     backgroundColor: colors.primary,
     borderRadius: 12,
-    padding: 18,
+    padding: 16,
     marginBottom: 16,
+    gap: 8,
   },
-  paymentButtonDisabled: {
+  payButtonDisabled: {
     opacity: 0.6,
   },
-  paymentButtonText: {
+  payButtonText: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textWhite,
-  },
-  securityInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
   },
   securityText: {
     fontSize: 12,
-    color: colors.textLight,
-  },
-  mockupBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.warning + '20',
-    borderBottomWidth: 2,
-    borderBottomColor: colors.warning,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  mockupBannerText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.warning,
-    textTransform: 'uppercase',
+    color: colors.gray500,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 
 export default PaymentScreen;
-

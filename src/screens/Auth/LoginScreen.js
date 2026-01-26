@@ -11,8 +11,8 @@ import {
   Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
+import SafeIcon from '../../components/SafeIcon';
 import { useAuth } from '../../contexts/AuthContext';
 import { LacosLogoFull } from '../../components/LacosLogo';
 
@@ -72,7 +72,7 @@ const LoginScreen = ({ navigation }) => {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
+              <SafeIcon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.logoContainer}>
               <LacosLogoFull width={150} height={47} />
@@ -115,7 +115,7 @@ const LoginScreen = ({ navigation }) => {
                   style={styles.eyeButton}
                   onPress={() => setShowPassword(!showPassword)}
                 >
-                  <Ionicons
+                  <SafeIcon
                     name={showPassword ? 'eye-off' : 'eye'}
                     size={20}
                     color={colors.gray400}

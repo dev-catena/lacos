@@ -122,9 +122,14 @@ class UsersService {
         throw new Error('Token de autenticação não encontrado. Faça login novamente.');
       }
 
-      const response = await fetch(`${API_BASE_URL}/admin/users`, {
+      const url = `${API_BASE_URL}/admin/users`;
+      console.log('🌐 Tentando buscar usuários em:', url);
+      console.log('🔑 Token presente:', !!token);
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: headers,
+        mode: 'cors', // Garantir modo CORS
       });
 
       if (response.status === 401) {
@@ -181,6 +186,14 @@ class UsersService {
         stack: error.stack,
         name: error.name
       });
+      
+      // Tratar erro "Failed to fetch" especificamente
+      if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+        const errorMessage = `Não foi possível conectar ao servidor. Verifique se o backend está rodando em ${API_BASE_URL}`;
+        console.error('❌ Erro de conexão:', errorMessage);
+        throw new Error(errorMessage);
+      }
+      
       throw error;
     }
   }

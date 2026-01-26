@@ -14,6 +14,13 @@ import RecordingScreen from '../screens/Patient/RecordingScreen';
 import PatientProfileScreen from '../screens/Patient/PatientProfileScreen';
 import PatientJoinGroupScreen from '../screens/Patient/PatientJoinGroupScreen';
 import PatientVideoCallScreen from '../screens/Patient/PatientVideoCallScreen';
+import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
+import PrescriptionsScreen from '../screens/Prescriptions/PrescriptionsScreen';
+import PrescriptionDetailsScreen from '../screens/Prescriptions/PrescriptionDetailsScreen';
+import NewPrescriptionScreen from '../screens/Prescriptions/NewPrescriptionScreen';
+import AddPrescriptionScreen from '../screens/Prescriptions/AddPrescriptionScreen';
+import AddMedicationScreen from '../screens/Medications/AddMedicationScreen';
+import SelectDoctorScreen from '../screens/Medications/SelectDoctorScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -260,6 +267,55 @@ const PatientNavigator = () => {
       <Stack.Screen 
         name="RecordingScreen" 
         component={RecordingScreen} 
+      />
+      <Stack.Screen 
+        name="GroupDetail" 
+        component={GroupDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Prescriptions" 
+        component={PrescriptionsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PrescriptionDetails" 
+        component={PrescriptionDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="NewPrescription" 
+        component={NewPrescriptionScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddPrescription" 
+        component={AddPrescriptionScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="SelectDoctor" 
+        component={SelectDoctorScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddMedication" 
+        component={AddMedicationScreen}
+        options={{ 
+          headerShown: false 
+        }}
       />
       </Stack.Navigator>
       {/* Componente de controle de navegação - renderizado fora do Stack mas com acesso via useNavigation */}

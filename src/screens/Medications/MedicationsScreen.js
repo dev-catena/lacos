@@ -395,6 +395,9 @@ const MedicationsScreen = ({ route, navigation }) => {
 
                   {period.meds.map((med, index) => {
                     const getFormIcon = (form) => {
+                      if (!form || typeof form !== 'string') {
+                        return 'medical-outline';
+                      }
                       const formLower = form.toLowerCase();
                       if (formLower.includes('comprimido')) return 'medical-outline';
                       if (formLower.includes('cápsula')) return 'ellipse-outline';

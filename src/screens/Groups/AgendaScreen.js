@@ -160,7 +160,34 @@ const AgendaScreen = ({ route, navigation }) => {
         
         // Expandir compromissos recorrentes
         const expandedAppointments = expandRecurringAppointments(rawAppointments);
-        setAppointments(expandedAppointments);
+        
+        // Filtrar consultas não pagas para pacientes
+        // Pacientes só devem ver teleconsultas que já foram pagas
+        const isPatient = user?.profile === 'accompanied';
+        const filteredAppointments = expandedAppointments.filter(apt => {
+          // Se for teleconsulta e o usuário for paciente
+          if (apt.is_teleconsultation && isPatient) {
+            // Só mostrar se já foi paga (paid_held, released) ou se não tem status de pagamento (consultas antigas)
+            const paymentStatus = apt.payment_status;
+            if (paymentStatus === 'pending' || paymentStatus === null) {
+              console.log('🚫 AgendaScreen - Ocultando teleconsulta não paga para paciente:', {
+                appointmentId: apt.id,
+                payment_status: paymentStatus,
+              });
+              return false; // Não mostrar para paciente
+            }
+          }
+          return true; // Mostrar todas as outras
+        });
+        
+        console.log('📋 AgendaScreen - Appointments filtrados:', {
+          total: expandedAppointments.length,
+          filtrados: filteredAppointments.length,
+          isPatient,
+          userProfile: user?.profile,
+        });
+        
+        setAppointments(filteredAppointments);
       } else {
         console.error('Erro ao carregar compromissos:', result.error);
       }
@@ -286,19 +313,19 @@ const AgendaScreen = ({ route, navigation }) => {
             )}
           </View>
 
-          {/* Banner de Pagamento para Teleconsultas - Só para cuidadores/amigos */}
+          {/* Banner de Pagamento para Teleconsultas - Para todos EXCETO pacientes */}
           {(() => {
             const isTeleconsultation = item.is_teleconsultation;
             const hasUser = !!user;
-            const isCaregiver = user && (
-              user.profile === 'caregiver' || 
-              user.profile === 'professional_caregiver' || 
-              user.role === 'caregiver' ||
-              user.profile === 'accompanied' // Fallback: acompanhado também pode pagar
-            );
+            
+            // Verificar se NÃO é paciente (pacientes não devem pagar)
+            const isPatient = user?.profile === 'accompanied';
+            const isNotPatient = hasUser && !isPatient;
+            
             const paymentPending = !item.payment_status || item.payment_status === 'pending' || item.payment_status === null;
             
-            const shouldShowBanner = isTeleconsultation && hasUser && isCaregiver && paymentPending;
+            // Mostrar banner se: é teleconsulta, usuário não é paciente, e pagamento está pendente
+            const shouldShowBanner = isTeleconsultation && isNotPatient && paymentPending;
             
             // Debug log
             if (isTeleconsultation) {
@@ -308,7 +335,8 @@ const AgendaScreen = ({ route, navigation }) => {
                 hasUser,
                 userProfile: user?.profile,
                 userRole: user?.role,
-                isCaregiver,
+                isPatient,
+                isNotPatient,
                 payment_status: item.payment_status,
                 paymentPending,
                 shouldShowBanner,
@@ -332,18 +360,27 @@ const AgendaScreen = ({ route, navigation }) => {
                   });
                 } else {
                   navigation.navigate('PaymentScreen', {
-                    appointmentId: item.id,
                     appointment: item,
                     groupId,
+                    groupName,
                   });
                 }
               }}
               >
                 <Ionicons name="card-outline" size={16} color={colors.warning} />
                 <Text style={styles.paymentBannerText}>
-                  {item.doctorUser?.consultation_price || item.doctor?.consultation_price 
-                    ? `Aguarda pagamento (R$ ${(parseFloat(item.doctorUser?.consultation_price || item.doctor?.consultation_price || 0) * 1.2).toFixed(2).replace('.', ',')}). Clique para pagar`
-                    : 'Aguarda pagamento. Clique aqui para pagar'}
+                  {(() => {
+                    // Sempre calcular valor total baseado no consultation_price do médico
+                    // O amount pode estar errado, então sempre recalcular
+                    const consultationPrice = item.doctorUser?.consultation_price || 
+                                            item.doctor?.consultation_price || 
+                                            100.00;
+                    
+                    // Calcular valor total: consultation_price * 1.20 (consulta + 20% plataforma)
+                    const totalAmount = Math.round(consultationPrice * 1.20 * 100) / 100;
+                    
+                    return `💳 Aguarda pagamento (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}). Toque para pagar`;
+                  })()}
                 </Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.warning} />
               </TouchableOpacity>

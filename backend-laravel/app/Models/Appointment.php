@@ -27,6 +27,7 @@ class Appointment extends Model
         'recurrence_start',
         'recurrence_end',
         'is_teleconsultation',
+        'created_by_user_id',
         // Campos de pagamento
         'payment_status',
         'amount',

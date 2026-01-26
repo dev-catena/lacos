@@ -25,6 +25,7 @@ import GroupContactsScreen from '../screens/Groups/GroupContactsScreen';
 import EditPatientDataScreen from '../screens/Groups/EditPatientDataScreen';
 import PanicSettingsScreen from '../screens/Groups/PanicSettingsScreen';
 import AddVitalSignsScreen from '../screens/Groups/AddVitalSignsScreen';
+import VitalSignsDetailScreen from '../screens/VitalSigns/VitalSignsDetailScreen';
 import FallSensorScreen from '../screens/Groups/FallSensorScreen';
 import AgendaScreen from '../screens/Groups/AgendaScreen';
 import AddAppointmentScreen from '../screens/Groups/AddAppointmentScreen';
@@ -53,6 +54,7 @@ import AddMedicationScreen from '../screens/Medications/AddMedicationScreen';
 import MedicationDetailsScreen from '../screens/Medications/MedicationDetailsScreen';
 import PrescriptionsScreen from '../screens/Prescriptions/PrescriptionsScreen';
 import PrescriptionDetailsScreen from '../screens/Prescriptions/PrescriptionDetailsScreen';
+import AddPrescriptionScreen from '../screens/Prescriptions/AddPrescriptionScreen';
 
 // Importa as telas de Consultas
 import ConsultationsScreen from '../screens/Consultations/ConsultationsScreen';
@@ -168,6 +170,13 @@ const HomeStack = () => {
         }}
       />
       <Stack.Screen 
+        name="VitalSignsDetail" 
+        component={VitalSignsDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="FallSensor" 
         component={FallSensorScreen}
         options={{ 
@@ -226,6 +235,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="PrescriptionDetails" 
         component={PrescriptionDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddPrescription" 
+        component={AddPrescriptionScreen}
         options={{ 
           headerShown: false 
         }}
@@ -477,6 +493,13 @@ const GroupsStack = () => {
         }}
       />
       <Stack.Screen 
+        name="VitalSignsDetail" 
+        component={VitalSignsDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="FallSensor" 
         component={FallSensorScreen}
         options={{ 
@@ -535,6 +558,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="PrescriptionDetails" 
         component={PrescriptionDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AddPrescription" 
+        component={AddPrescriptionScreen}
         options={{ 
           headerShown: false 
         }}

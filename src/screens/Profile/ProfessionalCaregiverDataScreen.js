@@ -74,6 +74,30 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
     description: '',
   });
 
+  // Atualizar formData quando o user mudar (especialmente consultation_price)
+  useEffect(() => {
+    if (user) {
+      const parsedCrm = parseCrm(user?.crm || '');
+      setFormData(prev => ({
+        ...prev,
+        gender: user?.gender ? (genderMapFromEnglish[user.gender] || user.gender) : prev.gender,
+        city: user?.city || prev.city,
+        neighborhood: user?.neighborhood || prev.neighborhood,
+        formation_details: user?.formation_details || prev.formation_details,
+        hourly_rate: user?.hourly_rate ? user.hourly_rate.toString() : prev.hourly_rate,
+        availability: user?.availability || prev.availability,
+        is_available: user?.is_available !== undefined ? user.is_available : prev.is_available,
+        latitude: user?.latitude || prev.latitude,
+        longitude: user?.longitude || prev.longitude,
+        // Campos específicos de médico
+        crmUf: parsedCrm.uf || prev.crmUf,
+        crmNumber: parsedCrm.number || prev.crmNumber,
+        medical_specialty_id: user?.medical_specialty_id || prev.medical_specialty_id,
+        consultation_price: user?.consultation_price ? user.consultation_price.toString() : prev.consultation_price,
+      }));
+    }
+  }, [user]);
+
   // Carregar cursos quando a tela é focada ou quando o usuário é atualizado
   useEffect(() => {
     if (user?.caregiver_courses) {
@@ -237,16 +261,20 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // Converter gênero de português para inglês (backend espera valores em inglês)
+      // Converter gênero para português (banco espera 'masculino', 'feminino', 'outro')
       const genderMap = {
-        'Masculino': 'male',
-        'Feminino': 'female',
+        'Masculino': 'masculino',
+        'Feminino': 'feminino',
+        'Outro': 'outro',
+        'male': 'masculino',
+        'female': 'feminino',
+        'other': 'outro',
       };
-      const genderInEnglish = genderMap[formData.gender] || formData.gender;
+      const genderInPortuguese = genderMap[formData.gender] || formData.gender?.toLowerCase() || formData.gender;
 
       // Preparar dados para envio
       const dataToUpdate = {
-        gender: genderInEnglish,
+        gender: genderInPortuguese,
         city: formData.city.trim(),
         neighborhood: formData.neighborhood.trim(),
         is_available: formData.is_available,
@@ -309,6 +337,7 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
       const response = await userService.updateUserData(user.id, dataToUpdate);
       
       console.log('📥 ProfessionalCaregiverDataScreen - Resposta da API:', response);
+      console.log('📥 ProfessionalCaregiverDataScreen - Dados enviados:', dataToUpdate);
       
       if (response.success && response.data) {
         // Atualizar contexto
@@ -317,10 +346,20 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
         }
         
         // Verificar se consultation_price foi salvo
-        if (isDoctor && response.data.consultation_price !== undefined) {
-          console.log('✅ ProfessionalCaregiverDataScreen - Valor da consulta salvo:', response.data.consultation_price);
-        } else if (isDoctor) {
-          console.warn('⚠️ ProfessionalCaregiverDataScreen - Valor da consulta não retornado na resposta');
+        if (isDoctor) {
+          console.log('✅ ProfessionalCaregiverDataScreen - Valor da consulta:', {
+            enviado: dataToUpdate.consultation_price,
+            retornado: response.data.consultation_price,
+            noUser: response.data.consultation_price !== undefined,
+          });
+          
+          // Atualizar formData imediatamente com o valor retornado
+          if (response.data.consultation_price !== undefined && response.data.consultation_price !== null) {
+            setFormData(prev => ({
+              ...prev,
+              consultation_price: response.data.consultation_price.toString(),
+            }));
+          }
         }
         
         // Atualizar cursos no estado local se vierem na resposta

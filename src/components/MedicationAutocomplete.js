@@ -30,18 +30,21 @@ const MedicationAutocomplete = ({
   const containerRef = useRef(null);
   const isSelectingRef = useRef(false);
 
+  // Garantir que value seja sempre uma string
+  const safeValue = value || '';
+
   // Mostrar sugestões quando houver resultados e o input estiver focado
   useEffect(() => {
-    if (isFocused && suggestions.length > 0 && value.length >= 2) {
+    if (isFocused && suggestions.length > 0 && safeValue.length >= 2) {
       setShowSuggestions(true);
     } else {
       setShowSuggestions(false);
     }
-  }, [suggestions, isFocused, value]);
+  }, [suggestions, isFocused, safeValue]);
 
   const handleFocus = () => {
     setIsFocused(true);
-    if (value.length >= 2 && suggestions.length > 0) {
+    if (safeValue.length >= 2 && suggestions.length > 0) {
       setShowSuggestions(true);
     }
   };
@@ -53,6 +56,13 @@ const MedicationAutocomplete = ({
         setIsFocused(false);
         setShowSuggestions(false);
       }, 400);
+    }
+  };
+
+  const handleTextChange = (text) => {
+    console.log('🔍 MedicationAutocomplete - handleTextChange chamado com:', text);
+    if (onChangeText) {
+      onChangeText(text);
     }
   };
 
@@ -103,10 +113,10 @@ const MedicationAutocomplete = ({
       <View style={styles.inputContainer}>
         <TextInput
           ref={inputRef}
-          style={[styles.input, value && !isLoading && !showSuggestions && styles.inputFilled]}
+          style={[styles.input, safeValue && !isLoading && !showSuggestions && styles.inputFilled]}
           placeholder={placeholder}
-          value={value}
-          onChangeText={onChangeText}
+          value={safeValue}
+          onChangeText={handleTextChange}
           onFocus={handleFocus}
           onBlur={handleBlur}
           autoCapitalize="none"
@@ -117,7 +127,7 @@ const MedicationAutocomplete = ({
             <SafeIcon name="search" size={16} color={colors.textLight} />
           </View>
         )}
-        {value && !isLoading && !showSuggestions && (
+        {safeValue && !isLoading && !showSuggestions && (
           <View style={styles.indicator}>
             <SafeIcon name="checkmark-circle" size={20} color={colors.primary} />
           </View>
@@ -213,7 +223,7 @@ const MedicationAutocomplete = ({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    zIndex: 1,
+    zIndex: 9998,
   },
   inputContainer: {
     position: 'relative',
@@ -247,12 +257,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 12,
     maxHeight: 200,
-    elevation: 5,
+    elevation: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    zIndex: 1000,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    zIndex: 9999,
   },
   suggestionItem: {
     flexDirection: 'row',

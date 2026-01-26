@@ -21,8 +21,22 @@ class VitalSign extends Model
 
     protected $casts = [
         'measured_at' => 'datetime',
-        'value' => 'array',
+        'value' => 'array', // JSON será convertido para array/objeto quando lido
     ];
+    
+    /**
+     * Setter para value - permite objetos, arrays e números
+     */
+    public function setValueAttribute($value)
+    {
+        // Se for número, converter para array com um elemento para manter compatibilidade
+        if (is_numeric($value) && !is_array($value) && !is_object($value)) {
+            $this->attributes['value'] = json_encode([$value]);
+        } else {
+            // Para objetos e arrays, salvar como JSON
+            $this->attributes['value'] = json_encode($value);
+        }
+    }
 
     // Relacionamentos
     public function group()

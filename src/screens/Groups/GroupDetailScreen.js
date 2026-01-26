@@ -232,15 +232,14 @@ const GroupDetailScreen = ({ route, navigation }) => {
       id: 'vitalsigns',
       featureKey: 'sinaisVitais',
       title: 'Sinais Vitais',
-      subtitle: 'Registrar pressão, glicose e peso',
+      subtitle: 'Visualizar gráficos e histórico',
       icon: 'pulse',
       IconComponent: PulseIcon,
       color: colors.success,
       backgroundColor: colors.success + '20',
-      onPress: () => navigation.navigate('AddVitalSigns', { 
+      onPress: () => navigation.navigate('VitalSignsDetail', { 
         groupId, 
-        groupName,
-        accompaniedPersonId: groupId 
+        groupName
       }),
     },
     {

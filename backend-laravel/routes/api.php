@@ -29,6 +29,9 @@ use App\Http\Controllers\Api\EmergencyContactController;
 use App\Http\Controllers\Api\MedicalSpecialtyController;
 use App\Http\Controllers\Api\GroupMessageController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PrescriptionController;
+use App\Http\Controllers\Api\SystemSettingController;
+use App\Http\Controllers\Api\VitalSignController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -79,6 +82,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     // Gestão de Médicos (apenas root/admin)
     Route::get('/doctors', [AdminDoctorController::class, 'index']);
     Route::get('/doctors/pending', [AdminDoctorController::class, 'getPending']);
+    Route::get('/doctors/{id}', [AdminDoctorController::class, 'show']);
     Route::post('/doctors/{id}/approve', [AdminDoctorController::class, 'approve']);
     Route::post('/doctors/{id}/reject', [AdminDoctorController::class, 'reject']);
     Route::post('/doctors/{id}/block', [AdminDoctorController::class, 'block']);
@@ -180,7 +184,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
     Route::post('/appointments/{id}/confirm', [AppointmentController::class, 'confirm']);
     Route::post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
+    Route::post('/appointments/{id}/payment', [AppointmentController::class, 'processPayment']);
     Route::get('/appointments/{id}/payment-status', [AppointmentController::class, 'paymentStatus']);
+    
+    // Configurações do Sistema
+    Route::get('/system-settings', [SystemSettingController::class, 'index']);
+    Route::get('/system-settings/recording', [SystemSettingController::class, 'getRecordingSettings']);
+    Route::get('/system-settings/{key}', [SystemSettingController::class, 'show']);
+    Route::put('/system-settings/{key}', [SystemSettingController::class, 'update']);
     
     // Medicamentos - Gestão de Medicamentos do Grupo
     Route::get('/medications', [MedicationController::class, 'index']);
@@ -189,8 +200,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/medications/{id}', [MedicationController::class, 'destroy']);
     Route::patch('/medications/{id}/toggle-active', [MedicationController::class, 'toggleActive']);
     
+    // Receitas - Gestão de Receitas do Grupo
+    Route::get('/prescriptions', [PrescriptionController::class, 'index']);
+    Route::post('/prescriptions', [PrescriptionController::class, 'store']);
+    Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show']);
+    Route::put('/prescriptions/{id}', [PrescriptionController::class, 'update']);
+    Route::post('/prescriptions/generate-signed-recipe', [PrescriptionController::class, 'generateSignedRecipe']);
+    Route::post('/prescriptions/generate-signed-certificate', [PrescriptionController::class, 'generateSignedCertificate']);
+    Route::get('/prescriptions/validate/{hash}', [PrescriptionController::class, 'validateDocument']);
+    
     // Médicos - Gestão de Médicos do Grupo e Agenda
     Route::get('/doctors', [DoctorController::class, 'index']);
+    Route::post('/doctors', [DoctorController::class, 'store']); // Criar novo médico
     Route::get('/doctors/{id}/availability', [DoctorController::class, 'getAvailability']);
     Route::post('/doctors/{id}/availability', [DoctorController::class, 'saveAvailability']);
     
@@ -233,6 +254,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/panic/{eventId}/end-call', [PanicController::class, 'endCall']);
     Route::get('/panic', [PanicController::class, 'index']);
     Route::get('/panic/config/{groupId}', [PanicController::class, 'checkConfig']);
+    
+    // Sinais Vitais - Gestão de Sinais Vitais do Grupo
+    Route::get('/vital-signs', [VitalSignController::class, 'index']);
+    Route::post('/vital-signs', [VitalSignController::class, 'store']);
+    Route::get('/vital-signs/{id}', [VitalSignController::class, 'show']);
+    Route::put('/vital-signs/{id}', [VitalSignController::class, 'update']);
+    Route::delete('/vital-signs/{id}', [VitalSignController::class, 'destroy']);
     
     // Pagamentos - Gateway de Pagamento (Stripe)
     Route::post('/payments/create-intent', [PaymentController::class, 'createIntent']);

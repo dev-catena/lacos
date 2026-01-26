@@ -11,6 +11,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -249,6 +250,7 @@ const NoGroupsScreen = ({ navigation, route, onGroupJoined }) => {
         animationType="slide"
         transparent={true}
         onRequestClose={() => setInviteModalVisible(false)}
+        statusBarTranslucent={true}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -424,14 +426,23 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'flex-end',
+    zIndex: 1000,
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingBottom: 40,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 15,
+    zIndex: 1001,
+    minHeight: 300,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -441,6 +452,9 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   modalTitle: {
     fontSize: 20,
@@ -453,6 +467,7 @@ const styles = StyleSheet.create({
   modalBody: {
     paddingHorizontal: 24,
     paddingTop: 24,
+    backgroundColor: '#FFFFFF',
   },
   modalLabel: {
     fontSize: 15,

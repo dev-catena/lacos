@@ -1,11 +1,18 @@
-# 🧪 Testes Unitários - Wizard de Cadastro de Fornecedor
+# 🧪 Testes Unitários e Funcionais
 
-Este diretório contém scripts de teste para validar o wizard de cadastro de fornecedor.
+Este diretório contém scripts de teste para validar funcionalidades do sistema.
 
 ## 📦 Scripts Disponíveis
 
 ### `test_supplier_wizard.py`
 Script Python que testa todas as validações do wizard de cadastro de fornecedor.
+
+### `test_appointment_flow.py`
+Script Python que testa o fluxo completo de agendamento:
+- Login como médico
+- Disponibilização de horários
+- Login como cuidador
+- Agendamento de consulta
 
 ### `create_test_user.py`
 Script Python para criar automaticamente uma conta de teste com credenciais válidas.
@@ -480,15 +487,92 @@ Erro na execução do teste (problema de conexão, timeout, etc.)
        └─> Identificar problemas de validação
 ```
 
+## 🏥 Teste Funcional - Fluxo de Agendamento
+
+### Descrição
+O script `test_appointment_flow.py` testa o fluxo completo de agendamento de consultas:
+1. Login como médico (CPF: 40780462319, senha: 11111111)
+2. Disponibilização de 2 horários para hoje (a partir da hora atual)
+3. Login como cuidador/amigo
+4. Agendamento de uma consulta usando um dos horários disponíveis
+5. Geração de relatório com resultados
+
+### Uso
+
+#### Comando Básico (solicita credenciais do cuidador)
+```bash
+cd testunit
+source venv/bin/activate
+python3 test_appointment_flow.py
+```
+
+#### Com Todos os Parâmetros
+```bash
+python3 test_appointment_flow.py <API_URL> <DOCTOR_CPF> <DOCTOR_PASSWORD> <CAREGIVER_LOGIN> <CAREGIVER_PASSWORD>
+```
+
+**Exemplo:**
+```bash
+python3 test_appointment_flow.py http://10.102.0.103:8000/api 40780462319 11111111 cpf_ou_email_cuidador senha_cuidador
+```
+
+#### Usando o Script Helper
+```bash
+./run_appointment_test.sh http://10.102.0.103:8000/api 40780462319 11111111 cpf_ou_email_cuidador senha_cuidador
+```
+
+### Relatório
+O script gera um relatório JSON com:
+- Resumo dos passos executados
+- Status de cada passo (PASS/FAIL/ERROR)
+- Dados coletados durante o teste
+- Erros encontrados (se houver)
+
+**Arquivo gerado:** `report_appointment_flow_YYYYMMDD_HHMMSS.json`
+
+### Exemplo de Saída
+```
+================================================================================
+🧪 TESTE FUNCIONAL - FLUXO DE AGENDAMENTO
+================================================================================
+API: http://10.102.0.103:8000/api
+Médico CPF: 40780462319
+Cuidador: cpf_ou_email_cuidador
+================================================================================
+
+✅ Login Médico: Médico logado: Dr. Nome (ID: 7)
+✅ Criar Disponibilidade: 2 horários disponibilizados: 14:00 e 15:00
+✅ Login Cuidador: Cuidador logado: Nome do Cuidador
+✅ Obter Grupos: Grupo selecionado: Grupo do Paciente (ID: 1)
+✅ Criar Agendamento: Consulta agendada para 2026-01-25 14:00:00
+
+================================================================================
+✅ TESTE CONCLUÍDO COM SUCESSO!
+================================================================================
+
+📊 RELATÓRIO DE TESTE
+================================================================================
+
+📈 RESUMO:
+   Total de passos: 5
+   ✅ Passou: 5 (100.0%)
+   ❌ Falhou: 0 (0.0%)
+   ⚠️  Erro: 0 (0.0%)
+
+💾 Relatório salvo em: testunit/report_appointment_flow_20260125_143000.json
+```
+
 ## 📁 Estrutura de Arquivos
 
 ```
 testunit/
 ├── setup.sh                    # Script de configuração inicial
 ├── run_tests.sh                # Script helper para executar testes
+├── run_appointment_test.sh     # Helper para teste de agendamento
 ├── create_test_user.py         # Script para criar conta de teste
 ├── create_test_user.sh         # Helper para criar conta
 ├── test_supplier_wizard.py     # Script principal de testes
+├── test_appointment_flow.py    # Teste funcional de agendamento
 ├── requirements.txt             # Dependências Python
 ├── README.md                   # Este arquivo
 ├── .gitignore                  # Arquivos ignorados pelo git

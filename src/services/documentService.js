@@ -26,6 +26,17 @@ const documentService = {
       
       return documents;
     } catch (error) {
+      // Verificar se o erro é porque a tabela não existe
+      const errorMessage = error.message || error.toString() || JSON.stringify(error);
+      const errorData = error.response?.data || error._rawErrorData || {};
+      const errorText = errorData.error || errorMessage;
+      
+      if (errorText && (errorText.includes("doesn't exist") || errorText.includes("Table 'lacos.documents'"))) {
+        // Tabela não existe - retornar array vazio silenciosamente
+        console.log('⚠️ documentService - Tabela documents não existe, retornando array vazio');
+        return [];
+      }
+      
       console.error('❌ documentService - Erro ao buscar documentos:', error.response?.data || error);
       throw error;
     }

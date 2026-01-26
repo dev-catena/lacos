@@ -5,13 +5,20 @@ import UsersManagement from './components/UsersManagement';
 import DoctorsManagement from './components/DoctorsManagement';
 import PlansManagement from './components/PlansManagement';
 import SuppliersManagement from './components/SuppliersManagement';
+import RecordingSettingsManagement from './components/RecordingSettingsManagement';
 import authService from './services/authService';
 import usersService from './services/usersService';
 import './App.css';
 import './components/GlobalButtonStyles.css';
 
 function App() {
-  const [activeSection, setActiveSection] = useState('plans');
+  // Carregar seção salva do localStorage ou usar 'plans' como padrão
+  const getInitialSection = () => {
+    const savedSection = localStorage.getItem('@lacos:activeSection');
+    return savedSection || 'plans';
+  };
+
+  const [activeSection, setActiveSection] = useState(getInitialSection());
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -24,6 +31,13 @@ function App() {
       handleLogout();
     });
   }, []);
+
+  // Salvar seção ativa no localStorage sempre que mudar
+  useEffect(() => {
+    if (isAuthenticated) {
+      localStorage.setItem('@lacos:activeSection', activeSection);
+    }
+  }, [activeSection, isAuthenticated]);
 
   const checkAuth = async () => {
     try {
@@ -68,6 +82,8 @@ function App() {
     authService.logout();
     setIsAuthenticated(false);
     setUser(null);
+    // Limpar seção salva ao fazer logout
+    localStorage.removeItem('@lacos:activeSection');
   };
 
   const renderContent = () => {
@@ -80,6 +96,8 @@ function App() {
         return <PlansManagement />;
       case 'suppliers':
         return <SuppliersManagement />;
+      case 'recording':
+        return <RecordingSettingsManagement />;
       default:
         return <PlansManagement />;
     }

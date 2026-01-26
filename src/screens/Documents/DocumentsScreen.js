@@ -249,10 +249,10 @@ const DocumentsScreen = ({ route, navigation }) => {
               onPress={() => setFilterType(item.id)}
             >
               <SafeIcon 
-                name={item.icon} 
-                size={16} 
-                color={filterType === item.id ? '#2C5F7C' : colors.gray600} 
-              />
+                  name={item.icon} 
+                  size={16} 
+                  color={filterType === item.id ? '#2C5F7C' : colors.gray600} 
+                />
               <Text style={[
                 styles.filterChipText,
                 filterType === item.id && styles.filterChipTextActive

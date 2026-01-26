@@ -41,9 +41,19 @@ class CaregiverController extends Controller
             }
             
             // Filtrar por disponibilidade (is_available)
+            // Se is_available=true, considerar também null como disponível (padrão)
             if ($request->has('is_available')) {
                 $isAvailable = filter_var($request->is_available, FILTER_VALIDATE_BOOLEAN);
-                $query->where('is_available', $isAvailable);
+                if ($isAvailable) {
+                    // Se buscar por disponível, incluir também null (padrão é disponível)
+                    $query->where(function($q) {
+                        $q->where('is_available', true)
+                          ->orWhereNull('is_available');
+                    });
+                } else {
+                    // Se buscar por indisponível, apenas false
+                    $query->where('is_available', false);
+                }
             }
             
             // Filtrar por especialidade médica (apenas para médicos)
@@ -51,7 +61,19 @@ class CaregiverController extends Controller
                 $query->where('medical_specialty_id', $request->medical_specialty_id);
             }
             
-            $query->with(['caregiverCourses', 'caregiverReviews', 'medicalSpecialty']);
+            // Carregar relacionamentos apenas se as tabelas existirem
+            $withRelations = [];
+            if (Schema::hasTable('caregiver_courses')) {
+                $withRelations[] = 'caregiverCourses';
+            }
+            if (Schema::hasTable('caregiver_reviews')) {
+                $withRelations[] = 'caregiverReviews';
+            }
+            $withRelations[] = 'medicalSpecialty';
+            
+            if (!empty($withRelations)) {
+                $query->with($withRelations);
+            }
 
             // Filtro por avaliação mínima
             if ($request->has('min_rating')) {
@@ -88,7 +110,19 @@ class CaregiverController extends Controller
             }
 
             $caregivers = $query->get()->map(function ($caregiver) {
-                $avgRating = $caregiver->caregiverReviews->avg('rating');
+                // Calcular média de avaliações de forma segura
+                $avgRating = null;
+                $totalReviews = 0;
+                if (Schema::hasTable('caregiver_reviews') && $caregiver->relationLoaded('caregiverReviews')) {
+                    $avgRating = $caregiver->caregiverReviews->avg('rating');
+                    $totalReviews = $caregiver->caregiverReviews->count();
+                }
+                
+                // Obter cursos de forma segura
+                $courses = [];
+                if (Schema::hasTable('caregiver_courses') && $caregiver->relationLoaded('caregiverCourses')) {
+                    $courses = $caregiver->caregiverCourses;
+                }
                 
                 return [
                     'id' => $caregiver->id,
@@ -101,8 +135,8 @@ class CaregiverController extends Controller
                     'availability' => $caregiver->availability,
                     'is_available' => $caregiver->is_available,
                     'average_rating' => $avgRating ? round($avgRating, 1) : null,
-                    'total_reviews' => $caregiver->caregiverReviews->count(),
-                    'courses' => $caregiver->caregiverCourses,
+                    'total_reviews' => $totalReviews,
+                    'courses' => $courses,
                     'profile' => $caregiver->profile,
                     // Campos específicos de médico
                     'crm' => $caregiver->crm,
@@ -132,9 +166,21 @@ class CaregiverController extends Controller
     public function show(Request $request, $id)
     {
         try {
-            $caregiver = User::whereIn('profile', ['professional_caregiver', 'doctor'])
-                ->with(['caregiverCourses', 'caregiverReviews', 'medicalSpecialty'])
-                ->find($id);
+            // Carregar relacionamentos apenas se as tabelas existirem
+            $withRelations = [];
+            if (Schema::hasTable('caregiver_courses')) {
+                $withRelations[] = 'caregiverCourses';
+            }
+            if (Schema::hasTable('caregiver_reviews')) {
+                $withRelations[] = 'caregiverReviews';
+            }
+            $withRelations[] = 'medicalSpecialty';
+            
+            $query = User::whereIn('profile', ['professional_caregiver', 'doctor']);
+            if (!empty($withRelations)) {
+                $query->with($withRelations);
+            }
+            $caregiver = $query->find($id);
 
             if (!$caregiver) {
                 return response()->json([
@@ -143,7 +189,19 @@ class CaregiverController extends Controller
                 ], 404);
             }
 
-            $avgRating = $caregiver->caregiverReviews->avg('rating');
+            // Calcular média de avaliações de forma segura
+            $avgRating = null;
+            $totalReviews = 0;
+            if (Schema::hasTable('caregiver_reviews') && $caregiver->relationLoaded('caregiverReviews')) {
+                $avgRating = $caregiver->caregiverReviews->avg('rating');
+                $totalReviews = $caregiver->caregiverReviews->count();
+            }
+            
+            // Obter cursos de forma segura
+            $courses = [];
+            if (Schema::hasTable('caregiver_courses') && $caregiver->relationLoaded('caregiverCourses')) {
+                $courses = $caregiver->caregiverCourses;
+            }
 
             return response()->json([
                 'success' => true,
@@ -158,8 +216,8 @@ class CaregiverController extends Controller
                     'availability' => $caregiver->availability,
                     'is_available' => $caregiver->is_available,
                     'average_rating' => $avgRating ? round($avgRating, 1) : null,
-                    'total_reviews' => $caregiver->caregiverReviews->count(),
-                    'courses' => $caregiver->caregiverCourses,
+                    'total_reviews' => $totalReviews,
+                    'courses' => $courses,
                     'profile' => $caregiver->profile,
                     // Campos específicos de médico
                     'crm' => $caregiver->crm,

@@ -118,19 +118,20 @@ class MedicationController extends Controller
             $medArray = $medication->toArray();
             
             // Se tem médico, garantir que medical_specialty_id está presente
-            if (isset($medArray['doctor']) && $medArray['doctor']) {
-                // Se o médico não tem medical_specialty_id no array, buscar do relacionamento
-                if (!isset($medArray['doctor']['medical_specialty_id']) && $medication->doctor) {
-                    $doctorData = DB::table('doctors')
-                        ->where('id', $medication->doctor->id)
-                        ->select('medical_specialty_id')
-                        ->first();
-                    
-                    if ($doctorData) {
-                        $medArray['doctor']['medical_specialty_id'] = $doctorData->medical_specialty_id;
-                    }
-                }
-            }
+            // COMENTADO: Relação doctor não funciona sem doctor_id na tabela medications
+            // if (isset($medArray['doctor']) && $medArray['doctor']) {
+            //     // Se o médico não tem medical_specialty_id no array, buscar do relacionamento
+            //     // if (!isset($medArray['doctor']['medical_specialty_id']) && $medication->doctor) {
+            //     //     $doctorData = DB::table('doctors')
+            //     //         ->where('id', $medication->doctor->id)
+            //     //         ->select('medical_specialty_id')
+            //     //         ->first();
+            //     //     
+            //     //     if ($doctorData) {
+            //             // $medArray['doctor']['medical_specialty_id'] = $doctorData->medical_specialty_id;
+            //         // }
+            //     // }
+            // }
             
             $medicationsArray[] = $medArray;
         }
@@ -377,7 +378,7 @@ class MedicationController extends Controller
     {
         $validated = $request->validate([
             'group_id' => 'required|exists:groups,id',
-            'doctor_id' => 'nullable|exists:doctors,id',
+            // doctor_id não existe na tabela medications, então não validamos aqui
             'name' => 'required|string|max:200',
             'pharmaceutical_form' => 'nullable|string|max:50',
             'dosage' => 'nullable|string|max:50',
@@ -408,21 +409,45 @@ class MedicationController extends Controller
         
         // Preparar dados para o modelo
         $medicationData = $validated;
+        // doctor_id não existe na tabela medications, então não adicionamos aqui
+        // O mutator do modelo vai converter o array para JSON string automaticamente
         $medicationData['frequency'] = $frequencyData;
-        $medicationData['times'] = $times; // Array de horários
+        
+        // Converter array de horários para um único valor TIME (pegar o primeiro horário)
+        // A coluna 'time' é do tipo TIME, não JSON
+        if (!empty($times) && is_array($times)) {
+            $firstTime = $times[0] ?? null;
+            if ($firstTime) {
+                // Garantir formato HH:MM:SS para MySQL TIME
+                $timeParts = explode(':', $firstTime);
+                if (count($timeParts) >= 2) {
+                    $hour = (int)$timeParts[0];
+                    $minute = (int)$timeParts[1];
+                    // Validar valores (0-23 para hora, 0-59 para minuto)
+                    $hour = max(0, min(23, $hour));
+                    $minute = max(0, min(59, $minute));
+                    $medicationData['time'] = sprintf('%02d:%02d:00', $hour, $minute);
+                } else {
+                    // Se não tiver formato correto, tentar adicionar :00
+                    $medicationData['time'] = $firstTime . ':00';
+                }
+            }
+        } else {
+            // Se não houver horários, não definir time (pode ser NULL)
+            unset($medicationData['time']);
+        }
+        
         unset($medicationData['frequency_type']);
         unset($medicationData['frequency_details']);
         
-        // Mapear duration_type e duration_value para duration (array)
-        $medicationData['duration'] = [
-            'type' => $validated['duration_type'],
-            'value' => $validated['duration_value'] ?? null,
-        ];
+        // Remover campos que não existem na tabela
+        unset($medicationData['first_dose_at']);
+        unset($medicationData['doctor_id']); // Remover doctor_id - coluna não existe na tabela medications
+        // pharmaceutical_form, unit, administration_route, dose_quantity e dose_quantity_unit EXISTEM na tabela - NÃO remover
+        unset($medicationData['times']); // Remover - usar 'time' ao invés
+        // Não mapear duration - coluna não existe na tabela
         unset($medicationData['duration_type']);
         unset($medicationData['duration_value']);
-        
-        // Remover campos que não estão no fillable do modelo
-        unset($medicationData['first_dose_at']);
         
         // Adicionar campos obrigatórios que não foram enviados
         // start_date e end_date podem ser calculados a partir de duration ou fornecidos (ex: dias intercalados)
@@ -435,12 +460,108 @@ class MedicationController extends Controller
         }
         
         // Se for temporário, calcular end_date (a menos que já tenha sido fornecido)
-        if (!isset($medicationData['end_date']) && $medicationData['duration']['type'] === 'temporario' && isset($medicationData['duration']['value'])) {
-            $medicationData['end_date'] = now()->addDays($medicationData['duration']['value']);
+        // Usar duration_type e duration_value diretamente, já que duration não existe na tabela
+        if (!isset($medicationData['end_date']) && isset($validated['duration_type']) && $validated['duration_type'] === 'temporario' && isset($validated['duration_value'])) {
+            $medicationData['end_date'] = now()->addDays($validated['duration_value']);
+        }
+        
+        // Adicionar registered_by_user_id se não estiver presente
+        if (!isset($medicationData['registered_by_user_id'])) {
+            $user = Auth::user();
+            if ($user) {
+                $medicationData['registered_by_user_id'] = $user->id;
+            }
+        }
+        
+        // Buscar o paciente do grupo (accompanied_person_id) - obrigatório
+        // A coluna referenced a tabela accompanied_people, não users
+        if (!isset($medicationData['accompanied_person_id']) && isset($medicationData['group_id'])) {
+            try {
+                // Primeiro, buscar o user_id do paciente no grupo
+                $patientUser = DB::table('group_members')
+                    ->join('users', 'group_members.user_id', '=', 'users.id')
+                    ->where('group_members.group_id', $medicationData['group_id'])
+                    ->whereIn('group_members.role', ['priority_contact', 'patient'])
+                    ->select('users.id as user_id')
+                    ->first();
+                
+                if ($patientUser && Schema::hasTable('accompanied_people')) {
+                    // Buscar o registro em accompanied_people que corresponde ao grupo e ao paciente
+                    $accompaniedPerson = DB::table('accompanied_people')
+                        ->where('group_id', $medicationData['group_id'])
+                        ->where('user_id', $patientUser->user_id)
+                        ->select('id')
+                        ->first();
+                    
+                    if ($accompaniedPerson) {
+                        $medicationData['accompanied_person_id'] = $accompaniedPerson->id;
+                        Log::info('MedicationController.store - Paciente acompanhado encontrado', [
+                            'group_id' => $medicationData['group_id'],
+                            'user_id' => $patientUser->user_id,
+                            'accompanied_person_id' => $accompaniedPerson->id
+                        ]);
+                    } else {
+                        // Se não encontrar em accompanied_people, criar um registro
+                        Log::warning('MedicationController.store - Registro não encontrado em accompanied_people, criando...', [
+                            'group_id' => $medicationData['group_id'],
+                            'user_id' => $patientUser->user_id
+                        ]);
+                        
+                        $userData = DB::table('users')->where('id', $patientUser->user_id)->first();
+                        if ($userData) {
+                            $accompaniedPersonId = DB::table('accompanied_people')->insertGetId([
+                                'group_id' => $medicationData['group_id'],
+                                'user_id' => $patientUser->user_id,
+                                'name' => $userData->name ?? 'Paciente',
+                                'email' => $userData->email ?? null,
+                                'phone' => $userData->phone ?? null,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                            $medicationData['accompanied_person_id'] = $accompaniedPersonId;
+                            Log::info('MedicationController.store - Registro criado em accompanied_people', [
+                                'accompanied_person_id' => $accompaniedPersonId
+                            ]);
+                        }
+                    }
+                } else {
+                    Log::warning('MedicationController.store - Nenhum paciente encontrado no grupo', [
+                        'group_id' => $medicationData['group_id']
+                    ]);
+                    // Se não encontrar paciente, buscar o primeiro registro em accompanied_people do grupo
+                    if (Schema::hasTable('accompanied_people')) {
+                        $firstAccompanied = DB::table('accompanied_people')
+                            ->where('group_id', $medicationData['group_id'])
+                            ->select('id')
+                            ->first();
+                        if ($firstAccompanied) {
+                            $medicationData['accompanied_person_id'] = $firstAccompanied->id;
+                            Log::info('MedicationController.store - Usando primeiro registro de accompanied_people do grupo', [
+                                'accompanied_person_id' => $firstAccompanied->id
+                            ]);
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::error('MedicationController.store - Erro ao buscar paciente do grupo: ' . $e->getMessage(), [
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
+        }
+        
+        // Validar se accompanied_person_id foi preenchido
+        if (!isset($medicationData['accompanied_person_id'])) {
+            Log::error('MedicationController.store - accompanied_person_id não foi preenchido');
+            return response()->json([
+                'success' => false,
+                'message' => 'Não foi possível identificar o paciente do grupo',
+                'error' => 'accompanied_person_id is required'
+            ], 422);
         }
         
         $medication = Medication::create($medicationData);
-        $medication->load('doctor');
+        // Remover load('doctor') - relação não funciona sem doctor_id na tabela
+        // $medication->load('doctor');
 
         // Registrar atividade - SEMPRE, sem try/catch que esconde erros
         $user = Auth::user();
@@ -474,41 +595,44 @@ class MedicationController extends Controller
 
     public function show($id)
     {
-        $medication = Medication::with(['doctor', 'doseHistory'])->findOrFail($id);
+        // COMENTADO: Relação doctor não funciona sem doctor_id na tabela medications
+        $medication = Medication::with(['doseHistory'])->findOrFail($id);
+        // $medication = Medication::with(['doctor', 'doseHistory'])->findOrFail($id);
         
+        // COMENTADO: Relação doctor não funciona sem doctor_id na tabela medications
         // Carregar especialidade médica se o médico tiver
-        if ($medication->doctor) {
-            // Verificar se o médico tem medical_specialty_id (pode estar na tabela doctors ou users)
-            $medicalSpecialtyId = null;
-            
-            // Tentar pegar de diferentes lugares
-            if (isset($medication->doctor->medical_specialty_id)) {
-                $medicalSpecialtyId = $medication->doctor->medical_specialty_id;
-            } elseif (isset($medication->doctor->user_id)) {
-                // Se o médico tem user_id, buscar na tabela users
-                $user = DB::table('users')
-                    ->where('id', $medication->doctor->user_id)
-                    ->select('medical_specialty_id')
-                    ->first();
-                if ($user && $user->medical_specialty_id) {
-                    $medicalSpecialtyId = $user->medical_specialty_id;
-                }
-            }
-            
-            if ($medicalSpecialtyId) {
-                $specialty = DB::table('medical_specialties')
-                    ->where('id', $medicalSpecialtyId)
-                    ->select('id', 'name')
-                    ->first();
-                
-                if ($specialty) {
-                    $medication->doctor->medical_specialty = [
-                        'id' => $specialty->id,
-                        'name' => $specialty->name,
-                    ];
-                }
-            }
-        }
+        // if ($medication->doctor) {
+        //     // Verificar se o médico tem medical_specialty_id (pode estar na tabela doctors ou users)
+        //     $medicalSpecialtyId = null;
+        //     
+        //     // Tentar pegar de diferentes lugares
+        //     if (isset($medication->doctor->medical_specialty_id)) {
+        //         $medicalSpecialtyId = $medication->doctor->medical_specialty_id;
+        //     } elseif (isset($medication->doctor->user_id)) {
+        //         // Se o médico tem user_id, buscar na tabela users
+        //         $user = DB::table('users')
+        //             ->where('id', $medication->doctor->user_id)
+        //             ->select('medical_specialty_id')
+        //             ->first();
+        //         if ($user && $user->medical_specialty_id) {
+        //             $medicalSpecialtyId = $user->medical_specialty_id;
+        //         }
+        //     }
+        //     
+        //     if ($medicalSpecialtyId) {
+        //         $specialty = DB::table('medical_specialties')
+        //             ->where('id', $medicalSpecialtyId)
+        //             ->select('id', 'name')
+        //             ->first();
+        //         
+        //         if ($specialty) {
+        //             $medication->doctor->medical_specialty = [
+        //                 'id' => $specialty->id,
+        //                 'name' => $specialty->name,
+        //             ];
+        //         }
+        //     }
+        // }
         return response()->json($medication);
     }
 
@@ -522,6 +646,7 @@ class MedicationController extends Controller
             'dosage' => 'sometimes|string|max:50',
             'unit' => 'sometimes|string|max:20',
             'dose_quantity' => 'sometimes|string|max:20',
+            'dose_quantity_unit' => 'sometimes|string|max:20',
             'administration_route' => 'sometimes|string|max:50',
             'frequency_type' => 'sometimes|in:simple,advanced',
             'frequency_details' => 'sometimes|json',
@@ -651,7 +776,8 @@ class MedicationController extends Controller
 
         // Atualizar o medicamento
         $medication->update($validated);
-        $medication->load('doctor');
+        // COMENTADO: Relação doctor não funciona sem doctor_id na tabela medications
+        // $medication->load('doctor');
 
         return response()->json($medication);
     }

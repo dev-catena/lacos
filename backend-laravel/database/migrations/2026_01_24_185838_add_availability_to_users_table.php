@@ -13,7 +13,12 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             if (!Schema::hasColumn('users', 'availability')) {
-                $table->text('availability')->nullable()->after('is_available');
+                // Tentar adicionar após is_available se existir, senão adicionar no final
+                if (Schema::hasColumn('users', 'is_available')) {
+                    $table->text('availability')->nullable()->after('is_available');
+                } else {
+                    $table->text('availability')->nullable();
+                }
             }
         });
     }

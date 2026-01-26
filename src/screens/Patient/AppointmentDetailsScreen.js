@@ -11,8 +11,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import SafeIcon from '../../components/SafeIcon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import { useFocusEffect } from '@react-navigation/native';
@@ -29,18 +29,31 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [recordingSettings, setRecordingSettings] = useState({
+    recording_start_before_minutes: 15,
+    recording_stop_after_end_minutes: 15,
+    recording_max_duration_after_end_minutes: 30,
+  });
+  const [canStartRecording, setCanStartRecording] = useState(false);
+  const [canResumeRecording, setCanResumeRecording] = useState(false);
+  const [recordingStatus, setRecordingStatus] = useState(null); // 'available', 'started', 'finished', 'expired'
 
   // REGRA: Só permite gravação para consultas do tipo 'medical'
   const isMedical = appointment?.type === 'medical';
 
   useEffect(() => {
+    // Carregar configurações de gravação
+    loadRecordingSettings();
+  }, []);
+
+  useEffect(() => {
     // Só verifica microfone se for consulta médica
-    if (isMedical) {
+    if (isMedical && recordingSettings) {
       checkMicrophoneAvailability();
-      const interval = setInterval(checkMicrophoneAvailability, 60000); // Verifica a cada minuto
+      const interval = setInterval(checkMicrophoneAvailability, 30000); // Verifica a cada 30 segundos
       return () => clearInterval(interval);
     }
-  }, [isMedical]);
+  }, [isMedical, recordingSettings]);
 
   useEffect(() => {
     if (isMicrophoneBlinking) {
@@ -75,27 +88,69 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
     }, [appointment?.id, recordingJustSaved])
   );
 
+  const loadRecordingSettings = async () => {
+    try {
+      const result = await systemSettingService.getRecordingSettings();
+      if (result.success && result.data) {
+        setRecordingSettings(result.data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações de gravação:', error);
+    }
+  };
+
   const checkMicrophoneAvailability = () => {
-    if (!appointment?.time) return;
+    if (!appointment?.time || !recordingSettings) return;
 
     const now = new Date();
     const [hours, minutes] = appointment.time.split(':');
     const appointmentTime = new Date();
     appointmentTime.setHours(parseInt(hours), parseInt(minutes), 0);
 
-    // 15 minutos antes
-    const fifteenMinBefore = new Date(appointmentTime.getTime() - 15 * 60000);
-    // 30 minutos depois
-    const thirtyMinAfter = new Date(appointmentTime.getTime() + 30 * 60000);
-    // 3 minutos depois (para piscar)
-    const threeMinAfter = new Date(appointmentTime.getTime() + 3 * 60000);
+    // Calcular limites baseados nas configurações
+    const startBeforeMinutes = recordingSettings.recording_start_before_minutes || 15;
+    const stopAfterEndMinutes = recordingSettings.recording_stop_after_end_minutes || 15;
+    const maxDurationAfterEndMinutes = recordingSettings.recording_max_duration_after_end_minutes || 30;
 
-    // Mostrar microfone se está no período (15 min antes até 30 min depois)
-    const shouldShow = now >= fifteenMinBefore && now <= thirtyMinAfter;
+    // Tempo de início permitido (X minutos antes)
+    const startTime = new Date(appointmentTime.getTime() - startBeforeMinutes * 60000);
+    
+    // Tempo limite para iniciar nova gravação (X minutos após o fim)
+    const stopStartTime = new Date(appointmentTime.getTime() + stopAfterEndMinutes * 60000);
+    
+    // Tempo máximo de gravação (X minutos após o fim)
+    const maxRecordingTime = new Date(appointmentTime.getTime() + maxDurationAfterEndMinutes * 60000);
+
+    // Verificar se pode iniciar nova gravação
+    const canStart = now >= startTime && now <= stopStartTime;
+    setCanStartRecording(canStart);
+
+    // Verificar se pode retomar gravação (se já foi finalizada mas ainda está dentro do limite)
+    const canResume = recordingData && now <= maxRecordingTime;
+    setCanResumeRecording(canResume);
+
+    // Determinar status da gravação
+    if (recordingData) {
+      if (now > maxRecordingTime) {
+        setRecordingStatus('expired');
+      } else {
+        setRecordingStatus('finished');
+      }
+    } else if (canStart) {
+      setRecordingStatus('available');
+    } else if (now < startTime) {
+      setRecordingStatus('not_started');
+    } else {
+      setRecordingStatus('expired');
+    }
+
+    // Mostrar microfone se pode iniciar ou retomar
+    const shouldShow = canStart || canResume;
     setShowMicrophone(shouldShow);
 
     // Piscar se está entre o horário de início e 3 minutos depois
-    const shouldBlink = now >= appointmentTime && now <= threeMinAfter;
+    const threeMinAfter = new Date(appointmentTime.getTime() + 3 * 60000);
+    const shouldBlink = now >= appointmentTime && now <= threeMinAfter && canStart;
     setIsMicrophoneBlinking(shouldBlink);
   };
 
@@ -261,8 +316,21 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
   };
 
   const handleStartRecording = () => {
+    // Verificar se pode iniciar ou retomar
+    if (!canStartRecording && !canResumeRecording) {
+      Toast.show({
+        type: 'error',
+        text1: 'Gravação não disponível',
+        text2: 'O tempo para iniciar gravação expirou',
+        position: 'bottom',
+      });
+      return;
+    }
+
     navigation.navigate('RecordingScreen', {
       appointment,
+      recordingData: canResumeRecording ? recordingData : null, // Passar dados se for retomar
+      recordingSettings, // Passar configurações
     });
   };
 
@@ -276,7 +344,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detalhes da Consulta</Text>
         <View style={styles.placeholder} />
@@ -286,7 +354,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
         {/* Appointment Info Card */}
         <View style={styles.appointmentCard}>
           <View style={[styles.iconContainer, { backgroundColor: colors.warning + '20' }]}>
-            <Ionicons name="calendar" size={48} color={colors.warning} />
+            <SafeIcon name="calendar" size={48} color={colors.warning} />
           </View>
 
           <Text style={styles.title}>{appointment?.title}</Text>
@@ -294,20 +362,20 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
 
           <View style={styles.infoSection}>
             <View style={styles.infoRow}>
-              <Ionicons name="time-outline" size={20} color={colors.textLight} />
+              <SafeIcon name="time-outline" size={20} color={colors.textLight} />
               <Text style={styles.infoLabel}>Horário:</Text>
               <Text style={styles.infoValue}>{appointment?.time}</Text>
             </View>
 
             <View style={styles.infoRow}>
-              <Ionicons name="calendar-outline" size={20} color={colors.textLight} />
+              <SafeIcon name="calendar-outline" size={20} color={colors.textLight} />
               <Text style={styles.infoLabel}>Data:</Text>
               <Text style={styles.infoValue}>{appointment?.date}</Text>
             </View>
 
             {appointment?.location && (
               <View style={styles.infoRow}>
-                <Ionicons name="location-outline" size={20} color={colors.textLight} />
+                <SafeIcon name="location-outline" size={20} color={colors.textLight} />
                 <Text style={styles.infoLabel}>Local:</Text>
                 <Text style={styles.infoValue}>{appointment?.location}</Text>
               </View>
@@ -319,7 +387,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
         {isMedical && showMicrophone && (
           <View style={styles.recordingSection}>
             <View style={styles.recordingHeader}>
-              <Ionicons name="mic" size={24} color={colors.error} />
+              <SafeIcon name="mic" size={24} color={colors.error} />
               <Text style={styles.recordingTitle}>Gravação de Áudio</Text>
             </View>
 
@@ -336,26 +404,32 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
                 onPress={handleStartRecording}
               >
                 <View style={styles.recordButtonIcon}>
-                  <Ionicons name="mic" size={32} color={colors.textWhite} />
+                  <SafeIcon name="mic" size={32} color={colors.textWhite} />
                 </View>
                 <View style={styles.recordButtonContent}>
                   <Text style={styles.recordButtonTitle}>
-                    {isMicrophoneBlinking ? 'Gravar Agora!' : 'Iniciar Gravação'}
+                    {canResumeRecording 
+                      ? 'Retomar Gravação'
+                      : isMicrophoneBlinking 
+                        ? 'Gravar Agora!' 
+                        : 'Iniciar Gravação'}
                   </Text>
                   <Text style={styles.recordButtonSubtitle}>
-                    {isMicrophoneBlinking 
-                      ? 'Consulta em andamento - Toque para gravar'
-                      : 'Grave suas anotações sobre a consulta'
+                    {canResumeRecording
+                      ? 'Continue gravando suas anotações'
+                      : isMicrophoneBlinking 
+                        ? 'Consulta em andamento - Toque para gravar'
+                        : 'Grave suas anotações sobre a consulta'
                     }
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={24} color={colors.textWhite} />
+                <SafeIcon name="chevron-forward" size={24} color={colors.textWhite} />
               </TouchableOpacity>
             </Animated.View>
 
             {isMicrophoneBlinking && (
               <View style={styles.urgentBadge}>
-                <Ionicons name="alert-circle" size={16} color={colors.error} />
+                <SafeIcon name="alert-circle" size={16} color={colors.error} />
                 <Text style={styles.urgentText}>
                   Disponível por mais alguns minutos!
                 </Text>
@@ -368,14 +442,14 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
         {recordingData && (
           <View style={styles.audioPlayerSection}>
             <View style={styles.audioPlayerHeader}>
-              <Ionicons name="musical-notes" size={24} color={colors.success} />
+              <SafeIcon name="musical-notes" size={24} color={colors.success} />
               <Text style={styles.audioPlayerTitle}>Gravação de Áudio</Text>
             </View>
 
             <View style={styles.audioPlayerCard}>
               <View style={styles.audioInfo}>
                 <View style={styles.audioIconContainer}>
-                  <Ionicons 
+                  <SafeIcon 
                     name={isPlaying ? "pause-circle" : "play-circle"} 
                     size={64} 
                     color={colors.success} 
@@ -409,7 +483,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
                     <ActivityIndicator color={colors.textWhite} />
                   ) : (
                     <>
-                      <Ionicons 
+                      <SafeIcon 
                         name={isPlaying ? "pause" : "play"} 
                         size={24} 
                         color={colors.textWhite} 
@@ -426,14 +500,14 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
                   onPress={deleteRecording}
                   disabled={isLoading}
                 >
-                  <Ionicons name="trash-outline" size={20} color={colors.error} />
+                  <SafeIcon name="trash-outline" size={20} color={colors.error} />
                   <Text style={styles.deleteButtonText}>Excluir</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.audioInfoCard}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <SafeIcon name="checkmark-circle" size={20} color={colors.success} />
               <Text style={styles.audioInfoText}>
                 Seus cuidadores podem ouvir esta gravação e acompanhar suas consultas.
               </Text>
@@ -444,7 +518,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
         {/* Instructions - Só mostra para consultas médicas */}
         {isMedical && (
           <View style={styles.instructionsCard}>
-            <Ionicons name="information-circle" size={24} color={colors.info} />
+            <SafeIcon name="information-circle" size={24} color={colors.info} />
             <View style={styles.instructionsContent}>
               <Text style={styles.instructionsTitle}>Como funciona?</Text>
               <Text style={styles.instructionsText}>

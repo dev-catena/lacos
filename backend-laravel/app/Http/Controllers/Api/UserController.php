@@ -30,7 +30,7 @@ class UserController extends Controller
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $id,
             'phone' => 'sometimes|nullable|string|max:20',
-            'gender' => 'sometimes|nullable|in:male,female,other',
+            'gender' => 'sometimes|nullable|in:masculino,feminino,outro,male,female,other',
             'blood_type' => 'sometimes|nullable|string|max:5',
             'birth_date' => 'sometimes|nullable|date',
             'password' => 'sometimes|nullable|string|min:6',
@@ -52,6 +52,10 @@ class UserController extends Controller
             'is_available' => 'sometimes|nullable|boolean',
             'latitude' => 'sometimes|nullable|numeric',
             'longitude' => 'sometimes|nullable|numeric',
+            // Campos específicos de médico
+            'crm' => 'sometimes|nullable|string|max:20',
+            'medical_specialty_id' => 'sometimes|nullable|exists:medical_specialties,id',
+            'consultation_price' => 'sometimes|nullable|numeric|min:0',
         ];
 
         $request->validate($rules);
@@ -60,11 +64,23 @@ class UserController extends Controller
         $data = [];
         
         // Campos sempre presentes
-        $alwaysFields = ['name', 'email', 'phone', 'gender', 'blood_type', 'birth_date'];
+        $alwaysFields = ['name', 'email', 'phone', 'blood_type', 'birth_date'];
         foreach ($alwaysFields as $field) {
             if ($request->has($field)) {
                 $data[$field] = $request->input($field);
             }
+        }
+        
+        // Processar gender separadamente para converter valores em inglês para português
+        if ($request->has('gender')) {
+            $gender = $request->input('gender');
+            // Converter valores em inglês para português
+            $genderMap = [
+                'male' => 'masculino',
+                'female' => 'feminino',
+                'other' => 'outro',
+            ];
+            $data['gender'] = $genderMap[$gender] ?? $gender;
         }
         
         // Campos de dados pessoais (verificar se existem)
@@ -99,6 +115,25 @@ class UserController extends Controller
         foreach ($caregiverFields as $field) {
             if ($request->has($field) && Schema::hasColumn('users', $field)) {
                 $data[$field] = $request->input($field);
+            }
+        }
+        
+        // Campos específicos de médico (verificar se existem)
+        $doctorFields = [
+            'crm',
+            'medical_specialty_id',
+            'consultation_price',
+        ];
+        
+        foreach ($doctorFields as $field) {
+            if ($request->has($field) && Schema::hasColumn('users', $field)) {
+                $value = $request->input($field);
+                // Para consultation_price, garantir que seja numérico ou null
+                if ($field === 'consultation_price') {
+                    $data[$field] = $value !== null && $value !== '' ? (float) $value : null;
+                } else {
+                    $data[$field] = $value;
+                }
             }
         }
 

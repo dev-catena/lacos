@@ -9,8 +9,8 @@ import {
   Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import SafeIcon from '../../components/SafeIcon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
@@ -18,11 +18,13 @@ import colors from '../../constants/colors';
 const APPOINTMENT_RECORDINGS_KEY = '@lacos_appointment_recordings';
 
 const RecordingScreen = ({ route, navigation }) => {
-  const { appointment } = route.params || {};
+  const { appointment, recordingData: existingRecordingData, recordingSettings } = route.params || {};
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingTime, setRecordingTime] = useState(existingRecordingData?.duration || 0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isResuming, setIsResuming] = useState(!!existingRecordingData);
+  const [maxRecordingTime, setMaxRecordingTime] = useState(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const waveAnim1 = useRef(new Animated.Value(0)).current;
@@ -30,13 +32,41 @@ const RecordingScreen = ({ route, navigation }) => {
   const waveAnim3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Calcular tempo máximo de gravação
+    if (appointment?.time && recordingSettings) {
+      const [hours, minutes] = appointment.time.split(':');
+      const appointmentTime = new Date();
+      appointmentTime.setHours(parseInt(hours), parseInt(minutes), 0);
+      
+      const maxDurationAfterEnd = recordingSettings.recording_max_duration_after_end_minutes || 30;
+      const maxTime = new Date(appointmentTime.getTime() + maxDurationAfterEnd * 60000);
+      setMaxRecordingTime(maxTime);
+    }
+
+    // Iniciar gravação (mesmo se for retomar, inicia nova sessão)
     startRecording();
+
     return () => {
       if (recording) {
         recording.stopAndUnloadAsync();
       }
     };
   }, []);
+
+  useEffect(() => {
+    // Verificar se excedeu o tempo máximo durante a gravação
+    if (isRecording && !isPaused && maxRecordingTime) {
+      const checkInterval = setInterval(() => {
+        const now = new Date();
+        if (now >= maxRecordingTime) {
+          // Forçar parada
+          handleFinish(true); // true = forçar sem perguntar
+        }
+      }, 1000);
+
+      return () => clearInterval(checkInterval);
+    }
+  }, [isRecording, isPaused, maxRecordingTime]);
 
   useEffect(() => {
     if (isRecording && !isPaused) {
@@ -133,70 +163,93 @@ const RecordingScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleFinish = () => {
-    Alert.alert(
-      'Finalizar Gravação?',
-      'Deseja finalizar e salvar esta gravação?',
-      [
-        { text: 'Continuar Gravando', style: 'cancel' },
-        {
-          text: 'Finalizar',
-          onPress: async () => {
-            try {
-              await recording.stopAndUnloadAsync();
-              const uri = recording.getURI();
-              
-              // Salvar gravação vinculada à consulta no AsyncStorage
-              if (appointment && appointment.id && uri) {
-                try {
-                  const recordingsJson = await AsyncStorage.getItem(APPOINTMENT_RECORDINGS_KEY);
-                  const recordings = recordingsJson ? JSON.parse(recordingsJson) : {};
-                  
-                  recordings[appointment.id] = {
-                    uri: uri,
-                    duration: recordingTime,
-                    recordedAt: new Date().toISOString(),
-                    appointmentTitle: appointment.title,
-                    appointmentTime: appointment.time,
-                  };
-                  
-                  await AsyncStorage.setItem(APPOINTMENT_RECORDINGS_KEY, JSON.stringify(recordings));
-                  
-                  console.log('Gravação salva:', recordings[appointment.id]);
-                  
-                  Toast.show({
-                    type: 'success',
-                    text1: 'Gravação Salva! ✅',
-                    text2: `Áudio de ${formatTime(recordingTime)} salvo com sucesso`,
-                    position: 'top',
-                  });
-                } catch (storageError) {
-                  console.error('Erro ao salvar no AsyncStorage:', storageError);
-                }
-              }
-              
-              setIsRecording(false);
-              
-              // Voltar para a tela de detalhes da consulta
-              setTimeout(() => {
-                navigation.navigate('AppointmentDetails', { 
-                  appointment: appointment,
-                  recordingJustSaved: true,
-                });
-              }, 800);
-            } catch (error) {
-              console.error('Erro ao finalizar:', error);
-              Toast.show({
-                type: 'error',
-                text1: 'Erro',
-                text2: 'Não foi possível salvar a gravação',
-                position: 'bottom',
-              });
-            }
+  const handleFinish = (forceFinish = false) => {
+    const finishAction = async () => {
+      try {
+        if (recording) {
+          await recording.stopAndUnloadAsync();
+        }
+        const uri = recording ? recording.getURI() : null;
+        
+        // Salvar gravação vinculada à consulta no AsyncStorage
+        if (appointment && appointment.id) {
+          try {
+            const recordingsJson = await AsyncStorage.getItem(APPOINTMENT_RECORDINGS_KEY);
+            const recordings = recordingsJson ? JSON.parse(recordingsJson) : {};
+            
+            // Se já existe gravação e estamos retomando, acumular tempo
+            const existingDuration = existingRecordingData?.duration || 0;
+            const totalDuration = existingDuration + recordingTime;
+            
+            recordings[appointment.id] = {
+              uri: uri || existingRecordingData?.uri, // Manter URI anterior se não houver nova
+              duration: totalDuration,
+              recordedAt: existingRecordingData?.recordedAt || new Date().toISOString(),
+              lastUpdatedAt: new Date().toISOString(),
+              appointmentTitle: appointment.title,
+              appointmentTime: appointment.time,
+              isResumed: isResuming,
+            };
+            
+            await AsyncStorage.setItem(APPOINTMENT_RECORDINGS_KEY, JSON.stringify(recordings));
+            
+            console.log('Gravação salva:', recordings[appointment.id]);
+            
+            Toast.show({
+              type: 'success',
+              text1: isResuming ? 'Gravação Retomada e Salva! ✅' : 'Gravação Salva! ✅',
+              text2: `Áudio de ${formatTime(totalDuration)} salvo com sucesso`,
+              position: 'top',
+            });
+          } catch (storageError) {
+            console.error('Erro ao salvar no AsyncStorage:', storageError);
+          }
+        }
+        
+        setIsRecording(false);
+        
+        // Voltar para a tela de detalhes da consulta
+        setTimeout(() => {
+          navigation.navigate('AppointmentDetails', { 
+            appointment: appointment,
+            recordingJustSaved: true,
+          });
+        }, 800);
+      } catch (error) {
+        console.error('Erro ao finalizar:', error);
+        Toast.show({
+          type: 'error',
+          text1: 'Erro',
+          text2: 'Não foi possível salvar a gravação',
+          position: 'bottom',
+        });
+      }
+    };
+
+    if (forceFinish) {
+      // Forçar finalização sem perguntar (quando excede tempo máximo)
+      finishAction();
+      Toast.show({
+        type: 'info',
+        text1: 'Gravação Finalizada',
+        text2: 'Tempo máximo de gravação atingido',
+        position: 'top',
+      });
+    } else {
+      Alert.alert(
+        'Finalizar Gravação?',
+        isResuming 
+          ? 'Deseja finalizar e salvar esta gravação? Você poderá retomá-la depois.'
+          : 'Deseja finalizar e salvar esta gravação?',
+        [
+          { text: 'Continuar Gravando', style: 'cancel' },
+          {
+            text: 'Finalizar',
+            onPress: finishAction,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleCancel = () => {
@@ -240,7 +293,7 @@ const RecordingScreen = ({ route, navigation }) => {
           style={styles.cancelButton}
           onPress={handleCancel}
         >
-          <Ionicons name="close" size={28} color={colors.textWhite} />
+          <SafeIcon name="close" size={28} color={colors.textWhite} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Gravando Consulta</Text>
         <View style={styles.placeholder} />
@@ -318,7 +371,7 @@ const RecordingScreen = ({ route, navigation }) => {
             ]}
           >
             <View style={styles.microphoneCircle}>
-              <Ionicons 
+              <SafeIcon 
                 name={isPaused ? "pause" : "mic"} 
                 size={64} 
                 color={colors.textWhite} 
@@ -337,6 +390,11 @@ const RecordingScreen = ({ route, navigation }) => {
 
         {/* Timer */}
         <Text style={styles.timer}>{formatTime(recordingTime)}</Text>
+        {isResuming && (
+          <Text style={styles.resumeText}>
+            Retomando gravação anterior
+          </Text>
+        )}
 
         {/* Controls */}
         <View style={styles.controls}>
@@ -344,7 +402,7 @@ const RecordingScreen = ({ route, navigation }) => {
             style={styles.controlButton}
             onPress={handlePauseResume}
           >
-            <Ionicons 
+            <SafeIcon 
               name={isPaused ? "play" : "pause"} 
               size={32} 
               color={colors.textWhite} 
@@ -358,14 +416,14 @@ const RecordingScreen = ({ route, navigation }) => {
             style={[styles.controlButton, styles.finishButton]}
             onPress={handleFinish}
           >
-            <Ionicons name="checkmark-circle" size={32} color={colors.textWhite} />
+            <SafeIcon name="checkmark-circle" size={32} color={colors.textWhite} />
             <Text style={styles.controlButtonText}>Finalizar</Text>
           </TouchableOpacity>
         </View>
 
         {/* Instructions */}
         <View style={styles.instructionsContainer}>
-          <Ionicons name="information-circle-outline" size={20} color={colors.textWhite} opacity={0.7} />
+          <SafeIcon name="information-circle-outline" size={20} color={colors.textWhite} style={{ opacity: 0.7 }} />
           <Text style={styles.instructionsText}>
             Fale sobre a consulta. Seus cuidadores receberão esta gravação.
           </Text>
@@ -485,6 +543,14 @@ const styles = StyleSheet.create({
     color: colors.textWhite,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
+  },
+  resumeText: {
+    fontSize: 14,
+    color: colors.textWhite,
+    opacity: 0.9,
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   controls: {
     flexDirection: 'row',

@@ -298,6 +298,50 @@ const PatientHomeScreen = ({ navigation }) => {
         error: appointmentsResult.error
       });
       
+      // Filtrar teleconsultas não pagas - pacientes só devem ver teleconsultas pagas
+      let filteredAppointments = [];
+      if (appointmentsResult.success && appointmentsResult.data && Array.isArray(appointmentsResult.data)) {
+        console.log('🔍 PatientHomeScreen - Filtrando appointments:', {
+          total: appointmentsResult.data.length,
+          appointments: appointmentsResult.data.map(apt => ({
+            id: apt.id,
+            is_teleconsultation: apt.is_teleconsultation,
+            payment_status: apt.payment_status,
+          })),
+        });
+        
+        filteredAppointments = appointmentsResult.data.filter(apt => {
+          // Se for teleconsulta, só mostrar se já foi paga
+          const isTeleconsultation = apt.is_teleconsultation || apt.data?.is_teleconsultation || false;
+          if (isTeleconsultation) {
+            const paymentStatus = apt.payment_status || apt.data?.payment_status;
+            console.log('🔍 PatientHomeScreen - Verificando teleconsulta:', {
+              appointmentId: apt.id,
+              is_teleconsultation: isTeleconsultation,
+              payment_status: paymentStatus,
+              shouldShow: !(paymentStatus === 'pending' || paymentStatus === null || paymentStatus === undefined),
+            });
+            
+            if (paymentStatus === 'pending' || paymentStatus === null || paymentStatus === undefined) {
+              console.log('🚫 PatientHomeScreen - Ocultando teleconsulta não paga:', {
+                appointmentId: apt.id,
+                payment_status: paymentStatus,
+              });
+              return false; // Não mostrar para paciente
+            }
+          }
+          return true; // Mostrar todas as outras
+        });
+        
+        console.log('📋 PatientHomeScreen - Appointments filtrados:', {
+          total: appointmentsResult.data.length,
+          filtrados: filteredAppointments.length,
+          ocultados: appointmentsResult.data.length - filteredAppointments.length,
+        });
+      } else {
+        filteredAppointments = appointmentsResult.data || [];
+      }
+      
       // Buscar medications
       const medicationsResult = await medicationService.getMedications(currentGroupId);
       
@@ -309,11 +353,24 @@ const PatientHomeScreen = ({ navigation }) => {
       
       const upcomingEvents = [];
       
-      // Processar appointments
+      // Processar appointments (usar filteredAppointments que já filtra teleconsultas não pagas)
       const appointmentsList = [];
-      if (appointmentsResult.success && appointmentsResult.data) {
-        const appointments = Array.isArray(appointmentsResult.data) ? appointmentsResult.data : [];
+      if (appointmentsResult.success && filteredAppointments) {
+        const appointments = Array.isArray(filteredAppointments) ? filteredAppointments : [];
         appointments.forEach(appointment => {
+          // FILTRO ADICIONAL: Verificar novamente se é teleconsulta não paga
+          // (dupla verificação para garantir que não apareça para paciente)
+          if (appointment.is_teleconsultation) {
+            const paymentStatus = appointment.payment_status;
+            if (paymentStatus === 'pending' || paymentStatus === null) {
+              console.log('🚫 PatientHomeScreen - Ocultando teleconsulta não paga no processamento:', {
+                appointmentId: appointment.id,
+                payment_status: paymentStatus,
+              });
+              return; // Não processar esta consulta
+            }
+          }
+          
           // Backend usa 'appointment_date' não 'scheduled_at'
           const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at);
           const hours = appointmentDate.getHours().toString().padStart(2, '0');
@@ -1037,7 +1094,23 @@ const PatientHomeScreen = ({ navigation }) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Agendas</Text>
             
-            {appointments.map((appointment) => {
+            {appointments
+              .filter(appointment => {
+                // FILTRO FINAL: Garantir que teleconsultas não pagas não apareçam
+                const isTeleconsultation = appointment.is_teleconsultation || appointment.data?.is_teleconsultation || appointment.data?.isTeleconsultation || false;
+                if (isTeleconsultation) {
+                  const paymentStatus = appointment.data?.payment_status || appointment.payment_status;
+                  if (paymentStatus === 'pending' || paymentStatus === null || paymentStatus === undefined) {
+                    console.log('🚫 PatientHomeScreen - Filtro final no render: Ocultando teleconsulta não paga:', {
+                      appointmentId: appointment.id || appointment.data?.id,
+                      payment_status: paymentStatus,
+                    });
+                    return false; // Não renderizar esta consulta
+                  }
+                }
+                return true; // Mostrar todas as outras
+              })
+              .map((appointment) => {
               const appointmentDate = new Date(appointment.appointmentTime || appointment.data?.appointment_date || appointment.data?.scheduled_at);
               const now = new Date();
               const minutesUntilAppointment = (appointmentDate - now) / (1000 * 60);

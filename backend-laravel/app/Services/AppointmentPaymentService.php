@@ -3,363 +3,308 @@
 namespace App\Services;
 
 use App\Models\Appointment;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Serviço para gerenciar pagamentos de teleconsultas
- * 
- * NOTA: Esta implementação usa MOCKUP quando não é possível integrar com gateway real
+ * AppointmentPaymentService - Lógica de negócio para pagamento de consultas
  */
 class AppointmentPaymentService
 {
-    private $isMockMode = true; // MUDAR PARA false quando gateway real estiver configurado
-    
+    protected $paymentService;
+
+    public function __construct(PaymentService $paymentService)
+    {
+        $this->paymentService = $paymentService;
+    }
+
     /**
-     * Processar pagamento e colocar em hold
+     * Processar pagamento de uma consulta
+     * 
+     * @param Appointment $appointment
+     * @param array $paymentData Dados do pagamento (payment_method, card_token, etc)
+     * @return array
      */
-    public function processPayment(Appointment $appointment, $amount, $paymentMethodData = [])
+    public function processPayment(Appointment $appointment, array $paymentData): array
     {
         try {
+            // Validar se consulta pode ser paga
+            if ($appointment->payment_status !== 'pending') {
+                return [
+                    'success' => false,
+                    'message' => 'Esta consulta já foi paga ou não está pendente de pagamento.',
+                ];
+            }
+
             // Validar se é teleconsulta
             if (!$appointment->is_teleconsultation) {
-                throw new \Exception('Apenas teleconsultas podem ser pagas');
+                return [
+                    'success' => false,
+                    'message' => 'Apenas teleconsultas requerem pagamento.',
+                ];
             }
-            
-            // Validar status
-            if ($appointment->payment_status === 'paid_held' || $appointment->payment_status === 'released') {
-                throw new \Exception('Esta consulta já foi paga');
+
+            // Obter valor da consulta (já deve incluir a taxa de 20% da plataforma)
+            $amount = $appointment->amount;
+            if (!$amount) {
+                // Buscar valor do médico e calcular total
+                $doctor = $appointment->doctorUser;
+                $consultationPrice = null;
+                
+                if ($doctor && isset($doctor->consultation_price)) {
+                    $consultationPrice = $doctor->consultation_price;
+                } else {
+                    $consultationPrice = 100.00; // Valor padrão
+                }
+                
+                // Calcular valor total: consultation_price + 20% (taxa da plataforma)
+                $amount = round($consultationPrice * 1.20, 2);
             }
-            
-            if ($this->isMockMode) {
-                return $this->processPaymentMock($appointment, $amount, $paymentMethodData);
+
+            // Criar pagamento no gateway (mock)
+            $description = "Teleconsulta - {$appointment->title}";
+            $customerId = auth()->id();
+
+            $paymentResult = $this->paymentService->createPaymentWithHold(
+                $amount,
+                'BRL',
+                $description,
+                $customerId,
+                [
+                    'doctor_percentage' => 80,
+                    'platform_percentage' => 20,
+                    'doctor_account_id' => $this->getDoctorAccountId($appointment->doctor_id),
+                    'platform_account_id' => $this->getPlatformAccountId(),
+                ]
+            );
+
+            if (!$paymentResult['success']) {
+                return [
+                    'success' => false,
+                    'message' => 'Erro ao processar pagamento no gateway.',
+                ];
             }
-            
-            // TODO: Implementar integração real com gateway
-            // return $this->processPaymentReal($appointment, $amount, $paymentMethodData);
-            
-        } catch (\Exception $e) {
-            Log::error('Erro ao processar pagamento', [
-                'appointment_id' => $appointment->id,
-                'error' => $e->getMessage(),
-            ]);
-            throw $e;
-        }
-    }
-    
-    /**
-     * MOCKUP: Processar pagamento (simulado)
-     */
-    private function processPaymentMock(Appointment $appointment, $amount, $paymentMethodData)
-    {
-        DB::beginTransaction();
-        try {
-            // Gerar IDs mock
-            $paymentId = 'mock_pay_' . time() . '_' . $appointment->id;
-            $holdId = 'mock_hold_' . time() . '_' . $appointment->id;
-            
+
             // Atualizar appointment
             $appointment->update([
                 'payment_status' => 'paid_held',
                 'amount' => $amount,
-                'payment_id' => $paymentId,
-                'payment_hold_id' => $holdId,
+                'payment_id' => $paymentResult['payment_id'],
+                'payment_hold_id' => $paymentResult['hold_id'],
                 'paid_at' => now(),
                 'held_at' => now(),
             ]);
-            
-            DB::commit();
-            
-            Log::info('Pagamento processado (MOCKUP)', [
+
+            Log::info('AppointmentPaymentService.processPayment - Pagamento processado', [
                 'appointment_id' => $appointment->id,
-                'payment_id' => $paymentId,
-                'hold_id' => $holdId,
+                'payment_id' => $paymentResult['payment_id'],
+                'hold_id' => $paymentResult['hold_id'],
                 'amount' => $amount,
             ]);
-            
+
             return [
                 'success' => true,
-                'payment_id' => $paymentId,
-                'hold_id' => $holdId,
+                'appointment_id' => $appointment->id,
+                'payment_id' => $paymentResult['payment_id'],
+                'hold_id' => $paymentResult['hold_id'],
                 'status' => 'paid_held',
                 'amount' => $amount,
-                'is_mock' => true,
+                'message' => 'Pagamento processado e valor mantido em hold',
             ];
-            
         } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-    }
-    
-    /**
-     * Liberar pagamento e dividir valores
-     */
-    public function releasePayment(Appointment $appointment, $confirmedBy = 'patient')
-    {
-        try {
-            // Validar status
-            if ($appointment->payment_status !== 'paid_held') {
-                throw new \Exception('Pagamento não está em hold');
-            }
-            
-            if ($this->isMockMode) {
-                return $this->releasePaymentMock($appointment, $confirmedBy);
-            }
-            
-            // TODO: Implementar liberação real com gateway
-            // return $this->releasePaymentReal($appointment, $confirmedBy);
-            
-        } catch (\Exception $e) {
-            Log::error('Erro ao liberar pagamento', [
+            Log::error('AppointmentPaymentService.processPayment - Erro', [
                 'appointment_id' => $appointment->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
-            throw $e;
+
+            return [
+                'success' => false,
+                'message' => 'Erro ao processar pagamento: ' . $e->getMessage(),
+            ];
         }
     }
-    
+
     /**
-     * MOCKUP: Liberar pagamento (simulado)
+     * Confirmar consulta realizada e liberar pagamento
+     * 
+     * @param Appointment $appointment
+     * @param string $confirmedBy Quem confirmou (patient, system_auto, etc)
+     * @return array
      */
-    private function releasePaymentMock(Appointment $appointment, $confirmedBy)
+    public function confirmAndRelease(Appointment $appointment, string $confirmedBy = 'patient'): array
     {
-        DB::beginTransaction();
         try {
-            $amount = $appointment->amount ?? 0;
-            $doctorAmount = $amount * 0.80; // 80% para médico
-            $platformAmount = $amount * 0.20; // 20% para plataforma
+            // Validar se pagamento está em hold
+            if ($appointment->payment_status !== 'paid_held') {
+                return [
+                    'success' => false,
+                    'message' => 'Pagamento não está em hold para ser liberado.',
+                ];
+            }
+
+            // Calcular valores antes de liberar
+            // O amount já inclui a taxa de 20%, então:
+            // amount = consultation_price * 1.20
+            // Para obter o valor original: amount / 1.20
+            $originalPrice = round($appointment->amount / 1.20, 2);
+            $doctorAmount = $originalPrice;
+            $platformAmount = round($appointment->amount - $originalPrice, 2);
             
+            // Calcular percentuais para o gateway
+            // O gateway divide baseado em percentuais do valor total
+            $doctorPercentage = round(($doctorAmount / $appointment->amount) * 100, 2);
+            $platformPercentage = round(($platformAmount / $appointment->amount) * 100, 2);
+            
+            // Liberar hold no gateway
+            $releaseResult = $this->paymentService->releaseHold(
+                $appointment->payment_hold_id,
+                $appointment->amount,
+                [
+                    'doctor_percentage' => $doctorPercentage,
+                    'platform_percentage' => $platformPercentage,
+                    'doctor_account_id' => $this->getDoctorAccountId($appointment->doctor_id),
+                    'platform_account_id' => $this->getPlatformAccountId(),
+                ]
+            );
+
+            if (!$releaseResult['success']) {
+                return [
+                    'success' => false,
+                    'message' => 'Erro ao liberar pagamento no gateway.',
+                ];
+            }
+
+            // Valores já foram calculados acima antes de liberar o hold
+
             // Atualizar appointment
             $appointment->update([
+                'status' => 'concluida',
                 'payment_status' => 'released',
-                'status' => 'completed',
-                'doctor_amount' => $doctorAmount,
-                'platform_amount' => $platformAmount,
-                'released_at' => now(),
+                'confirmed_by' => $confirmedBy,
                 'confirmed_at' => now(),
-                'confirmed_by' => $confirmedBy,
-            ]);
-            
-            DB::commit();
-            
-            Log::info('Pagamento liberado (MOCKUP)', [
-                'appointment_id' => $appointment->id,
+                'released_at' => now(),
                 'doctor_amount' => $doctorAmount,
                 'platform_amount' => $platformAmount,
-                'confirmed_by' => $confirmedBy,
             ]);
-            
+
+            Log::info('AppointmentPaymentService.confirmAndRelease - Pagamento liberado', [
+                'appointment_id' => $appointment->id,
+                'confirmed_by' => $confirmedBy,
+                'doctor_amount' => $doctorAmount,
+                'platform_amount' => $platformAmount,
+            ]);
+
             return [
                 'success' => true,
-                'status' => 'released',
-                'transfers' => [
-                    [
-                        'account' => 'doctor',
-                        'amount' => $doctorAmount,
-                        'transfer_id' => 'mock_trans_doctor_' . $appointment->id,
-                    ],
-                    [
-                        'account' => 'platform',
-                        'amount' => $platformAmount,
-                        'transfer_id' => 'mock_trans_platform_' . $appointment->id,
-                    ],
-                ],
-                'is_mock' => true,
+                'appointment_id' => $appointment->id,
+                'status' => 'concluida',
+                'payment_status' => 'released',
+                'transfers' => $releaseResult['transfers'],
+                'doctor_amount' => $doctorAmount,
+                'platform_amount' => $platformAmount,
             ];
-            
         } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-    }
-    
-    /**
-     * Reembolsar pagamento
-     */
-    public function refundPayment(Appointment $appointment, $cancelledBy, $reason = null)
-    {
-        try {
-            // Validar status
-            if ($appointment->payment_status !== 'paid_held') {
-                throw new \Exception('Pagamento não está em hold para reembolso');
-            }
-            
-            if ($this->isMockMode) {
-                return $this->refundPaymentMock($appointment, $cancelledBy, $reason);
-            }
-            
-            // TODO: Implementar reembolso real com gateway
-            // return $this->refundPaymentReal($appointment, $cancelledBy, $reason);
-            
-        } catch (\Exception $e) {
-            Log::error('Erro ao reembolsar pagamento', [
+            Log::error('AppointmentPaymentService.confirmAndRelease - Erro', [
                 'appointment_id' => $appointment->id,
                 'error' => $e->getMessage(),
             ]);
-            throw $e;
+
+            return [
+                'success' => false,
+                'message' => 'Erro ao liberar pagamento: ' . $e->getMessage(),
+            ];
         }
     }
-    
+
     /**
-     * MOCKUP: Reembolsar pagamento (simulado)
+     * Cancelar consulta e reembolsar
+     * 
+     * @param Appointment $appointment
+     * @param string $cancelledBy Quem cancelou
+     * @return array
      */
-    private function refundPaymentMock(Appointment $appointment, $cancelledBy, $reason)
+    public function cancelAndRefund(Appointment $appointment, string $cancelledBy = 'doctor'): array
     {
-        DB::beginTransaction();
         try {
-            $refundId = 'mock_refund_' . time() . '_' . $appointment->id;
-            $amount = $appointment->amount ?? 0;
-            
+            // Validar se pagamento está em hold
+            if ($appointment->payment_status !== 'paid_held') {
+                return [
+                    'success' => false,
+                    'message' => 'Pagamento não está em hold para ser reembolsado.',
+                ];
+            }
+
+            // Cancelar hold e reembolsar no gateway
+            $refundResult = $this->paymentService->cancelHoldAndRefund(
+                $appointment->payment_hold_id,
+                $appointment->amount
+            );
+
+            if (!$refundResult['success']) {
+                return [
+                    'success' => false,
+                    'message' => 'Erro ao processar reembolso no gateway.',
+                ];
+            }
+
             // Atualizar appointment
             $appointment->update([
+                'status' => 'cancelada',
                 'payment_status' => 'refunded',
-                'status' => 'cancelled',
-                'refund_id' => $refundId,
-                'refunded_at' => now(),
+                'cancelled_by' => $cancelledBy,
                 'cancelled_at' => now(),
-                'cancelled_by' => $cancelledBy,
+                'refund_id' => $refundResult['refund_id'],
+                'refunded_at' => now(),
             ]);
-            
-            DB::commit();
-            
-            Log::info('Pagamento reembolsado (MOCKUP)', [
+
+            Log::info('AppointmentPaymentService.cancelAndRefund - Reembolso processado', [
                 'appointment_id' => $appointment->id,
-                'refund_id' => $refundId,
-                'amount' => $amount,
                 'cancelled_by' => $cancelledBy,
+                'refund_id' => $refundResult['refund_id'],
             ]);
-            
+
             return [
                 'success' => true,
-                'refund_id' => $refundId,
-                'refund_amount' => $amount,
-                'status' => 'refunded',
-                'is_mock' => true,
+                'appointment_id' => $appointment->id,
+                'status' => 'cancelada',
+                'payment_status' => 'refunded',
+                'refund_id' => $refundResult['refund_id'],
+                'refund_amount' => $appointment->amount,
             ];
-            
         } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
+            Log::error('AppointmentPaymentService.cancelAndRefund - Erro', [
+                'appointment_id' => $appointment->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Erro ao processar reembolso: ' . $e->getMessage(),
+            ];
         }
     }
-    
+
     /**
-     * Verificar se médico entrou na videoconsulta
+     * Obter ID da conta do médico no gateway
      */
-    public function checkDoctorJoinedVideoCall(Appointment $appointment)
+    protected function getDoctorAccountId($doctorId): string
     {
-        // TODO: Implementar verificação real via WebSocket ou logs de vídeo
-        // Por enquanto, retorna true (mock)
-        return true;
+        // Em produção, buscar da tabela de médicos
+        return 'doctor_account_' . $doctorId;
     }
-    
+
     /**
-     * Verificar se paciente entrou na videoconsulta
+     * Obter ID da conta da plataforma no gateway
      */
-    public function checkPatientJoinedVideoCall(Appointment $appointment)
+    protected function getPlatformAccountId(): string
     {
-        // TODO: Implementar verificação real via WebSocket ou logs de vídeo
-        // Por enquanto, retorna true (mock)
-        return true;
-    }
-    
-    /**
-     * Verificar consultas com 6 horas decorridas e liberar automaticamente
-     */
-    public function autoReleaseAfter6Hours()
-    {
-        $appointments = Appointment::where('status', 'scheduled')
-            ->where('payment_status', 'paid_held')
-            ->where('scheduled_at', '<=', now()->subHours(6))
-            ->get();
-        
-        $released = 0;
-        foreach ($appointments as $appointment) {
-            try {
-                $this->releasePayment($appointment, 'system_auto');
-                $released++;
-            } catch (\Exception $e) {
-                Log::error('Erro ao liberar pagamento automático', [
-                    'appointment_id' => $appointment->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-        
-        return $released;
-    }
-    
-    /**
-     * Verificar ausência de médico na videoconsulta
-     */
-    public function checkDoctorAbsence()
-    {
-        $now = now();
-        $appointments = Appointment::where('status', 'scheduled')
-            ->where('payment_status', 'paid_held')
-            ->where('scheduled_at', '>=', $now->copy()->subMinutes(40))
-            ->where('scheduled_at', '<=', $now->copy()->addMinutes(15))
-            ->get();
-        
-        $refunded = 0;
-        foreach ($appointments as $appointment) {
-            $scheduledAt = \Carbon\Carbon::parse($appointment->scheduled_at);
-            $startWindow = $scheduledAt->copy()->subMinutes(15);
-            $endWindow = $scheduledAt->copy()->addMinutes(40);
-            
-            if ($now->between($startWindow, $endWindow)) {
-                if (!$this->checkDoctorJoinedVideoCall($appointment)) {
-                    try {
-                        $this->refundPayment($appointment, 'system_doctor_absence', 'Médico não entrou na videoconsulta');
-                        $refunded++;
-                    } catch (\Exception $e) {
-                        Log::error('Erro ao reembolsar por ausência de médico', [
-                            'appointment_id' => $appointment->id,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
-                }
-            }
-        }
-        
-        return $refunded;
-    }
-    
-    /**
-     * Verificar ausência de paciente na videoconsulta
-     */
-    public function checkPatientAbsence()
-    {
-        $now = now();
-        $appointments = Appointment::where('status', 'scheduled')
-            ->where('payment_status', 'paid_held')
-            ->where('scheduled_at', '>=', $now->copy()->subMinutes(40))
-            ->where('scheduled_at', '<=', $now->copy()->addMinutes(15))
-            ->get();
-        
-        $released = 0;
-        foreach ($appointments as $appointment) {
-            $scheduledAt = \Carbon\Carbon::parse($appointment->scheduled_at);
-            $startWindow = $scheduledAt->copy()->subMinutes(15);
-            $endWindow = $scheduledAt->copy()->addMinutes(40);
-            
-            if ($now->between($startWindow, $endWindow)) {
-                if (!$this->checkPatientJoinedVideoCall($appointment)) {
-                    try {
-                        $this->releasePayment($appointment, 'system_patient_absence');
-                        $released++;
-                    } catch (\Exception $e) {
-                        Log::error('Erro ao liberar pagamento por ausência de paciente', [
-                            'appointment_id' => $appointment->id,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
-                }
-            }
-        }
-        
-        return $released;
+        return 'platform_account_lacos';
     }
 }
+
+
+
+
 

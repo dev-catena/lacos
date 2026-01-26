@@ -58,6 +58,22 @@ class AppointmentController extends Controller
             $validated['scheduled_at'] = $validated['appointment_date'];
         }
 
+        // Garantir que recurrence_type sempre tenha um valor (padrão: 'none')
+        if (!isset($validated['recurrence_type']) || empty($validated['recurrence_type'])) {
+            $validated['recurrence_type'] = 'none';
+        }
+        
+        // Remover campos de recorrência se não foram fornecidos (exceto recurrence_type que já tem valor padrão)
+        if (!isset($validated['recurrence_days']) || empty($validated['recurrence_days'])) {
+            unset($validated['recurrence_days']);
+        }
+        if (!isset($validated['recurrence_start']) || empty($validated['recurrence_start'])) {
+            unset($validated['recurrence_start']);
+        }
+        if (!isset($validated['recurrence_end']) || empty($validated['recurrence_end'])) {
+            unset($validated['recurrence_end']);
+        }
+
         $appointment = Appointment::create($validated);
         $appointment->load('doctor');
 
@@ -117,6 +133,22 @@ class AppointmentController extends Controller
             'recurrence_start' => 'nullable|date',
             'recurrence_end' => 'nullable|date',
         ]);
+
+        // Garantir que recurrence_type sempre tenha um valor (padrão: 'none')
+        if (!isset($validated['recurrence_type']) || empty($validated['recurrence_type'])) {
+            $validated['recurrence_type'] = 'none';
+        }
+        
+        // Remover campos de recorrência se não foram fornecidos (exceto recurrence_type que já tem valor padrão)
+        if (!isset($validated['recurrence_days']) || empty($validated['recurrence_days'])) {
+            unset($validated['recurrence_days']);
+        }
+        if (!isset($validated['recurrence_start']) || empty($validated['recurrence_start'])) {
+            unset($validated['recurrence_start']);
+        }
+        if (!isset($validated['recurrence_end']) || empty($validated['recurrence_end'])) {
+            unset($validated['recurrence_end']);
+        }
 
         $appointment->update($validated);
         $appointment->load('doctor');

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\VitalSign;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class VitalSignController extends Controller
 {
@@ -37,9 +38,34 @@ class VitalSignController extends Controller
             $query->where('measured_at', '<=', $endDate);
         }
 
-        $vitalSigns = $query->orderBy('measured_at', 'desc')->get();
+        $vitalSigns = $query->with('recorder')->orderBy('measured_at', 'desc')->get();
 
-        return response()->json($vitalSigns);
+        // Adicionar informações do cuidador e wearable
+        $vitalSignsArray = $vitalSigns->map(function ($vitalSign) {
+            $data = $vitalSign->toArray();
+            
+            // Adicionar nome do cuidador
+            if ($vitalSign->recorder) {
+                $data['measured_by_name'] = $vitalSign->recorder->name;
+            }
+            
+            // Extrair nome do wearable das notes (se houver)
+            // Formato esperado: "wearable: Nome do Wearable" ou similar
+            if ($vitalSign->notes) {
+                $notesLower = strtolower($vitalSign->notes);
+                if (strpos($notesLower, 'wearable') !== false) {
+                    // Tentar extrair nome do wearable das notes
+                    preg_match('/wearable[:\s]+([^\n]+)/i', $vitalSign->notes, $matches);
+                    if (!empty($matches[1])) {
+                        $data['wearable_name'] = trim($matches[1]);
+                    }
+                }
+            }
+            
+            return $data;
+        });
+
+        return response()->json($vitalSignsArray);
     }
 
     /**
@@ -64,40 +90,78 @@ class VitalSignController extends Controller
             \Log::info('VitalSignController::store - Dados validados:', $validated);
             \Log::info('VitalSignController::store - User ID:', ['user_id' => $user->id]);
             
-            // O campo value é JSON no banco (cast 'array' no modelo), então precisamos garantir que seja um array
+            // O campo value é JSON no banco, pode ser objeto, array ou número
             $valueToStore = $validated['value'];
             
-            // Se já for array, manter
-            if (is_array($valueToStore)) {
-                // Já é array, manter como está
-            }
-            // Se for objeto (vindo do JSON do frontend), converter para array
-            elseif (is_object($valueToStore)) {
+            // Se for objeto (vindo do JSON do frontend), manter como objeto (ex: pressão arterial)
+            if (is_object($valueToStore)) {
                 $valueToStore = (array) $valueToStore;
             }
             // Se for string, tentar fazer decode JSON primeiro
             elseif (is_string($valueToStore)) {
                 $decoded = json_decode($valueToStore, true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                if (json_last_error() === JSON_ERROR_NONE) {
                     $valueToStore = $decoded;
                 } else {
-                    // Se não for JSON válido ou não for array, converter para array
+                    // Se não for JSON válido, converter para array com um elemento
                     $valueToStore = [$valueToStore];
                 }
             }
-            // Se for número, converter para array
-            elseif (is_numeric($valueToStore)) {
-                $valueToStore = [$valueToStore];
-            }
-            // Qualquer outro tipo, converter para array
-            else {
-                $valueToStore = [$valueToStore];
-            }
+            // Se for número, manter como número (será salvo como JSON)
+            // Se for array, manter como array
+            // Qualquer outro tipo, manter como está
             
             \Log::info('VitalSignController::store - Value a ser salvo:', ['value' => $valueToStore, 'type' => gettype($valueToStore)]);
             
+            // Determinar accompanied_person_id (mesma lógica do PrescriptionController)
+            $accompaniedPersonId = null;
+            $patientMember = DB::table('group_members')
+                ->where('group_id', $validated['group_id'])
+                ->whereIn('role', ['priority_contact', 'patient'])
+                ->first();
+            
+            if ($patientMember) {
+                $accompaniedPerson = DB::table('accompanied_people')
+                    ->where('group_id', $validated['group_id'])
+                    ->where('user_id', $patientMember->user_id)
+                    ->first();
+                
+                if ($accompaniedPerson) {
+                    $accompaniedPersonId = $accompaniedPerson->id;
+                } else {
+                    $firstAccompanied = DB::table('accompanied_people')
+                        ->where('group_id', $validated['group_id'])
+                        ->first();
+                    if ($firstAccompanied) {
+                        $accompaniedPersonId = $firstAccompanied->id;
+                    }
+                }
+            }
+
+            if (!$accompaniedPersonId) {
+                $firstAccompanied = DB::table('accompanied_people')
+                    ->where('group_id', $validated['group_id'])
+                    ->first();
+                if ($firstAccompanied) {
+                    $accompaniedPersonId = $firstAccompanied->id;
+                }
+            }
+
+            if (!$accompaniedPersonId) {
+                \Log::warning('VitalSignController::store - Não foi possível determinar accompanied_person_id, salvando com NULL', [
+                    'group_id' => $validated['group_id'],
+                ]);
+                // Para sinais vitais, accompanied_person_id pode ser null
+            }
+            
+            \Log::info('VitalSignController::store - Criando sinal vital:', [
+                'accompanied_person_id' => $accompaniedPersonId,
+                'group_id' => $validated['group_id'],
+            ]);
+            
             $vitalSign = VitalSign::create([
                 'group_id' => $validated['group_id'],
+                'accompanied_person_id' => $accompaniedPersonId, // Pode ser null
                 'type' => $validated['type'],
                 'value' => $valueToStore,
                 'unit' => $validated['unit'] ?? null,
@@ -161,4 +225,5 @@ class VitalSignController extends Controller
         return response()->json(['message' => 'Vital sign deleted successfully']);
     }
 }
+
 

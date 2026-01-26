@@ -116,3 +116,4 @@ mysql -u lacos -pLacos2025Secure -e "USE lacos; SHOW TABLES;"
 
 
 
+

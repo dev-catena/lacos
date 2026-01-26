@@ -285,7 +285,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
           // Verificar se o valor realmente mudou
           if (contact[field] === value) {
             console.log('⚠️ [GroupContacts] Valor não mudou, mas atualizando mesmo assim:', { field, value });
-          }
+      }
           const newContact = { ...contact, [field]: value };
           console.log('🔄 [GroupContacts] Contato atualizado:', { 
             index: idx, 
@@ -356,9 +356,9 @@ const GroupContactsScreen = ({ route, navigation }) => {
         console.log('📸 [GroupContacts] Foto selecionada:', imageUri);
         
         // Atualizar o contato com a URI da foto
-        setContacts(prev => prev.map((contact, idx) => 
-          idx === index ? { ...contact, photoUri: imageUri } : contact
-        ));
+          setContacts(prev => prev.map((contact, idx) => 
+            idx === index ? { ...contact, photoUri: imageUri } : contact
+          ));
       }
     } catch (error) {
       console.error('❌ [GroupContacts] Erro ao selecionar imagem:', error);
@@ -573,7 +573,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
         // Recarregar contatos antes de voltar para garantir que os dados estão atualizados
         console.log('🔄 [GroupContacts] Recarregando contatos após salvar...');
         await loadGroupContacts();
-        
+
         // Aguardar um pouco e voltar
         setTimeout(() => {
           navigation.goBack();
@@ -657,7 +657,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
                     {contact.isSOS ? (
                       <SafeIcon name="alert-circle" size={16} color={colors.textWhite} />
                     ) : (
-                      <Text style={styles.contactNumberText}>{index + 1}</Text>
+                    <Text style={styles.contactNumberText}>{index + 1}</Text>
                     )}
                   </View>
                   <Text style={styles.contactLabel}>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SafeIcon from './SafeIcon';
 import doctorsService from '../services/doctorsService';
+import { API_BASE_URL } from '../config/api';
 import './DoctorsManagement.css';
 
 const DoctorsManagement = () => {
@@ -8,7 +9,14 @@ const DoctorsManagement = () => {
   const [pendingDoctors, setPendingDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('pending'); // pending, approved
+  
+  // Carregar aba salva do localStorage ou usar 'pending' como padrão
+  const getInitialTab = () => {
+    const savedTab = localStorage.getItem('@lacos:doctorsActiveTab');
+    return savedTab || 'pending';
+  };
+  
+  const [activeTab, setActiveTab] = useState(getInitialTab()); // pending, approved, blocked
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState(null);
   const [editFormData, setEditFormData] = useState({
@@ -20,6 +28,9 @@ const DoctorsManagement = () => {
   });
   const [specialties, setSpecialties] = useState([]);
   const [loadingSpecialties, setLoadingSpecialties] = useState(false);
+  const [technicalSheetVisible, setTechnicalSheetVisible] = useState(false);
+  const [technicalSheetData, setTechnicalSheetData] = useState(null);
+  const [loadingTechnicalSheet, setLoadingTechnicalSheet] = useState(false);
 
   const formatCrmDisplay = (crm) => {
     if (!crm) return 'N/A';
@@ -52,8 +63,9 @@ const DoctorsManagement = () => {
   const loadSpecialties = async () => {
     try {
       setLoadingSpecialties(true);
-      const { API_BASE_URL } = require('../config/api');
-      const token = localStorage.getItem('token');
+      // Usar a mesma chave de token que outros serviços
+      const token = localStorage.getItem('@lacos:token') || localStorage.getItem('token');
+      console.log('🔍 Carregando especialidades...', { token: !!token, apiUrl: API_BASE_URL });
       const response = await fetch(`${API_BASE_URL}/medical-specialties`, {
         method: 'GET',
         headers: {
@@ -77,7 +89,10 @@ const DoctorsManagement = () => {
         
         // A resposta pode vir como { data: [...] } ou como array direto
         const specialtiesList = Array.isArray(data) ? data : (data.data || []);
+        console.log('✅ Especialidades carregadas:', specialtiesList.length);
         setSpecialties(specialtiesList.sort((a, b) => a.name.localeCompare(b.name)));
+      } else {
+        console.error('❌ Erro ao carregar especialidades:', response.status, response.statusText);
       }
     } catch (err) {
       console.error('Erro ao carregar especialidades:', err);
@@ -85,6 +100,11 @@ const DoctorsManagement = () => {
       setLoadingSpecialties(false);
     }
   };
+
+  // Salvar aba ativa no localStorage sempre que mudar
+  useEffect(() => {
+    localStorage.setItem('@lacos:doctorsActiveTab', activeTab);
+  }, [activeTab]);
 
   // Carregar dados quando mudar de aba
   useEffect(() => {
@@ -193,18 +213,23 @@ const DoctorsManagement = () => {
     
     // Extrair CPF e especialidade corretamente (pode vir de diferentes lugares)
     const cpf = doctor.cpf || doctor.user?.cpf || '';
-    const specialtyId = doctor.specialty?.id || doctor.medical_specialty_id || doctor.user?.medical_specialty_id || '';
+    const specialtyId = doctor.specialty?.id || doctor.medical_specialty_id || doctor.user?.medical_specialty_id || null;
+    
+    // Converter para string para garantir compatibilidade com o select
+    const specialtyIdString = specialtyId ? String(specialtyId) : '';
     
     console.log('🔍 DoctorsManagement - CPF extraído:', cpf);
     console.log('🔍 DoctorsManagement - Especialidade ID extraído:', specialtyId);
+    console.log('🔍 DoctorsManagement - Especialidade ID (string):', specialtyIdString);
     console.log('🔍 DoctorsManagement - Especialidade objeto:', doctor.specialty);
+    console.log('🔍 DoctorsManagement - Dados completos do médico:', JSON.stringify(doctor, null, 2));
     
     setEditFormData({
       name: doctor.name || '',
       email: doctor.email || '',
       cpf: cpf,
       crm: doctor.crm || '',
-      medical_specialty_id: specialtyId,
+      medical_specialty_id: specialtyIdString,
     });
     setEditModalVisible(true);
   };
@@ -221,6 +246,20 @@ const DoctorsManagement = () => {
       alert('Médico atualizado com sucesso!');
     } catch (err) {
       setError(err.message || 'Erro ao atualizar médico');
+    }
+  };
+
+  const handleViewTechnicalSheet = async (doctorId) => {
+    try {
+      setLoadingTechnicalSheet(true);
+      setError(null);
+      const data = await doctorsService.getDoctorDetails(doctorId);
+      setTechnicalSheetData(data);
+      setTechnicalSheetVisible(true);
+    } catch (err) {
+      setError(err.message || 'Erro ao carregar ficha técnica');
+    } finally {
+      setLoadingTechnicalSheet(false);
     }
   };
 
@@ -434,9 +473,17 @@ const DoctorsManagement = () => {
 
                     <div className="doctor-actions">
                       <button
+                        className="action-btn"
+                        onClick={() => handleViewTechnicalSheet(doctor.id)}
+                        style={{ backgroundColor: '#6366f1', color: 'white', marginRight: '8px' }}
+                      >
+                        <SafeIcon name="document-text" size={18} color="white" style={{ marginRight: '6px' }} />
+                        Ficha Técnica
+                      </button>
+                      <button
                         className="action-btn edit-btn"
                         onClick={() => handleEdit(doctor)}
-                        style={{ backgroundColor: '#3b82f6', color: 'white' }}
+                        style={{ backgroundColor: '#3b82f6', color: 'white', marginRight: '8px' }}
                       >
                         <SafeIcon name="edit" size={18} color="white" style={{ marginRight: '6px' }} />
                         Editar
@@ -574,17 +621,45 @@ const DoctorsManagement = () => {
               <div className="form-group">
                 <label>Especialidade:</label>
                 <select
-                  value={editFormData.medical_specialty_id}
-                  onChange={(e) => setEditFormData({ ...editFormData, medical_specialty_id: e.target.value })}
+                  value={String(editFormData.medical_specialty_id || '')}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    console.log('🔍 Alterando especialidade para:', newValue);
+                    console.log('🔍 Valor atual antes da mudança:', editFormData.medical_specialty_id);
+                    console.log('🔍 Especialidades disponíveis:', specialties.map(s => ({ id: s.id, name: s.name })));
+                    setEditFormData({ ...editFormData, medical_specialty_id: newValue });
+                  }}
                   className="form-input"
+                  disabled={loadingSpecialties}
                 >
                   <option value="">Selecione uma especialidade</option>
-                  {specialties.map((spec) => (
-                    <option key={spec.id} value={spec.id}>
-                      {spec.name}
-                    </option>
-                  ))}
+                  {specialties.map((spec) => {
+                    const specId = String(spec.id);
+                    const currentValue = String(editFormData.medical_specialty_id || '');
+                    const isSelected = specId === currentValue;
+                    if (isSelected) {
+                      console.log('✅ Especialidade selecionada:', { id: specId, name: spec.name, currentValue });
+                    }
+                    return (
+                      <option key={spec.id} value={specId}>
+                        {spec.name}
+                      </option>
+                    );
+                  })}
                 </select>
+                {loadingSpecialties && (
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                    Carregando especialidades...
+                  </p>
+                )}
+                {!loadingSpecialties && specialties.length === 0 && (
+                  <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
+                    Nenhuma especialidade disponível
+                  </p>
+                )}
+                <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+                  Valor atual: {editFormData.medical_specialty_id || '(vazio)'} | Total de especialidades: {specialties.length}
+                </p>
               </div>
             </div>
 
@@ -594,6 +669,165 @@ const DoctorsManagement = () => {
               </button>
               <button className="btn-primary" onClick={handleUpdate}>
                 Salvar Alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Ficha Técnica */}
+      {technicalSheetVisible && (
+        <div className="modal-overlay" onClick={() => setTechnicalSheetVisible(false)}>
+          <div className="modal-content" style={{ maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Ficha Técnica do Médico</h2>
+              <button className="modal-close" onClick={() => setTechnicalSheetVisible(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              {loadingTechnicalSheet ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div className="spinner" style={{ margin: '0 auto' }}></div>
+                  <p style={{ marginTop: '16px', color: '#6b7280' }}>Carregando dados...</p>
+                </div>
+              ) : technicalSheetData ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* Dados Pessoais */}
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '16px', borderBottom: '2px solid #e5e7eb', paddingBottom: '8px' }}>
+                      <SafeIcon name="person" size={20} color="#6366f1" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+                      Dados Pessoais
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                      <div className="detail-item">
+                        <strong>Nome:</strong> {technicalSheetData.name || 'N/A'}
+                      </div>
+                      {technicalSheetData.last_name && (
+                        <div className="detail-item">
+                          <strong>Sobrenome:</strong> {technicalSheetData.last_name}
+                        </div>
+                      )}
+                      <div className="detail-item">
+                        <strong>Email:</strong> {technicalSheetData.email || 'N/A'}
+                      </div>
+                      <div className="detail-item">
+                        <strong>Telefone:</strong> {technicalSheetData.phone || 'N/A'}
+                      </div>
+                      <div className="detail-item">
+                        <strong>CPF:</strong> {formatCpfDisplay(technicalSheetData.cpf)}
+                      </div>
+                      <div className="detail-item">
+                        <strong>Data de Nascimento:</strong> {technicalSheetData.birth_date ? new Date(technicalSheetData.birth_date).toLocaleDateString('pt-BR') : 'N/A'}
+                      </div>
+                      <div className="detail-item">
+                        <strong>Sexo:</strong> {technicalSheetData.gender || 'N/A'}
+                      </div>
+                      {technicalSheetData.address && (
+                        <>
+                          <div className="detail-item" style={{ gridColumn: '1 / -1' }}>
+                            <strong>Endereço:</strong> {technicalSheetData.address}
+                            {technicalSheetData.address_number && `, ${technicalSheetData.address_number}`}
+                            {technicalSheetData.address_complement && ` - ${technicalSheetData.address_complement}`}
+                          </div>
+                          <div className="detail-item">
+                            <strong>Bairro:</strong> {technicalSheetData.neighborhood || 'N/A'}
+                          </div>
+                          <div className="detail-item">
+                            <strong>Cidade:</strong> {technicalSheetData.city || 'N/A'}
+                          </div>
+                          <div className="detail-item">
+                            <strong>Estado:</strong> {technicalSheetData.state || 'N/A'}
+                          </div>
+                          <div className="detail-item">
+                            <strong>CEP:</strong> {technicalSheetData.zip_code || 'N/A'}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Dados Profissionais */}
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '16px', borderBottom: '2px solid #e5e7eb', paddingBottom: '8px' }}>
+                      <SafeIcon name="medical" size={20} color="#10b981" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+                      Dados Profissionais
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                      <div className="detail-item">
+                        <strong>CRM:</strong> {formatCrmDisplay(technicalSheetData.crm)}
+                      </div>
+                      <div className="detail-item">
+                        <strong>Especialidade:</strong> {technicalSheetData.medical_specialty?.name || 'N/A'}
+                      </div>
+                      {technicalSheetData.formation_details && (
+                        <div className="detail-item">
+                          <strong>Formação:</strong> {technicalSheetData.formation_details}
+                        </div>
+                      )}
+                      {technicalSheetData.formation_description && (
+                        <div className="detail-item" style={{ gridColumn: '1 / -1' }}>
+                          <strong>Detalhes da Formação:</strong>
+                          <p style={{ marginTop: '8px', color: '#6b7280', lineHeight: '1.6' }}>
+                            {technicalSheetData.formation_description}
+                          </p>
+                        </div>
+                      )}
+                      {technicalSheetData.hourly_rate && (
+                        <div className="detail-item">
+                          <strong>Valor/Hora:</strong> R$ {parseFloat(technicalSheetData.hourly_rate).toFixed(2).replace('.', ',')}
+                        </div>
+                      )}
+                      {technicalSheetData.consultation_price && (
+                        <div className="detail-item">
+                          <strong>Valor da Consulta:</strong> R$ {parseFloat(technicalSheetData.consultation_price).toFixed(2).replace('.', ',')}
+                        </div>
+                      )}
+                      <div className="detail-item">
+                        <strong>Disponibilidade:</strong> {technicalSheetData.availability || 'N/A'}
+                      </div>
+                      <div className="detail-item">
+                        <strong>Disponível:</strong> {technicalSheetData.is_available ? 'Sim' : 'Não'}
+                      </div>
+                      {technicalSheetData.latitude && technicalSheetData.longitude && (
+                        <div className="detail-item" style={{ gridColumn: '1 / -1' }}>
+                          <strong>Localização:</strong> {technicalSheetData.latitude}, {technicalSheetData.longitude}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '16px', borderBottom: '2px solid #e5e7eb', paddingBottom: '8px' }}>
+                      <SafeIcon name="information-circle" size={20} color="#f59e0b" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+                      Status
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                      <div className="detail-item">
+                        <strong>Status:</strong> {technicalSheetData.is_blocked ? 'Bloqueado' : (technicalSheetData.is_activated ? 'Ativado' : 'Aguardando Ativação')}
+                      </div>
+                      <div className="detail-item">
+                        <strong>Data de Aprovação:</strong> {technicalSheetData.approved_at ? new Date(technicalSheetData.approved_at).toLocaleDateString('pt-BR') : 'N/A'}
+                      </div>
+                      <div className="detail-item">
+                        <strong>Data de Cadastro:</strong> {technicalSheetData.created_at ? new Date(technicalSheetData.created_at).toLocaleDateString('pt-BR') : 'N/A'}
+                      </div>
+                      <div className="detail-item">
+                        <strong>Última Atualização:</strong> {technicalSheetData.updated_at ? new Date(technicalSheetData.updated_at).toLocaleDateString('pt-BR') : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#ef4444' }}>
+                  <p>Erro ao carregar dados do médico</p>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-primary" onClick={() => setTechnicalSheetVisible(false)}>
+                Fechar
               </button>
             </div>
           </div>

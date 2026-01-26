@@ -17,7 +17,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('group_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade'); // Quem fez upload
-            $table->foreignId('doctor_id')->nullable()->constrained('doctors')->onDelete('set null');
+            // doctor_id sem foreign key para permitir apontar para doctors OU users (profile='doctor')
+            $table->unsignedBigInteger('doctor_id')->nullable();
             // consultation_id pode não existir ainda, então usar unsignedBigInteger
             $table->unsignedBigInteger('consultation_id')->nullable();
             $table->enum('type', ['exam_lab', 'exam_image', 'prescription', 'report', 'other']);

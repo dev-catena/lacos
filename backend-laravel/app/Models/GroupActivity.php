@@ -228,11 +228,22 @@ class GroupActivity extends Model
         ];
         
         $typeLabel = $typeLabels[$appointmentType] ?? 'compromisso';
-        // Formatar data sem conversão de timezone
-        // Extrair apenas a parte da data (YYYY-MM-DD) antes de fazer parse para evitar problemas de timezone
-        $dateOnly = substr($appointmentDate, 0, 10); // Pega apenas YYYY-MM-DD
-        $carbonDate = \Carbon\Carbon::createFromFormat('Y-m-d', $dateOnly);
-        $formattedDate = $carbonDate->format('d/m/Y');
+        // Formatar data de forma mais simples e rápida
+        try {
+            // Tentar parse direto primeiro
+            $carbonDate = \Carbon\Carbon::parse($appointmentDate);
+            $formattedDate = $carbonDate->format('d/m/Y');
+        } catch (\Exception $e) {
+            // Se falhar, tentar extrair apenas a data
+            try {
+                $dateOnly = substr($appointmentDate, 0, 10); // Pega apenas YYYY-MM-DD
+                $carbonDate = \Carbon\Carbon::createFromFormat('Y-m-d', $dateOnly);
+                $formattedDate = $carbonDate->format('d/m/Y');
+            } catch (\Exception $e2) {
+                // Se ainda falhar, usar a data como string
+                $formattedDate = $appointmentDate;
+            }
+        }
         
         return self::create([
             'group_id' => $groupId,

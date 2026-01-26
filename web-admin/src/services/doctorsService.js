@@ -322,6 +322,33 @@ class DoctorsService {
     }
   }
 
+  async getDoctorDetails(doctorId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/doctors/${doctorId}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (response.status === 401) {
+        throw new Error('Não autenticado. Faça login novamente.');
+      }
+
+      if (response.status === 403) {
+        throw new Error('Acesso negado. Você precisa ter permissão de root.');
+      }
+
+      if (!response.ok) {
+        const error = await cleanJsonResponse(response);
+        throw new Error(error.message || error.error || `Erro ${response.status}: ${response.statusText}`);
+      }
+
+      return await cleanJsonResponse(response);
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do médico:', error);
+      throw error;
+    }
+  }
+
   async deleteDoctor(doctorId) {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/doctors/${doctorId}`, {
