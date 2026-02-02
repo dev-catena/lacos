@@ -1,0 +1,22 @@
+# Ambiente virtual
+venv/
+env/
+.venv/
+
+# Relatórios gerados
+report_*.json
+report_*.html
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+

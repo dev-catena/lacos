@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Script para ser executado NO SERVIDOR para criar backup dos arquivos
+# Execute este script no servidor: ssh darley@10.102.0.103 -p 63022
+
+REMOTE_PATH="/var/www/lacos-backend"
+BACKUP_DIR="/tmp/lacos_backup_$$"
+BACKUP_FILE="/tmp/lacos_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+
+echo "📦 Criando backup dos arquivos..."
+
+# Criar diretório temporário
+mkdir -p "$BACKUP_DIR/app/Http/Controllers"
+mkdir -p "$BACKUP_DIR/app/Models"
+mkdir -p "$BACKUP_DIR/database/migrations"
+
+# Copiar controllers
+echo "📁 Copiando Controllers..."
+find "$REMOTE_PATH/app/Http/Controllers" -name '*.php' -type f | while read file; do
+    relative_path=${file#$REMOTE_PATH/}
+    target_file="$BACKUP_DIR/$relative_path"
+    target_dir=$(dirname "$target_file")
+    mkdir -p "$target_dir"
+    cp "$file" "$target_file"
+    echo "  ✅ $relative_path"
+done
+
+# Copiar models
+echo "📁 Copiando Models..."
+find "$REMOTE_PATH/app/Models" -name '*.php' -type f | while read file; do
+    relative_path=${file#$REMOTE_PATH/}
+    target_file="$BACKUP_DIR/$relative_path"
+    target_dir=$(dirname "$target_file")
+    mkdir -p "$target_dir"
+    cp "$file" "$target_file"
+    echo "  ✅ $relative_path"
+done
+
+# Copiar migrations
+echo "📁 Copiando Migrations..."
+find "$REMOTE_PATH/database/migrations" -name '*.php' -type f | while read file; do
+    relative_path=${file#$REMOTE_PATH/}
+    target_file="$BACKUP_DIR/$relative_path"
+    target_dir=$(dirname "$target_file")
+    mkdir -p "$target_dir"
+    cp "$file" "$target_file"
+    echo "  ✅ $relative_path"
+done
+
+# Criar arquivo tar.gz
+echo "📦 Compactando arquivos..."
+cd "$BACKUP_DIR"
+tar -czf "$BACKUP_FILE" app database
+rm -rf "$BACKUP_DIR"
+
+echo ""
+echo "✅ Backup criado: $BACKUP_FILE"
+echo ""
+echo "Para baixar o arquivo, execute no seu computador local:"
+echo "  scp -P 63022 darley@10.102.0.103:$BACKUP_FILE /tmp/lacos_backup.tar.gz"
+echo ""
+echo "Depois extraia com:"
+echo "  cd /home/darley/lacos/backend-laravel"
+echo "  tar -xzf /tmp/lacos_backup.tar.gz"
+
+
+
+
+
+
+
+

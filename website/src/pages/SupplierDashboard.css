@@ -1,0 +1,197 @@
+.supplier-dashboard-main {
+  min-height: calc(100vh - 200px);
+  padding: 2rem 0;
+  background: #f5f5f5;
+}
+
+.supplier-dashboard {
+  display: flex;
+  gap: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.supplier-sidebar {
+  width: 280px;
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: fit-content;
+  position: sticky;
+  top: 100px;
+}
+
+.supplier-info {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.supplier-info h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.supplier-company {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.supplier-company strong {
+  font-size: 1.1rem;
+  color: #2c3e50;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.status-approved {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-rejected {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-suspended {
+  background: #e2e3e5;
+  color: #383d41;
+}
+
+.supplier-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.supplier-nav .nav-item {
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 1rem;
+  color: #666;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.supplier-nav .nav-item:hover {
+  background: #f0f0f0;
+  color: #2c3e50;
+}
+
+.supplier-nav .nav-item.active {
+  background: #e3f2fd;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.supplier-content {
+  flex: 1;
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.section-content h1 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: #2c3e50;
+}
+
+.section-content > p {
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.placeholder-content {
+  padding: 3rem;
+  text-align: center;
+  color: #999;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.error-container h2 {
+  color: #d32f2f;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .supplier-dashboard {
+    flex-direction: column;
+  }
+
+  .supplier-sidebar {
+    width: 100%;
+    position: static;
+  }
+
+  .supplier-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .supplier-nav .nav-item {
+    flex: 1;
+    min-width: 120px;
+    justify-content: center;
+  }
+}
+
+
+
+
+
+

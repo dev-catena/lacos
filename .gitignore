@@ -1,0 +1,37 @@
+node_modules/
+.expo/
+.expo-shared/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+.env
+.env_COMPLETO_SERVIDOR
+**/ENV-prod.txt
+**/*ENV-prod*
+**/*STRIPE*.sh
+!**/.env.example
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Vim swap files
+*.swp
+*.swo
+*.swk
+*.swl
+*.swm
+*.swn
+*.swr
+
+backend-laravel/.env.backup.*
+backups/**/*.bak
