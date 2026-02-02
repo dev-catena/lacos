@@ -1,0 +1,202 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
+
+class CertificateController extends Controller
+{
+    /**
+     * Fazer upload do certificado digital (.apx ou .pfx)
+     * POST /api/certificate/upload
+     */
+    public function upload(Request $request)
+    {
+        try {
+            $user = Auth::user();
+
+            // Verificar se é médico
+            if ($user->profile !== 'doctor') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Apenas médicos podem configurar certificado digital',
+                ], 403);
+            }
+
+            // Validação
+            $validator = Validator::make($request->all(), [
+                'certificate_file' => 'required|file|max:5120', // 5MB max
+                'certificate_password' => 'required|string|max:255',
+                'certificate_username' => 'nullable|string|max:255',
+                'certificate_type' => 'nullable|in:apx,pfx',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dados inválidos',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $file = $request->file('certificate_file');
+            $fileName = $file->getClientOriginalName();
+            $extension = strtolower($file->getClientOriginalExtension());
+            
+            // Detectar tipo de certificado
+            $certificateType = $request->certificate_type;
+            if (!$certificateType) {
+                $certificateType = ($extension === 'apx') ? 'apx' : 'pfx';
+            }
+
+            // Validar extensão
+            if ($certificateType === 'apx') {
+                if ($extension !== 'apx') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Arquivo deve ser .apx',
+                    ], 422);
+                }
+            } else {
+                if (!in_array($extension, ['pfx', 'p12'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Arquivo deve ser .pfx ou .p12',
+                    ], 422);
+                }
+            }
+
+            // Criar diretório para certificados se não existir
+            $certDir = 'certificates/doctors/' . $user->id;
+            Storage::disk('local')->makeDirectory($certDir);
+
+            // Nome do arquivo baseado no tipo
+            $certificateFileName = $certificateType === 'apx' ? 'certificate.apx' : 'certificate.pfx';
+            
+            // Salvar certificado
+            $certificatePath = $file->storeAs($certDir, $certificateFileName, 'local');
+
+            // Criptografar senha antes de salvar
+            $encryptedPassword = Crypt::encryptString($request->certificate_password);
+
+            // Atualizar usuário
+            $updateData = [
+                'certificate_password_encrypted' => $encryptedPassword,
+                'certificate_type' => $certificateType,
+                'has_certificate' => true,
+                'certificate_uploaded_at' => now(),
+            ];
+
+            if ($certificateType === 'apx') {
+                $updateData['certificate_apx_path'] = $certificatePath;
+            } else {
+                $updateData['certificate_path'] = $certificatePath;
+                if ($request->certificate_username) {
+                    $updateData['certificate_username'] = $request->certificate_username;
+                }
+            }
+
+            $user->update($updateData);
+
+            Log::info('Certificado digital configurado', [
+                'user_id' => $user->id,
+                'type' => $certificateType,
+                'certificate_path' => $certificatePath,
+                'has_certificate' => true,
+                'certificate_uploaded_at' => now(),
+            ]);
+            
+            // Recarregar o usuário do banco para garantir que os dados estão atualizados
+            $user->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Certificado digital configurado com sucesso',
+                'data' => [
+                    'has_certificate' => true,
+                'certificate_uploaded_at' => now(),
+                    'certificate_type' => $certificateType,
+                    'certificate_username' => $user->certificate_username ?? null,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Erro ao fazer upload do certificado: ' . $e->getMessage(), [
+                'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao configurar certificado digital',
+                'error' => config('app.debug') ? $e->getMessage() : 'Server Error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Remover certificado digital
+     * DELETE /api/certificate/remove
+     */
+    public function remove(Request $request)
+    {
+        try {
+            $user = Auth::user();
+
+            // Verificar se é médico
+            if ($user->profile !== 'doctor') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Apenas médicos podem remover certificado digital',
+                ], 403);
+            }
+
+            // Remover arquivo do storage
+            if ($user->certificate_apx_path) {
+                Storage::disk('local')->delete($user->certificate_apx_path);
+            }
+            if ($user->certificate_path) {
+                Storage::disk('local')->delete($user->certificate_path);
+            }
+
+            // Limpar campos do banco
+            $user->update([
+                'certificate_apx_path' => null,
+                'certificate_path' => null,
+                'certificate_username' => null,
+                'certificate_password_encrypted' => null,
+                'certificate_type' => null,
+                'has_certificate' => false,
+            ]);
+
+            Log::info('Certificado digital removido', [
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Certificado digital removido com sucesso',
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Erro ao remover certificado: ' . $e->getMessage(), [
+                'user_id' => Auth::id(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao remover certificado digital',
+                'error' => config('app.debug') ? $e->getMessage() : 'Server Error',
+            ], 500);
+        }
+    }
+}
+
+
