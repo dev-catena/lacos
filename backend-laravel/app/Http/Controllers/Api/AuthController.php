@@ -666,5 +666,41 @@ class AuthController extends Controller
         ];
         return $labels[$profile] ?? $profile;
     }
+
+    /**
+     * Logout do usuário
+     * POST /api/logout
+     */
+    public function logout(Request $request)
+    {
+        try {
+            $user = $request->user();
+            
+            if ($user) {
+                // Revogar todos os tokens do usuário
+                $user->tokens()->delete();
+                
+                Log::info('Logout realizado', [
+                    'user_id' => $user->id,
+                    'user_email' => $user->email,
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Logout realizado com sucesso'
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Erro no logout: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao fazer logout',
+                'error' => config('app.debug') ? $e->getMessage() : 'Server Error'
+            ], 500);
+        }
+    }
 }
 

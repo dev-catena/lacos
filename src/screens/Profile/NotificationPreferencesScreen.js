@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,41 +7,70 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import SafeIcon from '../../components/SafeIcon';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
+import { useAuth } from '../../contexts/AuthContext';
+import notificationPreferenceService from '../../services/notificationPreferenceService';
 
 const NotificationPreferencesScreen = ({ navigation }) => {
+  const { user } = useAuth();
+  const isDoctor = user?.profile === 'doctor';
+  
   const [preferences, setPreferences] = useState({
-    // Medicamentos
+    // Para médicos: apenas Consultas e Sinais Vitais
+    // Consultas e Compromissos (médico)
+    appointmentPatientNotification: true, // Notificação de consulta ao paciente, 10 min antes
+    
+    // Sinais Vitais (médico)
+    vitalSignsBasalChange: true, // Ocorrências de alteração acima de 50% da basal no paciente da carteira
+    
+    // Para outros perfis: apenas opções implementadas
+    // Medicamentos (não médico)
     medicationReminders: true,
     medicationLateAlerts: true,
-    medicationRunningOut: true,
     
-    // Consultas e Compromissos
+    // Consultas e Compromissos (não médico)
     appointmentReminders: true,
-    appointmentConfirmation: true,
     appointmentCancellation: true,
     
-    // Sinais Vitais
+    // Sinais Vitais (não médico)
     vitalSignsAlerts: true,
     vitalSignsAbnormal: true,
-    vitalSignsReminders: false,
     
-    // Atualizações do Grupo
-    groupInvites: true,
+    // Atualizações do Grupo (não médico) - IMPLEMENTADO
     groupMemberAdded: true,
-    groupChanges: false,
-    
-    // Sistema
-    systemUpdates: true,
-    newsAndTips: false,
-    emailNotifications: true,
+    groupChanges: true,
   });
 
   const [loading, setLoading] = useState(false);
+  const [loadingPreferences, setLoadingPreferences] = useState(true);
+
+  // Carregar preferências ao montar o componente
+  useEffect(() => {
+    loadPreferences();
+  }, []);
+
+  const loadPreferences = async () => {
+    try {
+      setLoadingPreferences(true);
+      const result = await notificationPreferenceService.getPreferences();
+      
+      if (result.success && result.data) {
+        setPreferences(prev => ({
+          ...prev,
+          ...result.data,
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar preferências:', error);
+    } finally {
+      setLoadingPreferences(false);
+    }
+  };
 
   const togglePreference = (key) => {
     setPreferences(prev => ({
@@ -54,15 +83,23 @@ const NotificationPreferencesScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // TODO: Integrar com API
-      // await updateNotificationPreferences(preferences);
+      const result = await notificationPreferenceService.updatePreferences(preferences);
       
-      Toast.show({
-        type: 'success',
-        text1: '✅ Preferências salvas',
-        text2: 'Suas configurações foram atualizadas',
-        position: 'bottom',
-      });
+      if (result.success) {
+        Toast.show({
+          type: 'success',
+          text1: '✅ Preferências salvas',
+          text2: result.message || 'Suas configurações foram atualizadas',
+          position: 'bottom',
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Erro',
+          text2: result.error || 'Não foi possível salvar as preferências',
+          position: 'bottom',
+        });
+      }
     } catch (error) {
       console.error('Erro ao salvar preferências:', error);
       Toast.show({
@@ -120,177 +157,163 @@ const NotificationPreferencesScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
+      {loadingPreferences ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Carregando preferências...</Text>
+        </View>
+      ) : (
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
-          {/* Medicamentos */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <SafeIcon name="medical" size={24} color={colors.secondary} />
-              <Text style={styles.sectionTitle}>Medicamentos</Text>
-            </View>
-            <View style={styles.sectionContent}>
-              <NotificationToggle
-                icon="alarm"
-                title="Lembretes de Medicação"
-                subtitle="Receber avisos dos horários dos remédios"
-                value={preferences.medicationReminders}
-                onToggle={() => togglePreference('medicationReminders')}
-                color={colors.secondary}
-              />
-              <NotificationToggle
-                icon="warning"
-                title="Alertas de Atraso"
-                subtitle="Avisar quando dose não for tomada"
-                value={preferences.medicationLateAlerts}
-                onToggle={() => togglePreference('medicationLateAlerts')}
-                color={colors.error}
-              />
-              <NotificationToggle
-                icon="flask"
-                title="Estoque Acabando"
-                subtitle="Avisar quando medicamento estiver acabando"
-                value={preferences.medicationRunningOut}
-                onToggle={() => togglePreference('medicationRunningOut')}
-                color={colors.warning}
-              />
-            </View>
-          </View>
+          {isDoctor ? (
+            <>
+              {/* CONFIGURAÇÃO PARA MÉDICOS */}
+              
+              {/* Consultas e Compromissos - Médico */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <SafeIcon name="calendar" size={24} color={colors.warning} />
+                  <Text style={styles.sectionTitle}>Consultas e Compromissos</Text>
+                </View>
+                <View style={styles.sectionContent}>
+                  <NotificationToggle
+                    icon="time"
+                    title="Notificação de Consultas"
+                    subtitle="Receber notificação da consulta 10 minutos antes"
+                    value={preferences.appointmentPatientNotification}
+                    onToggle={() => togglePreference('appointmentPatientNotification')}
+                    color={colors.warning}
+                  />
+                </View>
+              </View>
 
-          {/* Consultas e Compromissos */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <SafeIcon name="calendar" size={24} color={colors.warning} />
-              <Text style={styles.sectionTitle}>Consultas e Compromissos</Text>
-            </View>
-            <View style={styles.sectionContent}>
-              <NotificationToggle
-                icon="time"
-                title="Lembretes de Consultas"
-                subtitle="Avisos antes das consultas agendadas"
-                value={preferences.appointmentReminders}
-                onToggle={() => togglePreference('appointmentReminders')}
-                color={colors.warning}
-              />
-              <NotificationToggle
-                icon="checkmark-circle"
-                title="Confirmações"
-                subtitle="Confirmar presença em consultas"
-                value={preferences.appointmentConfirmation}
-                onToggle={() => togglePreference('appointmentConfirmation')}
-                color={colors.success}
-              />
-              <NotificationToggle
-                icon="close-circle"
-                title="Cancelamentos"
-                subtitle="Avisar sobre consultas canceladas"
-                value={preferences.appointmentCancellation}
-                onToggle={() => togglePreference('appointmentCancellation')}
-                color={colors.error}
-              />
-            </View>
-          </View>
+              {/* Sinais Vitais - Médico */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <SafeIcon name="pulse" size={24} color={colors.success} />
+                  <Text style={styles.sectionTitle}>Sinais Vitais</Text>
+                </View>
+                <View style={styles.sectionContent}>
+                  <NotificationToggle
+                    icon="warning"
+                    title="Alteração Acima de 50% da Basal"
+                    subtitle="Notificar ocorrências de alteração acima de 50% da basal no paciente da carteira"
+                    value={preferences.vitalSignsBasalChange}
+                    onToggle={() => togglePreference('vitalSignsBasalChange')}
+                    color={colors.error}
+                  />
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* CONFIGURAÇÃO PARA OUTROS PERFIS */}
+              
+              {/* Medicamentos */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <SafeIcon name="medical" size={24} color={colors.secondary} />
+                  <Text style={styles.sectionTitle}>Medicamentos</Text>
+                </View>
+                <View style={styles.sectionContent}>
+                  <NotificationToggle
+                    icon="alarm"
+                    title="Lembretes de Medicação"
+                    subtitle="Receber avisos dos horários dos remédios"
+                    value={preferences.medicationReminders}
+                    onToggle={() => togglePreference('medicationReminders')}
+                    color={colors.secondary}
+                  />
+                  <NotificationToggle
+                    icon="warning"
+                    title="Alertas de Atraso"
+                    subtitle="Avisar quando dose não for tomada"
+                    value={preferences.medicationLateAlerts}
+                    onToggle={() => togglePreference('medicationLateAlerts')}
+                    color={colors.error}
+                  />
+                </View>
+              </View>
 
-          {/* Sinais Vitais */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <SafeIcon name="pulse" size={24} color={colors.success} />
-              <Text style={styles.sectionTitle}>Sinais Vitais</Text>
-            </View>
-            <View style={styles.sectionContent}>
-              <NotificationToggle
-                icon="notifications"
-                title="Alertas de Sinais Vitais"
-                subtitle="Receber notificações sobre medições"
-                value={preferences.vitalSignsAlerts}
-                onToggle={() => togglePreference('vitalSignsAlerts')}
-                color={colors.success}
-              />
-              <NotificationToggle
-                icon="warning"
-                title="Valores Anormais"
-                subtitle="Avisar quando valores estiverem fora do normal"
-                value={preferences.vitalSignsAbnormal}
-                onToggle={() => togglePreference('vitalSignsAbnormal')}
-                color={colors.error}
-              />
-              <NotificationToggle
-                icon="alarm"
-                title="Lembretes de Medição"
-                subtitle="Lembrar de medir periodicamente"
-                value={preferences.vitalSignsReminders}
-                onToggle={() => togglePreference('vitalSignsReminders')}
-                color={colors.info}
-              />
-            </View>
-          </View>
+              {/* Consultas e Compromissos */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <SafeIcon name="calendar" size={24} color={colors.warning} />
+                  <Text style={styles.sectionTitle}>Consultas e Compromissos</Text>
+                </View>
+                <View style={styles.sectionContent}>
+                  <NotificationToggle
+                    icon="time"
+                    title="Lembretes de Consultas"
+                    subtitle="Avisos antes das consultas agendadas"
+                    value={preferences.appointmentReminders}
+                    onToggle={() => togglePreference('appointmentReminders')}
+                    color={colors.warning}
+                  />
+                  <NotificationToggle
+                    icon="close-circle"
+                    title="Cancelamentos"
+                    subtitle="Avisar sobre consultas canceladas"
+                    value={preferences.appointmentCancellation}
+                    onToggle={() => togglePreference('appointmentCancellation')}
+                    color={colors.error}
+                  />
+                </View>
+              </View>
 
-          {/* Atualizações do Grupo */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <SafeIcon name="people" size={24} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Atualizações do Grupo</Text>
-            </View>
-            <View style={styles.sectionContent}>
-              <NotificationToggle
-                icon="mail"
-                title="Convites de Grupo"
-                subtitle="Receber convites para participar de grupos"
-                value={preferences.groupInvites}
-                onToggle={() => togglePreference('groupInvites')}
-                color={colors.primary}
-              />
-              <NotificationToggle
-                icon="person-add"
-                title="Novos Membros"
-                subtitle="Avisar quando alguém entrar no grupo"
-                value={preferences.groupMemberAdded}
-                onToggle={() => togglePreference('groupMemberAdded')}
-                color={colors.info}
-              />
-              <NotificationToggle
-                icon="create"
-                title="Alterações no Grupo"
-                subtitle="Notificar mudanças de configurações"
-                value={preferences.groupChanges}
-                onToggle={() => togglePreference('groupChanges')}
-                color={colors.textLight}
-              />
-            </View>
-          </View>
+              {/* Sinais Vitais */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <SafeIcon name="pulse" size={24} color={colors.success} />
+                  <Text style={styles.sectionTitle}>Sinais Vitais</Text>
+                </View>
+                <View style={styles.sectionContent}>
+                  <NotificationToggle
+                    icon="notifications"
+                    title="Alertas de Sinais Vitais"
+                    subtitle="Receber notificações sobre medições"
+                    value={preferences.vitalSignsAlerts}
+                    onToggle={() => togglePreference('vitalSignsAlerts')}
+                    color={colors.success}
+                  />
+                  <NotificationToggle
+                    icon="warning"
+                    title="Valores Anormais"
+                    subtitle="Avisar quando valores estiverem fora do normal"
+                    value={preferences.vitalSignsAbnormal}
+                    onToggle={() => togglePreference('vitalSignsAbnormal')}
+                    color={colors.error}
+                  />
+                </View>
+              </View>
 
-          {/* Sistema */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <SafeIcon name="settings" size={24} color={colors.text} />
-              <Text style={styles.sectionTitle}>Sistema</Text>
-            </View>
-            <View style={styles.sectionContent}>
-              <NotificationToggle
-                icon="cloud-download"
-                title="Atualizações do App"
-                subtitle="Novidades e melhorias disponíveis"
-                value={preferences.systemUpdates}
-                onToggle={() => togglePreference('systemUpdates')}
-                color={colors.primary}
-              />
-              <NotificationToggle
-                icon="bulb"
-                title="Dicas e Novidades"
-                subtitle="Receber dicas de uso e notícias"
-                value={preferences.newsAndTips}
-                onToggle={() => togglePreference('newsAndTips')}
-                color={colors.warning}
-              />
-              <NotificationToggle
-                icon="mail"
-                title="Notificações por E-mail"
-                subtitle="Receber resumos por e-mail"
-                value={preferences.emailNotifications}
-                onToggle={() => togglePreference('emailNotifications')}
-                color={colors.info}
-              />
-            </View>
-          </View>
+              {/* Atualizações do Grupo */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <SafeIcon name="people" size={24} color={colors.primary} />
+                  <Text style={styles.sectionTitle}>Atualizações do Grupo</Text>
+                </View>
+                <View style={styles.sectionContent}>
+                  <NotificationToggle
+                    icon="person-add"
+                    title="Novos Membros"
+                    subtitle="Avisar quando alguém entrar no grupo"
+                    value={preferences.groupMemberAdded}
+                    onToggle={() => togglePreference('groupMemberAdded')}
+                    color={colors.info}
+                  />
+                  <NotificationToggle
+                    icon="create"
+                    title="Alterações no Grupo"
+                    subtitle="Notificar mudanças de configurações"
+                    value={preferences.groupChanges}
+                    onToggle={() => togglePreference('groupChanges')}
+                    color={colors.textLight}
+                  />
+                </View>
+              </View>
+            </>
+          )}
 
           {/* Info Card */}
           <View style={styles.infoCard}>
@@ -303,6 +326,7 @@ const NotificationPreferencesScreen = ({ navigation }) => {
           <View style={{ height: 40 }} />
         </View>
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
@@ -411,6 +435,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text,
     lineHeight: 18,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.textLight,
   },
 });
 

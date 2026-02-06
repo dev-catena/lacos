@@ -637,7 +637,10 @@ export const AuthProvider = ({ children }) => {
       
       // PASSO 6: FORÇAR NAVEGAÇÃO DIRETAMENTE para Welcome
       // IMPORTANTE: NÃO redirecionar se isRegistering=true (usuário está em processo de registro com erro)
+      // IMPORTANTE: Verificar se já está na Welcome para evitar navegação duplicada
+      // IMPORTANTE: Usar uma flag para garantir que só navega uma vez
       if (navigationRef?.current && !isRegistering) {
+        // Usar um timeout único para evitar múltiplas navegações
         setTimeout(() => {
           try {
             // Verificar rota atual antes de redirecionar
@@ -650,8 +653,16 @@ export const AuthProvider = ({ children }) => {
               return;
             }
             
+            // PROTEÇÃO: Se já estiver na Welcome, NÃO navegar novamente
+            if (currentRoute === 'Welcome') {
+              console.log('🔑 AuthContext - ✅ Já estamos na Welcome - Não navegando novamente');
+              return;
+            }
+            
             console.log('🔑 AuthContext - Forçando navegação para Welcome...');
-            console.log('🔑 AuthContext - isRegistering:', isRegistering, '- NÃO redirecionando se isRegistering=true');
+            console.log('🔑 AuthContext - Rota atual:', currentRoute);
+            
+            // Usar reset com animationEnabled: false para evitar animação duplicada
             navigationRef.current?.reset({
               index: 0,
               routes: [{ name: 'Welcome' }],
@@ -659,18 +670,18 @@ export const AuthProvider = ({ children }) => {
             console.log('🔑 AuthContext - ✅ Navegação resetada para Welcome');
           } catch (navError) {
             console.error('❌ AuthContext - Erro ao forçar navegação:', navError);
-            // Fallback: tentar navigate APENAS se não estiver em Register
+            // Fallback: tentar navigate APENAS se não estiver em Register ou Welcome
             try {
               const state = navigationRef.current.getState();
               const currentRoute = state?.routes[state?.index]?.name;
-              if (currentRoute !== 'Register' && !isRegistering) {
+              if (currentRoute !== 'Register' && currentRoute !== 'Welcome' && !isRegistering) {
                 navigationRef.current?.navigate('Welcome');
               }
             } catch (e2) {
               console.error('❌ AuthContext - Erro no fallback de navegação:', e2);
             }
           }
-        }, 100);
+        }, 200); // Delay aumentado para garantir que o estado foi atualizado
       } else if (isRegistering) {
         console.log('🔑 AuthContext - ⚠️ isRegistering=true - NÃO redirecionando para Welcome no logout');
       }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Group;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -556,17 +557,35 @@ class GroupController extends Controller
                         ->where('user_id', $user->id)
                         ->exists();
                 
-                $hasMedications = Schema::hasTable('medications') && 
-                    DB::table('medications')
-                        ->where('group_id', $id)
-                        ->where('user_id', $user->id)
-                        ->exists();
+                $hasMedications = false;
+                if (Schema::hasTable('medications')) {
+                    // A tabela medications não tem user_id, mas tem registered_by_user_id
+                    if (Schema::hasColumn('medications', 'registered_by_user_id')) {
+                        $hasMedications = DB::table('medications')
+                            ->where('group_id', $id)
+                            ->where('registered_by_user_id', $user->id)
+                            ->exists();
+                    } else {
+                        // Fallback: verificar apenas se existe algum medication no grupo
+                        $hasMedications = DB::table('medications')
+                            ->where('group_id', $id)
+                            ->exists();
+                    }
+                }
                 
-                $hasAppointments = Schema::hasTable('appointments') && 
-                    DB::table('appointments')
+                $hasAppointments = false;
+                if (Schema::hasTable('appointments')) {
+                    // A tabela appointments não tem user_id, mas tem doctor_id e created_by_user_id
+                    $hasAppointments = DB::table('appointments')
                         ->where('group_id', $id)
-                        ->where('user_id', $user->id)
+                        ->where(function($query) use ($user) {
+                            $query->where('doctor_id', $user->id);
+                            if (Schema::hasColumn('appointments', 'created_by_user_id')) {
+                                $query->orWhere('created_by_user_id', $user->id);
+                            }
+                        })
                         ->exists();
+                }
                 
                 $hasAccess = $hasActivities || $hasDocuments || $hasMedications || $hasAppointments;
             }
@@ -930,11 +949,74 @@ class GroupController extends Controller
                 ]);
             }
 
+            // Guardar dados antigos para comparar mudanças
+            $oldGroup = (array) $group;
+            
             // Atualizar grupo
             if (!empty($data)) {
                 $data['updated_at'] = now();
                 DB::table('groups')->where('id', $id)->update($data);
                 Log::info("Grupo {$id} atualizado com sucesso", $data);
+                
+                // Enviar notificações para os membros sobre alterações no grupo
+                try {
+                    $notificationService = new NotificationService();
+                    
+                    // Verificar quais campos foram alterados (apenas campos importantes)
+                    $importantFields = ['name', 'description', 'accompanied_name'];
+                    $hasImportantChanges = false;
+                    foreach ($importantFields as $field) {
+                        if (isset($data[$field]) && isset($oldGroup[$field]) && $data[$field] != $oldGroup[$field]) {
+                            $hasImportantChanges = true;
+                            break;
+                        }
+                    }
+                    
+                    if ($hasImportantChanges) {
+                        // Buscar todos os membros do grupo (exceto quem fez a alteração)
+                        $groupMembers = [];
+                        if (Schema::hasTable('group_members')) {
+                            $groupMembers = DB::table('group_members')
+                                ->where('group_id', $id)
+                                ->where('user_id', '!=', $user->id)
+                                ->where('is_active', true)
+                                ->pluck('user_id')
+                                ->toArray();
+                        }
+
+                        foreach ($groupMembers as $memberId) {
+                            $member = \App\Models\User::find($memberId);
+                            if (!$member) continue;
+
+                            // Verificar se o membro tem preferência de notificação habilitada
+                            if (!$notificationService->hasNotificationPreference($member, 'group_changes')) {
+                                continue;
+                            }
+
+                            $title = 'Alterações no Grupo';
+                            $message = "O grupo {$group->name} foi atualizado";
+                            
+                            $notificationService->sendNotification(
+                                $member,
+                                'group',
+                                $title,
+                                $message,
+                                [
+                                    'group_id' => $id,
+                                    'group_name' => $group->name,
+                                    'updated_by' => $user->id,
+                                    'updated_by_name' => $user->name,
+                                    'action_type' => 'group_updated',
+                                    'changes' => array_keys($data),
+                                ],
+                                false,
+                                $id
+                            );
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Erro ao enviar notificações de alteração no grupo: " . $e->getMessage());
+                }
             }
 
             // Buscar grupo atualizado
@@ -996,15 +1078,82 @@ class GroupController extends Controller
         try {
             $user = Auth::user();
             if (!$user) return response()->json(["success" => false, "message" => "Usuário não autenticado"], 401);
+            
             $group = DB::table("groups")->where("id", $id)->first();
             if (!$group) return response()->json(["success" => false, "message" => "Grupo não encontrado"], 404);
-            // Verificar se é admin/criador (usar created_by se existir, senão admin_user_id)
+            
+            // Verificar se o usuário tem acesso ao grupo (mesma lógica do método show)
+            $hasAccess = false;
+            
+            // 1. Verificar se é admin/criador (usar created_by se existir, senão admin_user_id)
             $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
-            $hasAccess = $createdBy && $createdBy == $user->id;
-            if (!$hasAccess && Schema::hasTable("group_members")) {
-                $hasAccess = DB::table("group_members")->where("user_id", $user->id)->where("group_id", $id)->exists();
+            if ($createdBy && $createdBy == $user->id) {
+                $hasAccess = true;
             }
-            if (!$hasAccess) return response()->json(["success" => false, "message" => "Você não tem acesso"], 403);
+            
+            // 2. Verificar via group_members
+            if (!$hasAccess && Schema::hasTable("group_members")) {
+                $hasAccess = DB::table("group_members")
+                    ->where("user_id", $user->id)
+                    ->where("group_id", $id)
+                    ->exists();
+            }
+            
+            // 3. Verificar via atividades, documentos, medicamentos, consultas, etc.
+            if (!$hasAccess) {
+                $hasActivities = Schema::hasTable('group_activities') && 
+                    DB::table('group_activities')
+                        ->where('group_id', $id)
+                        ->where('user_id', $user->id)
+                        ->exists();
+                
+                $hasDocuments = Schema::hasTable('documents') && 
+                    DB::table('documents')
+                        ->where('group_id', $id)
+                        ->where('user_id', $user->id)
+                        ->exists();
+                
+                $hasMedications = false;
+                if (Schema::hasTable('medications')) {
+                    // A tabela medications não tem user_id, mas tem registered_by_user_id
+                    if (Schema::hasColumn('medications', 'registered_by_user_id')) {
+                        $hasMedications = DB::table('medications')
+                            ->where('group_id', $id)
+                            ->where('registered_by_user_id', $user->id)
+                            ->exists();
+                    } else {
+                        // Fallback: verificar apenas se existe algum medication no grupo
+                        $hasMedications = DB::table('medications')
+                            ->where('group_id', $id)
+                            ->exists();
+                    }
+                }
+                
+                $hasAppointments = false;
+                if (Schema::hasTable('appointments')) {
+                    // A tabela appointments não tem user_id, mas tem doctor_id e created_by_user_id
+                    $hasAppointments = DB::table('appointments')
+                        ->where('group_id', $id)
+                        ->where(function($query) use ($user) {
+                            $query->where('doctor_id', $user->id);
+                            if (Schema::hasColumn('appointments', 'created_by_user_id')) {
+                                $query->orWhere('created_by_user_id', $user->id);
+                            }
+                        })
+                        ->exists();
+                }
+                
+                $hasAccess = $hasActivities || $hasDocuments || $hasMedications || $hasAppointments;
+            }
+            
+            if (!$hasAccess) {
+                Log::warning("GroupController::members - Acesso negado", [
+                    'user_id' => $user->id,
+                    'group_id' => $id,
+                    'created_by' => $createdBy,
+                ]);
+                return response()->json(["success" => false, "message" => "Você não tem acesso"], 403);
+            }
             $members = [];
             if (Schema::hasTable("group_members")) {
                 $memberColumns = ["users.id", "users.name", "users.email", "users.phone", "group_members.role", "group_members.joined_at"];
@@ -1065,6 +1214,7 @@ class GroupController extends Controller
                     ->values()
                     ->toArray();
             }
+            
             // Usar created_by se existir, senão admin_user_id (compatibilidade)
             $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
             if ($createdBy) {
@@ -1385,6 +1535,59 @@ class GroupController extends Controller
                 } catch (\Exception $e) {
                     Log::warning("Erro ao registrar atividade de entrada no grupo: " . $e->getMessage());
                 }
+            }
+
+            // Enviar notificações para os membros do grupo sobre o novo membro
+            try {
+                $notificationService = new NotificationService();
+                
+                // Buscar todos os membros do grupo (exceto o novo membro)
+                $groupMembers = [];
+                if (Schema::hasTable('group_members')) {
+                    $groupMembers = DB::table('group_members')
+                        ->where('group_id', $group->id)
+                        ->where('user_id', '!=', $user->id)
+                        ->where('is_active', true)
+                        ->pluck('user_id')
+                        ->toArray();
+                }
+
+                // Buscar informações do grupo
+                $groupModel = \App\Models\Group::find($group->id);
+                if (!$groupModel) {
+                    $groupModel = DB::table('groups')->where('id', $group->id)->first();
+                }
+
+                foreach ($groupMembers as $memberId) {
+                    $member = \App\Models\User::find($memberId);
+                    if (!$member) continue;
+
+                    // Verificar se o membro tem preferência de notificação habilitada
+                    if (!$notificationService->hasNotificationPreference($member, 'group_member_added')) {
+                        continue;
+                    }
+
+                    $title = 'Novo Membro no Grupo';
+                    $message = "{$user->name} entrou no grupo {$group->name}";
+                    
+                    $notificationService->sendNotification(
+                        $member,
+                        'group',
+                        $title,
+                        $message,
+                        [
+                            'group_id' => $group->id,
+                            'group_name' => $group->name,
+                            'new_member_id' => $user->id,
+                            'new_member_name' => $user->name,
+                            'action_type' => 'member_joined',
+                        ],
+                        false,
+                        $group->id
+                    );
+                }
+            } catch (\Exception $e) {
+                Log::warning("Erro ao enviar notificações de novo membro: " . $e->getMessage());
             }
 
             Log::info("Usuário entrou no grupo", [

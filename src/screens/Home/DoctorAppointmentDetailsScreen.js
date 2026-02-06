@@ -15,6 +15,7 @@ import moment from 'moment';
 import 'moment/locale/pt-br';
 import groupService from '../../services/groupService';
 import documentService from '../../services/documentService';
+import appointmentService from '../../services/appointmentService';
 import {
   ReceiptIcon,
   CalendarIcon,
@@ -29,12 +30,14 @@ import {
   ChevronForwardIcon,
   TimeIcon,
   VideoCamIcon,
+  CloseCircleIcon,
 } from '../../components/CustomIcons';
 
 moment.locale('pt-br');
 
 const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
-  const { appointment } = route.params || {};
+  const { appointment: initialAppointment } = route.params || {};
+  const [appointment, setAppointment] = useState(initialAppointment);
   const [canStart, setCanStart] = useState(false);
   const [patientInfo, setPatientInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +49,13 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
     loadPatientInfo();
   }, [appointment]);
 
+  // Atualizar appointment quando route.params mudar
+  useEffect(() => {
+    if (route.params?.appointment) {
+      setAppointment(route.params.appointment);
+    }
+  }, [route.params?.appointment]);
+
   useEffect(() => {
     if (appointment?.group_id) {
       loadDocuments();
@@ -54,6 +64,12 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
 
   const checkCanStart = () => {
     if (!appointment) return;
+    
+    // Não pode iniciar se estiver cancelada
+    if (appointment.status === 'cancelled') {
+      setCanStart(false);
+      return;
+    }
     
     const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at);
     const now = new Date();
@@ -312,6 +328,96 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
     });
   };
 
+  const handleCancelAppointment = () => {
+    // Verificar se já está cancelada
+    if (appointment.status === 'cancelled') {
+      Alert.alert(
+        'Consulta já cancelada',
+        'Esta consulta já foi cancelada anteriormente.'
+      );
+      return;
+    }
+
+    // Verificar se já foi completada
+    if (appointment.status === 'completed') {
+      Alert.alert(
+        'Não é possível cancelar',
+        'Não é possível cancelar uma consulta que já foi completada.'
+      );
+      return;
+    }
+
+    const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at);
+    const now = new Date();
+    
+    // Validar que só pode cancelar até a hora da consulta
+    if (now > appointmentDate) {
+      Alert.alert(
+        'Não é possível cancelar',
+        'Não é possível cancelar uma consulta após o horário agendado.'
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Cancelar Consulta',
+      'Tem certeza que deseja cancelar esta consulta? O cuidador e o paciente serão notificados.',
+      [
+        {
+          text: 'Não',
+          style: 'cancel',
+        },
+        {
+          text: 'Sim, cancelar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await appointmentService.cancelAppointment(
+                appointment.id,
+                'doctor',
+                null // Pode adicionar campo de motivo depois
+              );
+
+              if (result.success) {
+                // Atualizar estado local da consulta com dados retornados do backend
+                const updatedAppointment = {
+                  ...appointment,
+                  status: result.data?.status || 'cancelled',
+                  cancelled_by: 'doctor',
+                  payment_status: result.data?.payment_status || appointment.payment_status,
+                };
+                
+                setAppointment(updatedAppointment);
+                
+                Alert.alert(
+                  'Consulta Cancelada',
+                  'A consulta foi cancelada com sucesso. O cuidador e o paciente foram notificados.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Atualizar a lista de consultas se houver callback
+                        if (route.params?.onAppointmentUpdated) {
+                          route.params.onAppointmentUpdated(updatedAppointment);
+                        }
+                        // Não navegar de volta automaticamente, deixar o usuário ver o status
+                      },
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert('Erro', result.error || 'Não foi possível cancelar a consulta');
+              }
+            } catch (error) {
+              console.error('Erro ao cancelar consulta:', error);
+              Alert.alert('Erro', 'Não foi possível cancelar a consulta. Tente novamente.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -347,10 +453,25 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+        {/* Status Cancelado */}
+        {appointment.status === 'cancelled' && (
+          <View style={styles.cancelledCard}>
+            <CloseCircleIcon size={24} color={colors.error} />
+            <Text style={styles.cancelledTitle}>Consulta Cancelada</Text>
+            <Text style={styles.cancelledText}>
+              Esta consulta foi cancelada
+              {appointment.cancelled_by === 'doctor' ? ' pelo médico' : ' pelo paciente'}
+            </Text>
+          </View>
+        )}
+
         {/* Informações da Consulta */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Consulta</Text>
-          <View style={styles.infoCard}>
+          <View style={[
+            styles.infoCard,
+            appointment.status === 'cancelled' && styles.infoCardCancelled
+          ]}>
             <Text style={styles.infoTitle}>{appointment.title || 'Consulta'}</Text>
             {appointment.description && (
               <Text style={styles.infoDescription}>{appointment.description}</Text>
@@ -512,7 +633,7 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
         )}
 
         {/* Status de Início */}
-        {!canStart && (
+        {!canStart && appointment.status !== 'cancelled' && (
           <View style={styles.warningCard}>
             <TimeIcon size={24} color={colors.warning} />
             <Text style={styles.warningText}>
@@ -525,28 +646,51 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
         )}
       </ScrollView>
 
-      {/* Botão de Iniciar Consulta */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[
-            styles.startButton,
-            !canStart && styles.startButtonDisabled
-          ]}
-          onPress={handleStartConsultation}
-          disabled={!canStart}
-        >
-          <VideoCamIcon 
-            size={24} 
-            color={canStart ? '#FFFFFF' : colors.textLight} 
-          />
-          <Text style={[
-            styles.startButtonText,
-            !canStart && styles.startButtonTextDisabled
-          ]}>
-            Iniciar Consulta
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Botões de Ação */}
+      {appointment.status !== 'cancelled' && (
+        <View style={styles.footer}>
+          {/* Botão de Cancelar (só aparece se ainda não passou a hora e não está cancelada) */}
+          {(() => {
+            const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at);
+            const now = new Date();
+            const canCancel = now <= appointmentDate && appointment.status !== 'cancelled';
+            
+            if (canCancel) {
+              return (
+                <TouchableOpacity
+                  style={styles.cancelButtonFooter}
+                  onPress={handleCancelAppointment}
+                >
+                  <CloseCircleIcon size={20} color={colors.error} />
+                  <Text style={styles.cancelButtonText}>Cancelar Consulta</Text>
+                </TouchableOpacity>
+              );
+            }
+            return null;
+          })()}
+          
+          {/* Botão de Iniciar Consulta */}
+          <TouchableOpacity
+            style={[
+              styles.startButton,
+              !canStart && styles.startButtonDisabled
+            ]}
+            onPress={handleStartConsultation}
+            disabled={!canStart}
+          >
+            <VideoCamIcon 
+              size={24} 
+              color={canStart ? '#FFFFFF' : colors.textLight} 
+            />
+            <Text style={[
+              styles.startButtonText,
+              !canStart && styles.startButtonTextDisabled
+            ]}>
+              Iniciar Consulta
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -586,6 +730,9 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 32,
+  },
+  cancelButton: {
+    padding: 4,
   },
   content: {
     flex: 1,
@@ -737,6 +884,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
+    gap: 12,
+  },
+  cancelButtonFooter: {
+    backgroundColor: colors.error + '15',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.error + '40',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.error,
   },
   startButton: {
     backgroundColor: colors.primary,
@@ -825,6 +989,31 @@ const styles = StyleSheet.create({
   fileMeta: {
     fontSize: 12,
     color: colors.textLight,
+  },
+  cancelledCard: {
+    backgroundColor: colors.error + '15',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.error + '40',
+  },
+  cancelledTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.error,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  cancelledText: {
+    fontSize: 14,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  infoCardCancelled: {
+    opacity: 0.6,
+    borderColor: colors.error + '40',
   },
 });
 

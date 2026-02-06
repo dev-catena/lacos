@@ -55,3 +55,4 @@ echo "💡 Para alterar o IP do servidor, edite APP_HOST no arquivo .env"
 
 
 
+

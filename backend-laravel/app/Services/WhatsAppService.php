@@ -89,6 +89,64 @@ class WhatsAppService
     }
 
     /**
+     * Enviar mensagem genérica via WhatsApp
+     */
+    public function sendMessage($phoneNumber, $message)
+    {
+        try {
+            $phone = $this->formatPhoneNumber($phoneNumber);
+            
+            Log::info('Enviando mensagem via WhatsApp', [
+                'phone' => $phone,
+                'instance' => $this->instanceName,
+            ]);
+
+            $response = Http::timeout(30)->withHeaders([
+                'apikey' => $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->post("{$this->apiUrl}/message/sendText/{$this->instanceName}", [
+                'number' => $phone,
+                'text' => $message,
+            ]);
+
+            if ($response->successful()) {
+                $responseData = $response->json();
+                Log::info('WhatsApp mensagem enviada com sucesso', [
+                    'phone' => $phone,
+                    'message_id' => $responseData['key']['id'] ?? null,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message_id' => $responseData['key']['id'] ?? null,
+                ];
+            }
+
+            $errorMessage = $response->json('message', 'Erro desconhecido');
+            Log::error('Erro ao enviar WhatsApp', [
+                'phone' => $phone,
+                'status' => $response->status(),
+                'error' => $errorMessage,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Exceção ao enviar WhatsApp: ' . $e->getMessage(), [
+                'phone' => $phoneNumber,
+                'exception' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Erro ao enviar mensagem WhatsApp: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * Verificar se a instância está conectada
      */
     public function checkConnection()

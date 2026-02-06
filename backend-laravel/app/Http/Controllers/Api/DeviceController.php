@@ -66,6 +66,33 @@ class DeviceController extends Controller
     public function getGroupDevices($groupId)
     {
         try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'error' => 'Usuário não autenticado',
+                    'message' => 'É necessário estar autenticado para acessar esta funcionalidade'
+                ], 401);
+            }
+            
+            // Verificar se o usuário tem acesso ao grupo
+            $group = \App\Models\Group::find($groupId);
+            if (!$group) {
+                return response()->json([
+                    'error' => 'Grupo não encontrado',
+                    'message' => 'O grupo informado não existe'
+                ], 404);
+            }
+            
+            // Verificar se o usuário é membro do grupo
+            $isMember = $group->members()->where('user_id', $user->id)->where('is_active', true)->exists();
+            if (!$isMember) {
+                return response()->json([
+                    'error' => 'Acesso negado',
+                    'message' => 'Você não tem permissão para acessar os dispositivos deste grupo'
+                ], 403);
+            }
+            
             $devices = Device::where('group_id', $groupId)
                 ->orderBy('created_at', 'desc')
                 ->get()
@@ -97,6 +124,33 @@ class DeviceController extends Controller
     public function createGroupDevice(Request $request, $groupId)
     {
         try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'error' => 'Usuário não autenticado',
+                    'message' => 'É necessário estar autenticado para acessar esta funcionalidade'
+                ], 401);
+            }
+            
+            // Verificar se o usuário tem acesso ao grupo
+            $group = \App\Models\Group::find($groupId);
+            if (!$group) {
+                return response()->json([
+                    'error' => 'Grupo não encontrado',
+                    'message' => 'O grupo informado não existe'
+                ], 404);
+            }
+            
+            // Verificar se o usuário é membro do grupo
+            $isMember = $group->members()->where('user_id', $user->id)->where('is_active', true)->exists();
+            if (!$isMember) {
+                return response()->json([
+                    'error' => 'Acesso negado',
+                    'message' => 'Você não tem permissão para criar dispositivos neste grupo'
+                ], 403);
+            }
+            
             $validator = Validator::make($request->all(), [
                 'nickname' => 'required|string|max:255',
                 'type' => 'required|in:smartwatch,sensor',
@@ -115,7 +169,7 @@ class DeviceController extends Controller
                 'type' => $request->type,
                 'identifier' => $request->identifier,
                 'group_id' => $groupId,
-                'user_id' => Auth::id(),
+                'user_id' => $user->id,
             ]);
 
             // Registrar atividade de registro de smartwatch (apenas se for smartwatch)
@@ -336,6 +390,13 @@ class DeviceController extends Controller
     {
         try {
             $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'error' => 'Usuário não autenticado',
+                    'message' => 'É necessário estar autenticado para acessar esta funcionalidade'
+                ], 401);
+            }
 
             // Se deviceId não foi passado, então $groupId é o ID do dispositivo (rota admin)
             // Nesse caso, verificar se é root
@@ -343,7 +404,7 @@ class DeviceController extends Controller
                 // Verificar se é root: por campo is_root ou por email root@lacos.com ou admin@lacos.com
                 $isRoot = ($user->is_root ?? false) || ($user->email === 'root@lacos.com') || ($user->email === 'admin@lacos.com');
 
-                if (!$user || !$isRoot) {
+                if (!$isRoot) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Acesso negado. Apenas usuários root podem acessar esta funcionalidade.'
@@ -355,12 +416,26 @@ class DeviceController extends Controller
             
             $device = Device::findOrFail($id);
             
-            // Se foi passado groupId, verificar se o dispositivo pertence ao grupo
-            if ($groupId && $deviceId && $device->group_id != $groupId) {
-                return response()->json([
-                    'error' => 'Dispositivo não pertence a este grupo',
-                    'message' => 'O dispositivo não está vinculado ao grupo informado'
-                ], 403);
+            // Se foi passado groupId, verificar se o dispositivo pertence ao grupo e se o usuário tem acesso
+            if ($groupId && $deviceId) {
+                if ($device->group_id != $groupId) {
+                    return response()->json([
+                        'error' => 'Dispositivo não pertence a este grupo',
+                        'message' => 'O dispositivo não está vinculado ao grupo informado'
+                    ], 403);
+                }
+                
+                // Verificar se o usuário tem acesso ao grupo
+                $group = \App\Models\Group::find($groupId);
+                if ($group) {
+                    $isMember = $group->members()->where('user_id', $user->id)->where('is_active', true)->exists();
+                    if (!$isMember) {
+                        return response()->json([
+                            'error' => 'Acesso negado',
+                            'message' => 'Você não tem permissão para excluir dispositivos deste grupo'
+                        ], 403);
+                    }
+                }
             }
             
             $device->delete();

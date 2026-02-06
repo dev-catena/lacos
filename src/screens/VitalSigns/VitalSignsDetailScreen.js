@@ -285,7 +285,7 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
         transparent={true}
         animationType="slide"
         onRequestClose={() => setShowDetailsModal(false)}
-        statusBarTranslucent={true}
+        statusBarTranslucent={false}
       >
         <Pressable 
           style={styles.modalOverlay}
@@ -308,30 +308,77 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
             </View>
 
             <ScrollView style={styles.modalScrollView}>
-              {selectedIndicatorData.map((item, index) => (
-                <View key={index} style={styles.detailItem}>
-                  <View style={styles.detailItemLeft}>
-                    <Text style={styles.detailDate}>
-                      {moment(item.measured_at).format('DD/MM/YYYY')}
-                    </Text>
-                    <Text style={styles.detailTime}>
-                      {moment(item.measured_at).format('HH:mm')}
-                    </Text>
+              {selectedIndicatorData.map((item, index) => {
+                // Formatar o valor corretamente
+                let displayValue = '';
+                let value = item.value;
+                
+                // Se value é string JSON, tentar parsear
+                if (typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
+                  try {
+                    value = JSON.parse(value);
+                  } catch (e) {
+                    // Se falhar, manter como string
+                  }
+                }
+                
+                // Se value é array, pegar primeiro elemento
+                if (Array.isArray(value) && value.length > 0) {
+                  value = value[0];
+                }
+                
+                // Se value ainda é array dentro de array, pegar primeiro
+                if (Array.isArray(value) && value.length > 0) {
+                  value = value[0];
+                }
+                
+                // Formatar baseado no tipo
+                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                  // Objeto com systolic/diastolic (pressão arterial)
+                  if (value.systolic !== undefined && value.diastolic !== undefined) {
+                    displayValue = `${value.systolic}/${value.diastolic}`;
+                  } else {
+                    // Outro objeto, tentar pegar primeiro valor
+                    const keys = Object.keys(value);
+                    if (keys.length > 0) {
+                      displayValue = String(value[keys[0]]);
+                    } else {
+                      displayValue = 'N/A';
+                    }
+                  }
+                } else {
+                  // Valor numérico ou string
+                  const numValue = parseFloat(value);
+                  if (!isNaN(numValue)) {
+                    displayValue = numValue.toFixed(1);
+                  } else {
+                    displayValue = String(value || 'N/A');
+                  }
+                }
+                
+                const unit = indicatorsConfig.find(i => i.key === selectedIndicator)?.unit || '';
+                
+                return (
+                  <View key={index} style={styles.detailItem}>
+                    <View style={styles.detailItemLeft}>
+                      <Text style={styles.detailDate}>
+                        {moment(item.measured_at).format('DD/MM/YYYY')}
+                      </Text>
+                      <Text style={styles.detailTime}>
+                        {moment(item.measured_at).format('HH:mm')}
+                      </Text>
+                    </View>
+                    <View style={styles.detailItemCenter}>
+                      <Text style={styles.detailValue}>
+                        {displayValue} {unit}
+                      </Text>
+                      <Text style={styles.detailSource}>
+                        {item.measured_by_name || item.wearable_name || 'Manual'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.detailItemCenter}>
-                    <Text style={styles.detailValue}>
-                      {typeof item.value === 'object' && item.value !== null
-                        ? `${item.value.systolic}/${item.value.diastolic}`
-                        : parseFloat(item.value || 0).toFixed(1)}
-                      {' '}
-                      {indicatorsConfig.find(i => i.key === selectedIndicator)?.unit || ''}
-                    </Text>
-                    <Text style={styles.detailSource}>
-                      {item.measured_by_name || item.wearable_name || 'Manual'}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -479,12 +526,12 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: '#FFFFFF', // Branco puro e opaco
     justifyContent: 'flex-end',
     zIndex: 1000,
   },
   modalContent: {
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF', // Branco puro e opaco
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '80%',
@@ -504,7 +551,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF', // Branco puro e opaco
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
@@ -519,7 +566,7 @@ const styles = StyleSheet.create({
   modalScrollView: {
     maxHeight: 400,
     paddingHorizontal: 20,
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF', // Branco puro e opaco
   },
   detailItem: {
     flexDirection: 'row',
@@ -527,7 +574,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF', // Branco puro e opaco
   },
   detailItemLeft: {
     width: 100,

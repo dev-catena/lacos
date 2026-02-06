@@ -110,24 +110,25 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
   }, [user]);
 
 
-  // Função para recarregar dados do usuário
-  const reloadUserData = useCallback(async () => {
-    try {
-      const response = await userService.getUser();
-      if (response.success && response.data && updateUser) {
-        updateUser(response.data);
-      }
-    } catch (error) {
-      console.error('Erro ao recarregar dados do usuário:', error);
-    }
-  }, [updateUser]);
+  // Função para recarregar dados do usuário (removida para evitar loop)
+  // Os dados já são atualizados quando o usuário salva
+  // const reloadUserData = useCallback(async () => {
+  //   try {
+  //     const response = await userService.getUser();
+  //     if (response.success && response.data && updateUser) {
+  //       updateUser(response.data);
+  //     }
+  //   } catch (error) {
+  //     console.error('Erro ao recarregar dados do usuário:', error);
+  //   }
+  // }, [updateUser]);
 
-  // Recarregar dados quando a tela recebe foco
-  useFocusEffect(
-    useCallback(() => {
-      reloadUserData();
-    }, [reloadUserData])
-  );
+  // Recarregar dados quando a tela recebe foco (removido para evitar loop)
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     reloadUserData();
+  //   }, [reloadUserData])
+  // );
 
   // Carregar especialidades se for médico
   useEffect(() => {
@@ -314,16 +315,32 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
 
       // Adicionar cursos (será enviado como array)
       // Remover campos temporários como 'id' antes de enviar
-      dataToUpdate.courses = courses.map(course => ({
-        name: course.name,
-        institution: course.institution,
-        year: course.year ? parseInt(course.year) : new Date().getFullYear(),
-        description: course.description || null,
-        certificate_url: course.certificate_url || null,
-      }));
+      console.log('📚 Estado atual de courses antes de mapear:', JSON.stringify(courses, null, 2));
+      console.log('📚 Quantidade de cursos no estado:', courses.length);
+      console.log('📚 Tipo de courses:', typeof courses, Array.isArray(courses));
+      
+      // Garantir que courses é um array
+      const coursesArray = Array.isArray(courses) ? courses : [];
+      
+      dataToUpdate.courses = coursesArray.map((course, index) => {
+        // Garantir que course é um objeto
+        const courseObj = typeof course === 'object' && course !== null ? course : {};
+        
+        const courseData = {
+          name: courseObj.name || '',
+          institution: courseObj.institution || '',
+          year: courseObj.year ? parseInt(courseObj.year) : new Date().getFullYear(),
+          description: courseObj.description || null,
+          certificate_url: courseObj.certificate_url || null,
+        };
+        console.log(`📚 Curso ${index} mapeado:`, courseData);
+        return courseData;
+      });
 
-      console.log('📚 Cursos a serem enviados:', dataToUpdate.courses);
-      console.log('📤 Dados completos a serem enviados:', dataToUpdate);
+      console.log('📚 Cursos a serem enviados (array final):', JSON.stringify(dataToUpdate.courses, null, 2));
+      console.log('📚 Tipo de courses no dataToUpdate:', typeof dataToUpdate.courses, Array.isArray(dataToUpdate.courses));
+      console.log('📚 Quantidade de cursos no dataToUpdate:', dataToUpdate.courses.length);
+      console.log('📤 Dados completos a serem enviados (primeiros 2000 chars):', JSON.stringify(dataToUpdate, null, 2).substring(0, 2000));
       if (isDoctor) {
         console.log('💳 Valor da consulta a ser enviado:', {
           formDataValue: formData.consultation_price,
@@ -336,7 +353,9 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
       console.log('📤 ProfessionalCaregiverDataScreen - Enviando dados para API:', JSON.stringify(dataToUpdate, null, 2));
       const response = await userService.updateUserData(user.id, dataToUpdate);
       
-      console.log('📥 ProfessionalCaregiverDataScreen - Resposta da API:', response);
+      console.log('📥 ProfessionalCaregiverDataScreen - Resposta completa da API:', JSON.stringify(response, null, 2));
+      console.log('📥 ProfessionalCaregiverDataScreen - response.data:', response.data);
+      console.log('📥 ProfessionalCaregiverDataScreen - response.data keys:', response.data ? Object.keys(response.data) : 'N/A');
       console.log('📥 ProfessionalCaregiverDataScreen - Dados enviados:', dataToUpdate);
       
       if (response.success && response.data) {
@@ -344,6 +363,17 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
         if (updateUser) {
           updateUser(response.data);
         }
+        
+        // Atualizar cursos localmente com os dados retornados
+        const updatedCourses = response.data.caregiver_courses || response.data.caregiverCourses || [];
+        console.log('📚 Cursos encontrados na resposta:', {
+          'caregiver_courses': response.data.caregiver_courses,
+          'caregiverCourses': response.data.caregiverCourses,
+          'updatedCourses': updatedCourses,
+          'updatedCourses_length': updatedCourses.length,
+        });
+        setCourses(updatedCourses);
+        console.log('📚 Cursos atualizados após salvar:', updatedCourses);
         
         // Verificar se consultation_price foi salvo
         if (isDoctor) {

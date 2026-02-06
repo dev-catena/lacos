@@ -4,12 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-// SoftDeletes removido porque a tabela não tem a coluna deleted_at
-// use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Document extends Model
 {
-    use HasFactory; // SoftDeletes removido
+    use HasFactory, SoftDeletes;
 
     protected $table = 'documents';
 
@@ -23,8 +22,7 @@ class Document extends Model
         'document_date',
         'file_path',
         'file_name',
-        'file_type', // Tabela usa 'file_type' ao invés de 'mime_type'
-        'mime_type', // Manter para compatibilidade
+        'mime_type',
         'file_size',
         'notes',
     ];
@@ -34,7 +32,7 @@ class Document extends Model
         'file_size' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        // 'deleted_at' removido porque a tabela não tem essa coluna
+        'deleted_at' => 'datetime',
     ];
 
     /**

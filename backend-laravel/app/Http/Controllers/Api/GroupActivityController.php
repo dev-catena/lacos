@@ -72,7 +72,9 @@ class GroupActivityController extends Controller
             }
             
             // Buscar atividades recentes dos grupos do usuário
-            $activities = GroupActivity::whereIn('group_id', $userGroups)
+            // IMPORTANTE: Carregar relacionamento group explicitamente
+            $activities = GroupActivity::with('group')
+                ->whereIn('group_id', $userGroups)
                 ->orderBy('created_at', 'desc')
                 ->limit($limit)
                 ->get()
@@ -81,6 +83,18 @@ class GroupActivityController extends Controller
                     if (!in_array($activity->group_id, $userGroups->toArray())) {
                         \Log::warning('Atividade ' . $activity->id . ' não pertence aos grupos do usuário. Group ID: ' . $activity->group_id);
                         return null;
+                    }
+                    
+                    // Log para debug de atividades de cancelamento
+                    if ($activity->action_type === 'appointment_cancelled') {
+                        \Log::info('Atividade de cancelamento encontrada:', [
+                            'activity_id' => $activity->id,
+                            'group_id' => $activity->group_id,
+                            'action_type' => $activity->action_type,
+                            'description' => $activity->description,
+                            'has_group' => $activity->group !== null,
+                            'group_name' => $activity->group ? $activity->group->name : 'N/A',
+                        ]);
                     }
                     
                     // Garantir que group_id esteja sempre presente

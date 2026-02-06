@@ -155,6 +155,47 @@ class AppointmentService {
       };
     }
   }
+
+  /**
+   * Cancelar consulta
+   */
+  async cancelAppointment(appointmentId, cancelledBy = 'doctor', reason = null) {
+    try {
+      console.log('🚫 appointmentService.cancelAppointment - Cancelando consulta:', {
+        appointmentId,
+        cancelledBy,
+        reason,
+      });
+
+      const response = await apiService.post(`/appointments/${appointmentId}/cancel`, {
+        cancelled_by: cancelledBy,
+        reason: reason,
+      });
+
+      console.log('✅ appointmentService.cancelAppointment - Resposta:', response);
+
+      return {
+        success: true,
+        data: response,
+        message: response.message || 'Consulta cancelada com sucesso',
+      };
+    } catch (error) {
+      console.error('❌ Erro ao cancelar consulta:', error);
+
+      let errorMessage = 'Erro ao cancelar consulta';
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.errors) {
+        errorMessage = Object.values(error.errors).flat().join(', ');
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+        errors: error.errors,
+      };
+    }
+  }
 }
 
 export default new AppointmentService();

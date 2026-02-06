@@ -251,10 +251,9 @@ class AppointmentPaymentService
 
             // Atualizar appointment
             $appointment->update([
-                'status' => 'cancelada',
+                'status' => 'cancelled',
                 'payment_status' => 'refunded',
                 'cancelled_by' => $cancelledBy,
-                'cancelled_at' => now(),
                 'refund_id' => $refundResult['refund_id'],
                 'refunded_at' => now(),
             ]);
@@ -268,7 +267,7 @@ class AppointmentPaymentService
             return [
                 'success' => true,
                 'appointment_id' => $appointment->id,
-                'status' => 'cancelada',
+                'status' => 'cancelled',
                 'payment_status' => 'refunded',
                 'refund_id' => $refundResult['refund_id'],
                 'refund_amount' => $appointment->amount,

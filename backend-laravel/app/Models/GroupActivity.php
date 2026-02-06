@@ -351,6 +351,50 @@ class GroupActivity extends Model
         ]);
     }
 
+    /**
+     * Registrar cancelamento de consulta
+     */
+    public static function logAppointmentCancelled($groupId, $userId, $userName, $appointmentTitle, $appointmentDate, $appointmentType = 'common', $appointmentId = null, $cancelledBy = 'doctor')
+    {
+        $typeLabels = [
+            'common' => 'compromisso',
+            'medical' => 'consulta médica',
+            'fisioterapia' => 'sessão de fisioterapia',
+            'exames' => 'exame',
+        ];
+        
+        $typeLabel = $typeLabels[$appointmentType] ?? 'compromisso';
+        
+        try {
+            $carbonDate = \Carbon\Carbon::parse($appointmentDate);
+            $formattedDate = $carbonDate->format('d/m/Y \à\s H:i');
+        } catch (\Exception $e) {
+            try {
+                $dateOnly = substr($appointmentDate, 0, 10);
+                $carbonDate = \Carbon\Carbon::createFromFormat('Y-m-d', $dateOnly);
+                $formattedDate = $carbonDate->format('d/m/Y');
+            } catch (\Exception $e2) {
+                $formattedDate = $appointmentDate;
+            }
+        }
+        
+        $cancelledByLabel = $cancelledBy === 'doctor' ? 'médico' : 'paciente';
+        
+        return self::create([
+            'group_id' => $groupId,
+            'user_id' => $userId,
+            'action_type' => 'appointment_cancelled',
+            'description' => "O {$typeLabel} \"{$appointmentTitle}\" agendado para {$formattedDate} foi cancelado pelo {$cancelledByLabel}",
+            'metadata' => [
+                'appointment_id' => $appointmentId,
+                'appointment_title' => $appointmentTitle,
+                'appointment_date' => $appointmentDate,
+                'appointment_type' => $appointmentType,
+                'cancelled_by' => $cancelledBy,
+            ],
+        ]);
+    }
+
     private static function getRoleLabel($role)
     {
         $labels = [

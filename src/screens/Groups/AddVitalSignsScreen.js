@@ -443,13 +443,13 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
       fields: [
         {
           key: 'blood_pressure_systolic',
-          placeholder: '120',
+          placeholder: 'Ex: 120',
           label: 'Sistólica',
           width: '48%',
         },
         {
           key: 'blood_pressure_diastolic',
-          placeholder: '80',
+          placeholder: 'Ex: 80',
           label: 'Diastólica',
           width: '48%',
         },
@@ -466,7 +466,7 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
       fields: [
         {
           key: 'heart_rate',
-          placeholder: '75',
+          placeholder: 'Ex: 75',
           width: '100%',
         },
       ],
@@ -482,7 +482,7 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
       fields: [
         {
           key: 'oxygen_saturation',
-          placeholder: '96',
+          placeholder: 'Ex: 96',
           width: '100%',
         },
       ],
@@ -498,7 +498,7 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
       fields: [
         {
           key: 'blood_glucose',
-          placeholder: '90',
+          placeholder: 'Ex: 90',
           width: '100%',
         },
       ],
@@ -514,7 +514,7 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
       fields: [
         {
           key: 'temperature',
-          placeholder: '36.5',
+          placeholder: 'Ex: 36.5',
           width: '100%',
         },
       ],
@@ -530,7 +530,7 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
       fields: [
         {
           key: 'respiratory_rate',
-          placeholder: '16',
+          placeholder: 'Ex: 16',
           width: '100%',
         },
       ],
@@ -701,7 +701,7 @@ const AddVitalSignsScreen = ({ route, navigation }) => {
                 <Text style={styles.saveButtonText}>Salvando...</Text>
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.textWhite} />
+                  <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
                   <Text style={styles.saveButtonText}>Salvar Medições</Text>
                 </>
               )}
@@ -940,15 +940,15 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     flexDirection: 'row',
-    backgroundColor: colors.success,
+    backgroundColor: '#a5b4fc', // Azul pastel
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: colors.success,
+    shadowColor: '#6366f1',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
   },
@@ -956,7 +956,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    color: colors.textWhite,
+    color: '#FFFFFF', // Branco puro
     fontSize: 16,
     fontWeight: 'bold',
   },

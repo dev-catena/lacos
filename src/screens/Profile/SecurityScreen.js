@@ -23,7 +23,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const SecurityScreen = ({ navigation }) => {
   const { user, updateUser } = useAuth();
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [show2FA, setShow2FA] = useState(false);
+  // const [show2FA, setShow2FA] = useState(false); // COMENTADO: 2FA desabilitado
   const [showCertificate, setShowCertificate] = useState(false);
   const isDoctor = user?.profile === 'doctor';
   
@@ -37,13 +37,14 @@ const SecurityScreen = ({ navigation }) => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState('');
+  // COMENTADO: Estados relacionados ao 2FA
+  // const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  // const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
-  const [switchValue, setSwitchValue] = useState(false);
-  const [showVerifyCode, setShowVerifyCode] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [verifying, setVerifying] = useState(false);
+  // const [switchValue, setSwitchValue] = useState(false);
+  // const [showVerifyCode, setShowVerifyCode] = useState(false);
+  // const [verificationCode, setVerificationCode] = useState('');
+  // const [verifying, setVerifying] = useState(false);
 
   // Estado do certificado digital
   const [certificateData, setCertificateData] = useState({
@@ -58,13 +59,14 @@ const SecurityScreen = ({ navigation }) => {
     // Sincronizar UI com o usuário logado (quando disponível)
     if (!user) return;
 
-    const enabled = !!user.two_factor_enabled;
-    setTwoFactorEnabled(enabled);
-    setSwitchValue(enabled); // Sincronizar switch também
+    // COMENTADO: Código relacionado ao 2FA
+    // const enabled = !!user.two_factor_enabled;
+    // setTwoFactorEnabled(enabled);
+    // setSwitchValue(enabled); // Sincronizar switch também
 
     // Se existir telefone específico do 2FA, preferir; senão usar telefone do perfil
-    const phone = user.two_factor_phone || user.phone || '';
-    setPhoneNumber(phone);
+    // const phone = user.two_factor_phone || user.phone || '';
+    // setPhoneNumber(phone);
 
     // Carregar dados do certificado se for médico
     if (isDoctor && user.certificate_username) {
@@ -102,7 +104,8 @@ const SecurityScreen = ({ navigation }) => {
     try {
       const result = await userService.changePassword(
         passwordData.currentPassword,
-        passwordData.newPassword
+        passwordData.newPassword,
+        passwordData.confirmPassword
       );
 
       if (result.success) {
@@ -133,6 +136,8 @@ const SecurityScreen = ({ navigation }) => {
     }
   };
 
+  // COMENTADO: Funções relacionadas ao 2FA
+  /*
   const handleEnable2FA = async () => {
     if (!phoneNumber) {
       Alert.alert('Erro', 'Digite um número de telefone');
@@ -301,6 +306,7 @@ const SecurityScreen = ({ navigation }) => {
       ]
     );
   };
+  */
 
   // Funções do Certificado Digital
   const handlePickCertificate = async () => {
@@ -575,7 +581,8 @@ const SecurityScreen = ({ navigation }) => {
             )}
           </View>
 
-          {/* Autenticação de Dois Fatores */}
+          {/* COMENTADO: Autenticação de Dois Fatores */}
+          {/*
           <View style={styles.section}>
             <TouchableOpacity
               style={styles.sectionHeader}
@@ -680,6 +687,7 @@ const SecurityScreen = ({ navigation }) => {
               </View>
             )}
           </View>
+          */}
 
           {/* Certificado Digital ICP-Brasil - Apenas para Médicos */}
           {isDoctor && (
@@ -815,7 +823,8 @@ const SecurityScreen = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      {/* Modal de Verificação de Código 2FA */}
+      {/* COMENTADO: Modal de Verificação de Código 2FA */}
+      {/*
       <Modal
         visible={showVerifyCode}
         transparent={true}
@@ -884,6 +893,7 @@ const SecurityScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+      */}
     </SafeAreaView>
   );
 };

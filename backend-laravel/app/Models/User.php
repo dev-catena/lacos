@@ -72,7 +72,7 @@ class User extends Authenticatable
     public function groups()
     {
         return $this->belongsToMany(Group::class, 'group_members', 'user_id', 'group_id')
-                    ->withPivot('role', 'is_active', 'is_emergency_contact', 'joined_at')
+                    ->withPivot('role', 'is_active', 'joined_at')
                     ->withTimestamps();
     }
 
@@ -114,6 +114,30 @@ class User extends Authenticatable
     public function medicalSpecialty()
     {
         return $this->belongsTo(MedicalSpecialty::class, 'medical_specialty_id');
+    }
+
+    /**
+     * Relacionamento com preferências de notificação
+     */
+    public function notificationPreferences()
+    {
+        return $this->hasOne(UserNotificationPreference::class);
+    }
+
+    /**
+     * Relacionamento com notificações
+     */
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class);
+    }
+
+    /**
+     * Relacionamento com consultas (como médico)
+     */
+    public function appointments()
+    {
+        return $this->hasMany(\App\Models\Appointment::class, 'doctor_id');
     }
 }
 

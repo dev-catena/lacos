@@ -833,6 +833,7 @@ const HomeScreen = ({ navigation }) => {
                     'prescription_created',
                     'consultation_created',
                     'appointment_created',
+                    'appointment_cancelled',
                     'occurrence_created',
                     'document_created',
                     'member_joined',
@@ -854,9 +855,38 @@ const HomeScreen = ({ navigation }) => {
                           if (activity.groupId) {
                             const group = allUserGroups.find(g => g.id === activity.groupId);
                             if (group) {
+                              // Mapear tipo de atividade para o card correto
+                              const getCardFromActivityType = (actionType) => {
+                                const cardMap = {
+                                  // Agenda
+                                  'appointment_cancelled': 'agenda',
+                                  'appointment_created': 'agenda',
+                                  'consultation_created': 'agenda',
+                                  
+                                  // Medicamentos
+                                  'medication_created': 'medications',
+                                  'medication_updated': 'medications',
+                                  'medication_discontinued': 'medications',
+                                  'medication_completed': 'medications',
+                                  
+                                  // Documentos
+                                  'document_created': 'documents',
+                                  
+                                  // Receitas
+                                  'prescription_created': 'prescriptions',
+                                  
+                                  // Sinais Vitais
+                                  'vital_sign_recorded': 'vitalsigns',
+                                };
+                                return cardMap[actionType] || null;
+                              };
+
+                              const targetCard = getCardFromActivityType(activity.action_type);
+                              
                               navigation.navigate('GroupDetail', {
                                 groupId: activity.groupId,
                                 groupName: activity.groupName || group.name,
+                                openCard: targetCard, // Parâmetro para indicar qual card abrir
                               });
                             }
                           }

@@ -125,5 +125,6 @@ class Appointment extends Model
     {
         return $this->hasMany(AppointmentException::class);
     }
+
 }
 

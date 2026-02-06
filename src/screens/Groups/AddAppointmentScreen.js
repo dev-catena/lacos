@@ -517,11 +517,27 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             }, {}),
           });
           
-          // Filtrar horários agendados da disponibilidade
+          // Filtrar datas passadas e horários agendados da disponibilidade
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Zerar horas para comparar apenas datas
+          
           const filteredDaySchedules = {};
           const filteredAvailableDays = [];
           
           (response.data.availableDays || []).forEach((dateKey) => {
+            // Filtrar datas passadas
+            const dateParts = dateKey.split('-');
+            if (dateParts.length === 3) {
+              const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+              dateObj.setHours(0, 0, 0, 0);
+              
+              // Pular datas passadas
+              if (dateObj < today) {
+                console.log('🚫 loadDoctorAvailability - Pulando data passada:', dateKey);
+                return;
+              }
+            }
+            
             const availableTimes = response.data.daySchedules?.[dateKey] || [];
             const bookedTimes = bookedTimesByDate[dateKey] || new Set();
             
@@ -558,11 +574,35 @@ const AddAppointmentScreen = ({ route, navigation }) => {
               return trimmed;
             };
             
-            // Filtrar apenas horários não agendados
+            // Verificar se é hoje para filtrar horários passados
+            const isToday = dateObj.getTime() === today.getTime();
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            
+            // Filtrar apenas horários não agendados e não passados (se for hoje)
             const freeTimes = availableTimes.filter(time => {
               if (!time || time.trim() === '') return false;
               
               const normalizedAvailableTime = normalizeTime(time);
+              
+              // Se for hoje, verificar se o horário já passou
+              if (isToday) {
+                const [timeHour, timeMinute] = normalizedAvailableTime.split(':').map(Number);
+                if (isNaN(timeHour) || isNaN(timeMinute)) {
+                  return false; // Horário inválido
+                }
+                
+                // Comparar horário disponível com horário atual
+                if (timeHour < currentHour || (timeHour === currentHour && timeMinute <= currentMinute)) {
+                  console.log('🚫 loadDoctorAvailability - Pulando horário passado:', {
+                    dateKey,
+                    time: normalizedAvailableTime,
+                    currentTime: `${currentHour}:${currentMinute}`,
+                  });
+                  return false; // Horário já passou
+                }
+              }
               
               // Verificar se o horário está agendado (comparar com todas as variações possíveis)
               let isBooked = false;
@@ -927,6 +967,46 @@ const AddAppointmentScreen = ({ route, navigation }) => {
       }
     }
 
+    // Verificar se o agendamento está sendo feito com menos de 1 hora de antecedência
+    const appointmentDateTime = new Date(formData.date);
+    const now = new Date();
+    const timeDifference = appointmentDateTime.getTime() - now.getTime();
+    const oneHourInMs = 60 * 60 * 1000; // 1 hora em milissegundos
+    const isLessThanOneHour = timeDifference > 0 && timeDifference < oneHourInMs;
+    const isTeleconsultation = formData.isTeleconsultation;
+    
+    // Se for teleconsulta e menos de 1 hora, avisar sobre política de cancelamento
+    if (isTeleconsultation && isLessThanOneHour) {
+      Alert.alert(
+        '⚠️ Agendamento com Menos de 1 Hora',
+        'Você está agendando uma teleconsulta com menos de 1 hora de antecedência.\n\n' +
+        'IMPORTANTE: Se você cancelar esta consulta, o valor pago NÃO será reembolsado devido ao cancelamento em cima da hora.\n\n' +
+        'Deseja continuar com o agendamento?',
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel',
+            onPress: () => {
+              // Usuário cancelou, não fazer nada
+            },
+          },
+          {
+            text: 'Sim, continuar',
+            onPress: () => {
+              // Continuar com o agendamento
+              proceedWithSave();
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // Se não for o caso acima, prosseguir normalmente
+    proceedWithSave();
+  };
+
+  const proceedWithSave = async () => {
     setLoading(true);
 
     try {
@@ -2116,13 +2196,65 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   {/* Lista de Datas Disponíveis */}
                   <View style={styles.availabilityDatesContainer}>
                     {doctorAvailability.availableDays && doctorAvailability.availableDays.length > 0 ? (
-                      doctorAvailability.availableDays.map((dateKey) => {
+                      doctorAvailability.availableDays
+                        .filter((dateKey) => {
+                          // Filtrar datas passadas também no render (camada extra de proteção)
+                          const dateParts = dateKey.split('-');
+                          if (dateParts.length === 3) {
+                            const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+                            dateObj.setHours(0, 0, 0, 0);
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            return dateObj >= today;
+                          }
+                          return true;
+                        })
+                        .map((dateKey) => {
                         // Criar data no timezone local para evitar deslocamento de um dia
                         // dateKey está no formato "YYYY-MM-DD"
                         const [year, month, day] = dateKey.split('-').map(Number);
                         const date = new Date(year, month - 1, day); // month é 0-indexed
                         const isSelected = selectedAvailabilityDate === dateKey;
-                        const times = doctorAvailability.daySchedules?.[dateKey] || [];
+                        let times = doctorAvailability.daySchedules?.[dateKey] || [];
+                        
+                        // Se for hoje, filtrar horários passados
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const dateObj = new Date(year, month - 1, day);
+                        dateObj.setHours(0, 0, 0, 0);
+                        const isToday = dateObj.getTime() === today.getTime();
+                        
+                        if (isToday) {
+                          const now = new Date();
+                          const currentHour = now.getHours();
+                          const currentMinute = now.getMinutes();
+                          
+                          times = times.filter(time => {
+                            if (!time || time.trim() === '') return false;
+                            
+                            // Normalizar horário
+                            const normalizeTime = (t) => {
+                              if (!t) return '';
+                              const trimmed = t.trim();
+                              if (/^\d{2}:\d{2}:\d{2}/.test(trimmed)) return trimmed.substring(0, 5);
+                              if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed;
+                              if (/^\d{1}:\d{2}$/.test(trimmed)) return `0${trimmed}`;
+                              return trimmed;
+                            };
+                            
+                            const normalizedTime = normalizeTime(time);
+                            const [timeHour, timeMinute] = normalizedTime.split(':').map(Number);
+                            
+                            if (isNaN(timeHour) || isNaN(timeMinute)) return false;
+                            
+                            // Verificar se o horário já passou
+                            if (timeHour < currentHour || (timeHour === currentHour && timeMinute <= currentMinute)) {
+                              return false;
+                            }
+                            
+                            return true;
+                          });
+                        }
 
                         return (
                           <View key={dateKey} style={styles.availabilityDateCard}>

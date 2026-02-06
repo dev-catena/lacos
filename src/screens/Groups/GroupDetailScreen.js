@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -39,7 +40,7 @@ import groupService from '../../services/groupService';
 import planService from '../../services/planService';
 
 const GroupDetailScreen = ({ route, navigation }) => {
-  const { groupId, groupName, accompaniedName } = route.params || {};
+  const { groupId, groupName, accompaniedName, openCard } = route.params || {};
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -52,6 +53,88 @@ const GroupDetailScreen = ({ route, navigation }) => {
     checkAdminStatus();
     loadUserPlan();
   }, [groupId, user?.id]); // Adicionar user?.id como dependência
+
+  // Usar ref para rastrear se já navegou para evitar navegações duplicadas
+  const hasNavigatedRef = useRef(false);
+  const lastOpenCardRef = useRef(null);
+  const navigationTimerRef = useRef(null);
+
+  // Navegar automaticamente para o card correto se openCard foi fornecido
+  // Usar useFocusEffect para garantir que execute sempre que a tela receber foco
+  useFocusEffect(
+    React.useCallback(() => {
+      // Obter openCard atual dos route params (pode mudar a cada navegação)
+      const currentOpenCard = route.params?.openCard;
+      
+      // Limpar timer anterior se existir
+      if (navigationTimerRef.current) {
+        clearTimeout(navigationTimerRef.current);
+        navigationTimerRef.current = null;
+      }
+
+      // Resetar o ref se o openCard mudou (nova notificação) ou se não há openCard
+      if (!currentOpenCard) {
+        hasNavigatedRef.current = false;
+        lastOpenCardRef.current = null;
+        return;
+      }
+
+      if (currentOpenCard !== lastOpenCardRef.current) {
+        hasNavigatedRef.current = false;
+        lastOpenCardRef.current = currentOpenCard;
+      }
+
+      // Navegar apenas se:
+      // 1. Tem openCard
+      // 2. Não está carregando
+      // 3. Plano foi carregado
+      // 4. Ainda não navegou para este openCard
+      if (currentOpenCard && !loading && userPlan && !hasNavigatedRef.current) {
+        // Aguardar um pouco para garantir que a tela foi renderizada
+        navigationTimerRef.current = setTimeout(() => {
+          // Mapear openCard para a navegação correta
+          const cardNavigationMap = {
+            'agenda': () => navigation.navigate('Agenda', { groupId, groupName }),
+            'medications': () => navigation.navigate('Medications', { groupId, groupName }),
+            'documents': () => navigation.navigate('Documents', { groupId, groupName }),
+            'prescriptions': () => navigation.navigate('Prescriptions', { groupId, groupName }),
+            'vitalsigns': () => navigation.navigate('VitalSignsDetail', { groupId, groupName }),
+          };
+
+          const navigateToCard = cardNavigationMap[currentOpenCard];
+          if (navigateToCard) {
+            console.log('🎯 GroupDetail - Navegando automaticamente para o card:', currentOpenCard);
+            hasNavigatedRef.current = true; // Marcar como navegado
+            
+            // Limpar openCard dos params ANTES de navegar para evitar re-navegação
+            // Isso garante que na próxima vez que a tela receber foco, não tente navegar novamente
+            navigation.setParams({ openCard: undefined });
+            
+            // Pequeno delay antes de navegar para garantir que os params foram limpos
+            setTimeout(() => {
+              navigateToCard();
+            }, 100);
+          } else {
+            console.warn('⚠️ GroupDetail - Card não encontrado:', currentOpenCard);
+          }
+          
+          navigationTimerRef.current = null;
+        }, 500); // Delay para garantir renderização
+      }
+
+      // Cleanup: limpar timer quando a tela perder foco
+      // Resetar ref quando a tela perder foco para permitir nova navegação na próxima vez
+      return () => {
+        if (navigationTimerRef.current) {
+          clearTimeout(navigationTimerRef.current);
+          navigationTimerRef.current = null;
+        }
+        // Resetar o ref quando a tela perder foco para permitir nova navegação
+        // Isso garante que cada vez que a tela receber foco com um novo openCard, navegue corretamente
+        hasNavigatedRef.current = false;
+      };
+    }, [loading, userPlan, groupId, groupName, navigation, route.params?.openCard])
+  );
 
   const checkAdminStatus = async () => {
     try {

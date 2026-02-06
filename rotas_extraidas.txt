@@ -1,0 +1,6547 @@
+================================================================================
+Rotas extraídas de Zontec-Software/thalamus-backend-laravel
+Arquivo: routes/api.php
+================================================================================
+
+
+================================================================================
+Método: GET
+Rota: /iot/localizacao/listar
+Controller: LocalizacaoController::listarLocalizacao
+Linha: 243
+
+================================================================================
+Método: POST
+Rota: /iot/localizacao/gravar
+Controller: LocalizacaoController::gravarLocalizacao
+Linha: 244
+
+================================================================================
+Método: POST
+Rota: /cartaoPessoa/valida
+Controller: AcessoController::testaCartao
+Linha: 247
+
+================================================================================
+Método: POST
+Rota: /acesso
+Controller: AcessoController::store
+Linha: 248
+
+================================================================================
+Método: GET
+Rota: /local
+Controller: LocalController::index
+Linha: 249
+
+================================================================================
+Método: GET
+Rota: /verificar/conexao
+Controller: UtilidadeController::verificarConexao
+Linha: 253
+
+================================================================================
+Método: POST
+Rota: /enviar-codigo
+Controller: UsuarioChaveController::enviarCodigo
+Linha: 257
+
+================================================================================
+Método: POST
+Rota: /validar-codigo
+Controller: UsuarioChaveController::validarCodigo
+Linha: 258
+
+================================================================================
+Método: POST
+Rota: /redefinir-senha
+Controller: RedefinirSenhaController::processarRedefinicaoSenha
+Linha: 259
+
+================================================================================
+Método: POST
+Rota: /usuario/senha/alterar
+Controller: AuthController::alterarSenha
+Linha: 260
+
+================================================================================
+Método: POST
+Rota: /pedido-venda
+Controller: PedidoVendaImportacaoController::importarPedidoVenda
+Linha: 265
+
+================================================================================
+Método: POST
+Rota: /estrutura-produto
+Controller: ImportacaoEstruturaProdutoController::importarEstrutura
+Linha: 266
+
+================================================================================
+Método: GET
+Rota: /cliente-fornecedor
+Controller: importacaoOmieController::importarClientesFornecedores
+Linha: 272
+
+================================================================================
+Método: GET
+Rota: /tipo
+Controller: importacaoOmieController::importarTipos
+Linha: 273
+
+================================================================================
+Método: GET
+Rota: /etapa
+Controller: importacaoOmieController::importarEtapas
+Linha: 274
+
+================================================================================
+Método: GET
+Rota: /familia
+Controller: importacaoOmieController::importarFamiliaProdutos
+Linha: 275
+
+================================================================================
+Método: GET
+Rota: /produto
+Controller: ProdutoImportacaoController::importarProdutos
+Linha: 276
+
+================================================================================
+Método: GET
+Rota: /projeto
+Controller: importacaoOmieController::ImportarProjetos
+Linha: 277
+
+================================================================================
+Método: GET
+Rota: /pedido-compra
+Controller: importacaoOmieController::importarPedidoCompra
+Linha: 278
+
+================================================================================
+Método: GET
+Rota: /ordem-producao
+Controller: importacaoOmieController::ImportarOrdemProducao
+Linha: 279
+
+================================================================================
+Método: GET
+Rota: /material-roteiro
+Controller: OmieEstruturaController::importarEstrutura
+Linha: 280
+
+================================================================================
+Método: GET
+Rota: /conta-receber
+Controller: importacaoOmieController::importarContaReceber
+Linha: 281
+
+================================================================================
+Método: GET
+Rota: /conta-pagar
+Controller: importacaoOmieController::importarContaPagar
+Linha: 282
+
+================================================================================
+Método: GET
+Rota: /grupo-dre
+Controller: importacaoOmieController::importarGrupoDRE
+Linha: 283
+
+================================================================================
+Método: GET
+Rota: /categoria-dre
+Controller: importacaoOmieController::importarCategoriaDRE
+Linha: 284
+
+================================================================================
+Método: GET
+Rota: /ncm
+Controller: importacaoOmieController::importarNCM
+Linha: 285
+
+================================================================================
+Método: POST
+Rota: /motivo
+Controller: importacaoOmieController::buscaMotivo
+Linha: 286
+
+================================================================================
+Método: POST
+Rota: /oportunidade
+Controller: importacaoOmieController::buscaOportunidade
+Linha: 287
+
+================================================================================
+Método: GET
+Rota: /unidade-medida
+Controller: importacaoOmieController::importarUnidadeMedida
+Linha: 288
+
+================================================================================
+Método: GET
+Rota: /estoque-local
+Controller: EstoqueLocalImportacaoController::importar
+Linha: 289
+
+================================================================================
+Método: POST
+Rota: /omie-wh/atualiza-pedido-venda
+Controller: PropostaComercialController::store
+Linha: 294
+
+================================================================================
+Método: POST
+Rota: /omie-cliente/wh
+Controller: OmieIntegracaoClienteController::getFromOmieWh
+Linha: 298
+
+================================================================================
+Método: GET
+Rota: /sgi/po/{id}/entidade
+Controller: SgiController::detalhesEntidade
+Parâmetros: $id
+Linha: 302
+
+================================================================================
+Método: POST
+Rota: /sgi/roteiro/gravar
+Controller: SgiApontamentoController::gravarRoteiro
+Linha: 304
+
+================================================================================
+Método: POST
+Rota: /sgi/roteiro/atualizar
+Controller: SgiApontamentoController::updateRoteiro
+Linha: 305
+
+================================================================================
+Método: POST
+Rota: /sgi/relatorio/gerar-excel
+Controller: SgiRelatorioGeralController::gerarExcel
+Linha: 306
+
+================================================================================
+Método: POST
+Rota: /sgi/relatorio/compras/download
+Controller: RelatorioSgiController::relatorioComprasDownload
+Linha: 307
+
+================================================================================
+Método: POST
+Rota: /sgi/relatorio/compras
+Controller: RelatorioSgiController::relatorioCompras
+Linha: 308
+
+================================================================================
+Método: GET
+Rota: /sgi/requisicao/{id}
+Controller: SgiRequisicaoController::InformacoesCabecalhoRequisicao
+Parâmetros: $id
+Linha: 309
+
+================================================================================
+Método: POST
+Rota: /sgi/requisicao/gravar
+Controller: SgiRequisicaoController::GravarRequisicao
+Linha: 310
+
+================================================================================
+Método: POST
+Rota: /sgi/requisicao/atualizar
+Controller: SgiRequisicaoController::AtualizarRequisicao
+Linha: 311
+
+================================================================================
+Método: GET
+Rota: /sgi/unidade-requisitante
+Controller: UnidadeRequisitanteController::index
+Linha: 312
+
+================================================================================
+Método: GET
+Rota: /sgi/relatorio/geral/listar
+Controller: SgiRelatorioGeralController::FiltroGeralGET
+Linha: 313
+
+================================================================================
+Método: POST
+Rota: /sgi/relatorio/geral/download
+Controller: SgiRelatorioGeralController::RelatorioGeralDownload
+Linha: 314
+
+================================================================================
+Método: POST
+Rota: /sgi/requisicao/recepcao
+Controller: SgiRequisicaoController::EtapaRecepcao
+Linha: 315
+
+================================================================================
+Método: POST
+Rota: /sgi/requisicao/almoxarifado
+Controller: SgiRequisicaoController::EtapaAlmoxarifado
+Linha: 316
+
+================================================================================
+Método: POST
+Rota: /sgi/op-apontamento/atualizar
+Controller: SgiApontamentoController::AtualizarOPApontamento
+Linha: 317
+
+================================================================================
+Método: POST
+Rota: /sgi/op-apontamento/gravar
+Controller: SgiApontamentoController::GravarOPApontamento
+Linha: 318
+
+================================================================================
+Método: POST
+Rota: /sgi/apontamento/gravar
+Controller: SgiApontamentoController::GravarApontamentoItem
+Linha: 319
+
+================================================================================
+Método: POST
+Rota: /sgi/apontamento/atualizar
+Controller: SgiApontamentoController::AtualizarApontamentoItem
+Linha: 320
+
+================================================================================
+Método: POST
+Rota: /pedidoCompra/buscar
+Controller: PedidoCompraController::buscarInformacoes
+Linha: 321
+
+================================================================================
+Método: POST
+Rota: /pedidoCompra/exibir
+Controller: PedidoCompraController::exibirInformacoes
+Linha: 322
+
+================================================================================
+Método: POST
+Rota: /sgi/requisicao/alterar-estado
+Controller: SgiRequisicaoController::alterarEstadoRequisicao
+Linha: 324
+
+================================================================================
+Método: POST
+Rota: /sgi/requisicao/regredir-etapa
+Controller: SgiRequisicaoController::regredirEtapa
+Linha: 325
+
+================================================================================
+Método: POST
+Rota: /sgi/servico/atualizar
+Controller: SgiRequisicaoController::AtualizarGestaoServico
+Linha: 328
+
+================================================================================
+Método: POST
+Rota: /email/fornecedor
+Controller: EmailFornecedorController::fornecedor
+Linha: 329
+
+================================================================================
+Método: GET
+Rota: /ver-email
+Controller: Closure
+Linha: 330
+
+================================================================================
+Método: GET
+Rota: /notificacoes/usuario/{id}
+Controller: NotificacaoController::ListarNotificacoesUsuarioSemProtecao
+Parâmetros: $id
+Linha: 338
+
+================================================================================
+Método: GET
+Rota: /protocolo/entidades/listar
+Controller: UtilidadeController::listaEntidadesProjetoPlaProtocolo
+Linha: 339
+
+================================================================================
+Método: GET
+Rota: /sgi/requisicoes/edicao
+Controller: SgiController::listarEditaveis
+Linha: 340
+
+================================================================================
+Método: POST
+Rota: /acesso/qrcode
+Controller: AcessoController::registrarPorQRCode
+Linha: 341
+
+================================================================================
+Método: POST
+Rota: compras/realizadas
+Controller: ProtocoloComprasController::listarComprasRealizadas
+Linha: 351
+
+================================================================================
+Método: POST
+Rota: op/cadastrar
+Controller: OrdemProducaoIntegracaoController::store
+Linha: 354
+
+================================================================================
+Método: PATCH
+Rota: op/atualizar
+Controller: OrdemProducaoIntegracaoController::update
+Linha: 355
+
+================================================================================
+Método: POST
+Rota: op/excluir
+Controller: OrdemProducaoIntegracaoController::destroy
+Linha: 356
+
+================================================================================
+Método: POST
+Rota: estoque/buscar
+Controller: ConsultarEstoqueController::ConsultarEstoque
+Linha: 357
+
+================================================================================
+Método: POST
+Rota: produto-estrutura/sync
+Controller: OrdemProducaoIntegracaoController::syncEstruturaPorProduto
+Linha: 358
+
+================================================================================
+Método: GET
+Rota: locais/listar
+Controller: EstoqueLocalController::index
+Linha: 362
+
+================================================================================
+Método: POST
+Rota: /anexar/{entidade}/{id}
+Controller: AnexoController::anexar
+Parâmetros: $entidade, $id
+Linha: 365
+
+================================================================================
+Método: GET
+Rota: /anexos/{entidade}/{id}
+Controller: AnexoController::listar
+Parâmetros: $entidade, $id
+Linha: 366
+
+================================================================================
+Método: DELETE
+Rota: /anexos/{entidade}/{id}/{anexo_id}
+Controller: AnexoController::excluir
+Parâmetros: $entidade, $id, $anexo_id
+Linha: 367
+
+================================================================================
+Método: GET
+Rota: /anexo/download/{id}
+Controller: AnexoController::download
+Parâmetros: $id
+Linha: 368
+
+================================================================================
+Método: POST
+Rota: /reunioes
+Controller: ReuniaoRelatorioController::relatorioReunioes
+Linha: 371
+
+================================================================================
+Método: POST
+Rota: /inspecoes
+Controller: InspecaoRelatorioController::relatorioInspecoes
+Linha: 372
+
+================================================================================
+Método: POST
+Rota: /pos-vendas
+Controller: PosVendaRelatorioController::relatorioPosVendas
+Linha: 373
+
+================================================================================
+Método: GET
+Rota: produtos
+Controller: AlmoxarifadoController::index
+Linha: 377
+
+================================================================================
+Método: GET
+Rota: produtos/{cod}
+Controller: AlmoxarifadoController::view
+Parâmetros: $cod
+Linha: 378
+
+================================================================================
+Método: PATCH
+Rota: produtos/separa-para-op
+Controller: AlmoxarifadoController::separaParaOP
+Linha: 379
+
+================================================================================
+Método: PATCH
+Rota: produtos/separa-para-venda
+Controller: AlmoxarifadoController::separaParaVenda
+Linha: 380
+
+================================================================================
+Método: POST
+Rota: /criar
+Controller: DemDemandaController::criarDemanda
+Linha: 385
+
+================================================================================
+Método: GET
+Rota: /listar/{id}
+Controller: DemDemandaController::listarDemandasPorSolicitante
+Parâmetros: $id
+Linha: 386
+
+================================================================================
+Método: DELETE
+Rota: /apagar/{id}
+Controller: DemDemandaController::apagarDemanda
+Parâmetros: $id
+Linha: 387
+
+================================================================================
+Método: GET
+Rota: /logs
+Controller: DemLogController::listarLogs
+Linha: 390
+
+================================================================================
+Método: GET
+Rota: /{id}
+Controller: DemDemandaController::show
+Parâmetros: $id
+Linha: 392
+
+================================================================================
+Método: POST
+Rota: itens/listar
+Controller: DemDemandaItemController::listarItens
+Linha: 395
+
+================================================================================
+Método: POST
+Rota: /itens/status
+Controller: DemDemandaItemController::listarItensPorStatus
+Linha: 396
+
+================================================================================
+Método: POST
+Rota: itens/autorizar
+Controller: DemDemandaItemController::autorizarItens
+Linha: 397
+
+================================================================================
+Método: PUT
+Rota: /item/{itemId}
+Controller: DemDemandaItemController::atualizarItem
+Parâmetros: $itemId
+Linha: 398
+
+================================================================================
+Método: PATCH
+Rota: /item/{itemId}/status
+Controller: DemDemandaItemController::atualizarStatusItem
+Parâmetros: $itemId
+Linha: 399
+
+================================================================================
+Método: GET
+Rota: /itens/{item}/timeline
+Controller: DemandaTimelineController::item
+Parâmetros: $item
+Linha: 400
+
+================================================================================
+Método: POST
+Rota: /requisicao/criar
+Controller: CompRequisicaoController::criarRequisicao
+Linha: 405
+
+================================================================================
+Método: GET
+Rota: /requisicao/listar
+Controller: CompRequisicaoController::listarRequisicoes
+Linha: 406
+
+================================================================================
+Método: GET
+Rota: /requisicao/listar-permitidas
+Controller: CompRequisicaoFiltroController::listarRequisicoesPermitidas
+Linha: 407
+
+================================================================================
+Método: GET
+Rota: /requisicao/{id}
+Controller: CompRequisicaoController::show
+Parâmetros: $id
+Linha: 408
+
+================================================================================
+Método: GET
+Rota: /requisicao/{id}/concluida
+Controller: CompRequisicaoController::showConcluida
+Parâmetros: $id
+Linha: 409
+
+================================================================================
+Método: POST
+Rota: /requisicao/{id}/enviar-aprovacao
+Controller: CompRequisicaoController::enviarParaAprovacao
+Parâmetros: $id
+Linha: 410
+
+================================================================================
+Método: POST
+Rota: /requisicao/{id}/voltar-cotacao
+Controller: CompRequisicaoController::voltarParaCotacao
+Parâmetros: $id
+Linha: 411
+
+================================================================================
+Método: GET
+Rota: /requisicao/{id}/demandas
+Controller: CompRequisicaoController::getDemandasRequisicao
+Parâmetros: $id
+Linha: 412
+
+================================================================================
+Método: GET
+Rota: /requisicao/{id}/pdf
+Controller: CompPdfController::gerarPdfRequisicao
+Parâmetros: $id
+Linha: 413
+
+================================================================================
+Método: PUT
+Rota: /requisicao/{id}/editar
+Controller: CompEdicaoRequisicaoController::editarRequisicao
+Parâmetros: $id
+Linha: 414
+
+================================================================================
+Método: POST
+Rota: /cotacao/criar
+Controller: CompCotacaoController::criarCotacao
+Linha: 417
+
+================================================================================
+Método: POST
+Rota: /cotacao/salvar
+Controller: CompCotacaoController::salvarCotacoes
+Linha: 418
+
+================================================================================
+Método: GET
+Rota: /cotacao/listar
+Controller: CompCotacaoController::listarCotacoes
+Linha: 419
+
+================================================================================
+Método: GET
+Rota: /cotacao/{id}
+Controller: CompCotacaoController::show
+Parâmetros: $id
+Linha: 420
+
+================================================================================
+Método: PUT
+Rota: /cotacao/{id}
+Controller: CompCotacaoController::atualizarCotacao
+Parâmetros: $id
+Linha: 421
+
+================================================================================
+Método: DELETE
+Rota: /cotacao/{id}
+Controller: CompCotacaoController::deletarCotacao
+Parâmetros: $id
+Linha: 422
+
+================================================================================
+Método: POST
+Rota: /aprovacao/criar
+Controller: CompAprovacaoController::criarAprovacao
+Linha: 425
+
+================================================================================
+Método: POST
+Rota: /aprovacao/requisicao/{id}/finalizar
+Controller: CompAprovacaoController::finalizarAprovacaoRequisicao
+Parâmetros: $id
+Linha: 426
+
+================================================================================
+Método: POST
+Rota: /aprovacao/requisicao/{id}/processar-lote
+Controller: CompAprovacaoController::processarAprovacoesEmLote
+Parâmetros: $id
+Linha: 427
+
+================================================================================
+Método: GET
+Rota: /aprovacao/listar
+Controller: CompAprovacaoController::listarAprovacoes
+Linha: 428
+
+================================================================================
+Método: GET
+Rota: /aprovacao/{id}
+Controller: CompAprovacaoController::show
+Parâmetros: $id
+Linha: 429
+
+================================================================================
+Método: POST
+Rota: /pedido-compra/finalizar
+Controller: CompPedidoCompraController::finalizarPedidoCompra
+Linha: 432
+
+================================================================================
+Método: POST
+Rota: /pedido-compra/salvar
+Controller: CompPedidoCompraController::salvarPedidoCompra
+Linha: 433
+
+================================================================================
+Método: POST
+Rota: /pedido-compra/concluir
+Controller: CompPedidoCompraController::concluirPedidoCompra
+Linha: 434
+
+================================================================================
+Método: POST
+Rota: /recebimento/salvar
+Controller: CompRecebimentoController::salvarRecebimento
+Linha: 437
+
+================================================================================
+Método: POST
+Rota: /recebimento/adicionar
+Controller: CompRecebimentoController::adicionarRecebimento
+Linha: 438
+
+================================================================================
+Método: DELETE
+Rota: /recebimento/excluir/{id}
+Controller: CompRecebimentoController::excluirRecebimento
+Parâmetros: $id
+Linha: 439
+
+================================================================================
+Método: POST
+Rota: /almoxarifado/{id}/finalizar
+Controller: CompRequisicaoController::finalizarAlmoxarifado
+Parâmetros: $id
+Linha: 442
+
+================================================================================
+Método: GET
+Rota: /gestao-servico/listar
+Controller: CompGestaoServicoController::listarRequisicoes
+Linha: 445
+
+================================================================================
+Método: GET
+Rota: /gestao-servico/{id}
+Controller: CompGestaoServicoController::show
+Parâmetros: $id
+Linha: 446
+
+================================================================================
+Método: POST
+Rota: /gestao-servico/{requisicaoId}/salvar
+Controller: CompGestaoServicoController::salvarGestaoServico
+Parâmetros: $requisicaoId
+Linha: 447
+
+================================================================================
+Método: POST
+Rota: /gestao-servico/{requisicaoId}/atualizar-status
+Controller: CompGestaoServicoController::atualizarStatusExecucao
+Parâmetros: $requisicaoId
+Linha: 448
+
+================================================================================
+Método: POST
+Rota: /gestao-servico/{requisicaoId}/encaminhar-pagamento
+Controller: CompGestaoServicoController::encaminharParaPagamento
+Parâmetros: $requisicaoId
+Linha: 449
+
+================================================================================
+Método: POST
+Rota: /gestao-servico/{requisicaoId}/finalizar
+Controller: CompGestaoServicoController::finalizarRequisicaoServico
+Parâmetros: $requisicaoId
+Linha: 450
+
+================================================================================
+Método: GET
+Rota: /pagamento/listar
+Controller: CompGestaoServicoController::listarRequisicoes
+Linha: 453
+
+================================================================================
+Método: GET
+Rota: /pagamento/{id}
+Controller: CompGestaoServicoController::show
+Parâmetros: $id
+Linha: 454
+
+================================================================================
+Método: POST
+Rota: /pagamento/salvar
+Controller: CompPagamentoController::salvarPagamento
+Linha: 455
+
+================================================================================
+Método: GET
+Rota: listar
+Controller: DemMotivacaoController::index
+Linha: 459
+
+================================================================================
+Método: POST
+Rota: gravar
+Controller: DemMotivacaoController::store
+Linha: 460
+
+================================================================================
+Método: GET
+Rota: buscar/{id}
+Controller: DemMotivacaoController::show
+Parâmetros: $id
+Linha: 461
+
+================================================================================
+Método: PATCH
+Rota: atualizar/{id}
+Controller: DemMotivacaoController::update
+Parâmetros: $id
+Linha: 462
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: DemMotivacaoController::destroy
+Parâmetros: $id
+Linha: 463
+
+================================================================================
+Método: POST
+Rota: /sincronizar-por-tipo
+Controller: DemMotivacaoController::syncOrigensPorTipo
+Linha: 465
+
+================================================================================
+Método: GET
+Rota: /tipo/buscar/{tipo}
+Controller: DemMotivacaoController::listarMotivacoesPorTipo
+Parâmetros: $tipo
+Linha: 466
+
+================================================================================
+Método: GET
+Rota: /tipo/listar
+Controller: DemMotivacaoController::listarMotivacoesAgrupadasPorTipo
+Linha: 467
+
+================================================================================
+Método: GET
+Rota: /origem/{origemId}
+Controller: DemMotivacaoController::listarMotivacoesPorOrigemId
+Parâmetros: $origemId
+Linha: 468
+
+================================================================================
+Método: GET
+Rota: listar
+Controller: DemOrigemController::index
+Linha: 472
+
+================================================================================
+Método: POST
+Rota: gravar
+Controller: DemOrigemController::store
+Linha: 473
+
+================================================================================
+Método: GET
+Rota: buscar/{id}
+Controller: DemOrigemController::show
+Parâmetros: $id
+Linha: 474
+
+================================================================================
+Método: PATCH
+Rota: atualizar/{id}
+Controller: DemOrigemController::update
+Parâmetros: $id
+Linha: 475
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: DemOrigemController::destroy
+Parâmetros: $id
+Linha: 476
+
+================================================================================
+Método: GET
+Rota: /{id}/motivacoes
+Controller: DemOrigemController::motivacoes
+Parâmetros: $id
+Linha: 477
+
+================================================================================
+Método: GET
+Rota: listar
+Controller: DemFamiliaController::index
+Linha: 482
+
+================================================================================
+Método: POST
+Rota: gravar
+Controller: DemFamiliaController::store
+Linha: 483
+
+================================================================================
+Método: GET
+Rota: buscar/{id}
+Controller: DemFamiliaController::show
+Parâmetros: $id
+Linha: 484
+
+================================================================================
+Método: PATCH
+Rota: atualizar/{id}
+Controller: DemFamiliaController::update
+Parâmetros: $id
+Linha: 485
+
+================================================================================
+Método: DELETE
+Rota: excluir/{id}
+Controller: DemFamiliaController::destroy
+Parâmetros: $id
+Linha: 486
+
+================================================================================
+Método: GET
+Rota: listar
+Controller: DemServicoController::index
+Linha: 491
+
+================================================================================
+Método: POST
+Rota: gravar
+Controller: DemServicoController::store
+Linha: 492
+
+================================================================================
+Método: GET
+Rota: buscar/{id}
+Controller: DemServicoController::show
+Parâmetros: $id
+Linha: 493
+
+================================================================================
+Método: PATCH
+Rota: atualizar/{id}
+Controller: DemServicoController::update
+Parâmetros: $id
+Linha: 494
+
+================================================================================
+Método: DELETE
+Rota: excluir/{id}
+Controller: DemServicoController::destroy
+Parâmetros: $id
+Linha: 495
+
+================================================================================
+Método: POST
+Rota: importar
+Controller: DemServicoController::importar
+Linha: 496
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: PosVendaController::index
+Linha: 501
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: PosVendaController::store
+Linha: 502
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: PosVendaController::show
+Parâmetros: $id
+Linha: 503
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: PosVendaController::destroy
+Parâmetros: $id
+Linha: 504
+
+================================================================================
+Método: PATCH
+Rota: /atualizar/{id}
+Controller: PosVendaController::update
+Parâmetros: $id
+Linha: 505
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: PosVendaDiagnosticoController::index
+Linha: 510
+
+================================================================================
+Método: PATCH
+Rota: /atualizar
+Controller: PosVendaDiagnosticoController::update
+Linha: 511
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: PosVendaTarefaController::index
+Linha: 516
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: PosVendaTarefaController::store
+Linha: 517
+
+================================================================================
+Método: POST
+Rota: /inspecao
+Controller: InspecaoController::registrarInspecao
+Linha: 521
+
+================================================================================
+Método: POST
+Rota: /inspecao-parametro
+Controller: InspecaoController::registrarInspecaoParametro
+Linha: 522
+
+================================================================================
+Método: PATCH
+Rota: /inspecao-parametro/atualizar/{id}
+Controller: InspecaoController::atualizarInspecaoParametro
+Parâmetros: $id
+Linha: 523
+
+================================================================================
+Método: GET
+Rota: /inspecao/buscar/{id}
+Controller: InspecaoController::detalhesInspecao
+Parâmetros: $id
+Linha: 524
+
+================================================================================
+Método: GET
+Rota: /{ativo_id}/parametros
+Controller: InspecaoController::parametrosDoAtivo
+Parâmetros: $ativo_id
+Linha: 525
+
+================================================================================
+Método: GET
+Rota: /{ativo_id}/parametros-inspecao
+Controller: InspecaoController::parametrosParaInspecaoDoAtivo
+Parâmetros: $ativo_id
+Linha: 526
+
+================================================================================
+Método: GET
+Rota: /inspecao/listar
+Controller: InspecaoController::listarInspecoesPorCategoria
+Linha: 527
+
+================================================================================
+Método: POST
+Rota: /parametros/sincronizar
+Controller: AtivoParametroController::syncParametros
+Linha: 528
+
+================================================================================
+Método: DELETE
+Rota: /inspecao/deletar/{id}
+Controller: InspecaoController::delete
+Parâmetros: $id
+Linha: 529
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: GestaoMateriaisParametroController::index
+Linha: 533
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: GestaoMateriaisParametroController::store
+Linha: 534
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: GestaoMateriaisParametroController::show
+Parâmetros: $id
+Linha: 535
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: GestaoMateriaisParametroController::destroy
+Parâmetros: $id
+Linha: 536
+
+================================================================================
+Método: PATCH
+Rota: /atualizar/{id}
+Controller: GestaoMateriaisParametroController::update
+Parâmetros: $id
+Linha: 537
+
+================================================================================
+Método: POST
+Rota: /pedido-venda
+Controller: PedidoVendaRelatorioController::relatorioEstruturaProdutos
+Linha: 541
+
+================================================================================
+Método: GET
+Rota: /buscar/{protocoloId}
+Controller: ProtocoloComentarioController::buscarGruposProtocolo
+Parâmetros: $protocoloId
+Linha: 546
+
+================================================================================
+Método: GET
+Rota: /buscar/{protocoloId}/plano
+Controller: ProtocoloComentarioController::buscarItensProtocoloPlano
+Parâmetros: $protocoloId
+Linha: 547
+
+================================================================================
+Método: POST
+Rota: /responder/comentario-com-comentario
+Controller: ProtocoloComentarioController::responderComentarioComComentario
+Linha: 551
+
+================================================================================
+Método: POST
+Rota: /responder/comentario-com-tarefa
+Controller: ProtocoloComentarioController::responderComentarioComTarefa
+Linha: 552
+
+================================================================================
+Método: POST
+Rota: /responder/comentario-com-anexo
+Controller: ProtocoloComentarioController::responderComentarioComAnexo
+Linha: 553
+
+================================================================================
+Método: POST
+Rota: /responder/tarefa-com-tarefa
+Controller: ProtocoloComentarioController::responderTarefaComTarefa
+Linha: 555
+
+================================================================================
+Método: POST
+Rota: /responder/tarefa-com-comentario
+Controller: ProtocoloComentarioController::responderTarefaComComentario
+Linha: 556
+
+================================================================================
+Método: POST
+Rota: /responder/tarefa-com-anexo
+Controller: ProtocoloComentarioController::responderTarefaComAnexo
+Linha: 557
+
+================================================================================
+Método: POST
+Rota: /comentario/gravar
+Controller: ProtocoloComentarioController::storeComentarioRaiz
+Linha: 559
+
+================================================================================
+Método: DELETE
+Rota: /comentario/excluir/{id}
+Controller: ProtocoloComentarioController::destroy
+Parâmetros: $id
+Linha: 560
+
+================================================================================
+Método: POST
+Rota: /tarefas/status
+Controller: ProtocoloController::ListarProtocoloEstatisticas
+Linha: 562
+
+================================================================================
+Método: DELETE
+Rota: /anexo/remover/{id}
+Controller: ProtocoloController::AnexoProtocoloRemover
+Parâmetros: $id
+Linha: 564
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: ProtocoloController::ListarProtocolo
+Linha: 565
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: ProtocoloController::GravarProtocolo
+Linha: 566
+
+================================================================================
+Método: POST
+Rota: /atualizar/{id}
+Controller: ProtocoloController::AtualizarProtocolo
+Parâmetros: $id
+Linha: 567
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: ProtocoloController::ExcluirProtocolo
+Parâmetros: $id
+Linha: 568
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: ProtocoloController::BuscarProtocolo
+Parâmetros: $id
+Linha: 569
+
+================================================================================
+Método: GET
+Rota: /tarefa/listar
+Controller: ProtocoloTarefaController::ListarTarefa
+Linha: 571
+
+================================================================================
+Método: POST
+Rota: /tarefa/gravar
+Controller: ProtocoloTarefaController::GravarTarefa
+Linha: 572
+
+================================================================================
+Método: PUT
+Rota: /tarefa/atualizar/{id}
+Controller: ProtocoloTarefaController::AtualizarTarefa
+Parâmetros: $id
+Linha: 573
+
+================================================================================
+Método: POST
+Rota: /tarefa/excluir/{id}
+Controller: ProtocoloTarefaController::ExcluirTarefa
+Parâmetros: $id
+Linha: 574
+
+================================================================================
+Método: GET
+Rota: /tipo/listar
+Controller: TipoController::ListarTipo
+Linha: 576
+
+================================================================================
+Método: GET
+Rota: /encerrados/listar
+Controller: ProtocoloEncerramentoController::index
+Linha: 578
+
+================================================================================
+Método: POST
+Rota: /encerrar
+Controller: ProtocoloEncerramentoController::store
+Linha: 579
+
+================================================================================
+Método: PUT
+Rota: /encerrar/{id}
+Controller: ProtocoloEncerramentoController::update
+Parâmetros: $id
+Linha: 580
+
+================================================================================
+Método: DELETE
+Rota: /encerrados/{id}
+Controller: ProtocoloEncerramentoController::destroy
+Parâmetros: $id
+Linha: 581
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: RoteiroController::index
+Linha: 587
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: RoteiroController::store
+Linha: 588
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: RoteiroController::show
+Parâmetros: $id
+Linha: 589
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: RoteiroController::destroy
+Parâmetros: $id
+Linha: 590
+
+================================================================================
+Método: PUT
+Rota: /atualizar/{id}
+Controller: RoteiroController::update
+Parâmetros: $id
+Linha: 591
+
+================================================================================
+Método: GET
+Rota: /produto/{produto_cod}
+Controller: EstruturaRoteiroController::obterEstruturaCompleta
+Parâmetros: $produto_cod
+Linha: 592
+
+================================================================================
+Método: GET
+Rota: /{roteiro_id}/materiais-disponiveis
+Controller: RoteiroController::materiaisDisponiveisRoteiro
+Parâmetros: $roteiro_id
+Linha: 593
+
+================================================================================
+Método: GET
+Rota: /buscar/{produto_cod}
+Controller: Rot2RoteiroController::getRoteiro
+Parâmetros: $produto_cod
+Linha: 598
+
+================================================================================
+Método: POST
+Rota: /cadastrar
+Controller: Rot2RoteiroController::cadastrarRoteiro
+Linha: 599
+
+================================================================================
+Método: GET
+Rota: /etapa
+Controller: Rot2EtapaController::index
+Linha: 600
+
+================================================================================
+Método: POST
+Rota: /etapa
+Controller: Rot2EtapaController::store
+Linha: 600
+
+================================================================================
+Método: GET
+Rota: /etapa/{id}
+Controller: Rot2EtapaController::show
+Parâmetros: $id
+Linha: 600
+
+================================================================================
+Método: PUT
+Rota: /etapa/{id}
+Controller: Rot2EtapaController::update
+Parâmetros: $id
+Linha: 600
+
+================================================================================
+Método: PATCH
+Rota: /etapa/{id}
+Controller: Rot2EtapaController::update
+Parâmetros: $id
+Linha: 600
+
+================================================================================
+Método: DELETE
+Rota: /etapa/{id}
+Controller: Rot2EtapaController::destroy
+Parâmetros: $id
+Linha: 600
+
+================================================================================
+Método: GET
+Rota: /tipo
+Controller: Rot2TipoEtapaController::index
+Linha: 601
+
+================================================================================
+Método: POST
+Rota: /tipo
+Controller: Rot2TipoEtapaController::store
+Linha: 601
+
+================================================================================
+Método: GET
+Rota: /tipo/{id}
+Controller: Rot2TipoEtapaController::show
+Parâmetros: $id
+Linha: 601
+
+================================================================================
+Método: PUT
+Rota: /tipo/{id}
+Controller: Rot2TipoEtapaController::update
+Parâmetros: $id
+Linha: 601
+
+================================================================================
+Método: PATCH
+Rota: /tipo/{id}
+Controller: Rot2TipoEtapaController::update
+Parâmetros: $id
+Linha: 601
+
+================================================================================
+Método: DELETE
+Rota: /tipo/{id}
+Controller: Rot2TipoEtapaController::destroy
+Parâmetros: $id
+Linha: 601
+
+================================================================================
+Método: GET
+Rota: /orientacao
+Controller: Rot2OrientacaoController::index
+Linha: 602
+
+================================================================================
+Método: POST
+Rota: /orientacao
+Controller: Rot2OrientacaoController::store
+Linha: 602
+
+================================================================================
+Método: GET
+Rota: /orientacao/{id}
+Controller: Rot2OrientacaoController::show
+Parâmetros: $id
+Linha: 602
+
+================================================================================
+Método: PUT
+Rota: /orientacao/{id}
+Controller: Rot2OrientacaoController::update
+Parâmetros: $id
+Linha: 602
+
+================================================================================
+Método: PATCH
+Rota: /orientacao/{id}
+Controller: Rot2OrientacaoController::update
+Parâmetros: $id
+Linha: 602
+
+================================================================================
+Método: DELETE
+Rota: /orientacao/{id}
+Controller: Rot2OrientacaoController::destroy
+Parâmetros: $id
+Linha: 602
+
+================================================================================
+Método: GET
+Rota: /instrucao
+Controller: Rot2InstrucaoController::index
+Linha: 603
+
+================================================================================
+Método: POST
+Rota: /instrucao
+Controller: Rot2InstrucaoController::store
+Linha: 603
+
+================================================================================
+Método: GET
+Rota: /instrucao/{id}
+Controller: Rot2InstrucaoController::show
+Parâmetros: $id
+Linha: 603
+
+================================================================================
+Método: PUT
+Rota: /instrucao/{id}
+Controller: Rot2InstrucaoController::update
+Parâmetros: $id
+Linha: 603
+
+================================================================================
+Método: PATCH
+Rota: /instrucao/{id}
+Controller: Rot2InstrucaoController::update
+Parâmetros: $id
+Linha: 603
+
+================================================================================
+Método: DELETE
+Rota: /instrucao/{id}
+Controller: Rot2InstrucaoController::destroy
+Parâmetros: $id
+Linha: 603
+
+================================================================================
+Método: POST
+Rota: /editarOrdem
+Controller: Rot2EtapaController::alterarOrdem
+Linha: 604
+
+================================================================================
+Método: POST
+Rota: /{produto_cod}/iniciar-edicao
+Controller: Rot2RoteiroController::iniciarEdicao
+Parâmetros: $produto_cod
+Linha: 607
+
+================================================================================
+Método: POST
+Rota: /{id}/publicar
+Controller: Rot2RoteiroController::publicar
+Parâmetros: $id
+Linha: 608
+
+================================================================================
+Método: GET
+Rota: /buscar/{produto_cod}/oficial
+Controller: Rot2RoteiroController::getRoteiroOficial
+Parâmetros: $produto_cod
+Linha: 609
+
+================================================================================
+Método: GET
+Rota: /buscar/{produto_cod}/edicao
+Controller: Rot2RoteiroController::getRoteiroEdicao
+Parâmetros: $produto_cod
+Linha: 610
+
+================================================================================
+Método: POST
+Rota: /adicionar
+Controller: EstruturaRoteiroController::adicionarSetor
+Linha: 614
+
+================================================================================
+Método: PATCH
+Rota: /ordenar/{id}
+Controller: EstruturaRoteiroController::atualizarOrdemSetor
+Parâmetros: $id
+Linha: 615
+
+================================================================================
+Método: DELETE
+Rota: /remover/{id}
+Controller: EstruturaRoteiroController::removerSetor
+Parâmetros: $id
+Linha: 616
+
+================================================================================
+Método: PUT
+Rota: {id}/ordem
+Controller: SetorServicoController::atualizarOrdemIndividual
+Parâmetros: $id
+Linha: 620
+
+================================================================================
+Método: POST
+Rota: /adicionar
+Controller: SetorServicoController::adicionarServico
+Linha: 621
+
+================================================================================
+Método: PATCH
+Rota: /atualizar/{id}
+Controller: SetorServicoController::atualizarServico
+Parâmetros: $id
+Linha: 622
+
+================================================================================
+Método: DELETE
+Rota: /remover/{id}
+Controller: SetorServicoController::removerServico
+Parâmetros: $id
+Linha: 623
+
+================================================================================
+Método: PATCH
+Rota: /material/atualizar/{id}
+Controller: SetorServicoController::atualizarMaterial
+Parâmetros: $id
+Linha: 624
+
+================================================================================
+Método: DELETE
+Rota: /material/remover/{id}
+Controller: SetorServicoController::removerMaterial
+Parâmetros: $id
+Linha: 625
+
+================================================================================
+Método: DELETE
+Rota: /parametro/remover/{id}
+Controller: SetorServicoController::removerParametro
+Parâmetros: $id
+Linha: 626
+
+================================================================================
+Método: DELETE
+Rota: /gabarito/remover/{id}
+Controller: SetorServicoController::removerGabarito
+Parâmetros: $id
+Linha: 627
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: ParametroController::index
+Linha: 631
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: ParametroController::store
+Linha: 632
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: ParametroController::show
+Parâmetros: $id
+Linha: 633
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: ParametroController::destroy
+Parâmetros: $id
+Linha: 634
+
+================================================================================
+Método: PUT
+Rota: /atualizar/{id}
+Controller: ParametroController::update
+Parâmetros: $id
+Linha: 635
+
+================================================================================
+Método: GET
+Rota: /todas
+Controller: ParametroController::all
+Linha: 636
+
+================================================================================
+Método: POST
+Rota: /{id}/restaurar
+Controller: ParametroController::restore
+Parâmetros: $id
+Linha: 637
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: GabaritoController::index
+Linha: 641
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: GabaritoController::store
+Linha: 642
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: GabaritoController::show
+Parâmetros: $id
+Linha: 643
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: GabaritoController::destroy
+Parâmetros: $id
+Linha: 644
+
+================================================================================
+Método: POST
+Rota: /atualizar/{id}
+Controller: GabaritoController::update
+Parâmetros: $id
+Linha: 645
+
+================================================================================
+Método: POST
+Rota: /download
+Controller: OportunidadeRelatorioController::downloadRelatorioOportunidades
+Linha: 651
+
+================================================================================
+Método: POST
+Rota: /dashboard
+Controller: IndicadorOportunidadeController::indicadores
+Linha: 652
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: OportunidadeController::index
+Linha: 653
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: OportunidadeController::store
+Linha: 654
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: OportunidadeController::show
+Parâmetros: $id
+Linha: 655
+
+================================================================================
+Método: POST
+Rota: /atualizar/{id}
+Controller: OportunidadeController::update
+Parâmetros: $id
+Linha: 656
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: OportunidadeController::excluirOportunidade
+Parâmetros: $id
+Linha: 657
+
+================================================================================
+Método: PATCH
+Rota: /produto-atualizar/{id}
+Controller: OportunidadeController::atualizarProdutoOportunidade
+Parâmetros: $id
+Linha: 658
+
+================================================================================
+Método: PATCH
+Rota: /responsavel-atualizar/{id}
+Controller: OportunidadeController::atualizarResponsavelOportunidade
+Parâmetros: $id
+Linha: 659
+
+================================================================================
+Método: PATCH
+Rota: /finalizacao-atualizar/{id}
+Controller: OportunidadeController::atualizarFinalizacaoOportunidade
+Parâmetros: $id
+Linha: 660
+
+================================================================================
+Método: PATCH
+Rota: /orcamento-atualizar/{id}
+Controller: OportunidadeController::atualizarOrcamentoOportunidade
+Parâmetros: $id
+Linha: 661
+
+================================================================================
+Método: DELETE
+Rota: /responsavel-excluir/{id}
+Controller: OportunidadeController::excluirOportunidadeResponsavel
+Parâmetros: $id
+Linha: 662
+
+================================================================================
+Método: DELETE
+Rota: /finalizacao-excluir/{id}
+Controller: OportunidadeController::excluirOportunidadeFinalizacao
+Parâmetros: $id
+Linha: 663
+
+================================================================================
+Método: DELETE
+Rota: /produto-excluir/{id}
+Controller: OportunidadeController::excluirOportunidadeProduto
+Parâmetros: $id
+Linha: 664
+
+================================================================================
+Método: DELETE
+Rota: /anexo-excluir/{id}
+Controller: OportunidadeController::excluirOportunidadeAnexo
+Parâmetros: $id
+Linha: 665
+
+================================================================================
+Método: DELETE
+Rota: /orcamento-excluir/{id}
+Controller: OportunidadeController::excluirOportunidadeOrcamento
+Parâmetros: $id
+Linha: 666
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: OptOportunidadeController::index
+Linha: 672
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: OptOportunidadeController::store
+Linha: 673
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: OptOportunidadeController::show
+Parâmetros: $id
+Linha: 674
+
+================================================================================
+Método: PATCH
+Rota: /atualizar/{id}
+Controller: OptOportunidadeController::update
+Parâmetros: $id
+Linha: 675
+
+================================================================================
+Método: PATCH
+Rota: /reativar/{id}
+Controller: OptOportunidadeController::reativar
+Parâmetros: $id
+Linha: 676
+
+================================================================================
+Método: PATCH
+Rota: /suspender
+Controller: OptOportunidadeController::suspender
+Linha: 677
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: OptOportunidadeController::destroy
+Parâmetros: $id
+Linha: 678
+
+================================================================================
+Método: POST
+Rota: /relatorio
+Controller: OptOportunidadeController::relatorio
+Linha: 679
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: OptOportunidadeTarefaController::index
+Linha: 684
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: OptOportunidadeTarefaController::store
+Linha: 685
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: PropostaComercialController::index
+Linha: 690
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: PropostaComercialController::show
+Parâmetros: $id
+Linha: 691
+
+================================================================================
+Método: PATCH
+Rota: /atualizar/{id}
+Controller: PropostaComercialController::update
+Parâmetros: $id
+Linha: 692
+
+================================================================================
+Método: GET
+Rota: /{propostaID}/anexos
+Controller: PropostaComercialAnexoController::index
+Parâmetros: $propostaID
+Linha: 694
+
+================================================================================
+Método: GET
+Rota: /item/{itemId}/anexos
+Controller: PropostaComercialItemAnexoController::index
+Parâmetros: $itemId
+Linha: 696
+
+================================================================================
+Método: GET
+Rota: /produtos
+Controller: CrmProducaoController::listaProdutos
+Linha: 701
+
+================================================================================
+Método: GET
+Rota: /ops-em-andamento
+Controller: CrmProducaoController::listaOpsEmAndamento
+Linha: 702
+
+================================================================================
+Método: GET
+Rota: /compras-em-andamento
+Controller: CrmProducaoController::listaComprasEmAndamento
+Linha: 703
+
+================================================================================
+Método: GET
+Rota: /ops-para-tratar
+Controller: CrmProducaoController::listaOpsParaTratar
+Linha: 704
+
+================================================================================
+Método: GET
+Rota: /ops-para-tratar/estrutura
+Controller: CrmProducaoController::listaEstruturaDasOpsParaTratar
+Linha: 705
+
+================================================================================
+Método: GET
+Rota: /ops-tratadas-nao-iniciadas
+Controller: CrmProducaoController::listaOpsTratadasNaoIniciadas
+Linha: 706
+
+================================================================================
+Método: GET
+Rota: /ops-tratadas-iniciadas
+Controller: CrmProducaoController::listaOpsTratadasIniciadas
+Linha: 707
+
+================================================================================
+Método: POST
+Rota: /criar-ops-e-reservas
+Controller: CrmProducaoController::criaOPsEReservas
+Linha: 708
+
+================================================================================
+Método: POST
+Rota: /criar-ops-reservas-compras-para-outra-op
+Controller: CrmProducaoController::criaOPsReservasEComprasDerivadasDeOutraOP
+Linha: 709
+
+================================================================================
+Método: POST
+Rota: /inicia-op
+Controller: CrmProducaoController::iniciaOP
+Linha: 710
+
+================================================================================
+Método: PATCH
+Rota: /associa-produto/{produtoCod}
+Controller: PropostaComercialAssocProdutoController::update
+Parâmetros: $produtoCod
+Linha: 715
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: PropostaComercialTarefaController::index
+Linha: 720
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: PropostaComercialTarefaController::store
+Linha: 721
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: ExpedicaoController::index
+Linha: 726
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: ExpedicaoController::store
+Linha: 727
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: ExpedicaoController::show
+Parâmetros: $id
+Linha: 728
+
+================================================================================
+Método: GET
+Rota: /produto/{produto_cod}
+Controller: EstruturaProdutoController::BuscarEstruturaCompleta
+Parâmetros: $produto_cod
+Linha: 733
+
+================================================================================
+Método: POST
+Rota: /adicionar
+Controller: EstruturaProdutoController::adicionarItem
+Linha: 734
+
+================================================================================
+Método: DELETE
+Rota: /remover/{id}
+Controller: EstruturaProdutoController::removerItem
+Parâmetros: $id
+Linha: 735
+
+================================================================================
+Método: PATCH
+Rota: /atualizar/{id}
+Controller: EstruturaProdutoController::atualizarItem
+Parâmetros: $id
+Linha: 736
+
+================================================================================
+Método: GET
+Rota: /cliente-temp/listar
+Controller: ClienteTempController::index
+Linha: 746
+
+================================================================================
+Método: POST
+Rota: /cliente-temp/gravar
+Controller: ClienteTempController::store
+Linha: 747
+
+================================================================================
+Método: GET
+Rota: /cliente-temp/buscar/{id}
+Controller: ClienteTempController::show
+Parâmetros: $id
+Linha: 748
+
+================================================================================
+Método: PATCH
+Rota: /cliente-temp/atualizar{id}
+Controller: ClienteTempController::update
+Parâmetros: $id
+Linha: 749
+
+================================================================================
+Método: DELETE
+Rota: /cliente-temp/excluir/{id}
+Controller: ClienteTempController::destroy
+Parâmetros: $id
+Linha: 750
+
+================================================================================
+Método: GET
+Rota: /cliente/cliente-temp/listar
+Controller: ClienteTempController::clientesUnidos
+Linha: 751
+
+================================================================================
+Método: POST
+Rota: /usuario/reativar
+Controller: UserController::reativarUsuarioPessoa
+Linha: 754
+
+================================================================================
+Método: GET
+Rota: /usuario/desativados
+Controller: UserController::usuariosDesativados
+Linha: 755
+
+================================================================================
+Método: GET
+Rota: /objetivo-estrategico/listar
+Controller: ObjetivoEstrategicoController::index
+Linha: 756
+
+================================================================================
+Método: GET
+Rota: /material-utilizado/tipos/listar
+Controller: MaterialUtilizadoController::listarTipos
+Linha: 759
+
+================================================================================
+Método: POST
+Rota: /material-utilizado/gravar
+Controller: MaterialUtilizadoController::store
+Linha: 760
+
+================================================================================
+Método: PATCH
+Rota: /material-utilizado/atualizar/{id}
+Controller: MaterialUtilizadoController::update
+Parâmetros: $id
+Linha: 761
+
+================================================================================
+Método: DELETE
+Rota: /material-utilizado/excluir/{id}
+Controller: MaterialUtilizadoController::destroy
+Parâmetros: $id
+Linha: 762
+
+================================================================================
+Método: POST
+Rota: /material-utilizado/buscar
+Controller: MaterialUtilizadoController::listarMateriaisUtilizados
+Linha: 763
+
+================================================================================
+Método: POST
+Rota: /projeto/programa/{id}
+Controller: ProjetoController::ListarProjetoPrograma
+Parâmetros: $id
+Linha: 766
+
+================================================================================
+Método: GET
+Rota: /verbos/listar
+Controller: VerboController::index
+Linha: 770
+
+================================================================================
+Método: POST
+Rota: /verbos/gravar
+Controller: VerboController::store
+Linha: 771
+
+================================================================================
+Método: GET
+Rota: /verbos/buscar/{id}
+Controller: VerboController::show
+Parâmetros: $id
+Linha: 772
+
+================================================================================
+Método: PUT
+Rota: /verbos/atualizar/{id}
+Controller: VerboController::update
+Parâmetros: $id
+Linha: 773
+
+================================================================================
+Método: DELETE
+Rota: /verbos/excluir/{id}
+Controller: VerboController::destroy
+Parâmetros: $id
+Linha: 774
+
+================================================================================
+Método: GET
+Rota: /objetos/listar
+Controller: ObjetoController::index
+Linha: 777
+
+================================================================================
+Método: POST
+Rota: /objetos/gravar
+Controller: ObjetoController::store
+Linha: 778
+
+================================================================================
+Método: GET
+Rota: /objetos/buscar/{id}
+Controller: ObjetoController::show
+Parâmetros: $id
+Linha: 779
+
+================================================================================
+Método: PUT
+Rota: /objetos/atualizar/{id}
+Controller: ObjetoController::update
+Parâmetros: $id
+Linha: 780
+
+================================================================================
+Método: DELETE
+Rota: /objetos/excluir/{id}
+Controller: ObjetoController::destroy
+Parâmetros: $id
+Linha: 781
+
+================================================================================
+Método: GET
+Rota: /locais/listar
+Controller: LocalCodController::index
+Linha: 784
+
+================================================================================
+Método: POST
+Rota: /locais/gravar
+Controller: LocalCodController::store
+Linha: 785
+
+================================================================================
+Método: GET
+Rota: /locais/buscar/{id}
+Controller: LocalCodController::show
+Parâmetros: $id
+Linha: 786
+
+================================================================================
+Método: PUT
+Rota: /locais/atualizar/{id}
+Controller: LocalCodController::update
+Parâmetros: $id
+Linha: 787
+
+================================================================================
+Método: DELETE
+Rota: /locais/excluir/{id}
+Controller: LocalCodController::destroy
+Parâmetros: $id
+Linha: 788
+
+================================================================================
+Método: GET
+Rota: /codificacoes/listar
+Controller: CodificacaoController::index
+Linha: 791
+
+================================================================================
+Método: POST
+Rota: /codificacoes/gravar
+Controller: CodificacaoController::store
+Linha: 792
+
+================================================================================
+Método: GET
+Rota: /codificacoes/buscar/{id}
+Controller: CodificacaoController::show
+Parâmetros: $id
+Linha: 793
+
+================================================================================
+Método: PUT
+Rota: /codificacoes/atualizar/{id}
+Controller: CodificacaoController::update
+Parâmetros: $id
+Linha: 794
+
+================================================================================
+Método: DELETE
+Rota: /codificacoes/excluir/{id}
+Controller: CodificacaoController::destroy
+Parâmetros: $id
+Linha: 795
+
+================================================================================
+Método: POST
+Rota: campos/listar
+Controller: FamiliaCamposController::listarPorFamilia
+Linha: 800
+
+================================================================================
+Método: POST
+Rota: campos/v2/listar
+Controller: FamiliaCamposController::listarCamposCompletos
+Linha: 801
+
+================================================================================
+Método: POST
+Rota: campos/sincronizar
+Controller: FamiliaCamposController::syncCampos
+Linha: 802
+
+================================================================================
+Método: POST
+Rota: campos/valores/listar
+Controller: FamiliaCamposController::listarValoresPossiveisPorFamilia
+Linha: 803
+
+================================================================================
+Método: POST
+Rota: campos/buscar/valores
+Controller: FamiliaCamposController::listarPorCampoFamilia
+Linha: 804
+
+================================================================================
+Método: POST
+Rota: cadastrar
+Controller: CampoProdutoController::cadastrarValores
+Linha: 808
+
+================================================================================
+Método: DELETE
+Rota: excluir
+Controller: CampoProdutoController::excluirValores
+Linha: 809
+
+================================================================================
+Método: PUT
+Rota: atualizar/{id}
+Controller: CampoProdutoController::atualizarValor
+Parâmetros: $id
+Linha: 810
+
+================================================================================
+Método: GET
+Rota: /campos/listar
+Controller: CampoProdutoController::listarCamposPossiveis
+Linha: 814
+
+================================================================================
+Método: POST
+Rota: /campos/gravar
+Controller: CampoProdutoController::gravarCampo
+Linha: 815
+
+================================================================================
+Método: PATCH
+Rota: /campos/atualizar/{id}
+Controller: CampoProdutoController::atualizarCampo
+Parâmetros: $id
+Linha: 816
+
+================================================================================
+Método: DELETE
+Rota: /campos/excluir/{id}
+Controller: CampoProdutoController::excluirCampo
+Parâmetros: $id
+Linha: 817
+
+================================================================================
+Método: GET
+Rota: /campos/listar/lista
+Controller: CampoProdutoController::listarListaCampos
+Linha: 819
+
+================================================================================
+Método: GET
+Rota: /listar/insumos
+Controller: ProdutoController::listarInsumos
+Linha: 821
+
+================================================================================
+Método: GET
+Rota: /listar/ferramentas
+Controller: ProdutoController::listarFerramentas
+Linha: 822
+
+================================================================================
+Método: POST
+Rota: /sem-categorizacao
+Controller: SemCategorizacaoProdutoController::store
+Linha: 825
+
+================================================================================
+Método: GET
+Rota: /sem-categorizacao
+Controller: SemCategorizacaoProdutoController::index
+Linha: 826
+
+================================================================================
+Método: GET
+Rota: /listar
+Controller: FamiliaProdutoController::index
+Linha: 832
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: FamiliaProdutoController::store
+Linha: 833
+
+================================================================================
+Método: GET
+Rota: /buscar/{id}
+Controller: FamiliaProdutoController::show
+Parâmetros: $id
+Linha: 834
+
+================================================================================
+Método: PUT
+Rota: /atualizar/{id}
+Controller: FamiliaProdutoController::update
+Parâmetros: $id
+Linha: 835
+
+================================================================================
+Método: DELETE
+Rota: /excluir/{id}
+Controller: FamiliaProdutoController::destroy
+Parâmetros: $id
+Linha: 836
+
+================================================================================
+Método: GET
+Rota: /unidade-medida/listar
+Controller: UnidadeMedidaProdutoController::index
+Linha: 840
+
+================================================================================
+Método: POST
+Rota: /unidade-medida/gravar
+Controller: UnidadeMedidaProdutoController::store
+Linha: 841
+
+================================================================================
+Método: GET
+Rota: /unidade-medida/buscar/{id}
+Controller: UnidadeMedidaProdutoController::show
+Parâmetros: $id
+Linha: 842
+
+================================================================================
+Método: DELETE
+Rota: /unidade-medida/excluir/{id}
+Controller: UnidadeMedidaProdutoController::destroy
+Parâmetros: $id
+Linha: 843
+
+================================================================================
+Método: PUT
+Rota: /unidade-medida/atualizar/{id}
+Controller: UnidadeMedidaProdutoController::update
+Parâmetros: $id
+Linha: 844
+
+================================================================================
+Método: GET
+Rota: /ncm/listar
+Controller: NCMController::listarNCM
+Linha: 846
+
+================================================================================
+Método: GET
+Rota: /familia/listar
+Controller: FamiliaProdutoController::listarFamilia
+Linha: 849
+
+================================================================================
+Método: GET
+Rota: /produto/familia/listar
+Controller: FamiliaProdutoController::listarFamilia
+Linha: 850
+
+================================================================================
+Método: GET
+Rota: /produto/tipo/listar
+Controller: ProdutoTipoProdutoController::listarTipoProduto
+Linha: 853
+
+================================================================================
+Método: POST
+Rota: /produto-filtrar
+Controller: ProdutoController::produtosFiltrados
+Linha: 854
+
+================================================================================
+Método: GET
+Rota: /protecao
+Controller: UtilidadeController::testeProtecao
+Linha: 857
+
+================================================================================
+Método: GET
+Rota: /pessoa/usuario
+Controller: PessoaController::showPessoaPorUsuario
+Linha: 858
+
+================================================================================
+Método: GET
+Rota: /pessoa/usuario/buscar
+Controller: PessoaController::buscarPessoaPorUsuario
+Linha: 859
+
+================================================================================
+Método: GET
+Rota: /pessoa/desativadas
+Controller: PessoaController::pessoasDesativadas
+Linha: 860
+
+================================================================================
+Método: POST
+Rota: /monitoramento/acelerometro/gravar
+Controller: AcelerometroRegistroController::GravarRegistroAcelerometro
+Linha: 863
+
+================================================================================
+Método: POST
+Rota: /monitoramento/acelerometro/buscar/{id}
+Controller: AcelerometroRegistroController::BuscarRegistroAcelerometro
+Parâmetros: $id
+Linha: 864
+
+================================================================================
+Método: POST
+Rota: /dispositivo/relatorio/acelerometro
+Controller: AcelerometroRegistroController::GerarRelatorioAcelerometro
+Linha: 865
+
+================================================================================
+Método: POST
+Rota: /monitoramento-bateria
+Controller: BateriaRegistroController::store
+Linha: 870
+
+================================================================================
+Método: POST
+Rota: /monitor-bateria/{id}
+Controller: BateriaRegistroController::show
+Parâmetros: $id
+Linha: 871
+
+================================================================================
+Método: POST
+Rota: /relatorio/monitorar-bateria
+Controller: BateriaRegistroController::gerarRelatorio
+Linha: 872
+
+================================================================================
+Método: POST
+Rota: /cadastrar/dispositivo-status
+Controller: DispositivoController::store
+Linha: 875
+
+================================================================================
+Método: GET
+Rota: /dispositivo
+Controller: DispositivoController::index
+Linha: 876
+
+================================================================================
+Método: GET
+Rota: /dispositivo/{id}/detalhes
+Controller: DispositivoController::detalhes
+Parâmetros: $id
+Linha: 877
+
+================================================================================
+Método: GET
+Rota: /verificar/dispositivo/{codigo}
+Controller: DispositivoController::show
+Parâmetros: $codigo
+Linha: 878
+
+================================================================================
+Método: PUT
+Rota: /dispositivo/{id}
+Controller: DispositivoController::update
+Parâmetros: $id
+Linha: 879
+
+================================================================================
+Método: DELETE
+Rota: /dispositivo/{id}
+Controller: DispositivoController::destroy
+Parâmetros: $id
+Linha: 880
+
+================================================================================
+Método: POST
+Rota: /omie/consultar/pedido-venda/{pedido_venda}
+Controller: OmiePedidoVendaController::buscarPedidoVendaOmie
+Parâmetros: $pedido_venda
+Linha: 883
+
+================================================================================
+Método: GET
+Rota: /pcm-producao/{estado}
+Controller: ProducaoControleController::listarProducaoPCM
+Parâmetros: $estado
+Linha: 887
+
+================================================================================
+Método: POST
+Rota: /pcm-producao/{op_cod}/iniciar
+Controller: ProducaoControleController::iniciarProducaoPCM
+Parâmetros: $op_cod
+Linha: 889
+
+================================================================================
+Método: POST
+Rota: /pcm-producao/{op_cod}/cancelar
+Controller: ProducaoControleController::cancelarProducaoPCM
+Parâmetros: $op_cod
+Linha: 890
+
+================================================================================
+Método: POST
+Rota: /pcm-producao/{op_cod}/finalizar
+Controller: ProducaoControleController::finalizarProducaoPCM
+Parâmetros: $op_cod
+Linha: 891
+
+================================================================================
+Método: POST
+Rota: /produto/omie/cadastrar
+Controller: ApiOmieController::cadastrarProduto
+Linha: 896
+
+================================================================================
+Método: PATCH
+Rota: /produto/omie/atualizar/{produto_cod}
+Controller: ApiOmieController::finalizarEdicaoProduto
+Parâmetros: $produto_cod
+Linha: 899
+
+================================================================================
+Método: GET
+Rota: /produto/original-editado/{produto_cod}
+Controller: ProdutoStagingController::produtoOriginaleEditado
+Parâmetros: $produto_cod
+Linha: 902
+
+================================================================================
+Método: POST
+Rota: /produto/alterar/{produto_cod}
+Controller: ProdutoStagingController::registrarAlteracaoProdutoAntigo
+Parâmetros: $produto_cod
+Linha: 905
+
+================================================================================
+Método: GET
+Rota: /produto/alteracoes/{produto_cod}
+Controller: ProdutoStagingController::buscarAlteracoesPendentes
+Parâmetros: $produto_cod
+Linha: 907
+
+================================================================================
+Método: GET
+Rota: /produto/em-edicao
+Controller: ProdutoStagingController::produtoEmEdicao
+Linha: 908
+
+================================================================================
+Método: PATCH
+Rota: /produto/editavel/{produto_cod}
+Controller: ApiOmieController::definirEditavel
+Parâmetros: $produto_cod
+Linha: 911
+
+================================================================================
+Método: GET
+Rota: /produto-filtrar
+Controller: ProdutoController::produtosFiltrados
+Linha: 915
+
+================================================================================
+Método: GET
+Rota: /produto-buscar/{produto_cod}
+Controller: ProdutoController::produtoPorCod
+Parâmetros: $produto_cod
+Linha: 916
+
+================================================================================
+Método: GET
+Rota: /base/recursos-humanos
+Controller: UtilidadeController::dadosBasicosRecursosHumanos
+Linha: 919
+
+================================================================================
+Método: GET
+Rota: /empresas-contrante/listar
+Controller: EmpresasContratanteController::index
+Linha: 921
+
+================================================================================
+Método: POST
+Rota: /empresas-contrante/gravar
+Controller: EmpresasContratanteController::store
+Linha: 922
+
+================================================================================
+Método: GET
+Rota: /empresas-contrante/buscar/{id}
+Controller: EmpresasContratanteController::show
+Parâmetros: $id
+Linha: 923
+
+================================================================================
+Método: DELETE
+Rota: /empresas-contrante/excluir/{id}
+Controller: EmpresasContratanteController::destroy
+Parâmetros: $id
+Linha: 924
+
+================================================================================
+Método: PUT
+Rota: /empresas-contrante/atualizar/{id}
+Controller: EmpresasContratanteController::update
+Parâmetros: $id
+Linha: 925
+
+================================================================================
+Método: GET
+Rota: /cor-raca/listar
+Controller: CorRacaController::index
+Linha: 927
+
+================================================================================
+Método: POST
+Rota: /cor-raca/gravar
+Controller: CorRacaController::store
+Linha: 928
+
+================================================================================
+Método: GET
+Rota: /cor-raca/buscar/{id}
+Controller: CorRacaController::show
+Parâmetros: $id
+Linha: 929
+
+================================================================================
+Método: DELETE
+Rota: /cor-raca/excluir/{id}
+Controller: CorRacaController::destroy
+Parâmetros: $id
+Linha: 930
+
+================================================================================
+Método: PUT
+Rota: /cor-raca/atualizar/{id}
+Controller: CorRacaController::update
+Parâmetros: $id
+Linha: 931
+
+================================================================================
+Método: GET
+Rota: /escolaridade/listar
+Controller: EscolaridadeController::index
+Linha: 933
+
+================================================================================
+Método: POST
+Rota: /escolaridade/gravar
+Controller: EscolaridadeController::store
+Linha: 934
+
+================================================================================
+Método: GET
+Rota: /escolaridade/buscar/{id}
+Controller: EscolaridadeController::show
+Parâmetros: $id
+Linha: 935
+
+================================================================================
+Método: DELETE
+Rota: /escolaridade/excluir/{id}
+Controller: EscolaridadeController::destroy
+Parâmetros: $id
+Linha: 936
+
+================================================================================
+Método: PUT
+Rota: /escolaridade/atualizar/{id}
+Controller: EscolaridadeController::update
+Parâmetros: $id
+Linha: 937
+
+================================================================================
+Método: GET
+Rota: /estado-civil/listar
+Controller: EstadoCivilController::index
+Linha: 939
+
+================================================================================
+Método: POST
+Rota: /estado-civil/gravar
+Controller: EstadoCivilController::store
+Linha: 940
+
+================================================================================
+Método: GET
+Rota: /estado-civil/buscar/{id}
+Controller: EstadoCivilController::show
+Parâmetros: $id
+Linha: 941
+
+================================================================================
+Método: DELETE
+Rota: /estado-civil/excluir/{id}
+Controller: EstadoCivilController::destroy
+Parâmetros: $id
+Linha: 942
+
+================================================================================
+Método: PUT
+Rota: /estado-civil/atualizar/{id}
+Controller: EstadoCivilController::update
+Parâmetros: $id
+Linha: 943
+
+================================================================================
+Método: GET
+Rota: /religiao/listar
+Controller: ReligiaoController::index
+Linha: 945
+
+================================================================================
+Método: POST
+Rota: /religiao/gravar
+Controller: ReligiaoController::store
+Linha: 946
+
+================================================================================
+Método: GET
+Rota: /religiao/buscar/{id}
+Controller: ReligiaoController::show
+Parâmetros: $id
+Linha: 947
+
+================================================================================
+Método: DELETE
+Rota: /religiao/excluir/{id}
+Controller: ReligiaoController::destroy
+Parâmetros: $id
+Linha: 948
+
+================================================================================
+Método: PUT
+Rota: /religiao/atualizar/{id}
+Controller: ReligiaoController::update
+Parâmetros: $id
+Linha: 949
+
+================================================================================
+Método: GET
+Rota: /tamanho/listar
+Controller: TamanhoController::index
+Linha: 951
+
+================================================================================
+Método: POST
+Rota: /tamanho/gravar
+Controller: TamanhoController::store
+Linha: 952
+
+================================================================================
+Método: GET
+Rota: /tamanho/buscar/{id}
+Controller: TamanhoController::show
+Parâmetros: $id
+Linha: 953
+
+================================================================================
+Método: DELETE
+Rota: /tamanho/excluir/{id}
+Controller: TamanhoController::destroy
+Parâmetros: $id
+Linha: 954
+
+================================================================================
+Método: PUT
+Rota: /tamanho/atualizar/{id}
+Controller: TamanhoController::update
+Parâmetros: $id
+Linha: 955
+
+================================================================================
+Método: GET
+Rota: /tipo-conta/listar
+Controller: ContaTipoController::index
+Linha: 957
+
+================================================================================
+Método: POST
+Rota: /tipo-conta/gravar
+Controller: ContaTipoController::store
+Linha: 958
+
+================================================================================
+Método: GET
+Rota: /tipo-conta/buscar/{id}
+Controller: ContaTipoController::show
+Parâmetros: $id
+Linha: 959
+
+================================================================================
+Método: DELETE
+Rota: /tipo-conta/excluir/{id}
+Controller: ContaTipoController::destroy
+Parâmetros: $id
+Linha: 960
+
+================================================================================
+Método: PUT
+Rota: /tipo-conta/atualizar/{id}
+Controller: ContaTipoController::update
+Parâmetros: $id
+Linha: 961
+
+================================================================================
+Método: GET
+Rota: /parentesco/listar
+Controller: ParentescoController::index
+Linha: 963
+
+================================================================================
+Método: POST
+Rota: /parentesco/gravar
+Controller: ParentescoController::store
+Linha: 964
+
+================================================================================
+Método: GET
+Rota: /parentesco/buscar/{id}
+Controller: ParentescoController::show
+Parâmetros: $id
+Linha: 965
+
+================================================================================
+Método: DELETE
+Rota: /parentesco/excluir/{id}
+Controller: ParentescoController::destroy
+Parâmetros: $id
+Linha: 966
+
+================================================================================
+Método: PUT
+Rota: /parentesco/atualizar/{id}
+Controller: ParentescoController::update
+Parâmetros: $id
+Linha: 967
+
+================================================================================
+Método: GET
+Rota: /tipo-graduacao/listar
+Controller: GraduacaoTipoController::index
+Linha: 969
+
+================================================================================
+Método: POST
+Rota: /tipo-graduacao/gravar
+Controller: GraduacaoTipoController::store
+Linha: 970
+
+================================================================================
+Método: GET
+Rota: /tipo-graduacao/buscar/{id}
+Controller: GraduacaoTipoController::show
+Parâmetros: $id
+Linha: 971
+
+================================================================================
+Método: DELETE
+Rota: /tipo-graduacao/excluir/{id}
+Controller: GraduacaoTipoController::destroy
+Parâmetros: $id
+Linha: 972
+
+================================================================================
+Método: PUT
+Rota: /tipo-graduacao/atualizar/{id}
+Controller: GraduacaoTipoController::update
+Parâmetros: $id
+Linha: 973
+
+================================================================================
+Método: GET
+Rota: /regional/listar
+Controller: RegionalController::index
+Linha: 975
+
+================================================================================
+Método: POST
+Rota: /regional/gravar
+Controller: RegionalController::store
+Linha: 976
+
+================================================================================
+Método: GET
+Rota: /regional/buscar/{id}
+Controller: RegionalController::show
+Parâmetros: $id
+Linha: 977
+
+================================================================================
+Método: DELETE
+Rota: /regional/excluir/{id}
+Controller: RegionalController::destroy
+Parâmetros: $id
+Linha: 978
+
+================================================================================
+Método: PUT
+Rota: /regional/atualizar/{id}
+Controller: RegionalController::update
+Parâmetros: $id
+Linha: 979
+
+================================================================================
+Método: POST
+Rota: /endereco/gravar
+Controller: PessoaEnderecoController::gravarEndereco
+Linha: 981
+
+================================================================================
+Método: PUT
+Rota: /endereco/atualizar/{id}
+Controller: PessoaEnderecoController::atualizarEndereco
+Parâmetros: $id
+Linha: 982
+
+================================================================================
+Método: DELETE
+Rota: /endereco/excluir/{id}
+Controller: PessoaEnderecoController::excluirEndereco
+Parâmetros: $id
+Linha: 983
+
+================================================================================
+Método: POST
+Rota: /graduacao/gravar
+Controller: PessoaGraduacaoController::gravarGraduacao
+Linha: 985
+
+================================================================================
+Método: PUT
+Rota: /graduacao/atualizar/{id}
+Controller: PessoaGraduacaoController::atualizarGraduacao
+Parâmetros: $id
+Linha: 986
+
+================================================================================
+Método: DELETE
+Rota: /graduacao/excluir/{id}
+Controller: PessoaGraduacaoController::excluirGraduacao
+Parâmetros: $id
+Linha: 987
+
+================================================================================
+Método: POST
+Rota: /contato-emergencia/gravar
+Controller: PessoaContatoEmergenciaController::gravarContatoEmergencia
+Linha: 989
+
+================================================================================
+Método: PUT
+Rota: /contato-emergencia/atualizar/{id}
+Controller: PessoaContatoEmergenciaController::atualizarContatoEmergencia
+Parâmetros: $id
+Linha: 990
+
+================================================================================
+Método: DELETE
+Rota: /contato-emergencia/excluir/{id}
+Controller: PessoaContatoEmergenciaController::excluirContatoEmergencia
+Parâmetros: $id
+Linha: 991
+
+================================================================================
+Método: POST
+Rota: /dados-bancarios/gravar
+Controller: PessoaDadosBancariosController::gravarDadosBancarios
+Linha: 993
+
+================================================================================
+Método: PUT
+Rota: /dados-bancarios/atualizar/{id}
+Controller: PessoaDadosBancariosController::atualizarDadosBancarios
+Parâmetros: $id
+Linha: 994
+
+================================================================================
+Método: DELETE
+Rota: /dados-bancarios/excluir/{id}
+Controller: PessoaDadosBancariosController::excluirDadosBancarios
+Parâmetros: $id
+Linha: 995
+
+================================================================================
+Método: POST
+Rota: /vinculo-familiar/gravar
+Controller: PessoaVinculoController::gravarVinculo
+Linha: 997
+
+================================================================================
+Método: PUT
+Rota: /vinculo-familiar/atualizar/{id}
+Controller: PessoaVinculoController::atualizarVinculo
+Parâmetros: $id
+Linha: 998
+
+================================================================================
+Método: DELETE
+Rota: /vinculo-familiar/excluir/{id}
+Controller: PessoaVinculoController::excluirVinculo
+Parâmetros: $id
+Linha: 999
+
+================================================================================
+Método: POST
+Rota: /trajeto/gravar
+Controller: PessoaTrajetoController::gravarTrajeto
+Linha: 1001
+
+================================================================================
+Método: PUT
+Rota: /trajeto/atualizar/{id}
+Controller: PessoaTrajetoController::atualizarTrajeto
+Parâmetros: $id
+Linha: 1002
+
+================================================================================
+Método: DELETE
+Rota: /trajeto/excluir/{id}
+Controller: PessoaTrajetoController::excluirTrajeto
+Parâmetros: $id
+Linha: 1003
+
+================================================================================
+Método: POST
+Rota: /admissao/gravar
+Controller: PessoaAdmissaoController::gravarAdmissao
+Linha: 1005
+
+================================================================================
+Método: PUT
+Rota: /admissao/atualizar/{id}
+Controller: PessoaAdmissaoController::atualizarAdmissao
+Parâmetros: $id
+Linha: 1006
+
+================================================================================
+Método: DELETE
+Rota: /admissao/excluir/{id}
+Controller: PessoaAdmissaoController::excluirAdmissao
+Parâmetros: $id
+Linha: 1007
+
+================================================================================
+Método: GET
+Rota: /motivos
+Controller: MotivoDemissaoController::index
+Linha: 1011
+
+================================================================================
+Método: GET
+Rota: /motivos/{id}
+Controller: MotivoDemissaoController::show
+Parâmetros: $id
+Linha: 1012
+
+================================================================================
+Método: POST
+Rota: /motivos
+Controller: MotivoDemissaoController::store
+Linha: 1013
+
+================================================================================
+Método: PUT
+Rota: /motivos/{id}
+Controller: MotivoDemissaoController::update
+Parâmetros: $id
+Linha: 1014
+
+================================================================================
+Método: DELETE
+Rota: /motivos/{id}
+Controller: MotivoDemissaoController::destroy
+Parâmetros: $id
+Linha: 1015
+
+================================================================================
+Método: GET
+Rota: /pessoa
+Controller: PessoaController::index
+Linha: 1018
+
+================================================================================
+Método: GET
+Rota: /pessoa/vendedor
+Controller: PessoaController::listaVendedores
+Linha: 1019
+
+================================================================================
+Método: GET
+Rota: /filtrar/pessoa
+Controller: PessoaController::indexFiltrado
+Linha: 1020
+
+================================================================================
+Método: GET
+Rota: /filtrar/pessoa-sem-usuario
+Controller: PessoaController::indexPessoaSemUsuario
+Linha: 1021
+
+================================================================================
+Método: GET
+Rota: /pessoa/convidado
+Controller: PessoaController::indexConvidado
+Linha: 1022
+
+================================================================================
+Método: POST
+Rota: /pessoa/usuario/cadastrar
+Controller: PessoaController::storePessoaUsuario
+Linha: 1023
+
+================================================================================
+Método: POST
+Rota: /pessoa/relatorio
+Controller: PessoaController::relatorioPorPeriodo
+Linha: 1024
+
+================================================================================
+Método: POST
+Rota: /pessoa/setor
+Controller: SetorController::SetorPessoa
+Linha: 1027
+
+================================================================================
+Método: POST
+Rota: /pessoa/{id}
+Controller: PessoaController::update
+Parâmetros: $id
+Linha: 1029
+
+================================================================================
+Método: POST
+Rota: /pessoa
+Controller: PessoaController::store
+Linha: 1032
+
+================================================================================
+Método: POST
+Rota: /usuario/setor
+Controller: SetorController::SetorUsuario
+Linha: 1033
+
+================================================================================
+Método: GET
+Rota: /pessoa/{id}
+Controller: PessoaController::show
+Parâmetros: $id
+Linha: 1035
+
+================================================================================
+Método: DELETE
+Rota: /pessoa/{id}
+Controller: PessoaController::destroy
+Parâmetros: $id
+Linha: 1037
+
+================================================================================
+Método: GET
+Rota: /comemoracao/mes/{mes}
+Controller: PessoaController::datasComemorativas
+Parâmetros: $mes
+Linha: 1039
+
+================================================================================
+Método: GET
+Rota: /pessoas/aniversariantes
+Controller: PessoaController::aniversariantesPorMes
+Linha: 1040
+
+================================================================================
+Método: GET
+Rota: /usuario/lideranca/listar
+Controller: UserController::ListarLiderancas
+Linha: 1044
+
+================================================================================
+Método: POST
+Rota: /movimentacao-material
+Controller: MovimentacaoMaterialController::store
+Linha: 1048
+
+================================================================================
+Método: GET
+Rota: /movimentacao-material/op/{op_cod}/setores
+Controller: MovimentacaoMaterialController::buscaMateriaisParadosPorOP
+Parâmetros: $op_cod
+Linha: 1049
+
+================================================================================
+Método: GET
+Rota: /movimentacao-material/op
+Controller: MovimentacaoMaterialController::listaMateriaisPorSetorDeOPsEmProducao
+Linha: 1050
+
+================================================================================
+Método: GET
+Rota: /notificacoes/usuario
+Controller: NotificacaoController::ListarNotificacoesUsuario
+Linha: 1054
+
+================================================================================
+Método: POST
+Rota: /notificacoes/ler
+Controller: NotificacaoController::NotificacaoLida
+Linha: 1055
+
+================================================================================
+Método: POST
+Rota: /notificacoes/excluir
+Controller: NotificacaoController::NotificacaoExcluida
+Linha: 1056
+
+================================================================================
+Método: GET
+Rota: /projeto/encerrados/listar
+Controller: EncerramentoProjetoController::index
+Linha: 1060
+
+================================================================================
+Método: POST
+Rota: /projeto/encerrar
+Controller: EncerramentoProjetoController::store
+Linha: 1061
+
+================================================================================
+Método: PUT
+Rota: /projeto/encerrar/{id}
+Controller: EncerramentoProjetoController::update
+Parâmetros: $id
+Linha: 1062
+
+================================================================================
+Método: DELETE
+Rota: /projeto/encerrados/{id}
+Controller: EncerramentoProjetoController::destroy
+Parâmetros: $id
+Linha: 1063
+
+================================================================================
+Método: POST
+Rota: /ordem-producao/listar
+Controller: ProducaoController::ListarOrdemProducao
+Linha: 1067
+
+================================================================================
+Método: POST
+Rota: /pedido-venda/listar
+Controller: OmiePedidoVendaController::ListarPedidoVenda
+Linha: 1068
+
+================================================================================
+Método: POST
+Rota: /op/associar/pedido-venda-item
+Controller: OmiePedidoVendaController::AssociarItemPedidoVendaOP
+Linha: 1069
+
+================================================================================
+Método: GET
+Rota: /cargo/listar
+Controller: CargoController::ListarCargos
+Linha: 1074
+
+================================================================================
+Método: GET
+Rota: /cargo/hierarquico
+Controller: CargoController::ListarCargoHierarquicamenteComPessoas
+Linha: 1075
+
+================================================================================
+Método: PUT
+Rota: /cargo/atualizar/{id}
+Controller: CargoController::AtualizarCargo
+Parâmetros: $id
+Linha: 1076
+
+================================================================================
+Método: POST
+Rota: /cargo/gravar
+Controller: CargoController::GravarCargo
+Linha: 1077
+
+================================================================================
+Método: DELETE
+Rota: /cargo/excluir/{id}
+Controller: CargoController::ExcluirCargo
+Parâmetros: $id
+Linha: 1078
+
+================================================================================
+Método: POST
+Rota: /associar/pessoa-cargo
+Controller: CargoController::AssociarPessoaCargo
+Linha: 1079
+
+================================================================================
+Método: DELETE
+Rota: /desassociar/pessoa-cargo/{id}
+Controller: CargoController::DesassociarPessoaCargo
+Parâmetros: $id
+Linha: 1080
+
+================================================================================
+Método: GET
+Rota: /estrategico
+Controller: SetorController::ListarSetorEstrategico
+Linha: 1085
+
+================================================================================
+Método: GET
+Rota: /operacional
+Controller: SetorController::ListarSetorOperacional
+Linha: 1086
+
+================================================================================
+Método: GET
+Rota: /hierarquico
+Controller: SetorController::ListarSetorHierarquicamenteComUsuario
+Linha: 1087
+
+================================================================================
+Método: GET
+Rota: /montagem
+Controller: SetorController::ListarSetorMontagem
+Linha: 1088
+
+================================================================================
+Método: POST
+Rota: /responsavel/usuario
+Controller: SetorController::UsuariosPorSetor
+Linha: 1089
+
+================================================================================
+Método: GET
+Rota: /todos
+Controller: SetorController::listarTodosSetores
+Linha: 1090
+
+================================================================================
+Método: GET
+Rota: /
+Controller: SetorController::index
+Linha: 1091
+
+================================================================================
+Método: POST
+Rota: /
+Controller: SetorController::GravarSetor
+Linha: 1092
+
+================================================================================
+Método: GET
+Rota: /{id}
+Controller: SetorController::show
+Parâmetros: $id
+Linha: 1093
+
+================================================================================
+Método: PUT
+Rota: /{id}
+Controller: SetorController::update
+Parâmetros: $id
+Linha: 1094
+
+================================================================================
+Método: DELETE
+Rota: /{id}
+Controller: SetorController::destroy
+Parâmetros: $id
+Linha: 1095
+
+================================================================================
+Método: PATCH
+Rota: /{id}
+Controller: SetorController::cadPeso
+Parâmetros: $id
+Linha: 1096
+
+================================================================================
+Método: POST
+Rota: /omie/projeto/criar
+Controller: ApiOmieController::CriarProjeto
+Linha: 1101
+
+================================================================================
+Método: GET
+Rota: /apontamento/montagem/lista
+Controller: VisualizacaoMontagemController::OrdemProducaoAtivasMontagem
+Linha: 1106
+
+================================================================================
+Método: GET
+Rota: /pcm/{id}/pdf/
+Controller: PcmController::GerarPDF
+Parâmetros: $id
+Linha: 1109
+
+================================================================================
+Método: POST
+Rota: /gravar
+Controller: EntregasProjetoController::GravarEntrega
+Linha: 1114
+
+================================================================================
+Método: PUT
+Rota: /atualizar
+Controller: EntregasProjetoController::AtualizarEntrega
+Linha: 1115
+
+================================================================================
+Método: POST
+Rota: /excluir
+Controller: EntregasProjetoController::ExcluirEntrega
+Linha: 1116
+
+================================================================================
+Método: POST
+Rota: /listar
+Controller: EntregasProjetoController::ListarEntregasProjeto
+Linha: 1117
+
+================================================================================
+Método: POST
+Rota: /buscar
+Controller: EntregasProjetoController::BuscarEntregas
+Linha: 1118
+
+================================================================================
+Método: POST
+Rota: /coordenador/entrega/listar
+Controller: EntregasProjetoController::ListarEntregasCoordenador
+Linha: 1121
+
+================================================================================
+Método: POST
+Rota: /tarefa/notificar
+Controller: NotificacaoEmailController::NotificacaoTarefa
+Linha: 1125
+
+================================================================================
+Método: POST
+Rota: /forms
+Controller: FormController::create
+Linha: 1129
+
+================================================================================
+Método: POST
+Rota: /forms/{formId}/fields
+Controller: FormController::addfield
+Parâmetros: $formId
+Linha: 1130
+
+================================================================================
+Método: POST
+Rota: /forms/{formId}/responses
+Controller: FormController::submitResponse
+Parâmetros: $formId
+Linha: 1131
+
+================================================================================
+Método: POST
+Rota: /categoria/grupo-pessoas/gravar
+Controller: CategoriaDREGruposController::GravarGrupoPessoaCategoria
+Linha: 1138
+
+================================================================================
+Método: GET
+Rota: /status-edicao/listar
+Controller: StatusEdicaoController::ListarStatus
+Linha: 1139
+
+================================================================================
+Método: POST
+Rota: /status-edicao/gravar
+Controller: StatusEdicaoController::GravarStatus
+Linha: 1140
+
+================================================================================
+Método: POST
+Rota: /excel/comparar
+Controller: OrcamentoDREController::CompararExcelCategoria
+Linha: 1141
+
+================================================================================
+Método: POST
+Rota: /estrutura/listar
+Controller: EstruturaDREController::ListarEstruturaDRE
+Linha: 1142
+
+================================================================================
+Método: POST
+Rota: /estrutura/gravar
+Controller: EstruturaDREController::AdicionarItemEstrutura
+Linha: 1143
+
+================================================================================
+Método: DELETE
+Rota: /estrutura/excluir/{id}
+Controller: EstruturaDREController::ExcluirItemEstrutura
+Parâmetros: $id
+Linha: 1144
+
+================================================================================
+Método: POST
+Rota: /categoria/gravar
+Controller: CategoriaDREController::AdicionarCategoriaDRE
+Linha: 1145
+
+================================================================================
+Método: GET
+Rota: /categoria/listar/setor
+Controller: CategoriaDREController::listaCategoriaSetor
+Linha: 1146
+
+================================================================================
+Método: DELETE
+Rota: /categoria/excluir/{id}
+Controller: CategoriaDREController::ExcluirCategoriaDRE
+Parâmetros: $id
+Linha: 1147
+
+================================================================================
+Método: GET
+Rota: /categoria/listar
+Controller: CategoriaDREController::ListarCategoriaDRE
+Linha: 1148
+
+================================================================================
+Método: GET
+Rota: /excel/novo
+Controller: OrcamentoDREController::GerarExcelCategoria
+Linha: 1149
+
+================================================================================
+Método: POST
+Rota: /excel/importar
+Controller: OrcamentoDREController::ImportarExcelCategoria
+Linha: 1150
+
+================================================================================
+Método: POST
+Rota: /excel/restaurar
+Controller: OrcamentoDREController::RestaurarExcelCategoria
+Linha: 1151
+
+================================================================================
+Método: GET
+Rota: /historico/arquivos
+Controller: OrcamentoDREController::ListarHistoricoArquivo
+Linha: 1152
+
+================================================================================
+Método: POST
+Rota: /categoria/orcamento/gravar-atualizar
+Controller: CategoriaDREController::GravarAtualizarOrcamentoIndividual
+Linha: 1153
+
+================================================================================
+Método: POST
+Rota: /categoria/associar/categoria-item
+Controller: CategoriaDREController::AssociarCategoriaItemCategoriaDRE
+Linha: 1154
+
+================================================================================
+Método: GET
+Rota: /categoria/listarProdutos/{id}
+Controller: CategoriaDREController::getProdutosCategoriaDRE
+Parâmetros: $id
+Linha: 1155
+
+================================================================================
+Método: POST
+Rota: /categoria/vincularProdutos
+Controller: CategoriaDREController::vincularProdutoCategoria
+Linha: 1156
+
+================================================================================
+Método: POST
+Rota: /categoria/desvincularProdutos
+Controller: CategoriaDREController::desvincularProdutoCategoria
+Linha: 1157
+
+================================================================================
+Método: POST
+Rota: /categoria/associar/responsavel
+Controller: CategoriaDREGruposController::vincularPessoaSetorCategoria
+Linha: 1160
+
+================================================================================
+Método: DELETE
+Rota: /categoria/desassociar/responsavel/{id}
+Controller: CategoriaDREGruposController::removerVinculo
+Parâmetros: $id
+Linha: 1161
+
+================================================================================
+Método: GET
+Rota: /grupo/listar
+Controller: EstruturaDREController::ListarGrupo
+Linha: 1162
+
+================================================================================
+Método: GET
+Rota: /subGrupo/listar/{id}
+Controller: EstruturaDREController::ListarSubGrupo
+Parâmetros: $id
+Linha: 1163
+
+================================================================================
+Método: GET
+Rota: /projeto/orcamento/listar
+Controller: FinanceiroOrcamentoProjetoController::ListarOrcamentoProjeto
+Linha: 1167
+
+================================================================================
+Método: POST
+Rota: /projeto/orcamento/gravar-atualizar
+Controller: FinanceiroOrcamentoProjetoController::GravarAtualizarOrcamentoProjeto
+Linha: 1168
+
+================================================================================
+Método: GET
+Rota: exercicio-financeiro/listar
+Controller: ExercicioFInanceiroController::index
+Linha: 1169
+
+================================================================================
+Método: POST
+Rota: exercicio-financeiro/gravar
+Controller: ExercicioFinanceiroController::store
+Linha: 1170
+
+================================================================================
+Método: DELETE
+Rota: exercicio-financeiro/excluir/{id}
+Controller: ExercicioFinanceiroController::destroy
+Parâmetros: $id
+Linha: 1171
+
+================================================================================
+Método: POST
+Rota: /orcamento/projeto/mensal
+Controller: OrcamentoProjetoController::GastoMensalProjeto
+Linha: 1174
+
+================================================================================
+Método: GET
+Rota: ordem-producao/injecao/existente
+Controller: OpInjecaoController::OrdemProducaoComTrabalho
+Linha: 1179
+
+================================================================================
+Método: GET
+Rota: ordem-producao/injecao/pendente
+Controller: OpInjecaoController::OrdemProducaoEmAbertoInjetora
+Linha: 1180
+
+================================================================================
+Método: GET
+Rota: ordem-producao/injecao/buscar/{id}
+Controller: OpInjecaoController::OrdemProducaoBuscar
+Parâmetros: $id
+Linha: 1181
+
+================================================================================
+Método: GET
+Rota: ordem-producao/trabalho/listar/{id}
+Controller: OpInjecaoController::TrabalhoInjecaoOp
+Parâmetros: $id
+Linha: 1182
+
+================================================================================
+Método: GET
+Rota: injecao/maquina/listar
+Controller: MaquinaController::ListarMaquina
+Linha: 1184
+
+================================================================================
+Método: POST
+Rota: injecao/maquina/gravar
+Controller: MaquinaController::GravarMaquina
+Linha: 1185
+
+================================================================================
+Método: PUT
+Rota: injecao/maquina/atualizar/{id}
+Controller: MaquinaController::AtualizarMaquina
+Parâmetros: $id
+Linha: 1186
+
+================================================================================
+Método: DELETE
+Rota: injecao/maquina/excluir/{id}
+Controller: MaquinaController::ExcluirMaquina
+Parâmetros: $id
+Linha: 1187
+
+================================================================================
+Método: POST
+Rota: injecao/op/encerrar
+Controller: OpInjecaoController::EncerrarOP
+Linha: 1189
+
+================================================================================
+Método: POST
+Rota: injecao/op/reabrir
+Controller: OpInjecaoController::ReabrirOP
+Linha: 1190
+
+================================================================================
+Método: GET
+Rota: injecao/informacoes
+Controller: GestaoInjetoraController::PainelInformacoes
+Linha: 1192
+
+================================================================================
+Método: GET
+Rota: injecao/mock
+Controller: GestaoInjetoraController::PainelInformacoesMock
+Linha: 1193
+
+================================================================================
+Método: POST
+Rota: trabalho/gravar
+Controller: InjetoraTrabalhoController::GravarTrabalho
+Linha: 1195
+
+================================================================================
+Método: PUT
+Rota: trabalho/atualizar/{id}
+Controller: InjetoraTrabalhoController::AtualizarTrabalho
+Parâmetros: $id
+Linha: 1196
+
+================================================================================
+Método: POST
+Rota: trabalho/correcao/{id}
+Controller: InjetoraTrabalhoController::CorrecaoTrabalho
+Parâmetros: $id
+Linha: 1197
+
+================================================================================
+Método: POST
+Rota: trabalho/pausar/{id}
+Controller: InjetoraTrabalhoController::PausarTrabalho
+Parâmetros: $id
+Linha: 1198
+
+================================================================================
+Método: GET
+Rota: trabalho/pausa/buscar/{id}
+Controller: InjetoraTrabalhoController::BuscarPausa
+Parâmetros: $id
+Linha: 1199
+
+================================================================================
+Método: GET
+Rota: injecao/motivo/listar
+Controller: InjetoraMotivoController::ListarMotivo
+Linha: 1201
+
+================================================================================
+Método: POST
+Rota: injecao/motivo/gravar
+Controller: InjetoraMotivoController::GravarMotivo
+Linha: 1202
+
+================================================================================
+Método: PUT
+Rota: injecao/motivo/atualizar/{id}
+Controller: InjetoraMotivoController::AtualizarMotivo
+Parâmetros: $id
+Linha: 1203
+
+================================================================================
+Método: DELETE
+Rota: injecao/motivo/excluir/{id}
+Controller: InjetoraMotivoController::ExcluirMotivo
+Parâmetros: $id
+Linha: 1204
+
+================================================================================
+Método: GET
+Rota: injecao/validar/qrcode/{qrcode}
+Controller: OpInjecaoController::ValidarQrCodeInjecao
+Parâmetros: $qrcode
+Linha: 1206
+
+================================================================================
+Método: GET
+Rota: injecao/servico
+Controller: InjetoraServicoController::index
+Linha: 1208
+
+================================================================================
+Método: POST
+Rota: injecao/servico
+Controller: InjetoraServicoController::store
+Linha: 1209
+
+================================================================================
+Método: POST
+Rota: injecao/tempo-medio
+Controller: InjetoraTrabalhoController::tempoMedio
+Linha: 1211
+
+================================================================================
+Método: POST
+Rota: injecao/qtd-periodo
+Controller: InjetoraTrabalhoController::qtdTotalProducaoPeriodo
+Linha: 1212
+
+================================================================================
+Método: POST
+Rota: /programa/cadastrar
+Controller: ProgramaController::CriarPrograma
+Linha: 1216
+
+================================================================================
+Método: GET
+Rota: /programa/listar
+Controller: ProgramaController::ListarPrograma
+Linha: 1217
+
+================================================================================
+Método: PUT
+Rota: /programa/atualizar/{id}
+Controller: ProgramaController::AtualizarPrograma
+Parâmetros: $id
+Linha: 1218
+
+================================================================================
+Método: PUT
+Rota: /programa/excluir/{id}
+Controller: ProgramaController::ExcluirPrograma
+Parâmetros: $id
+Linha: 1219
+
+================================================================================
+Método: POST
+Rota: /programa/associar/{id}
+Controller: ProgramaController::AssociarPrograma
+Parâmetros: $id
+Linha: 1220
+
+================================================================================
+Método: POST
+Rota: /programa/associar/excluir/{id}
+Controller: ProgramaController::ExcluirAssociarPrograma
+Parâmetros: $id
+Linha: 1221
+
+================================================================================
+Método: GET
+Rota: /programa/buscar/{id}
+Controller: ProgramaController::BuscarPrograma
+Parâmetros: $id
+Linha: 1222
+
+================================================================================
+Método: GET
+Rota: /planoAcao/listar
+Controller: PlanoAcaoController::ListarPlanoAcao
+Linha: 1224
+
+================================================================================
+Método: POST
+Rota: /planoAcao/tarefas/status
+Controller: PlanoAcaoController::ListarPlanoAcaoEstatisticas
+Linha: 1225
+
+================================================================================
+Método: POST
+Rota: /planoAcao/cadastrar
+Controller: PlanoAcaoController::CadastrarPlanoAcao
+Linha: 1226
+
+================================================================================
+Método: GET
+Rota: /planoAcao/buscar/{id}
+Controller: PlanoAcaoController::BuscarPlanoAcaoMaisTarefa
+Parâmetros: $id
+Linha: 1227
+
+================================================================================
+Método: PUT
+Rota: /planoAcao/atualizar/{id}
+Controller: PlanoAcaoController::AtualizarPlanoAcao
+Parâmetros: $id
+Linha: 1228
+
+================================================================================
+Método: PUT
+Rota: /planoAcao/excluir/{id}
+Controller: PlanoAcaoController::ExcluirPlanoAcao
+Parâmetros: $id
+Linha: 1229
+
+================================================================================
+Método: POST
+Rota: /gestao/tarefasUsuario
+Controller: GestaoProjetoController::ListaTarefasUsuarios
+Linha: 1231
+
+================================================================================
+Método: POST
+Rota: /planoAcaoTarefa/tarefasTime
+Controller: PlanoAcaoTarefaController::ListaTarefasTime
+Linha: 1232
+
+================================================================================
+Método: POST
+Rota: /planoAcaoTarefa/cadastrar
+Controller: PlanoAcaoTarefaController::CadastrarPlanoAcaoTarefa
+Linha: 1233
+
+================================================================================
+Método: PUT
+Rota: /planoAcaoTarefa/atualizar/{id}
+Controller: PlanoAcaoTarefaController::AtualizarPlanoAcaoTarefa
+Parâmetros: $id
+Linha: 1234
+
+================================================================================
+Método: PUT
+Rota: /planoAcaoTarefa/excluir/{id}
+Controller: PlanoAcaoTarefaController::ExcluirPlanoAcaoTarefa
+Parâmetros: $id
+Linha: 1235
+
+================================================================================
+Método: POST
+Rota: /planoAcaoTarefa/anexo/adicionar
+Controller: PlanoAcaoTarefaController::AnexoPlanoAcaoTarefaAdicionar
+Linha: 1237
+
+================================================================================
+Método: DELETE
+Rota: /planoAcaoTarefa/anexo/remover/{id}
+Controller: PlanoAcaoTarefaController::AnexoPlanoAcaoTarefaRemover
+Parâmetros: $id
+Linha: 1238
+
+================================================================================
+Método: GET
+Rota: /pcm/impacto-viabilidade
+Controller: ImpactoViabilidadeController::ListarImpactoViabilidade
+Linha: 1240
+
+================================================================================
+Método: POST
+Rota: /pcm/cadastrar
+Controller: PcmController::CadastrarPcm
+Linha: 1241
+
+================================================================================
+Método: GET
+Rota: /pcm/listar
+Controller: PcmController::ListarPcm
+Linha: 1242
+
+================================================================================
+Método: GET
+Rota: /pcm/buscar/{id}
+Controller: PcmController::BuscarPcm
+Parâmetros: $id
+Linha: 1243
+
+================================================================================
+Método: PUT
+Rota: /pcm/atualizar/{id}
+Controller: PcmController::AtualizarPcm
+Parâmetros: $id
+Linha: 1244
+
+================================================================================
+Método: PUT
+Rota: /pcm/excluir/{id}
+Controller: PcmController::ExcluirPcm
+Parâmetros: $id
+Linha: 1245
+
+================================================================================
+Método: POST
+Rota: /pedidos-edicao/aprovar/{id}
+Controller: PcmPedidoEdicaoController::aprovarPedido
+Parâmetros: $id
+Linha: 1247
+
+================================================================================
+Método: GET
+Rota: /pedidos-edicao
+Controller: PcmPedidoEdicaoController::index
+Linha: 1248
+
+================================================================================
+Método: POST
+Rota: /pedidos-edicao
+Controller: PcmPedidoEdicaoController::store
+Linha: 1248
+
+================================================================================
+Método: GET
+Rota: /pedidos-edicao/{id}
+Controller: PcmPedidoEdicaoController::show
+Parâmetros: $id
+Linha: 1248
+
+================================================================================
+Método: PUT
+Rota: /pedidos-edicao/{id}
+Controller: PcmPedidoEdicaoController::update
+Parâmetros: $id
+Linha: 1248
+
+================================================================================
+Método: PATCH
+Rota: /pedidos-edicao/{id}
+Controller: PcmPedidoEdicaoController::update
+Parâmetros: $id
+Linha: 1248
+
+================================================================================
+Método: DELETE
+Rota: /pedidos-edicao/{id}
+Controller: PcmPedidoEdicaoController::destroy
+Parâmetros: $id
+Linha: 1248
+
+================================================================================
+Método: GET
+Rota: /planoacao-projeto/listar/sem-programa
+Controller: PlanoAcaoController::ListarProjetosEPlanoAcaoSemPrograma
+Linha: 1253
+
+================================================================================
+Método: GET
+Rota: /planoacao-projeto/listar/sem-pcm
+Controller: PlanoAcaoController::ListarProjetoEPlanoAcaoSemPcm
+Linha: 1254
+
+================================================================================
+Método: POST
+Rota: /permissao/planoAcao/{id}
+Controller: PermissaoController::PermissaoPlanoAcao
+Parâmetros: $id
+Linha: 1257
+
+================================================================================
+Método: POST
+Rota: /permissao/projeto/{id}
+Controller: PermissaoController::PermissaoProjeto
+Parâmetros: $id
+Linha: 1261
+
+================================================================================
+Método: GET
+Rota: /filtro/responsavel
+Controller: GestaoProjetoController::ListarResponsavel
+Linha: 1263
+
+================================================================================
+Método: GET
+Rota: /filtro/gerente
+Controller: GestaoProjetoController::ListarGerente
+Linha: 1264
+
+================================================================================
+Método: GET
+Rota: /filtro/projeto
+Controller: GestaoProjetoController::ListarProjeto
+Linha: 1265
+
+================================================================================
+Método: POST
+Rota: /filtro/sprint
+Controller: GestaoProjetoController::ListarSprint
+Linha: 1266
+
+================================================================================
+Método: POST
+Rota: /projeto/filtrar
+Controller: GestaoProjetoController::FiltrarProjeto
+Linha: 1268
+
+================================================================================
+Método: POST
+Rota: /projeto/anexo/adicionar
+Controller: ProjetoController::AnexoProjetoAdicionar
+Linha: 1270
+
+================================================================================
+Método: DELETE
+Rota: /projeto/anexo/remover/{id}
+Controller: ProjetoController::AnexoProjetoRemover
+Parâmetros: $id
+Linha: 1271
+
+================================================================================
+Método: POST
+Rota: /sprintTarefa/anexo/adicionar
+Controller: SprintTarefaController::AnexoSprintTarefaAdicionar
+Linha: 1273
+
+================================================================================
+Método: DELETE
+Rota: /sprintTarefa/anexo/remover/{id}
+Controller: SprintTarefaController::AnexoSprintTarefaRemover
+Parâmetros: $id
+Linha: 1274
+
+================================================================================
+Método: POST
+Rota: /projeto/cadastrar
+Controller: ProjetoController::CadastrarProjeto
+Linha: 1276
+
+================================================================================
+Método: GET
+Rota: /projeto/listar
+Controller: ProjetoController::ListarProjeto
+Linha: 1277
+
+================================================================================
+Método: GET
+Rota: /projeto/usuario/{id}
+Controller: ProjetoController::ListarProjetoUsuario
+Parâmetros: $id
+Linha: 1278
+
+================================================================================
+Método: GET
+Rota: /projeto/indicadores
+Controller: ProjetoController::listarProjetosComIndicadores
+Linha: 1279
+
+================================================================================
+Método: GET
+Rota: /projeto/{id}/demandas
+Controller: ProjetoController::ListarDemandasProjeto
+Parâmetros: $id
+Linha: 1280
+
+================================================================================
+Método: GET
+Rota: /projeto/{id}
+Controller: ProjetoController::BuscarProjetoPorId
+Parâmetros: $id
+Linha: 1281
+
+================================================================================
+Método: POST
+Rota: /projeto/tarefas/status
+Controller: ProjetoController::ListarProjetoEstatisticas
+Linha: 1282
+
+================================================================================
+Método: POST
+Rota: /projeto/tarefas/status
+Controller: ProjetoController::ListarProjetoEstatisticas
+Linha: 1283
+
+================================================================================
+Método: POST
+Rota: /projeto/logs/tarefa/{idTarefa}
+Controller: LogTarefaController::ListarLogTarefa
+Parâmetros: $idTarefa
+Linha: 1284
+
+================================================================================
+Método: GET
+Rota: /projetos/demandas
+Controller: DemandasTemporariasController::index
+Linha: 1285
+
+================================================================================
+Método: POST
+Rota: /projetos/demandas
+Controller: DemandasTemporariasController::store
+Linha: 1285
+
+================================================================================
+Método: GET
+Rota: /projetos/demandas/{id}
+Controller: DemandasTemporariasController::show
+Parâmetros: $id
+Linha: 1285
+
+================================================================================
+Método: PUT
+Rota: /projetos/demandas/{id}
+Controller: DemandasTemporariasController::update
+Parâmetros: $id
+Linha: 1285
+
+================================================================================
+Método: PATCH
+Rota: /projetos/demandas/{id}
+Controller: DemandasTemporariasController::update
+Parâmetros: $id
+Linha: 1285
+
+================================================================================
+Método: DELETE
+Rota: /projetos/demandas/{id}
+Controller: DemandasTemporariasController::destroy
+Parâmetros: $id
+Linha: 1285
+
+================================================================================
+Método: POST
+Rota: /projetos/demandas/setor
+Controller: DemandasTemporariasController::getDemandasSetor
+Linha: 1286
+
+================================================================================
+Método: PUT
+Rota: /projeto/excluir/{id}
+Controller: ProjetoController::ExcluirProjeto
+Parâmetros: $id
+Linha: 1289
+
+================================================================================
+Método: PUT
+Rota: /projeto/atualizar/{id}
+Controller: ProjetoController::AtualizarProjeto
+Parâmetros: $id
+Middlewares: NotificacaoMiddleware
+Nome: projeto.atualizar
+Linha: 1291
+
+================================================================================
+Método: POST
+Rota: /sprint/cadastrar
+Controller: SprintController::CadastrarSprint
+Linha: 1295
+
+================================================================================
+Método: GET
+Rota: /sprint/buscar/{id}
+Controller: SprintController::BuscarSprintTarefa
+Parâmetros: $id
+Linha: 1296
+
+================================================================================
+Método: PUT
+Rota: /sprint/atualizar/{id}
+Controller: SprintController::AtualizarSprint
+Parâmetros: $id
+Linha: 1297
+
+================================================================================
+Método: PUT
+Rota: /sprint/excluir/{id}
+Controller: SprintController::ExcluirSprint
+Parâmetros: $id
+Linha: 1298
+
+================================================================================
+Método: POST
+Rota: /sprintTarefa/cadastrar
+Controller: SprintTarefaController::CadastrarSprintTarefa
+Linha: 1300
+
+================================================================================
+Método: PUT
+Rota: /sprintTarefa/atualizar/{id}
+Controller: SprintTarefaController::AtualizarSprintTarefa
+Parâmetros: $id
+Linha: 1301
+
+================================================================================
+Método: PUT
+Rota: /sprintTarefa/excluir/{id}
+Controller: SprintTarefaController::ExcluirSprintTarefa
+Parâmetros: $id
+Linha: 1302
+
+================================================================================
+Método: POST
+Rota: /sprintTarefa/kanban/atualizar
+Controller: SprintTarefaController::AtualizarKanban
+Linha: 1303
+
+================================================================================
+Método: POST
+Rota: registrar/conferencia
+Controller: InventarioController::RegistrarConferenciaAtivo
+Linha: 1307
+
+================================================================================
+Método: GET
+Rota: ativos/local-fisico/{id}
+Controller: AtivosController::BuscarAtivosLocal
+Parâmetros: $id
+Linha: 1309
+
+================================================================================
+Método: GET
+Rota: unidade/locais
+Controller: LocalController::BuscarLocaisUnidade
+Linha: 1311
+
+================================================================================
+Método: GET
+Rota: inventario/inventario-local/{id}
+Controller: InventarioController::BuscarAtivosPorInventarioLocal
+Parâmetros: $id
+Linha: 1313
+
+================================================================================
+Método: GET
+Rota: inventario/buscar/{id}
+Controller: InventarioController::BuscarInventario
+Parâmetros: $id
+Linha: 1314
+
+================================================================================
+Método: POST
+Rota: inventario/gravar
+Controller: InventarioController::GravarInventario
+Linha: 1315
+
+================================================================================
+Método: PUT
+Rota: inventario/atualizar/{id}
+Controller: InventarioController::AtualizarInventario
+Parâmetros: $id
+Linha: 1316
+
+================================================================================
+Método: DELETE
+Rota: inventario/excluir/{id}
+Controller: InventarioController::ExcluirInventario
+Parâmetros: $id
+Linha: 1317
+
+================================================================================
+Método: GET
+Rota: inventario/unidade/{id}
+Controller: InventarioController::BuscarInventarioPorUnidade
+Parâmetros: $id
+Linha: 1318
+
+================================================================================
+Método: POST
+Rota: ativos/relatorio
+Controller: GestaoMateriaisRelatorioController::RelatorioAtivos
+Linha: 1321
+
+================================================================================
+Método: POST
+Rota: solicitacao/relatorio
+Controller: GestaoMateriaisRelatorioController::RelatorioSolicitacoes
+Linha: 1322
+
+================================================================================
+Método: POST
+Rota: ativo/notificacao/listar
+Controller: AtivosNotificacaoController::ListarNotificacaoAtivo
+Linha: 1324
+
+================================================================================
+Método: DELETE
+Rota: status-ativo/excluir/{id}
+Controller: StatusAtivoController::ExcluirStatusAtivo
+Parâmetros: $id
+Linha: 1325
+
+================================================================================
+Método: POST
+Rota: ativo/notificacao/gravar
+Controller: AtivosNotificacaoController::GravarNotificacaoAtivo
+Linha: 1326
+
+================================================================================
+Método: PUT
+Rota: ativo/notificacao/atualizar
+Controller: AtivosNotificacaoController::AtualizarNotificacaoAtivo
+Linha: 1327
+
+================================================================================
+Método: DELETE
+Rota: ativo/notificacao/excluir/{id}
+Controller: AtivosNotificacaoController::ExcluirNotificacaoAtivo
+Parâmetros: $id
+Linha: 1328
+
+================================================================================
+Método: POST
+Rota: ativo/movimentar
+Controller: AtivosController::MovimentarAtivo
+Linha: 1330
+
+================================================================================
+Método: POST
+Rota: ativo/historico
+Controller: AtivosController::HistoricoAtivo
+Linha: 1331
+
+================================================================================
+Método: POST
+Rota: ativo/pdf/qrcode
+Controller: AtivosController::gerarQrcodePDF
+Linha: 1332
+
+================================================================================
+Método: POST
+Rota: ativos/relatorio-completo
+Controller: AtivoRelatorioController::relatorioAtivo
+Linha: 1333
+
+================================================================================
+Método: GET
+Rota: projetos/omie/listar
+Controller: ProjetoController::ListarProjetoOmie
+Linha: 1335
+
+================================================================================
+Método: GET
+Rota: ordem-producao/ativas
+Controller: ProducaoController::OrdemProducaoAtivas
+Linha: 1336
+
+================================================================================
+Método: GET
+Rota: ativos/listar
+Controller: AtivosController::ListarAtivos
+Linha: 1338
+
+================================================================================
+Método: POST
+Rota: ativos/buscar
+Controller: AtivosController::BuscarAtivos
+Linha: 1339
+
+================================================================================
+Método: GET
+Rota: ativos/listar/usuario/{id}
+Controller: AtivosController::ListarAtivosUsuario
+Parâmetros: $id
+Linha: 1340
+
+================================================================================
+Método: POST
+Rota: ativos/gravar
+Controller: AtivosController::GravarAtivos
+Linha: 1341
+
+================================================================================
+Método: POST
+Rota: ativos/atualizar
+Controller: AtivosController::AtualizarAtivos
+Linha: 1342
+
+================================================================================
+Método: DELETE
+Rota: ativos/excluir/{id}
+Controller: AtivosController::ExcluirAtivos
+Parâmetros: $id
+Linha: 1343
+
+================================================================================
+Método: POST
+Rota: ativos/anexo/adicionar
+Controller: AtivosController::AnexoAtivoAdicionar
+Linha: 1345
+
+================================================================================
+Método: POST
+Rota: ativos/anexo/excluir
+Controller: AtivosController::AnexoAtivoExcluir
+Linha: 1346
+
+================================================================================
+Método: POST
+Rota: ativos/buscar-por-categorias
+Controller: AtivosController::BuscarAtivosPorCategorias
+Linha: 1348
+
+================================================================================
+Método: POST
+Rota: solicitacao-material/gravar
+Controller: SolicitacaoController::GravarSolicitacao
+Linha: 1350
+
+================================================================================
+Método: POST
+Rota: solicitacao-material/listar
+Controller: SolicitacaoController::ListarSolicitacoes
+Linha: 1351
+
+================================================================================
+Método: POST
+Rota: solicitacao-material/buscar
+Controller: SolicitacaoController::BuscarSolicitacao
+Linha: 1352
+
+================================================================================
+Método: POST
+Rota: solicitacao-material-status/atualizar
+Controller: SolicitacaoController::AtualizarStatusMaterial
+Linha: 1353
+
+================================================================================
+Método: GET
+Rota: categoria/listar
+Controller: CategoriaController::ListarCategoria
+Linha: 1356
+
+================================================================================
+Método: GET
+Rota: categoria/superior
+Controller: CategoriaController::ListarCategoriaSuperior
+Linha: 1357
+
+================================================================================
+Método: POST
+Rota: categoria/gravar
+Controller: CategoriaController::GravarCategoria
+Linha: 1359
+
+================================================================================
+Método: PUT
+Rota: categoria/atualizar/{id}
+Controller: CategoriaController::AtualizarCategoria
+Parâmetros: $id
+Linha: 1360
+
+================================================================================
+Método: DELETE
+Rota: categoria/excluir/{id}
+Controller: CategoriaController::ExcluirCategoria
+Parâmetros: $id
+Linha: 1361
+
+================================================================================
+Método: GET
+Rota: local-fisico/listar
+Controller: LocalFisicoController::ListarLocalFisico
+Linha: 1363
+
+================================================================================
+Método: GET
+Rota: local-fisico/buscar/unidade/{id}
+Controller: LocalFisicoController::ListarLocalFisicoPorUnidade
+Parâmetros: $id
+Linha: 1364
+
+================================================================================
+Método: POST
+Rota: local-fisico/gravar
+Controller: LocalFisicoController::GravarLocalFisico
+Linha: 1365
+
+================================================================================
+Método: PUT
+Rota: local-fisico/atualizar/{id}
+Controller: LocalFisicoController::AtualizarLocalFisico
+Parâmetros: $id
+Linha: 1366
+
+================================================================================
+Método: DELETE
+Rota: local-fisico/excluir/{id}
+Controller: LocalFisicoController::ExcluirLocalFisico
+Parâmetros: $id
+Linha: 1367
+
+================================================================================
+Método: GET
+Rota: motivo-alerta/listar
+Controller: MotivoAlertaController::ListarMotivoAlerta
+Linha: 1369
+
+================================================================================
+Método: POST
+Rota: motivo-alerta/gravar
+Controller: MotivoAlertaController::GravarMotivoAlerta
+Linha: 1370
+
+================================================================================
+Método: PUT
+Rota: motivo-alerta/atualizar/{id}
+Controller: MotivoAlertaController::AtualizarMotivoAlerta
+Parâmetros: $id
+Linha: 1371
+
+================================================================================
+Método: DELETE
+Rota: motivo-alerta/excluir/{id}
+Controller: MotivoAlertaController::ExcluirMotivoAlerta
+Parâmetros: $id
+Linha: 1372
+
+================================================================================
+Método: GET
+Rota: status-ativo/listar
+Controller: StatusAtivoController::ListarStatusAtivo
+Linha: 1374
+
+================================================================================
+Método: POST
+Rota: status-ativo/gravar
+Controller: StatusAtivoController::GravarStatusAtivo
+Linha: 1375
+
+================================================================================
+Método: PUT
+Rota: status-ativo/atualizar/{id}
+Controller: StatusAtivoController::AtualizarStatusAtivo
+Parâmetros: $id
+Linha: 1376
+
+================================================================================
+Método: DELETE
+Rota: status-ativo/excluir/{id}
+Controller: StatusAtivoController::ExcluirStatusAtivo
+Parâmetros: $id
+Linha: 1377
+
+================================================================================
+Método: POST
+Rota: /apontamento-montagem/gravar
+Controller: TrabalhoController::store
+Linha: 1379
+
+================================================================================
+Método: POST
+Rota: /apontamento-montagem/pausa-resume/{id}
+Controller: TrabalhoController::PausaOuResumeTrabalho
+Parâmetros: $id
+Linha: 1380
+
+================================================================================
+Método: POST
+Rota: /apontamento-montagem/finaliza/{id}
+Controller: TrabalhoController::FinalizaTrabalho
+Parâmetros: $id
+Linha: 1381
+
+================================================================================
+Método: POST
+Rota: /apontamento-montagem/servicos-realizados
+Controller: TrabalhoController::InformaServicosRealizados
+Linha: 1382
+
+================================================================================
+Método: GET
+Rota: /buscar/familia-produto-vendido
+Controller: OmieController::BuscarFamiliaProdutosVendidos
+Linha: 1386
+
+================================================================================
+Método: GET
+Rota: /indicador
+Controller: IndicadorController::index
+Linha: 1390
+
+================================================================================
+Método: POST
+Rota: /indicador
+Controller: IndicadorController::store
+Linha: 1391
+
+================================================================================
+Método: GET
+Rota: /indicador/{id}
+Controller: IndicadorController::show
+Parâmetros: $id
+Linha: 1392
+
+================================================================================
+Método: PUT
+Rota: /indicador/{id}
+Controller: IndicadorController::update
+Parâmetros: $id
+Linha: 1393
+
+================================================================================
+Método: DELETE
+Rota: /indicador/{id}
+Controller: IndicadorController::destroy
+Parâmetros: $id
+Linha: 1394
+
+================================================================================
+Método: POST
+Rota: /indicador/contas/pagar-receber/ano
+Controller: IndicadorController::ContasPagarReceberAno
+Linha: 1398
+
+================================================================================
+Método: POST
+Rota: /indicador/contas/semana-detalhe
+Controller: IndicadorController::DetalhesContasPagarReceber
+Linha: 1399
+
+================================================================================
+Método: POST
+Rota: /indicador/contas/pagar-receber
+Controller: IndicadorController::ContasPagarReceber
+Linha: 1400
+
+================================================================================
+Método: POST
+Rota: /indicador/conta-receber
+Controller: IndicadorController::ContasReceberAnoMes
+Linha: 1401
+
+================================================================================
+Método: POST
+Rota: /indicador/conta-pagar
+Controller: IndicadorController::ContasPagarAnoMes
+Linha: 1402
+
+================================================================================
+Método: POST
+Rota: /indicador/projeto/custo
+Controller: IndicadorController::CustoProjeto
+Linha: 1403
+
+================================================================================
+Método: POST
+Rota: /indicador/produto-produzido
+Controller: IndicadorController::ProdutosProduzidos
+Linha: 1404
+
+================================================================================
+Método: POST
+Rota: /indicador/produto-vendido
+Controller: IndicadorController::ProdutosVendidos
+Linha: 1405
+
+================================================================================
+Método: POST
+Rota: /indicador/produto-vendido-mes
+Controller: IndicadorController::ProdutosVendidosMes
+Linha: 1406
+
+================================================================================
+Método: GET
+Rota: /omie/oportunidade/ano
+Controller: OmieOportunidadeController::anosComOportunidade
+Linha: 1407
+
+================================================================================
+Método: POST
+Rota: /omie/oportunidade/mes
+Controller: OmieOportunidadeController::mesComOportunidade
+Linha: 1408
+
+================================================================================
+Método: POST
+Rota: /omie/oportunidade/ticket
+Controller: OmieOportunidadeController::ticket
+Linha: 1409
+
+================================================================================
+Método: POST
+Rota: /omie/oportunidade/ticket-mes
+Controller: OmieOportunidadeController::ticketMes
+Linha: 1410
+
+================================================================================
+Método: POST
+Rota: /omie/oportunidade/proposta-viabilizada
+Controller: OmieOportunidadeController::propostaViabilizada
+Linha: 1411
+
+================================================================================
+Método: POST
+Rota: /omie/oportunidade/proposta-viabilizada-maior
+Controller: OmieOportunidadeController::propostaViabilizadaMaior
+Linha: 1412
+
+================================================================================
+Método: POST
+Rota: /omie/oportunidade/proposta-viabilizada/detalhe
+Controller: OmieOportunidadeController::propostaViabilizadaLista
+Linha: 1413
+
+================================================================================
+Método: POST
+Rota: /omie/oportunidade/proposta-viabilizada-mes
+Controller: OmieOportunidadeController::propostaViabilizadaMes
+Linha: 1414
+
+================================================================================
+Método: POST
+Rota: /omie/oportunidade/cliente-alcancado
+Controller: OmieOportunidadeController::clienteAlcancado
+Linha: 1415
+
+================================================================================
+Método: POST
+Rota: /omie/oportunidade/cliente-alcancado-semana
+Controller: OmieOportunidadeController::clienteAlcancadoSemana
+Linha: 1416
+
+================================================================================
+Método: GET
+Rota: /menu/home
+Controller: FuncionalidadeController::menuHome
+Linha: 1420
+
+================================================================================
+Método: GET
+Rota: /menu/estrutura
+Controller: FuncionalidadeController::menuEstruturaCompleta
+Linha: 1421
+
+================================================================================
+Método: GET
+Rota: /menu/estrutura/{id}
+Controller: FuncionalidadeController::menuEstruturaHomeSelecionado
+Parâmetros: $id
+Linha: 1422
+
+================================================================================
+Método: POST
+Rota: /menu/salvar
+Controller: FuncionalidadeController::salvarRelacao
+Linha: 1423
+
+================================================================================
+Método: POST
+Rota: /os/manutencao/indicador
+Controller: OrdemServicoIndicadorController::Manutencao
+Linha: 1428
+
+================================================================================
+Método: POST
+Rota: /os/assisTec/indicador
+Controller: OrdemServicoIndicadorController::AssistenciaTecnica
+Linha: 1429
+
+================================================================================
+Método: POST
+Rota: /os/retrabalho/indicador
+Controller: OrdemServicoIndicadorController::Retrabalho
+Linha: 1430
+
+================================================================================
+Método: POST
+Rota: /os/usinagemCNC/indicador
+Controller: OrdemServicoIndicadorController::UsinagemCNC
+Linha: 1431
+
+================================================================================
+Método: POST
+Rota: /os/filtrar/{tipo}
+Controller: OrdemServicoFiltroController::OrdemServicoFiltrar
+Parâmetros: $tipo
+Linha: 1433
+
+================================================================================
+Método: POST
+Rota: /os/relatorio/filtrar
+Controller: OrdemServicoFiltroController::OrdemServicoFiltrarRelatorio
+Linha: 1434
+
+================================================================================
+Método: POST
+Rota: /dashboard/os/indicador
+Controller: OrdemServicoDashboardController::DashboardIndicador
+Linha: 1437
+
+================================================================================
+Método: POST
+Rota: /dashboard/os/mes
+Controller: OrdemServicoDashboardController::DashboardOrdemMes
+Linha: 1438
+
+================================================================================
+Método: GET
+Rota: /os/motivo/listar
+Controller: OrdemServicoMotivoController::ListarMotivo
+Linha: 1440
+
+================================================================================
+Método: POST
+Rota: /os/motivo/gravar
+Controller: OrdemServicoMotivoController::GravarMotivo
+Linha: 1441
+
+================================================================================
+Método: DELETE
+Rota: /os/motivo/excluir/{id}
+Controller: OrdemServicoMotivoController::ExcluirMotivo
+Parâmetros: $id
+Linha: 1442
+
+================================================================================
+Método: POST
+Rota: /os/vincular/responsavel
+Controller: OrdemServicoResponsavelController::AssociarResponsavel
+Linha: 1444
+
+================================================================================
+Método: POST
+Rota: /os/atualizar
+Controller: OrdemServicoAtualizar::AtualizarOrdemServico
+Linha: 1446
+
+================================================================================
+Método: POST
+Rota: /os/trabalho/gravar
+Controller: OrdemServicoTrabalhoController::GravarTrabalho
+Linha: 1448
+
+================================================================================
+Método: PUT
+Rota: /os/trabalho/atualizar/{id}
+Controller: OrdemServicoTrabalhoController::AtualizarTrabalho
+Parâmetros: $id
+Linha: 1449
+
+================================================================================
+Método: DELETE
+Rota: /os/trabalho/material/excluir/{id}
+Controller: OrdemServicoTrabalhoController::ExcluirMaterialGasto
+Parâmetros: $id
+Linha: 1450
+
+================================================================================
+Método: POST
+Rota: /os/porta-molde/gravar
+Controller: OrdemServicoPortaMoldeController::GravarPortaMolde
+Linha: 1452
+
+================================================================================
+Método: GET
+Rota: /os/porta-molde/listar
+Controller: OrdemServicoPortaMoldeController::ListarPortaMolde
+Linha: 1453
+
+================================================================================
+Método: DELETE
+Rota: /os/porta-molde/excluir/{id}
+Controller: OrdemServicoPortaMoldeController::ExcluirPortaMolde
+Parâmetros: $id
+Linha: 1454
+
+================================================================================
+Método: POST
+Rota: /os/objeto-servico/gravar
+Controller: OrdemServicoObjetoController::GravarObjetoServico
+Linha: 1456
+
+================================================================================
+Método: GET
+Rota: /os/objeto-servico/listar
+Controller: OrdemServicoObjetoController::ListarObjetoServico
+Linha: 1457
+
+================================================================================
+Método: DELETE
+Rota: /os/objeto-servico/excluir/{id}
+Controller: OrdemServicoObjetoController::ExcluirObjetoServico
+Parâmetros: $id
+Linha: 1458
+
+================================================================================
+Método: POST
+Rota: /os/tipo-servico/gravar
+Controller: OrdemServicoTipoController::GravarTipoServico
+Linha: 1460
+
+================================================================================
+Método: GET
+Rota: /os/tipo-servico/listar
+Controller: OrdemServicoTipoController::ListarTipoServico
+Linha: 1461
+
+================================================================================
+Método: DELETE
+Rota: /os/tipo-servico/excluir/{id}
+Controller: OrdemServicoTipoController::ExcluirTipoServico
+Parâmetros: $id
+Linha: 1462
+
+================================================================================
+Método: POST
+Rota: /os/material-trabalho/gravar
+Controller: OrdemServicoMaterialController::gravar
+Linha: 1464
+
+================================================================================
+Método: POST
+Rota: /os/material-trabalho/atualizar
+Controller: OrdemServicoMaterialController::AtualizarMaterial
+Linha: 1465
+
+================================================================================
+Método: GET
+Rota: /os/material-trabalho/listar
+Controller: OrdemServicoMaterialController::ListarMaterial
+Linha: 1466
+
+================================================================================
+Método: DELETE
+Rota: /os/material-trabalho/excluir/{id}
+Controller: OrdemServicoMaterialController::ExcluirMaterial
+Parâmetros: $id
+Linha: 1467
+
+================================================================================
+Método: POST
+Rota: /os/material/receber
+Controller: OrdemServicoRecebimentoMaterialController::gravar
+Linha: 1469
+
+================================================================================
+Método: GET
+Rota: marca
+Controller: MarcaController::index
+Linha: 1475
+
+================================================================================
+Método: POST
+Rota: marca
+Controller: MarcaController::store
+Linha: 1475
+
+================================================================================
+Método: GET
+Rota: marca/{id}
+Controller: MarcaController::show
+Parâmetros: $id
+Linha: 1475
+
+================================================================================
+Método: PUT
+Rota: marca/{id}
+Controller: MarcaController::update
+Parâmetros: $id
+Linha: 1475
+
+================================================================================
+Método: PATCH
+Rota: marca/{id}
+Controller: MarcaController::update
+Parâmetros: $id
+Linha: 1475
+
+================================================================================
+Método: DELETE
+Rota: marca/{id}
+Controller: MarcaController::destroy
+Parâmetros: $id
+Linha: 1475
+
+================================================================================
+Método: GET
+Rota: modelo
+Controller: ModeloController::index
+Linha: 1476
+
+================================================================================
+Método: POST
+Rota: modelo
+Controller: ModeloController::store
+Linha: 1476
+
+================================================================================
+Método: GET
+Rota: modelo/{id}
+Controller: ModeloController::show
+Parâmetros: $id
+Linha: 1476
+
+================================================================================
+Método: PUT
+Rota: modelo/{id}
+Controller: ModeloController::update
+Parâmetros: $id
+Linha: 1476
+
+================================================================================
+Método: PATCH
+Rota: modelo/{id}
+Controller: ModeloController::update
+Parâmetros: $id
+Linha: 1476
+
+================================================================================
+Método: DELETE
+Rota: modelo/{id}
+Controller: ModeloController::destroy
+Parâmetros: $id
+Linha: 1476
+
+================================================================================
+Método: GET
+Rota: operadora
+Controller: OperadoraController::index
+Linha: 1477
+
+================================================================================
+Método: POST
+Rota: operadora
+Controller: OperadoraController::store
+Linha: 1477
+
+================================================================================
+Método: GET
+Rota: operadora/{id}
+Controller: OperadoraController::show
+Parâmetros: $id
+Linha: 1477
+
+================================================================================
+Método: PUT
+Rota: operadora/{id}
+Controller: OperadoraController::update
+Parâmetros: $id
+Linha: 1477
+
+================================================================================
+Método: PATCH
+Rota: operadora/{id}
+Controller: OperadoraController::update
+Parâmetros: $id
+Linha: 1477
+
+================================================================================
+Método: DELETE
+Rota: operadora/{id}
+Controller: OperadoraController::destroy
+Parâmetros: $id
+Linha: 1477
+
+================================================================================
+Método: GET
+Rota: /
+Controller: OrdemServicoAtivosExternosController::index
+Linha: 1480
+
+================================================================================
+Método: POST
+Rota: /
+Controller: OrdemServicoAtivosExternosController::store
+Linha: 1480
+
+================================================================================
+Método: GET
+Rota: //{id}
+Controller: OrdemServicoAtivosExternosController::show
+Parâmetros: $id
+Linha: 1480
+
+================================================================================
+Método: PUT
+Rota: //{id}
+Controller: OrdemServicoAtivosExternosController::update
+Parâmetros: $id
+Linha: 1480
+
+================================================================================
+Método: PATCH
+Rota: //{id}
+Controller: OrdemServicoAtivosExternosController::update
+Parâmetros: $id
+Linha: 1480
+
+================================================================================
+Método: DELETE
+Rota: //{id}
+Controller: OrdemServicoAtivosExternosController::destroy
+Parâmetros: $id
+Linha: 1480
+
+================================================================================
+Método: POST
+Rota: /buscar-codigo
+Controller: ServicoAtivoExternoController::buscarOsPorMib
+Linha: 1483
+
+================================================================================
+Método: GET
+Rota: servico
+Controller: ServicoAtivoExternoController::index
+Linha: 1487
+
+================================================================================
+Método: POST
+Rota: servico
+Controller: ServicoAtivoExternoController::store
+Linha: 1487
+
+================================================================================
+Método: GET
+Rota: servico/{id}
+Controller: ServicoAtivoExternoController::show
+Parâmetros: $id
+Linha: 1487
+
+================================================================================
+Método: PUT
+Rota: servico/{id}
+Controller: ServicoAtivoExternoController::update
+Parâmetros: $id
+Linha: 1487
+
+================================================================================
+Método: PATCH
+Rota: servico/{id}
+Controller: ServicoAtivoExternoController::update
+Parâmetros: $id
+Linha: 1487
+
+================================================================================
+Método: DELETE
+Rota: servico/{id}
+Controller: ServicoAtivoExternoController::destroy
+Parâmetros: $id
+Linha: 1487
+
+================================================================================
+Método: GET
+Rota: /os/assistencia-tecnica
+Controller: AssistenciaTecnicaController::index
+Linha: 1493
+
+================================================================================
+Método: POST
+Rota: /os/assistencia-tecnica
+Controller: AssistenciaTecnicaController::gravar
+Linha: 1494
+
+================================================================================
+Método: GET
+Rota: /os/assistencia-tecnica/{id}
+Controller: AssistenciaTecnicaController::show
+Parâmetros: $id
+Linha: 1495
+
+================================================================================
+Método: POST
+Rota: /os/assistencia-tecnica/{id}/recebe-produto
+Controller: AssistenciaTecnicaController::recebeProdutos
+Parâmetros: $id
+Linha: 1496
+
+================================================================================
+Método: GET
+Rota: /os/manutencao
+Controller: ManutencaoController::index
+Linha: 1501
+
+================================================================================
+Método: POST
+Rota: /os/manutencao
+Controller: ManutencaoController::store
+Linha: 1502
+
+================================================================================
+Método: GET
+Rota: /os/manutencao/{id}
+Controller: ManutencaoController::show
+Parâmetros: $id
+Linha: 1503
+
+================================================================================
+Método: GET
+Rota: /os/manutencao/listar/usuario/{id}
+Controller: ManutencaoController::ListarManutencaoUsuario
+Parâmetros: $id
+Linha: 1504
+
+================================================================================
+Método: POST
+Rota: /os/retrabalho
+Controller: RetrabalhoController::gravar
+Linha: 1508
+
+================================================================================
+Método: GET
+Rota: /os/retrabalho
+Controller: RetrabalhoController::index
+Linha: 1509
+
+================================================================================
+Método: GET
+Rota: /os/retrabalho/{id}
+Controller: RetrabalhoController::show
+Parâmetros: $id
+Linha: 1510
+
+================================================================================
+Método: GET
+Rota: /retrabalho/listar/usuario/{id}
+Controller: RetrabalhoController::ListarRetrabalhoUsuario
+Parâmetros: $id
+Linha: 1511
+
+================================================================================
+Método: POST
+Rota: /usinagem/gravar
+Controller: UsinagemController::GravarUsinagem
+Linha: 1515
+
+================================================================================
+Método: GET
+Rota: /usinagem/listar
+Controller: UsinagemController::ListarUsinagem
+Linha: 1516
+
+================================================================================
+Método: GET
+Rota: /usinagem/listar/usuario/{id}
+Controller: UsinagemController::ListarUsinagemUsuario
+Parâmetros: $id
+Linha: 1517
+
+================================================================================
+Método: GET
+Rota: /usinagem/buscar/{id}
+Controller: UsinagemController::BuscarUsinagem
+Parâmetros: $id
+Linha: 1518
+
+================================================================================
+Método: POST
+Rota: /os/{id}/material/lancar
+Controller: OrdemServicoMaterialController::store
+Parâmetros: $id
+Linha: 1523
+
+================================================================================
+Método: GET
+Rota: /os/{id}/materiais
+Controller: OrdemServicoMaterialController::listaMateriaisPorIdOs
+Parâmetros: $id
+Linha: 1525
+
+================================================================================
+Método: DELETE
+Rota: /os/material/{id}
+Controller: OrdemServicoMaterialController::delete
+Parâmetros: $id
+Linha: 1526
+
+================================================================================
+Método: POST
+Rota: /os/{id}/servico/lancar
+Controller: OrdemServicoController::lancarServicosOs
+Parâmetros: $id
+Linha: 1529
+
+================================================================================
+Método: POST
+Rota: /os/{id}/relatorio
+Controller: OrdemServicoController::insereRelatorioOS
+Parâmetros: $id
+Linha: 1531
+
+================================================================================
+Método: GET
+Rota: /os
+Controller: OrdemServicoController::index
+Linha: 1533
+
+================================================================================
+Método: PATCH
+Rota: /os/receber/{id}
+Controller: OrdemServicoController::receber
+Parâmetros: $id
+Linha: 1534
+
+================================================================================
+Método: GET
+Rota: /os/{id}
+Controller: OrdemServicoController::show
+Parâmetros: $id
+Linha: 1535
+
+================================================================================
+Método: PATCH
+Rota: /os/{id}
+Controller: OrdemServicoController::update
+Parâmetros: $id
+Linha: 1536
+
+================================================================================
+Método: GET
+Rota: /acesso
+Controller: AcessoController::index
+Linha: 1540
+
+================================================================================
+Método: GET
+Rota: /acesso/cartao/{id}
+Controller: AcessoController::showByCard
+Parâmetros: $id
+Linha: 1541
+
+================================================================================
+Método: GET
+Rota: /acesso/filtro
+Controller: AcessoController::filtro
+Linha: 1542
+
+================================================================================
+Método: POST
+Rota: /visita
+Controller: VisitaController::visita
+Linha: 1546
+
+================================================================================
+Método: GET
+Rota: /visitante
+Controller: PessoaVisitanteController::index
+Linha: 1547
+
+================================================================================
+Método: POST
+Rota: /visitante
+Controller: PessoaVisitanteController::store
+Linha: 1548
+
+================================================================================
+Método: GET
+Rota: /visitante/{id}
+Controller: PessoaVisitanteController::show
+Parâmetros: $id
+Linha: 1549
+
+================================================================================
+Método: PUT
+Rota: /visitante/{id}
+Controller: PessoaVisitanteController::update
+Parâmetros: $id
+Linha: 1550
+
+================================================================================
+Método: DELETE
+Rota: /visitante/{id}
+Controller: PessoaVisitanteController::destroy
+Parâmetros: $id
+Linha: 1551
+
+================================================================================
+Método: POST
+Rota: /local
+Controller: LocalController::store
+Linha: 1555
+
+================================================================================
+Método: GET
+Rota: /local/{id}
+Controller: LocalController::show
+Parâmetros: $id
+Linha: 1556
+
+================================================================================
+Método: GET
+Rota: /local/{id}/acessos
+Controller: LocalController::listaAcessos
+Parâmetros: $id
+Linha: 1557
+
+================================================================================
+Método: GET
+Rota: /local/{id}/acessos-hoje
+Controller: LocalController::listaAcessosHoje
+Parâmetros: $id
+Linha: 1558
+
+================================================================================
+Método: PUT
+Rota: /local/{id}
+Controller: LocalController::update
+Parâmetros: $id
+Linha: 1559
+
+================================================================================
+Método: DELETE
+Rota: /local/{id}
+Controller: LocalController::destroy
+Parâmetros: $id
+Linha: 1560
+
+================================================================================
+Método: GET
+Rota: /acesso
+Controller: AcessoController::index
+Linha: 1564
+
+================================================================================
+Método: POST
+Rota: /acesso/filtro_data
+Controller: AcessoController::indexInterval
+Linha: 1565
+
+================================================================================
+Método: PUT
+Rota: /acesso/{id}
+Controller: AcessoController::update
+Parâmetros: $id
+Linha: 1566
+
+================================================================================
+Método: DELETE
+Rota: /acesso/{id}
+Controller: AcessoController::destroy
+Parâmetros: $id
+Linha: 1567
+
+================================================================================
+Método: GET
+Rota: /meta
+Controller: MetaController::index
+Linha: 1571
+
+================================================================================
+Método: POST
+Rota: /meta
+Controller: MetaController::store
+Linha: 1572
+
+================================================================================
+Método: GET
+Rota: /meta/{id}
+Controller: MetaController::show
+Parâmetros: $id
+Linha: 1573
+
+================================================================================
+Método: PUT
+Rota: /meta/{id}
+Controller: MetaController::update
+Parâmetros: $id
+Linha: 1574
+
+================================================================================
+Método: DELETE
+Rota: /meta/{id}
+Controller: MetaController::destroy
+Parâmetros: $id
+Linha: 1575
+
+================================================================================
+Método: POST
+Rota: /upload/nf
+Controller: NotaFiscalController::uploadNF
+Linha: 1579
+
+================================================================================
+Método: GET
+Rota: /upload/nf/{id}
+Controller: NotaFiscalController::show
+Parâmetros: $id
+Linha: 1580
+
+================================================================================
+Método: POST
+Rota: /register
+Controller: AuthController::register
+Linha: 1584
+
+================================================================================
+Método: GET
+Rota: /sistema
+Controller: SistemaController::index
+Linha: 1589
+
+================================================================================
+Método: POST
+Rota: /sistema
+Controller: SistemaController::store
+Linha: 1590
+
+================================================================================
+Método: GET
+Rota: /sistema/{id}
+Controller: SistemaController::show
+Parâmetros: $id
+Linha: 1591
+
+================================================================================
+Método: PUT
+Rota: /sistema/{id}
+Controller: SistemaController::update
+Parâmetros: $id
+Linha: 1592
+
+================================================================================
+Método: DELETE
+Rota: /sistema/{id}
+Controller: SistemaController::destroy
+Parâmetros: $id
+Linha: 1593
+
+================================================================================
+Método: GET
+Rota: /sistema/{id}/funcionalidades
+Controller: SistemaController::listaFuncSistema
+Parâmetros: $id
+Linha: 1594
+
+================================================================================
+Método: GET
+Rota: /grupo
+Controller: GrupoController::index
+Linha: 1598
+
+================================================================================
+Método: POST
+Rota: /grupo
+Controller: GrupoController::store
+Linha: 1599
+
+================================================================================
+Método: GET
+Rota: /grupo/{id}
+Controller: GrupoController::show
+Parâmetros: $id
+Linha: 1600
+
+================================================================================
+Método: PUT
+Rota: /grupo/{id}
+Controller: GrupoController::update
+Parâmetros: $id
+Linha: 1601
+
+================================================================================
+Método: DELETE
+Rota: /grupo/{id}
+Controller: GrupoController::destroy
+Parâmetros: $id
+Linha: 1602
+
+================================================================================
+Método: GET
+Rota: /grupo/{id}/funcionalidades
+Controller: GrupoController::listaFuncGrupo
+Parâmetros: $id
+Linha: 1603
+
+================================================================================
+Método: GET
+Rota: /grupo/{id}/usuarios
+Controller: GrupoController::listaUsuariosGrupo
+Parâmetros: $id
+Linha: 1605
+
+================================================================================
+Método: GET
+Rota: /usuario/{id}/grupos
+Controller: GrupoController::listaGruposUsuario
+Parâmetros: $id
+Linha: 1610
+
+================================================================================
+Método: DELETE
+Rota: /usuario/grupo
+Controller: GrupoController::excluiUsuarioGrupo
+Linha: 1612
+
+================================================================================
+Método: DELETE
+Rota: /usuarios/grupo
+Controller: GrupoController::excluiUsuariosGrupo
+Linha: 1614
+
+================================================================================
+Método: GET
+Rota: /seguimento
+Controller: SeguimentoController::index
+Linha: 1619
+
+================================================================================
+Método: POST
+Rota: /usuario/grupo
+Controller: GrupoController::usuarioGrupo
+Linha: 1623
+
+================================================================================
+Método: POST
+Rota: /usuarios/grupo
+Controller: GrupoController::usuariosGrupo
+Linha: 1624
+
+================================================================================
+Método: GET
+Rota: /usuario/{id}/funcionalidades
+Controller: AuthController::usuFunc
+Parâmetros: $id
+Linha: 1625
+
+================================================================================
+Método: GET
+Rota: /usuario
+Controller: AuthController::index
+Linha: 1627
+
+================================================================================
+Método: DELETE
+Rota: /usuario/{id}
+Controller: AuthController::destroy
+Parâmetros: $id
+Linha: 1628
+
+================================================================================
+Método: GET
+Rota: /usuario/{id}
+Controller: AuthController::show
+Parâmetros: $id
+Linha: 1629
+
+================================================================================
+Método: PUT
+Rota: /usuario/{id}
+Controller: AuthController::update
+Parâmetros: $id
+Linha: 1630
+
+================================================================================
+Método: POST
+Rota: /funcionalidade/cards/usuario
+Controller: FuncionalidadeController::ListarCardsUsuario
+Linha: 1633
+
+================================================================================
+Método: GET
+Rota: /funcionalidade
+Controller: FuncionalidadeController::index
+Linha: 1635
+
+================================================================================
+Método: GET
+Rota: /funcionalidade/sistema
+Controller: FuncionalidadeController::listarApenasFuncionalidades
+Linha: 1636
+
+================================================================================
+Método: POST
+Rota: /funcionalidade
+Controller: FuncionalidadeController::store
+Linha: 1637
+
+================================================================================
+Método: GET
+Rota: /funcionalidade/{id}
+Controller: FuncionalidadeController::show
+Parâmetros: $id
+Linha: 1638
+
+================================================================================
+Método: PUT
+Rota: /funcionalidade/{id}
+Controller: FuncionalidadeController::update
+Parâmetros: $id
+Linha: 1639
+
+================================================================================
+Método: DELETE
+Rota: /funcionalidade/{id}
+Controller: FuncionalidadeController::destroy
+Parâmetros: $id
+Linha: 1640
+
+================================================================================
+Método: POST
+Rota: /funcionalidade/grupo
+Controller: FuncionalidadeController::funcionalidadeGrupo
+Linha: 1641
+
+================================================================================
+Método: POST
+Rota: /funcionalidades/grupo
+Controller: FuncionalidadeController::funcionalidadeGrupoArray
+Linha: 1642
+
+================================================================================
+Método: GET
+Rota: /grupo/{id}/funcionalidades
+Controller: FuncionalidadeController::listaFuncionalidadesGrupo
+Parâmetros: $id
+Linha: 1643
+
+================================================================================
+Método: GET
+Rota: /funcionalidade/{id}/grupos
+Controller: FuncionalidadeController::listaGruposFuncionalidade
+Parâmetros: $id
+Linha: 1645
+
+================================================================================
+Método: DELETE
+Rota: /func/grupo
+Controller: FuncionalidadeController::excluiFuncGrupo
+Linha: 1647
+
+================================================================================
+Método: DELETE
+Rota: /funcs/grupo
+Controller: FuncionalidadeController::excluiFuncsGrupo
+Linha: 1648
+
+================================================================================
+Método: GET
+Rota: /menu/usuario/{id}
+Controller: FuncionalidadeController::montaMenu
+Parâmetros: $id
+Linha: 1649
+
+================================================================================
+Método: POST
+Rota: /menu/usuario/
+Controller: FuncionalidadeController::montaMenuEmail
+Linha: 1650
+
+================================================================================
+Método: POST
+Rota: /logado/grupo/{id}
+Controller: GrupoController::usuarioLogadoGrupo
+Parâmetros: $id
+Linha: 1654
+
+================================================================================
+Método: GET
+Rota: /logado/funcionalidades
+Controller: AuthController::usuLogadoFunc
+Linha: 1655
+
+================================================================================
+Método: POST
+Rota: /seguimento
+Controller: SeguimentoController::store
+Linha: 1660
+
+================================================================================
+Método: GET
+Rota: /seguimento/{id}
+Controller: SeguimentoController::show
+Parâmetros: $id
+Linha: 1661
+
+================================================================================
+Método: PUT
+Rota: /seguimento/{id}
+Controller: SeguimentoController::update
+Parâmetros: $id
+Linha: 1662
+
+================================================================================
+Método: DELETE
+Rota: /seguimento/{id}
+Controller: SeguimentoController::destroy
+Parâmetros: $id
+Linha: 1663
+
+================================================================================
+Método: GET
+Rota: /seguimento/{id}/clientes
+Controller: SeguimentoController::clientes
+Parâmetros: $id
+Linha: 1664
+
+================================================================================
+Método: GET
+Rota: /produto
+Controller: ProdutoController::index
+Linha: 1668
+
+================================================================================
+Método: GET
+Rota: /produto/{id}
+Controller: ProdutoController::show
+Parâmetros: $id
+Linha: 1669
+
+================================================================================
+Método: GET
+Rota: /produto/relatorio/vinculados
+Controller: ProdutoController::relatorioProdutosVinculados
+Linha: 1670
+
+================================================================================
+Método: GET
+Rota: /listar/fornecedor
+Controller: FornecedorController::index
+Linha: 1674
+
+================================================================================
+Método: GET
+Rota: /cliente
+Controller: ClienteController::index
+Linha: 1675
+
+================================================================================
+Método: POST
+Rota: /cliente
+Controller: ClienteController::store
+Linha: 1676
+
+================================================================================
+Método: GET
+Rota: /cliente/{id}
+Controller: ClienteController::show
+Parâmetros: $id
+Linha: 1677
+
+================================================================================
+Método: PUT
+Rota: /cliente/{id}
+Controller: ClienteController::update
+Parâmetros: $id
+Linha: 1678
+
+================================================================================
+Método: DELETE
+Rota: /cliente/{id}
+Controller: ClienteController::destroy
+Parâmetros: $id
+Linha: 1679
+
+================================================================================
+Método: POST
+Rota: /omie-cliente/gravar
+Controller: OmieIntegracaoClienteController::store
+Linha: 1683
+
+================================================================================
+Método: GET
+Rota: /omie-cliente/listar-origens
+Controller: OmieIntegracaoClienteController::listarOrigens
+Linha: 1684
+
+================================================================================
+Método: GET
+Rota: /omie-cliente/listar-verticais
+Controller: OmieIntegracaoClienteController::listarVerticais
+Linha: 1685
+
+================================================================================
+Método: GET
+Rota: /producao
+Controller: ProducaoController::index
+Linha: 1689
+
+================================================================================
+Método: GET
+Rota: /producao/{id}
+Controller: ProducaoController::show
+Parâmetros: $id
+Linha: 1690
+
+================================================================================
+Método: GET
+Rota: /producao-by-num
+Controller: ProducaoController::getByNum
+Linha: 1691
+
+================================================================================
+Método: GET
+Rota: /producao-aberto
+Controller: ProducaoController::OrdemProducaoEmAberto
+Linha: 1692
+
+================================================================================
+Método: POST
+Rota: /producao/{op_cod}/estrutura-produto
+Controller: ProducaoController::insereEstruturaProdutoOP
+Parâmetros: $op_cod
+Linha: 1693
+
+================================================================================
+Método: PATCH
+Rota: /producao/itens-separados
+Controller: ProducaoController::atualizaQuantidadeSeparadaItensOp
+Linha: 1694
+
+================================================================================
+Método: PATCH
+Rota: /producao/{op_cod}/obs
+Controller: ProducaoController::atualizaObservacaoOp
+Parâmetros: $op_cod
+Linha: 1695
+
+================================================================================
+Método: POST
+Rota: /producao/{op_cod}/item-pendente/{produto_cod}
+Controller: ProducaoController::adicionaItemPendente
+Parâmetros: $op_cod, $produto_cod
+Linha: 1696
+
+================================================================================
+Método: GET
+Rota: /producao/{op_cod}/item-pendente/{produto_cod}
+Controller: ProducaoController::buscaDadosItemPendente
+Parâmetros: $op_cod, $produto_cod
+Linha: 1697
+
+================================================================================
+Método: POST
+Rota: /producao/apontamento
+Controller: ProducaoApontamentoController::store
+Linha: 1701
+
+================================================================================
+Método: POST
+Rota: /producao/apontamento/op/status
+Controller: ProducaoApontamentoController::opStatus
+Linha: 1702
+
+================================================================================
+Método: POST
+Rota: /producao/apontamento/op/ativas
+Controller: ProducaoApontamentoController::listarOpsAtivas
+Linha: 1703
+
+================================================================================
+Método: GET
+Rota: /setor-executante
+Controller: SetorExecutanteController::index
+Linha: 1707
+
+================================================================================
+Método: POST
+Rota: /setor-executante
+Controller: SetorExecutanteController::store
+Linha: 1708
+
+================================================================================
+Método: GET
+Rota: /setor-executante/{id}
+Controller: SetorExecutanteController::show
+Parâmetros: $id
+Linha: 1709
+
+================================================================================
+Método: PUT
+Rota: /setor-executante/{id}
+Controller: SetorExecutanteController::update
+Parâmetros: $id
+Linha: 1710
+
+================================================================================
+Método: DELETE
+Rota: /setor-executante/{id}
+Controller: SetorExecutanteController::destroy
+Parâmetros: $id
+Linha: 1711
+
+================================================================================
+Método: POST
+Rota: /pessoa/enviar-qrcode/{id}
+Controller: PessoaController::enviarQrcodePessoa
+Parâmetros: $id
+Linha: 1715
+
+================================================================================
+Método: POST
+Rota: /pessoa-visitante/enviar-qrcode/{id}
+Controller: PessoaController::enviarQrcodeVisitante
+Parâmetros: $id
+Linha: 1716
+
+================================================================================
+Método: GET
+Rota: /trabalho
+Controller: TrabalhoController::index
+Linha: 1720
+
+================================================================================
+Método: POST
+Rota: /trabalho
+Controller: TrabalhoController::store
+Linha: 1721
+
+================================================================================
+Método: GET
+Rota: /trabalho/{id}
+Controller: TrabalhoController::show
+Parâmetros: $id
+Linha: 1722
+
+================================================================================
+Método: PUT
+Rota: /trabalho/{id}
+Controller: TrabalhoController::update
+Parâmetros: $id
+Linha: 1723
+
+================================================================================
+Método: DELETE
+Rota: /trabalho/{id}
+Controller: TrabalhoController::destroy
+Parâmetros: $id
+Linha: 1724
+
+================================================================================
+Método: GET
+Rota: /tipoProduto
+Controller: TipoProdutoController::index
+Linha: 1728
+
+================================================================================
+Método: POST
+Rota: /tipoProduto
+Controller: TipoProdutoController::store
+Linha: 1729
+
+================================================================================
+Método: GET
+Rota: /tipoProduto/{id}
+Controller: TipoProdutoController::show
+Parâmetros: $id
+Linha: 1730
+
+================================================================================
+Método: PUT
+Rota: /tipoProduto/{id}
+Controller: TipoProdutoController::update
+Parâmetros: $id
+Linha: 1731
+
+================================================================================
+Método: DELETE
+Rota: /tipoProduto/{id}
+Controller: TipoProdutoController::destroy
+Parâmetros: $id
+Linha: 1732
+
+================================================================================
+Método: POST
+Rota: /injetora/corrente
+Controller: InjetoraController::store
+Linha: 1736
+
+================================================================================
+Método: GET
+Rota: /injetora/corrente
+Controller: InjetoraController::index
+Linha: 1737
+
+================================================================================
+Método: GET
+Rota: /injetora/correnteAtual
+Controller: InjetoraController::correnteAtual
+Linha: 1738
+
+================================================================================
+Método: POST
+Rota: /injetora/sinteseAcoesInjetora/
+Controller: InjetoraController::sinteseAcoesInjetora
+Linha: 1739
+
+================================================================================
+Método: POST
+Rota: /EstadosInjetoras
+Controller: EstadosInjetoraController::store
+Linha: 1743
+
+================================================================================
+Método: GET
+Rota: /EstadosInjetoras
+Controller: EstadosInjetoraController::index
+Linha: 1744
+
+================================================================================
+Método: POST
+Rota: /EstadosInjetoras/dia
+Controller: EstadosInjetoraController::estadosInjetoraDia
+Linha: 1745
+
+================================================================================
+Método: GET
+Rota: /giga
+Controller: GigaController::index
+Linha: 1749
+
+================================================================================
+Método: POST
+Rota: /giga
+Controller: GigaController::store
+Linha: 1750
+
+================================================================================
+Método: GET
+Rota: /giga/{id}
+Controller: GigaController::show
+Parâmetros: $id
+Linha: 1751
+
+================================================================================
+Método: PUT
+Rota: /giga/{id}
+Controller: GigaController::update
+Parâmetros: $id
+Linha: 1752
+
+================================================================================
+Método: DELETE
+Rota: /giga/{id}
+Controller: GigaController::destroy
+Parâmetros: $id
+Linha: 1753
+
+================================================================================
+Método: GET
+Rota: /sessao
+Controller: SessaoTestesController::index
+Linha: 1757
+
+================================================================================
+Método: POST
+Rota: /sessao
+Controller: SessaoTestesController::store
+Linha: 1758
+
+================================================================================
+Método: DELETE
+Rota: /sessao/{id}
+Controller: SessaoTestesController::destroy
+Parâmetros: $id
+Linha: 1759
+
+================================================================================
+Método: POST
+Rota: /sessao/giga
+Controller: SessaoTestesController::listaGigasOp
+Linha: 1760
+
+================================================================================
+Método: PATCH
+Rota: /sessao/{id}
+Controller: SessaoTestesController::finalizarSessao
+Parâmetros: $id
+Linha: 1761
+
+================================================================================
+Método: POST
+Rota: /sessao/abertas
+Controller: SessaoTestesController::listaSessoesAbertasOp
+Linha: 1762
+
+================================================================================
+Método: GET
+Rota: /sessao/{id}/resultados
+Controller: SessaoTestesController::listaResultadosSessao
+Parâmetros: $id
+Linha: 1763
+
+================================================================================
+Método: GET
+Rota: /sessao/{id}/testes
+Controller: SessaoTestesController::listaTestesSessao
+Parâmetros: $id
+Linha: 1764
+
+================================================================================
+Método: POST
+Rota: /teste/gravar
+Controller: TesteController::store
+Linha: 1768
+
+================================================================================
+Método: GET
+Rota: /teste/sessao/{id}
+Controller: TesteController::listaTestesSessao
+Parâmetros: $id
+Linha: 1769
+
+================================================================================
+Método: GET
+Rota: /teste/totalizadores-simples/op/{op_cod}
+Controller: TesteController::listaTotalizadoresSimplesPorOP
+Parâmetros: $op_cod
+Linha: 1770
+
+================================================================================
+Método: GET
+Rota: /teste/resultados/op/{op_cod}
+Controller: TesteController::resultadosDeTestePorOP
+Parâmetros: $op_cod
+Linha: 1771
+
+================================================================================
+Método: DELETE
+Rota: /teste/{id}
+Controller: TesteController::delete
+Parâmetros: $id
+Linha: 1772
+
+================================================================================
+Método: GET
+Rota: /parametroTeste
+Controller: ParametroTesteController::index
+Linha: 1775
+
+================================================================================
+Método: GET
+Rota: /parametroTeste/produto/{produto_cod}
+Controller: ParametroTesteController::show
+Parâmetros: $produto_cod
+Linha: 1776
+
+================================================================================
+Método: PATCH
+Rota: /parametroTeste/produto/{produto_cod}
+Controller: ParametroTesteController::update
+Parâmetros: $produto_cod
+Linha: 1777
+
+================================================================================
+Método: POST
+Rota: /parametroTeste
+Controller: ParametroTesteController::store
+Linha: 1778
+
+================================================================================
+Método: DELETE
+Rota: /parametroTeste/{produto_cod}
+Controller: ParametroTesteController::delete
+Parâmetros: $produto_cod
+Linha: 1779
+
+================================================================================
+Método: GET
+Rota: /ciclo
+Controller: CicloController::index
+Linha: 1782
+
+================================================================================
+Método: POST
+Rota: /ciclo
+Controller: CicloController::store
+Linha: 1783
+
+================================================================================
+Método: GET
+Rota: /ciclo/{id}
+Controller: CicloController::show
+Parâmetros: $id
+Linha: 1784
+
+================================================================================
+Método: DELETE
+Rota: /ciclo/{id}
+Controller: CicloController::destroy
+Parâmetros: $id
+Linha: 1785
+
+================================================================================
+Método: GET
+Rota: /
+Controller: ReuniaoTemaController::index
+Linha: 1791
+
+================================================================================
+Método: GET
+Rota: /{id}
+Controller: ReuniaoTemaController::show
+Parâmetros: $id
+Linha: 1792
+
+================================================================================
+Método: POST
+Rota: /
+Controller: ReuniaoTemaController::store
+Linha: 1793
+
+================================================================================
+Método: PATCH
+Rota: /{id}
+Controller: ReuniaoTemaController::update
+Parâmetros: $id
+Linha: 1794
+
+================================================================================
+Método: DELETE
+Rota: /{id}
+Controller: ReuniaoTemaController::destroy
+Parâmetros: $id
+Linha: 1795
+
+================================================================================
+Método: POST
+Rota: /pautasAnexos
+Controller: ReuniaoTemaController::buscaPautasEAnexosPorSetorETipo
+Linha: 1796
+
+================================================================================
+Método: GET
+Rota: /
+Controller: ReuniaoTipoController::index
+Linha: 1800
+
+================================================================================
+Método: GET
+Rota: /{id}
+Controller: ReuniaoTipoController::show
+Parâmetros: $id
+Linha: 1801
+
+================================================================================
+Método: GET
+Rota: /
+Controller: ReuniaoStatusController::index
+Linha: 1805
+
+================================================================================
+Método: GET
+Rota: /{id}
+Controller: ReuniaoStatusController::show
+Parâmetros: $id
+Linha: 1806
+
+================================================================================
+Método: GET
+Rota: /
+Controller: ReuniaoController::index
+Linha: 1809
+
+================================================================================
+Método: GET
+Rota: /{id}
+Controller: ReuniaoController::show
+Parâmetros: $id
+Linha: 1810
+
+================================================================================
+Método: POST
+Rota: /{id}/participante
+Controller: ReuniaoController::adicionaParticipante
+Parâmetros: $id
+Linha: 1811
+
+================================================================================
+Método: POST
+Rota: /
+Controller: ReuniaoController::store
+Linha: 1812
+
+================================================================================
+Método: PATCH
+Rota: /{id}
+Controller: ReuniaoController::update
+Parâmetros: $id
+Linha: 1813
+
+================================================================================
+Método: DELETE
+Rota: /{id}
+Controller: ReuniaoController::destroy
+Parâmetros: $id
+Linha: 1814

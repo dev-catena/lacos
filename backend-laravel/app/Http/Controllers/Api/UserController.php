@@ -137,23 +137,109 @@ class UserController extends Controller
             }
         }
 
-        // Processar cursos se fornecidos (para cuidador profissional)
-        if ($request->has('courses') && is_array($request->courses)) {
+        // Processar cursos se fornecidos (para cuidador profissional e médico)
+        // IMPORTANTE: Tentar múltiplas formas de acessar o array de cursos
+        // porque o Laravel pode receber de diferentes formas dependendo do Content-Type
+        $coursesData = null;
+        
+        // Tentar 1: Direto do request
+        if ($request->has('courses')) {
+            $coursesData = $request->input('courses');
+        }
+        // Tentar 2: Do JSON body direto
+        elseif ($request->isJson() && $request->json()->has('courses')) {
+            $coursesData = $request->json()->get('courses');
+        }
+        // Tentar 3: Do all() (último recurso)
+        elseif (isset($request->all()['courses'])) {
+            $coursesData = $request->all()['courses'];
+        }
+        
+        Log::info('UserController::update - Verificando cursos', [
+            'has_courses' => $request->has('courses'),
+            'is_json' => $request->isJson(),
+            'json_has_courses' => $request->isJson() ? $request->json()->has('courses') : false,
+            'courses_type' => $coursesData ? gettype($coursesData) : 'null',
+            'courses_is_array' => is_array($coursesData),
+            'courses_count' => is_array($coursesData) ? count($coursesData) : 0,
+            'courses_data' => $coursesData,
+            'user_id' => $user->id,
+            'user_profile' => $user->profile,
+            'request_all_keys' => array_keys($request->all()),
+        ]);
+        
+        // Processar cursos se encontrados
+        if ($coursesData && is_array($coursesData) && count($coursesData) > 0) {
+            Log::info('UserController::update - Processando cursos', [
+                'courses_count' => count($coursesData),
+                'courses' => $coursesData,
+            ]);
+            
             // Deletar cursos antigos
-            $user->caregiverCourses()->delete();
+            $deletedCount = $user->caregiverCourses()->delete();
+            Log::info('UserController::update - Cursos antigos deletados', ['count' => $deletedCount]);
             
             // Criar novos cursos
-            foreach ($request->courses as $course) {
-                if (!empty($course['name']) && !empty($course['institution'])) {
-                    $user->caregiverCourses()->create([
-                        'name' => $course['name'],
-                        'institution' => $course['institution'],
-                        'year' => $course['year'] ?? null,
-                        'description' => $course['description'] ?? null,
-                        'certificate_url' => $course['certificate_url'] ?? null,
+            $createdCount = 0;
+            foreach ($coursesData as $index => $course) {
+                // Garantir que course é um array
+                if (is_object($course)) {
+                    $course = (array) $course;
+                }
+                
+                Log::info("UserController::update - Processando curso {$index}", [
+                    'course' => $course,
+                    'course_type' => gettype($course),
+                    'has_name' => !empty($course['name'] ?? null),
+                    'has_institution' => !empty($course['institution'] ?? null),
+                ]);
+                
+                $courseName = $course['name'] ?? null;
+                $courseInstitution = $course['institution'] ?? null;
+                
+                if (!empty($courseName) && !empty($courseInstitution)) {
+                    try {
+                        $created = $user->caregiverCourses()->create([
+                            'name' => $courseName,
+                            'institution' => $courseInstitution,
+                            'year' => $course['year'] ?? null,
+                            'description' => $course['description'] ?? null,
+                            'certificate_url' => $course['certificate_url'] ?? null,
+                        ]);
+                        $createdCount++;
+                        Log::info("UserController::update - Curso {$index} criado com sucesso", [
+                            'id' => $created->id,
+                            'name' => $created->name,
+                            'institution' => $created->institution,
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error("UserController::update - Erro ao criar curso {$index}", [
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                            'course' => $course,
+                        ]);
+                    }
+                } else {
+                    Log::warning("UserController::update - Curso {$index} ignorado (campos obrigatórios vazios)", [
+                        'course' => $course,
+                        'name' => $courseName,
+                        'institution' => $courseInstitution,
                     ]);
                 }
             }
+            
+            Log::info('UserController::update - Cursos processados', [
+                'created_count' => $createdCount,
+                'total_received' => count($coursesData),
+            ]);
+        } else {
+            Log::info('UserController::update - Nenhum curso fornecido ou formato inválido', [
+                'has_courses' => $request->has('courses'),
+                'is_json' => $request->isJson(),
+                'courses_data' => $coursesData,
+                'is_array' => is_array($coursesData),
+                'is_null' => is_null($coursesData),
+            ]);
         }
 
         // Handle photo upload
@@ -181,7 +267,43 @@ class UserController extends Controller
 
         $user->update($data);
 
-        return response()->json($user);
+        // Recarregar o usuário com relacionamentos para retornar dados completos
+        $user->refresh();
+        $user->load(['caregiverCourses', 'medicalSpecialty']);
+        
+        // Converter para array e garantir que os cursos sejam incluídos
+        $userData = $user->toArray();
+        
+        // Adicionar cursos explicitamente (snake_case e camelCase para compatibilidade)
+        $courses = $user->caregiverCourses->map(function($course) {
+            return [
+                'id' => $course->id,
+                'name' => $course->name,
+                'institution' => $course->institution,
+                'year' => $course->year,
+                'description' => $course->description,
+                'certificate_url' => $course->certificate_url,
+            ];
+        })->toArray();
+        
+        $userData['caregiver_courses'] = $courses;
+        $userData['caregiverCourses'] = $courses; // Para compatibilidade com frontend
+        
+        Log::info('UserController::update - Usuário atualizado com cursos', [
+            'user_id' => $user->id,
+            'courses_count' => count($courses),
+            'courses' => $courses,
+            'userData_keys' => array_keys($userData),
+            'has_caregiver_courses' => isset($userData['caregiver_courses']),
+            'has_caregiverCourses' => isset($userData['caregiverCourses']),
+        ]);
+        
+        // Log adicional para debug
+        Log::info('UserController::update - Resposta completa (primeiros 1000 chars)', [
+            'response_preview' => substr(json_encode($userData), 0, 1000),
+        ]);
+        
+        return response()->json($userData);
     }
 
     /**

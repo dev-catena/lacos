@@ -123,9 +123,23 @@ const ClientDetailsScreen = ({ route, navigation }) => {
           const doctorUserId = appointment.doctorUser?.id ? Number(appointment.doctorUser.id) : null;
           const doctorId = appointment.doctor?.id ? Number(appointment.doctor.id) : null;
           
-          return appointmentDoctorId === currentDoctorId ||
-                 doctorUserId === currentDoctorId ||
-                 doctorId === currentDoctorId;
+          const isDoctorAppointment = 
+            appointmentDoctorId === currentDoctorId ||
+            doctorUserId === currentDoctorId ||
+            doctorId === currentDoctorId;
+          
+          // Se for teleconsulta, verificar se está paga
+          // Médicos só devem ver teleconsultas que já foram pagas
+          if (appointment.is_teleconsultation) {
+            const paymentStatus = appointment.payment_status;
+            const isPaid = paymentStatus === 'paid_held' || paymentStatus === 'paid' || paymentStatus === 'released';
+            if (!isPaid) {
+              // Teleconsulta não paga - não mostrar para o médico
+              return false;
+            }
+          }
+          
+          return isDoctorAppointment;
         });
 
         console.log('👨‍⚕️ ClientDetailsScreen - Consultas do médico:', doctorAppointments.length);

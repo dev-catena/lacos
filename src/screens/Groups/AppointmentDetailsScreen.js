@@ -131,14 +131,63 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
   const handleDelete = () => {
     if (!appointment) return;
 
+    // Verificar se está excluindo com menos de 1 hora de antecedência
+    const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at);
+    const now = new Date();
+    const timeDifference = appointmentDate.getTime() - now.getTime();
+    const oneHourInMs = 60 * 60 * 1000; // 1 hora em milissegundos
+    const isLessThanOneHour = timeDifference > 0 && timeDifference < oneHourInMs;
+    
+    // Verificar se a consulta foi paga
+    const paymentStatus = appointment.payment_status || appointment.paymentStatus;
+    const isPaid = paymentStatus === 'paid_held' || 
+                   paymentStatus === 'paid' || 
+                   paymentStatus === 'released';
+    const isTeleconsultation = appointment.is_teleconsultation || appointment.isTeleconsultation || false;
+    
+    // Se for consulta médica (type === 'medical'), também considerar como possível teleconsulta
+    const isMedicalAppointment = appointment.type === 'medical';
+    
+    // Log para debug
+    console.log('🔍 AppointmentDetailsScreen - handleDelete:', {
+      appointmentId: appointment.id,
+      appointmentDate: appointmentDate.toISOString(),
+      now: now.toISOString(),
+      timeDifferenceMs: timeDifference,
+      timeDifferenceMinutes: Math.floor(timeDifference / (60 * 1000)),
+      isLessThanOneHour,
+      paymentStatus,
+      isPaid,
+      isTeleconsultation,
+    });
+
     const isRecurringInstance = appointment.isRecurringInstance;
     const hasRecurrence = appointment.recurrence_type && appointment.recurrence_type !== 'none';
+    
+    // Montar mensagem de aviso sobre não reembolso se aplicável
+    // IMPORTANTE: Para teleconsultas ou consultas médicas pagas, sempre avisar se for menos de 1 hora
+    let refundWarning = '';
+    if (isLessThanOneHour) {
+      if (isTeleconsultation || (isMedicalAppointment && isPaid)) {
+        // Teleconsulta ou consulta médica paga: sempre avisar sobre não reembolso
+        refundWarning = '\n\n⚠️ ATENÇÃO: A exclusão está sendo feita com menos de 1 hora de antecedência.';
+        if (isTeleconsultation) {
+          refundWarning += '\n\n💰 IMPORTANTE: Como esta é uma teleconsulta excluída em cima da hora, o valor pago NÃO será reembolsado.';
+        } else {
+          refundWarning += '\n\n💰 IMPORTANTE: O valor pago NÃO será reembolsado devido ao cancelamento em cima da hora.';
+        }
+      } else if (isPaid) {
+        // Consulta paga (não teleconsulta): avisar sobre não reembolso
+        refundWarning = '\n\n⚠️ ATENÇÃO: A exclusão está sendo feita com menos de 1 hora de antecedência.';
+        refundWarning += '\n\n💰 O valor pago NÃO será reembolsado.';
+      }
+    }
     
     // Se for uma instância de recorrência, perguntar se quer excluir só este dia ou todos
     if (isRecurringInstance || hasRecurrence) {
       Alert.alert(
         'Excluir Compromisso',
-        'Este é um compromisso recorrente. O que deseja fazer?',
+        'Este é um compromisso recorrente. O que deseja fazer?' + refundWarning,
         [
           {
             text: 'Cancelar',
@@ -163,7 +212,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
       // Compromisso único, excluir normalmente
       Alert.alert(
         'Excluir Compromisso',
-        'Tem certeza que deseja excluir este compromisso? Esta ação não pode ser desfeita.',
+        'Tem certeza que deseja excluir este compromisso? Esta ação não pode ser desfeita.' + refundWarning,
         [
           {
             text: 'Cancelar',

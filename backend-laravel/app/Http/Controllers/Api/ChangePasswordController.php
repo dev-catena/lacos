@@ -28,6 +28,14 @@ class ChangePasswordController extends Controller
                 ], 401);
             }
 
+            Log::info('ChangePasswordController::changePassword - Requisição recebida', [
+                'user_id' => $user->id,
+                'has_current_password' => $request->has('current_password'),
+                'has_new_password' => $request->has('new_password'),
+                'has_new_password_confirmation' => $request->has('new_password_confirmation'),
+                'request_data_keys' => array_keys($request->all()),
+            ]);
+
             $validator = Validator::make($request->all(), [
                 'current_password' => 'required|string',
                 'new_password' => 'required|string|min:6|confirmed',
@@ -39,6 +47,11 @@ class ChangePasswordController extends Controller
             ]);
 
             if ($validator->fails()) {
+                Log::warning('ChangePasswordController::changePassword - Validação falhou', [
+                    'errors' => $validator->errors()->toArray(),
+                    'request_data' => $request->all(),
+                ]);
+                
                 return response()->json([
                     'success' => false,
                     'message' => 'Dados inválidos',

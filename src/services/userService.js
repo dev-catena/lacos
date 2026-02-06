@@ -531,14 +531,25 @@ class UserService {
   /**
    * Alterar senha do usuário
    */
-  async changePassword(currentPassword, newPassword) {
+  async changePassword(currentPassword, newPassword, confirmPassword = null) {
     try {
       console.log('🔐 UserService - Alterando senha do usuário');
       
-      const response = await apiService.post('/change-password', {
+      // O Laravel requer new_password_confirmation quando usa a regra 'confirmed'
+      const requestData = {
         current_password: currentPassword,
         new_password: newPassword,
-      });
+      };
+      
+      // Se confirmPassword foi fornecido, adicionar ao request
+      if (confirmPassword !== null) {
+        requestData.new_password_confirmation = confirmPassword;
+      } else {
+        // Se não foi fornecido, usar newPassword como confirmação (fallback)
+        requestData.new_password_confirmation = newPassword;
+      }
+      
+      const response = await apiService.post('/change-password', requestData);
 
       console.log('📥 Response:', response);
 
@@ -561,15 +572,27 @@ class UserService {
       // Extrair mensagem de erro mais específica
       let errorMessage = 'Erro ao alterar senha';
       
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (error.errors && typeof error.errors === 'object') {
+      // Verificar se é um erro de validação do Laravel
+      if (error.errors && typeof error.errors === 'object') {
         // Se for um objeto de erros do Laravel
         const firstError = Object.values(error.errors)[0];
         if (Array.isArray(firstError) && firstError.length > 0) {
           errorMessage = firstError[0];
         } else if (typeof firstError === 'string') {
           errorMessage = firstError;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error._rawErrorData) {
+        // Tentar extrair mensagem do erro raw
+        const rawError = error._rawErrorData;
+        if (rawError.message) {
+          errorMessage = rawError.message;
+        } else if (rawError.errors && typeof rawError.errors === 'object') {
+          const firstError = Object.values(rawError.errors)[0];
+          if (Array.isArray(firstError) && firstError.length > 0) {
+            errorMessage = firstError[0];
+          }
         }
       }
       

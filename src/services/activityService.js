@@ -77,6 +77,7 @@ class ActivityService {
       document_created: 'Documento Adicionado',
       consultation_created: 'Consulta Agendada',
       appointment_created: 'Compromisso Agendado',
+      appointment_cancelled: 'Consulta Cancelada',
       occurrence_created: 'Ocorrência Registrada',
       vital_sign_recorded: 'Sinal Vital Registrado',
       smartwatch_registered: 'Smartwatch Registrado',
@@ -105,6 +106,7 @@ class ActivityService {
       document_created: 'document-text',
       consultation_created: 'calendar',
       appointment_created: 'calendar-outline',
+      appointment_cancelled: 'close-circle',
       occurrence_created: 'warning',
       vital_sign_recorded: 'pulse',
       smartwatch_registered: 'watch',
@@ -133,6 +135,7 @@ class ActivityService {
       document_created: '#FF9800', // Laranja
       consultation_created: '#9C27B0', // Roxo
       appointment_created: '#2196F3', // Azul
+      appointment_cancelled: '#F44336', // Vermelho
       occurrence_created: '#F44336', // Vermelho
       vital_sign_recorded: '#E91E63', // Rosa
       smartwatch_registered: '#00BCD4', // Ciano

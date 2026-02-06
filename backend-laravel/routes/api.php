@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\GatewayController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\MedicationCatalogController;
 use App\Http\Controllers\Api\ChangePasswordController;
+use App\Http\Controllers\Api\NotificationPreferenceController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\SupplierProductController;
 use App\Http\Controllers\Api\SupplierOrderController;
@@ -121,11 +123,46 @@ Route::middleware('auth:sanctum')->group(function () {
             ], 403);
         }
         
+        // Carregar relacionamentos importantes
+        if ($user) {
+            $user->load(['caregiverCourses', 'medicalSpecialty']);
+            
+            // Garantir que os cursos sejam incluídos na resposta
+            $userData = $user->toArray();
+            $courses = $user->caregiverCourses->map(function($course) {
+                return [
+                    'id' => $course->id,
+                    'name' => $course->name,
+                    'institution' => $course->institution,
+                    'year' => $course->year,
+                    'description' => $course->description,
+                    'certificate_url' => $course->certificate_url,
+                ];
+            })->toArray();
+            
+            $userData['caregiver_courses'] = $courses;
+            $userData['caregiverCourses'] = $courses; // Para compatibilidade
+            
+            return response()->json($userData);
+        }
+        
         return response()->json($user);
     });
     
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/change-password', [ChangePasswordController::class, 'changePassword']);
+    
+    // Preferências de Notificação
+    Route::get('/notification-preferences', [NotificationPreferenceController::class, 'index']);
+    Route::put('/notification-preferences', [NotificationPreferenceController::class, 'update']);
+    
+    // Notificações
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::put('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+    Route::delete('/notifications/clear/all', [NotificationController::class, 'destroyAll']);
     
     // Fornecedores
     Route::post('/suppliers/register', [SupplierController::class, 'register']);
@@ -177,6 +214,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/groups/{id}/members', [GroupController::class, 'members']);
     Route::put('/groups/{groupId}/members/{memberId}/role', [GroupController::class, 'updateMemberRole']);
     Route::delete('/groups/{groupId}/members/{memberId}', [GroupController::class, 'removeMember']);
+    
+    // Dispositivos - Dispositivos dos Grupos (Smartwatch e Sensores)
+    Route::get('/groups/{groupId}/devices', [DeviceController::class, 'getGroupDevices']);
+    Route::post('/groups/{groupId}/devices', [DeviceController::class, 'createGroupDevice']);
+    Route::delete('/groups/{groupId}/devices/{deviceId}', [DeviceController::class, 'destroy']);
     
     // Mídias - Mídias dos Grupos
     Route::get('/groups/{groupId}/media', [MediaController::class, 'index']);

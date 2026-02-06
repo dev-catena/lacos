@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +25,8 @@ import {
   EditIcon,
   AddIcon,
   ArrowBackIcon,
+  CloseCircleIcon,
+  TrashOutlineIcon,
 } from '../../components/CustomIcons';
 import appointmentService from '../../services/appointmentService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -221,24 +224,158 @@ const AgendaScreen = ({ route, navigation }) => {
   // Filtrar appointments baseado no filtro ativo
   const getFilteredAppointments = () => {
     const now = new Date();
-    now.setHours(0, 0, 0, 0); // Zerar horas para comparar apenas datas
+    // Garantir que estamos comparando apenas o tempo (milissegundos desde epoch)
+    const nowTime = now.getTime();
 
     return appointments.filter(item => {
       const dateStr = item.appointment_date || item.scheduled_at || item.date;
       if (!dateStr) return false;
 
       const appointmentDate = new Date(dateStr);
-      appointmentDate.setHours(0, 0, 0, 0); // Zerar horas para comparar apenas datas
+      // Garantir que a data é válida
+      if (isNaN(appointmentDate.getTime())) {
+        console.warn('⚠️ AgendaScreen - Data inválida:', dateStr);
+        return false;
+      }
+
+      const appointmentTime = appointmentDate.getTime();
 
       if (activeFilter === 'upcoming') {
-        // Próximos: data >= hoje
-        return appointmentDate >= now;
+        // Próximos: data/hora > agora (ainda não aconteceu)
+        // Usar > ao invés de >= para garantir que consultas que já passaram não apareçam
+        const isUpcoming = appointmentTime > nowTime;
+        
+        // Log para debug se necessário
+        if (!isUpcoming && appointmentTime <= nowTime) {
+          const diffMinutes = Math.floor((nowTime - appointmentTime) / (1000 * 60));
+          if (diffMinutes < 60) { // Log apenas se passou menos de 1 hora
+            console.log('🔍 AgendaScreen - Consulta passada filtrada:', {
+              title: item.title,
+              appointmentTime: appointmentDate.toISOString(),
+              nowTime: now.toISOString(),
+              diffMinutes,
+              appointmentTimeMs: appointmentTime,
+              nowTimeMs: nowTime,
+            });
+          }
+        }
+        
+        return isUpcoming;
       } else if (activeFilter === 'past') {
-        // Passados: data < hoje
-        return appointmentDate < now;
+        // Passados: data/hora <= agora (já aconteceu)
+        return appointmentTime <= nowTime;
       }
       return true;
     });
+  };
+
+  const handleCancelAppointment = (appointment) => {
+    const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at);
+    const now = new Date();
+    
+    // Calcular diferença em milissegundos
+    const timeDifference = appointmentDate.getTime() - now.getTime();
+    const oneHourInMs = 60 * 60 * 1000; // 1 hora em milissegundos
+    
+    // Verificar se está cancelando com menos de 1 hora de antecedência
+    const isLessThanOneHour = timeDifference > 0 && timeDifference < oneHourInMs;
+    
+    // Verificar se a consulta foi paga (verificar múltiplos campos possíveis)
+    const paymentStatus = appointment.payment_status || appointment.paymentStatus;
+    const isPaid = paymentStatus === 'paid_held' || 
+                   paymentStatus === 'paid' || 
+                   paymentStatus === 'released';
+    
+    // Log para debug
+    console.log('🔍 AgendaScreen - handleCancelAppointment:', {
+      appointmentId: appointment.id,
+      appointmentDate: appointmentDate.toISOString(),
+      now: now.toISOString(),
+      timeDifferenceMs: timeDifference,
+      timeDifferenceMinutes: Math.floor(timeDifference / (60 * 1000)),
+      isLessThanOneHour,
+      paymentStatus,
+      isPaid,
+      isTeleconsultation: appointment.is_teleconsultation,
+    });
+    
+    // Montar mensagem de confirmação
+    let confirmationMessage = 'Tem certeza que deseja cancelar esta consulta? O médico e o paciente serão notificados.';
+    
+    if (isLessThanOneHour) {
+      // Sempre avisar se for menos de 1 hora
+      confirmationMessage += '\n\n⚠️ ATENÇÃO: O cancelamento está sendo feito com menos de 1 hora de antecedência.';
+      
+      // Se for teleconsulta, sempre avisar sobre não reembolso (teleconsultas são sempre pagas)
+      // Se não for teleconsulta mas estiver paga, também avisar
+      if (appointment.is_teleconsultation) {
+        confirmationMessage += '\n\n💰 IMPORTANTE: Como esta é uma teleconsulta cancelada em cima da hora, o valor pago NÃO será reembolsado.';
+      } else if (isPaid) {
+        confirmationMessage += '\n\n💰 O valor pago NÃO será reembolsado.';
+      }
+    } else if (isPaid) {
+      // Cancelamento com mais de 1 hora e está paga: haverá reembolso
+      confirmationMessage += '\n\nO valor pago será reembolsado.';
+    }
+
+    Alert.alert(
+      'Cancelar Consulta',
+      confirmationMessage,
+      [
+        {
+          text: 'Não',
+          style: 'cancel',
+        },
+        {
+          text: 'Sim, cancelar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await appointmentService.cancelAppointment(
+                appointment.id,
+                'patient', // Cuidador/amigo cancela como 'patient'
+                null
+              );
+
+              if (result.success) {
+                let successMessage = 'A consulta foi cancelada com sucesso. O médico e o paciente foram notificados.';
+                
+                // Verificar novamente o status de pagamento após cancelamento
+                const finalPaymentStatus = result.data?.payment_status || result.data?.data?.payment_status || paymentStatus;
+                const finalIsPaid = finalPaymentStatus === 'paid_held' || 
+                                   finalPaymentStatus === 'paid' || 
+                                   finalPaymentStatus === 'released';
+                
+                if (isLessThanOneHour && (appointment.is_teleconsultation || finalIsPaid)) {
+                  successMessage += '\n\n⚠️ O valor pago não foi reembolsado devido ao cancelamento com menos de 1 hora de antecedência.';
+                } else if (finalIsPaid && result.data?.refund_id) {
+                  successMessage += '\n\nO reembolso foi processado.';
+                }
+                
+                Alert.alert(
+                  'Consulta Cancelada',
+                  successMessage,
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Recarregar consultas
+                        loadAppointments();
+                      },
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert('Erro', result.error || 'Não foi possível cancelar a consulta');
+              }
+            } catch (error) {
+              console.error('Erro ao cancelar consulta:', error);
+              Alert.alert('Erro', 'Não foi possível cancelar a consulta. Tente novamente.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderAppointmentCard = ({ item }) => {
@@ -247,6 +384,13 @@ const AgendaScreen = ({ route, navigation }) => {
     const { day, month, weekDay } = formatDate(dateStr);
     const time = formatTime(dateStr);
     const isMedical = item.type === 'medical';
+    const isCancelled = item.status === 'cancelada' || item.status === 'cancelled';
+    
+    // Verificar se pode cancelar (pelo menos 1 hora antes)
+    const appointmentDate = new Date(item.appointment_date || item.scheduled_at);
+    const now = new Date();
+    const oneHourBefore = new Date(appointmentDate.getTime() - 60 * 60 * 1000);
+    const canCancel = !isCancelled && now <= oneHourBefore;
     
     // Log detalhado para teleconsultas
     if (item.is_teleconsultation) {
@@ -296,7 +440,13 @@ const AgendaScreen = ({ route, navigation }) => {
 
           {/* Badges */}
           <View style={styles.badgesContainer}>
-            {item.is_teleconsultation && (
+            {isCancelled && (
+              <View style={styles.cancelledBadge}>
+                <CloseCircleIcon size={12} color={colors.error} />
+                <Text style={styles.cancelledBadgeText}>Cancelada</Text>
+              </View>
+            )}
+            {item.is_teleconsultation && !isCancelled && (
               <View style={styles.teleconsultationBadge}>
                 <Ionicons 
                   name="videocam" 
@@ -306,7 +456,7 @@ const AgendaScreen = ({ route, navigation }) => {
                 <Text style={styles.teleconsultationBadgeText}>Teleconsulta</Text>
               </View>
             )}
-            {isMedical && (
+            {isMedical && !isCancelled && (
               <View style={styles.medicalBadge}>
                 <Text style={styles.medicalBadgeText}>Médico</Text>
               </View>
@@ -324,8 +474,8 @@ const AgendaScreen = ({ route, navigation }) => {
             
             const paymentPending = !item.payment_status || item.payment_status === 'pending' || item.payment_status === null;
             
-            // Mostrar banner se: é teleconsulta, usuário não é paciente, e pagamento está pendente
-            const shouldShowBanner = isTeleconsultation && isNotPatient && paymentPending;
+            // Mostrar banner se: é teleconsulta, usuário não é paciente, pagamento está pendente E não está cancelada
+            const shouldShowBanner = isTeleconsultation && isNotPatient && paymentPending && !isCancelled;
             
             // Debug log
             if (isTeleconsultation) {
@@ -444,31 +594,46 @@ const AgendaScreen = ({ route, navigation }) => {
 
         {/* Ações */}
         <View style={styles.appointmentActions}>
-          <TouchableOpacity 
-            style={styles.actionIconButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              // TODO: Implementar navegação para localização
-              console.log('Navegar para localização:', item.location);
-            }}
-          >
-            <NavigateIcon size={16} color={colors.info} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionIconButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              // Navegar para tela de edição
-              navigation.navigate('AddAppointment', {
-                groupId,
-                groupName,
-                appointmentId: item.isRecurringInstance ? item.originalAppointmentId : item.id,
-                appointment: item,
-              });
-            }}
-          >
-            <EditIcon size={16} color={colors.primary} />
-          </TouchableOpacity>
+          {!isCancelled && item.location && (
+            <TouchableOpacity 
+              style={styles.actionIconButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                // TODO: Implementar navegação para localização
+                console.log('Navegar para localização:', item.location);
+              }}
+            >
+              <NavigateIcon size={16} color={colors.info} />
+            </TouchableOpacity>
+          )}
+          {!isCancelled && (
+            <TouchableOpacity 
+              style={styles.actionIconButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                // Navegar para tela de edição
+                navigation.navigate('AddAppointment', {
+                  groupId,
+                  groupName,
+                  appointmentId: item.isRecurringInstance ? item.originalAppointmentId : item.id,
+                  appointment: item,
+                });
+              }}
+            >
+              <EditIcon size={16} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+          {canCancel && (
+            <TouchableOpacity 
+              style={[styles.actionIconButton, styles.cancelButton]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleCancelAppointment(item);
+              }}
+            >
+              <TrashOutlineIcon size={16} color={colors.error} />
+            </TouchableOpacity>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -744,6 +909,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  cancelButton: {
+    borderColor: colors.error + '40',
+    backgroundColor: colors.error + '10',
+  },
+  cancelledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.error + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: colors.error + '40',
+  },
+  cancelledBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.error,
+    textTransform: 'uppercase',
+  },
+  cancelButton: {
+    borderColor: colors.error + '40',
+    backgroundColor: colors.error + '10',
   },
   loadingContainer: {
     flex: 1,

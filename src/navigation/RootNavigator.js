@@ -16,6 +16,7 @@ const RootNavigator = () => {
   const prevSignedRef = useRef(signed);
   
   // Se o estado de autenticação mudou (logout), recriar AuthNavigator
+  // IMPORTANTE: Não recriar se já estiver deslogado para evitar renderizações duplicadas
   if (prevSignedRef.current !== signed) {
     console.log('🔐 RootNavigator - Estado de autenticação mudou!', {
       prevSigned: prevSignedRef.current,
@@ -24,7 +25,8 @@ const RootNavigator = () => {
     prevSignedRef.current = signed;
     
     // Se deslogou, recriar AuthNavigator para garantir navegação limpa
-    if (!signed) {
+    // Mas apenas se não tiver um AuthNavigator já criado
+    if (!signed && !authNavigatorRef.current) {
       console.log('🔐 RootNavigator - Usuário deslogou, recriando AuthNavigator');
       authNavigatorRef.current = <AuthNavigator key={`auth-navigator-${Date.now()}`} />;
     }
@@ -52,52 +54,12 @@ const RootNavigator = () => {
       console.error('❌ ERRO CRÍTICO: signed=true mas user é null!');
     }
     
-    // AÇÃO CRÍTICA: Se usuário deslogou, forçar navegação para Welcome
-    // IMPORTANTE: NÃO redirecionar se isRegistering=true (usuário está em processo de registro)
-    // PROTEÇÃO EXTRA: Verificar também a rota atual antes de redirecionar
+    // REMOVIDO: A navegação para Welcome é feita pelo AuthContext no signOut()
+    // Não precisamos navegar aqui para evitar duplicação
+    // O RootNavigator apenas renderiza o AuthNavigator quando signed=false
     if (!signed && !loading && !isRegistering && !user) {
       console.log('🔐 RootNavigator - ✅ Usuário deslogado detectado!');
-      console.log('🔐 RootNavigator - isRegistering:', isRegistering, '- NÃO redirecionando se isRegistering=true');
-      
-      // Forçar reset da navegação para Welcome APENAS se não estiver em registro
-      if (navigationRef?.current && !isRegistering) {
-        setTimeout(() => {
-          try {
-            const state = navigationRef.current.getState();
-            const currentRoute = state?.routes[state?.index]?.name;
-            console.log('🔐 RootNavigator - Rota atual:', currentRoute);
-            
-            // PROTEÇÃO EXTRA: Se estiver em Register, NÃO redirecionar (mesmo que isRegistering seja false)
-            if (currentRoute === 'Register') {
-              console.log('🔐 RootNavigator - ⚠️ Estamos em Register - NÃO redirecionando para Welcome');
-              return;
-            }
-            
-            if (currentRoute !== 'Welcome') {
-              console.log('🔐 RootNavigator - ⚠️ Não estamos em Welcome, forçando reset...');
-              navigationRef.current.reset({
-                index: 0,
-                routes: [{ name: 'Welcome' }],
-              });
-              console.log('🔐 RootNavigator - ✅ Navegação resetada para Welcome');
-            }
-          } catch (e) {
-            console.error('🔐 RootNavigator - Erro ao forçar navegação:', e);
-            // Tentar navigate como fallback APENAS se não estiver em Register
-            try {
-              const state = navigationRef.current.getState();
-              const currentRoute = state?.routes[state?.index]?.name;
-              if (currentRoute !== 'Register') {
-                navigationRef.current.navigate('Welcome');
-              }
-            } catch (e2) {
-              console.error('🔐 RootNavigator - Erro ao navegar para Welcome:', e2);
-            }
-          }
-        }, 300);
-      } else if (isRegistering) {
-        console.log('🔐 RootNavigator - ⚠️ isRegistering=true - NÃO redirecionando para Welcome');
-      }
+      console.log('🔐 RootNavigator - AuthContext já cuida da navegação, apenas renderizando AuthNavigator');
     }
   }, [signed, loading, user, isRegistering]);
 

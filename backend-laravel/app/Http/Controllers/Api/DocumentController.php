@@ -226,7 +226,6 @@ class DocumentController extends Controller
             }
 
             // Criar documento
-            // A tabela usa 'file_type' ao invés de 'mime_type'
             $documentData = [
                 'group_id' => $groupId,
                 'user_id' => $user->id,
@@ -235,7 +234,7 @@ class DocumentController extends Controller
                 'document_date' => $documentDate,
                 'file_path' => $path,
                 'file_name' => $file->getClientOriginalName(),
-                'file_type' => $file->getMimeType(), // Tabela usa 'file_type'
+                'mime_type' => $file->getMimeType(),
                 'file_size' => $file->getSize(),
                 'notes' => $request->input('notes'),
             ];
@@ -564,8 +563,8 @@ class DocumentController extends Controller
 
             $filePath = Storage::disk('public')->path($document->file_path);
 
-            // Usar file_type se mime_type não existir
-            $contentType = $document->mime_type ?? $document->file_type ?? 'application/octet-stream';
+            // Usar mime_type ou fallback para application/octet-stream
+            $contentType = $document->mime_type ?? 'application/octet-stream';
             
             return response()->download($filePath, $document->file_name, [
                 'Content-Type' => $contentType,

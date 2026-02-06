@@ -7,12 +7,13 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../../constants/colors';
-import activityService from '../../services/activityService';
+import notificationApiService from '../../services/notificationApiService';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 moment.locale('pt-br');
@@ -26,54 +27,57 @@ const NotificationsScreen = ({ navigation }) => {
   useFocusEffect(
     React.useCallback(() => {
       loadNotifications();
+      // Forçar atualização do contador no tab bar quando a tela receber foco
+      // Isso garante que o contador seja atualizado quando voltar para esta tela
     }, [])
   );
 
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      const result = await activityService.getRecentActivities(50);
+      const result = await notificationApiService.getNotifications({ limit: 50 });
       
       if (result.success && result.data) {
-        // Filtrar apenas notificações (tipos específicos)
-        const notificationTypes = [
-          'medication_created',
-          'medication_updated',
-          'medication_discontinued',
-          'medication_completed',
-          'prescription_created',
-          'consultation_created',
-          'appointment_created',
-          'occurrence_created',
-          'document_created',
-          'member_joined',
-          'member_promoted',
-          'member_removed',
-          'group_photo_updated',
-          'vital_sign_recorded',
-          'smartwatch_registered',
-          'caregiver_hired',
-        ];
-        
-        const formattedNotifications = result.data
-          .filter(activity => notificationTypes.includes(activity.action_type))
-          .map(activity => {
-            const createdAt = moment(activity.created_at);
-            return {
-              id: activity.id,
-              type: activity.action_type,
-              icon: activityService.getActivityIcon(activity.action_type),
-              color: activityService.getActivityColor(activity.action_type),
-              title: activityService.getActivityTypeLabel(activity.action_type),
-              message: activity.description || activityService.getActivityTypeLabel(activity.action_type),
-              time: createdAt.fromNow(),
-              dateTime: createdAt.format('DD/MM/YYYY [às] HH:mm'),
-              timestamp: activity.created_at,
-              read: false, // Por enquanto todas são não lidas
-              groupName: activity.group?.name || activity.group_name || 'Grupo',
-              groupId: activity.group_id || activity.group?.id,
-            };
-          });
+        const formattedNotifications = result.data.map(notification => {
+          const createdAt = moment(notification.created_at);
+          
+          // Determinar ícone e cor baseado no tipo
+          let icon = 'notifications';
+          let color = colors.primary;
+          
+          switch (notification.type) {
+            case 'appointment':
+              icon = 'calendar';
+              color = colors.warning;
+              break;
+            case 'vital_sign':
+              icon = 'pulse';
+              color = colors.error;
+              break;
+            default:
+              icon = 'notifications';
+              color = colors.primary;
+          }
+          
+          return {
+            id: notification.id,
+            type: notification.type,
+            icon: icon,
+            color: color,
+            title: notification.title,
+            message: notification.message,
+            time: createdAt.fromNow(),
+            dateTime: createdAt.format('DD/MM/YYYY [às] HH:mm'),
+            timestamp: notification.created_at,
+            read: notification.read || false,
+            readAt: notification.read_at,
+            data: notification.data || {},
+            metadata: notification.data || {},
+            action_type: notification.data?.action_type || notification.action_type || null,
+            groupId: notification.data?.group_id || notification.group_id || null,
+            groupName: notification.data?.group_name || 'Sistema',
+          };
+        });
         
         setNotifications(formattedNotifications);
       } else {
@@ -84,6 +88,132 @@ const NotificationsScreen = ({ navigation }) => {
       setNotifications([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await notificationApiService.markAllAsRead();
+      if (result.success) {
+        // Recarregar notificações
+        await loadNotifications();
+        // Forçar atualização do contador no tab bar
+        // O CustomTabBar vai atualizar quando a tela receber foco novamente
+      }
+    } catch (error) {
+      console.error('Erro ao marcar todas como lidas:', error);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    Alert.alert(
+      'Limpar Notificações',
+      'Tem certeza que deseja excluir todas as notificações? Esta ação não pode ser desfeita.',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Limpar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await notificationApiService.deleteAllNotifications();
+              if (result.success) {
+                await loadNotifications();
+              } else {
+                Alert.alert('Erro', result.error || 'Não foi possível limpar as notificações');
+              }
+            } catch (error) {
+              console.error('Erro ao limpar notificações:', error);
+              Alert.alert('Erro', 'Não foi possível limpar as notificações');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteNotification = async (notificationId) => {
+    try {
+      const result = await notificationApiService.deleteNotification(notificationId);
+      if (result.success) {
+        // Remover da lista local
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível excluir a notificação');
+      }
+    } catch (error) {
+      console.error('Erro ao deletar notificação:', error);
+      Alert.alert('Erro', 'Não foi possível excluir a notificação');
+    }
+  };
+
+  // Mapear tipo de notificação para o card correto no GroupDetail
+  const getCardFromNotificationType = (notification) => {
+    // Verificar se há metadata com action_type (atividades)
+    const actionType = notification.metadata?.action_type || notification.action_type;
+    const notificationType = notification.type;
+
+    // Mapear tipos de atividade/notificação para cards
+    const cardMap = {
+      // Agenda
+      'appointment_cancelled': 'agenda',
+      'appointment_created': 'agenda',
+      'consultation_created': 'agenda',
+      'appointment': 'agenda',
+      
+      // Medicamentos
+      'medication_created': 'medications',
+      'medication_updated': 'medications',
+      'medication_discontinued': 'medications',
+      'medication_completed': 'medications',
+      'medication': 'medications',
+      
+      // Documentos
+      'document_created': 'documents',
+      'document': 'documents',
+      
+      // Receitas
+      'prescription_created': 'prescriptions',
+      'prescription': 'prescriptions',
+      
+      // Sinais Vitais
+      'vital_sign_recorded': 'vitalsigns',
+      'vital_sign': 'vitalsigns',
+    };
+
+    return cardMap[actionType] || cardMap[notificationType] || null;
+  };
+
+  const handleNotificationPress = async (notification) => {
+    // Marcar como lida se ainda não estiver lida
+    if (!notification.read) {
+      try {
+        await notificationApiService.markAsRead(notification.id);
+        // Atualizar estado local
+        setNotifications(prev => 
+          prev.map(n => 
+            n.id === notification.id 
+              ? { ...n, read: true, readAt: new Date().toISOString() }
+              : n
+          )
+        );
+      } catch (error) {
+        console.error('Erro ao marcar notificação como lida:', error);
+      }
+    }
+
+    // Navegar para o grupo se tiver groupId
+    if (notification.groupId) {
+      const targetCard = getCardFromNotificationType(notification);
+      
+      navigation.navigate('GroupDetail', {
+        groupId: notification.groupId,
+        groupName: notification.groupName,
+        openCard: targetCard, // Parâmetro para indicar qual card abrir
+      });
     }
   };
 
@@ -111,9 +241,15 @@ const NotificationsScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
         <View style={styles.headerBottom}>
-          <TouchableOpacity onPress={() => {}}>
+          <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.headerActionButton}>
             <Text style={styles.markAllRead}>Marcar todas como lidas</Text>
           </TouchableOpacity>
+          {notifications.length > 0 && (
+            <TouchableOpacity onPress={handleDeleteAll} style={styles.headerActionButton}>
+              <Ionicons name="trash-outline" size={18} color={colors.error} />
+              <Text style={styles.clearAllText}>Limpar</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -154,37 +290,40 @@ const NotificationsScreen = ({ navigation }) => {
         ) : filteredNotifications.length > 0 ? (
           <View style={styles.notificationsList}>
             {filteredNotifications.map((notification) => (
-              <TouchableOpacity
+              <View
                 key={notification.id}
                 style={[
                   styles.notificationCard,
                   !notification.read && styles.notificationCardUnread,
                 ]}
-                onPress={() => {
-                  // Navegar para o grupo se tiver groupId
-                  if (notification.groupId) {
-                    navigation.navigate('GroupDetail', {
-                      groupId: notification.groupId,
-                      groupName: notification.groupName,
-                    });
-                  }
-                }}
-                activeOpacity={0.7}
               >
-                <View style={[styles.notificationIcon, { backgroundColor: notification.color + '20' }]}>
-                  <Ionicons name={notification.icon} size={24} color={notification.color} />
-                </View>
-                <View style={styles.notificationContent}>
-                  <Text style={styles.notificationTitle}>{notification.title}</Text>
-                  <Text style={styles.notificationMessage}>{notification.message}</Text>
-                  <View style={styles.notificationMeta}>
-                    <Text style={styles.notificationGroup}>{notification.groupName}</Text>
-                    <Text style={styles.notificationTime}>• {notification.time}</Text>
+                <TouchableOpacity
+                  style={styles.notificationCardContent}
+                  onPress={() => handleNotificationPress(notification)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.notificationIcon, { backgroundColor: notification.color + '20' }]}>
+                    <Ionicons name={notification.icon} size={24} color={notification.color} />
                   </View>
-                  <Text style={styles.notificationDateTime}>{notification.dateTime}</Text>
-                </View>
-                {!notification.read && <View style={styles.unreadDot} />}
-              </TouchableOpacity>
+                  <View style={styles.notificationContent}>
+                    <Text style={styles.notificationTitle}>{notification.title}</Text>
+                    <Text style={styles.notificationMessage}>{notification.message}</Text>
+                    <View style={styles.notificationMeta}>
+                      <Text style={styles.notificationGroup}>{notification.groupName}</Text>
+                      <Text style={styles.notificationTime}>• {notification.time}</Text>
+                    </View>
+                    <Text style={styles.notificationDateTime}>{notification.dateTime}</Text>
+                  </View>
+                  {!notification.read && <View style={styles.unreadDot} />}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDeleteNotification(notification.id)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
+                </TouchableOpacity>
+              </View>
             ))}
           </View>
         ) : (
@@ -227,6 +366,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     alignItems: 'center',
+    gap: 16,
+  },
+  headerActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  clearAllText: {
+    fontSize: 14,
+    color: colors.error,
+    fontWeight: '600',
   },
   title: {
     fontSize: 24,
@@ -277,11 +427,22 @@ const styles = StyleSheet.create({
   notificationCard: {
     flexDirection: 'row',
     backgroundColor: colors.backgroundLight,
-    padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  notificationCardContent: {
+    flex: 1,
+    flexDirection: 'row',
+    padding: 16,
+  },
+  deleteButton: {
+    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.error + '10',
   },
   notificationCardUnread: {
     borderColor: colors.primary,

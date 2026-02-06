@@ -75,3 +75,4 @@ chrome_options.add_argument('--headless')
 - Alguns testes podem precisar de dados pré-existentes no banco
 
 
+

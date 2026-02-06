@@ -590,6 +590,96 @@ class MedicationController extends Controller
             'action_type' => $activity->action_type,
         ]);
 
+        // Enviar notificações aos membros do grupo
+        try {
+            $notificationService = app(\App\Services\NotificationService::class);
+            $group = \App\Models\Group::find($medication->group_id);
+            
+            if ($group) {
+                // Buscar membros do grupo (exceto quem criou)
+                $members = $group->members()->where('user_id', '!=', $user->id)->get();
+                
+                Log::info('MedicationController.store - Enviando notificações', [
+                    'members_count' => $members->count(),
+                    'group_id' => $medication->group_id,
+                ]);
+                
+                foreach ($members as $member) {
+                    $memberUser = \App\Models\User::find($member->user_id);
+                    
+                    if (!$memberUser) {
+                        Log::warning('MedicationController.store - Usuário não encontrado', [
+                            'user_id' => $member->user_id,
+                        ]);
+                        continue;
+                    }
+                    
+                    // Verificar preferências de notificação
+                    $shouldNotify = $notificationService->hasNotificationPreference($memberUser, 'medication_reminders');
+                    
+                    Log::info('MedicationController.store - Verificando preferência de notificação', [
+                        'user_id' => $memberUser->id,
+                        'shouldNotify' => $shouldNotify,
+                    ]);
+                    
+                    if (!$shouldNotify) {
+                        Log::info('MedicationController.store - Usuário desabilitou notificações de medicamentos', [
+                            'user_id' => $memberUser->id,
+                        ]);
+                        continue;
+                    }
+                    
+                    $title = 'Novo Medicamento Cadastrado';
+                    $message = "{$user->name} cadastrou o medicamento {$medication->name}";
+                    if ($medication->dosage) {
+                        $message .= " ({$medication->dosage}";
+                        if ($medication->unit) {
+                            $message .= " {$medication->unit}";
+                        }
+                        $message .= ")";
+                    }
+                    
+                    Log::info('MedicationController.store - Enviando notificação', [
+                        'user_id' => $memberUser->id,
+                        'title' => $title,
+                        'message' => $message,
+                    ]);
+                    
+                    $notification = $notificationService->sendNotification(
+                        $memberUser,
+                        'medication',
+                        $title,
+                        $message,
+                        [
+                            'medication_id' => $medication->id,
+                            'group_id' => $medication->group_id,
+                            'medication_name' => $medication->name,
+                            'action_type' => 'medication_created',
+                        ],
+                        false, // Não enviar WhatsApp
+                        $medication->group_id
+                    );
+                    
+                    if ($notification) {
+                        Log::info('MedicationController.store - Notificação criada com sucesso', [
+                            'notification_id' => $notification->id,
+                            'user_id' => $memberUser->id,
+                        ]);
+                    } else {
+                        Log::warning('MedicationController.store - Falha ao criar notificação', [
+                            'user_id' => $memberUser->id,
+                        ]);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('MedicationController.store - Erro ao enviar notificações de medicamento', [
+                'medication_id' => $medication->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
         return response()->json($medication, 201);
     }
 

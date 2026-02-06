@@ -125,6 +125,17 @@ const DoctorHomeScreen = ({ navigation }) => {
             doctorUserId === currentDoctorId ||
             doctorId === currentDoctorId;
           
+          // Se for teleconsulta, verificar se está paga
+          // Médicos só devem ver teleconsultas que já foram pagas
+          if (appointment.is_teleconsultation) {
+            const paymentStatus = appointment.payment_status;
+            const isPaid = paymentStatus === 'paid_held' || paymentStatus === 'paid' || paymentStatus === 'released';
+            if (!isPaid) {
+              // Teleconsulta não paga - não mostrar para o médico
+              return false;
+            }
+          }
+          
           return isDoctorAppointment;
         });
 
@@ -736,8 +747,20 @@ const DoctorHomeScreen = ({ navigation }) => {
       setSavingAvailability(true);
       
       // Validar se há dados para salvar
-      if (availableDays.size === 0 && blockedDays.size === 0) {
-        Alert.alert('Aviso', 'Nenhuma agenda configurada para salvar');
+      if (availableDays.size === 0) {
+        Alert.alert('Aviso', 'Nenhuma agenda configurada para salvar. Adicione pelo menos um dia com horários disponíveis.');
+        setSavingAvailability(false);
+        return;
+      }
+      
+      // Validar se há horários configurados
+      const hasSchedules = Object.keys(daySchedules).some(dateKey => {
+        const times = daySchedules[dateKey];
+        return Array.isArray(times) && times.length > 0;
+      });
+      
+      if (!hasSchedules) {
+        Alert.alert('Aviso', 'Nenhum horário configurado. Adicione horários aos dias disponíveis antes de salvar.');
         setSavingAvailability(false);
         return;
       }
@@ -764,8 +787,16 @@ const DoctorHomeScreen = ({ navigation }) => {
         doctorEmail: user.email,
         doctorProfile: user.profile,
         availableDays: availableDaysArray,
+        availableDays_count: availableDaysArray.length,
         daySchedules: daySchedulesObject,
+        daySchedules_keys: Object.keys(daySchedulesObject),
+        daySchedules_values: Object.values(daySchedulesObject).map(times => ({
+          count: Array.isArray(times) ? times.length : 0,
+          times: times
+        })),
         fullData: availabilityData,
+        daySchedules_raw: daySchedules,
+        availableDays_raw: Array.from(availableDays),
       });
       
       console.log('📡 Enviando requisição POST para:', `/doctors/${user.id}/availability`);
@@ -1185,12 +1216,15 @@ const DoctorHomeScreen = ({ navigation }) => {
                   });
                 }
                 
+                const isCancelled = appointment.status === 'cancelled';
+                
                 return (
                 <TouchableOpacity
                   key={appointment.id}
                   style={[
                     styles.appointmentCard,
-                    isPast && styles.appointmentCardPast
+                    isPast && !isCancelled && styles.appointmentCardPast,
+                    isCancelled && styles.appointmentCardCancelled
                   ]}
                   onPress={() => handleAppointmentPress(appointment)}
                 >
@@ -1253,7 +1287,13 @@ const DoctorHomeScreen = ({ navigation }) => {
                     )}
                   </View>
                   
-                  {isPast && (
+                  {appointment.status === 'cancelled' && (
+                    <View style={styles.cancelledBadge}>
+                      <CloseCircleIcon size={14} color={colors.textWhite} />
+                      <Text style={styles.cancelledBadgeText}>Cancelada</Text>
+                    </View>
+                  )}
+                  {isPast && appointment.status !== 'cancelled' && (
                     <View style={styles.pastBadge}>
                       <Text style={styles.pastBadgeText}>Realizada</Text>
                     </View>
@@ -1584,6 +1624,11 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     borderColor: colors.border,
   },
+  appointmentCardCancelled: {
+    opacity: 0.7,
+    borderColor: colors.error + '40',
+    backgroundColor: colors.error + '05',
+  },
   appointmentHeader: {
     flexDirection: 'row',
     marginBottom: 12,
@@ -1688,6 +1733,24 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginLeft: 6,
     flex: 1,
+  },
+  cancelledBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: colors.error,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cancelledBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textWhite,
+    textTransform: 'uppercase',
   },
   pastBadge: {
     position: 'absolute',

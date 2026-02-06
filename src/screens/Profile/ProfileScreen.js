@@ -16,7 +16,6 @@ import {
   MedicalOutlineIcon,
   LockClosedOutlineIcon,
   NotificationsOutlineIcon,
-  KeyOutlineIcon,
   InformationCircleOutlineIcon,
   HelpCircleOutlineIcon,
   DocumentTextOutlineIcon,
@@ -167,38 +166,8 @@ const ProfileScreen = ({ navigation }) => {
               console.log('📱 ProfileScreen - Chamando signOut()...');
               await signOut();
               console.log('📱 ProfileScreen - ✅ signOut() executado com sucesso!');
-              
-              // Forçar navegação imediatamente
-              setTimeout(() => {
-                console.log('📱 ProfileScreen - Forçando navegação para Welcome...');
-                try {
-                  // Usar navigation.reset
-                  if (navigation?.reset) {
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Welcome' }],
-                    });
-                    console.log('📱 ProfileScreen - ✅ Navegação resetada via navigation');
-                  }
-                  // Último recurso: navigate
-                  else if (navigation?.navigate) {
-                    navigation.navigate('Welcome');
-                    console.log('📱 ProfileScreen - ✅ Navegação via navigate');
-                  } else {
-                    console.error('❌ ProfileScreen - Nenhum método de navegação disponível!');
-                    // Recarregar a página como último recurso
-                    if (typeof window !== 'undefined') {
-                      window.location.href = '/';
-                    }
-                  }
-                } catch (navError) {
-                  console.error('❌ ProfileScreen - Erro ao forçar navegação:', navError);
-                  // Recarregar a página como último recurso
-                  if (typeof window !== 'undefined') {
-                    window.location.href = '/';
-                  }
-                }
-              }, 200);
+              // Navegação será feita pelo AuthContext e RootNavigator
+              // Não precisamos navegar aqui para evitar duplicação
               
             } catch (error) {
               console.error('❌ ProfileScreen - ERRO CRÍTICO ao sair:', error);
@@ -343,16 +312,10 @@ const ProfileScreen = ({ navigation }) => {
         </View>
 
         {/* Menu Aplicativo */}
+        {/* NOTA: "Códigos de acesso" foi removido - não deve aparecer para médicos nem outros perfis */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Aplicativo</Text>
           <View style={styles.menuContainer}>
-            <MenuItem
-              icon={KeyOutlineIcon}
-              title="Códigos de Acesso"
-              subtitle="Ver códigos de todos os grupos"
-              color={colors.primary}
-              onPress={() => navigation.navigate('ShowGroupCodes')}
-            />
             <MenuItem
               icon={InformationCircleOutlineIcon}
               title="Sobre o Laços"

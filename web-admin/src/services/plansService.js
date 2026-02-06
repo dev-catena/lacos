@@ -210,7 +210,7 @@ class PlansService {
 
   getAllFeatures() {
     return [
-      { key: 'grupoCuidados', label: 'Grupo de cuidados', description: 'Permite gerenciar grupos de cuidados' },
+      { key: 'grupoCuidados', label: 'Conversa em Grupo', description: 'Permite gerenciar grupos de cuidados' },
       { key: 'historico', label: 'Histórico', description: 'Acesso ao histórico de atividades' },
       { key: 'remedios', label: 'Remédios', description: 'Gerenciamento de medicamentos' },
       { key: 'receitas', label: 'Receitas', description: 'Gerenciamento de receitas médicas e prescrições' },

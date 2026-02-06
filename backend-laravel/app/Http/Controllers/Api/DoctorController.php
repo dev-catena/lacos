@@ -424,11 +424,167 @@ class DoctorController extends Controller
     {
         try {
             $doctor = User::where("id", $id)->where("profile", "doctor")->firstOrFail();
-            $availability = json_decode($doctor->availability ?? "{}", true);
+            $availabilityRaw = $doctor->availability ?? "{}";
+            $availability = json_decode($availabilityRaw, true);
+            
+            Log::info("DoctorController.getAvailability - Dados brutos", [
+                'doctor_id' => $id,
+                'availability_raw' => $availabilityRaw,
+                'availability_decoded' => $availability,
+                'is_array' => is_array($availability),
+            ]);
+            
             if (!$availability || !is_array($availability)) {
                 $availability = ["availableDays" => [], "daySchedules" => []];
             }
-            return response()->json(["success" => true, "data" => $availability]);
+
+            // Filtrar datas passadas - apenas retornar datas atuais e futuras
+            // Usar timezone do Brasil (America/Sao_Paulo - GMT-3) para comparação de datas
+            $timezone = 'America/Sao_Paulo'; // GMT-3
+            $today = now()->setTimezone($timezone)->format('Y-m-d');
+            $currentTime = now()->setTimezone($timezone)->format('H:i');
+            $availableDays = $availability["availableDays"] ?? [];
+            $daySchedules = $availability["daySchedules"] ?? [];
+
+            Log::info("DoctorController.getAvailability - Antes do filtro", [
+                'doctor_id' => $id,
+                'timezone' => $timezone,
+                'today' => $today,
+                'currentTime' => $currentTime,
+                'availableDays' => $availableDays,
+                'daySchedules' => $daySchedules,
+                'availableDays_count' => count($availableDays),
+                'availability_raw' => $availabilityRaw,
+            ]);
+
+            // Filtrar apenas datas >= hoje
+            // Se for hoje ou ontem, verificar se ainda há horários futuros disponíveis
+            $yesterday = now()->setTimezone($timezone)->subDay()->format('Y-m-d');
+            
+            $filteredAvailableDays = array_filter($availableDays, function($date) use ($today, $yesterday, $daySchedules, $currentTime) {
+                // Se a data é futura, incluir
+                if ($date > $today) {
+                    Log::info("DoctorController.getAvailability - Data futura incluída", [
+                        'date' => $date,
+                        'today' => $today,
+                    ]);
+                    return true;
+                }
+                
+                // Se é hoje, incluir todos os horários (mesmo que já tenham passado)
+                // Isso permite que horários sejam vistos mesmo se o médico salvou há pouco tempo
+                if ($date === $today) {
+                    $times = $daySchedules[$date] ?? [];
+                    $hasTimes = count($times) > 0;
+                    
+                    // Incluir se houver horários, mesmo que já tenham passado
+                    // (permite ver horários que foram salvos recentemente)
+                    Log::info("DoctorController.getAvailability - Verificando dia atual", [
+                        'date' => $date,
+                        'today' => $today,
+                        'all_times' => $times,
+                        'currentTime' => $currentTime,
+                        'hasTimes' => $hasTimes,
+                    ]);
+                    
+                    return $hasTimes;
+                }
+                
+                // Se é ontem, verificar se há horários futuros (pode ser que o servidor esteja em timezone diferente)
+                if ($date === $yesterday) {
+                    $times = $daySchedules[$date] ?? [];
+                    $hasFutureTimes = false;
+                    
+                    // Para ontem, considerar todos os horários como válidos (pode ser diferença de timezone)
+                    if (count($times) > 0) {
+                        $hasFutureTimes = true;
+                    }
+                    
+                    Log::info("DoctorController.getAvailability - Verificando dia anterior (possível diferença de timezone)", [
+                        'date' => $date,
+                        'today' => $today,
+                        'yesterday' => $yesterday,
+                        'all_times' => $times,
+                        'hasFutureTimes' => $hasFutureTimes,
+                    ]);
+                    
+                    return $hasFutureTimes;
+                }
+                
+                // Se é passado (mais de 1 dia), excluir
+                Log::info("DoctorController.getAvailability - Data passada excluída", [
+                    'date' => $date,
+                    'today' => $today,
+                    'yesterday' => $yesterday,
+                ]);
+                return false;
+            });
+
+            // Reindexar array para manter índices sequenciais
+            $filteredAvailableDays = array_values($filteredAvailableDays);
+
+            // Filtrar daySchedules para manter apenas as datas futuras
+            // Se for hoje, filtrar apenas horários futuros
+            $filteredDaySchedules = [];
+            $yesterday = now()->setTimezone($timezone)->subDay()->format('Y-m-d');
+            foreach ($filteredAvailableDays as $date) {
+                if (isset($daySchedules[$date])) {
+                    if ($date === $today) {
+                        // Se é hoje, incluir todos os horários (mesmo que já tenham passado)
+                        // Filtrar apenas horários que passaram há mais de 2 horas
+                        $times = $daySchedules[$date];
+                        $currentHour = (int)substr($currentTime, 0, 2);
+                        $currentMinute = (int)substr($currentTime, 3, 2);
+                        $currentTotalMinutes = $currentHour * 60 + $currentMinute;
+                        
+                        $validTimes = array_filter($times, function($time) use ($currentTotalMinutes) {
+                            $timeHour = (int)substr($time, 0, 2);
+                            $timeMinute = (int)substr($time, 3, 2);
+                            $timeTotalMinutes = $timeHour * 60 + $timeMinute;
+                            
+                            // Incluir se for futuro ou se passou há menos de 2 horas
+                            $diffMinutes = $currentTotalMinutes - $timeTotalMinutes;
+                            return $diffMinutes <= 120; // 2 horas = 120 minutos
+                        });
+                        
+                        $filteredDaySchedules[$date] = array_values($validTimes);
+                        
+                        Log::info("DoctorController.getAvailability - Filtrando horários do dia atual", [
+                            'date' => $date,
+                            'all_times' => $times,
+                            'currentTime' => $currentTime,
+                            'validTimes' => $filteredDaySchedules[$date],
+                        ]);
+                    } elseif ($date === $yesterday) {
+                        // Se é ontem (possível diferença de timezone), incluir todos os horários
+                        $filteredDaySchedules[$date] = $daySchedules[$date];
+                        
+                        Log::info("DoctorController.getAvailability - Incluindo horários do dia anterior", [
+                            'date' => $date,
+                            'times' => $daySchedules[$date],
+                        ]);
+                    } else {
+                        // Se é futuro, incluir todos os horários
+                        $filteredDaySchedules[$date] = $daySchedules[$date];
+                    }
+                }
+            }
+
+            $filteredAvailability = [
+                "availableDays" => $filteredAvailableDays,
+                "daySchedules" => $filteredDaySchedules
+            ];
+
+            Log::info("DoctorController.getAvailability - Agenda filtrada", [
+                'doctor_id' => $id,
+                'original_days_count' => count($availableDays),
+                'filtered_days_count' => count($filteredAvailableDays),
+                'today' => $today,
+                'filteredAvailableDays' => $filteredAvailableDays,
+                'filteredDaySchedules' => $filteredDaySchedules,
+            ]);
+
+            return response()->json(["success" => true, "data" => $filteredAvailability]);
         } catch (\Exception $e) {
             \Log::error("Erro ao buscar agenda: " . $e->getMessage());
             return response()->json(["success" => false, "message" => "Erro ao buscar agenda"], 500);
@@ -477,13 +633,38 @@ class DoctorController extends Controller
             // Validar dados
             $validated = $request->validate([
                 "availableDays" => "nullable|array", 
-                "daySchedules" => "nullable|array"
+                "daySchedules" => "nullable|array",
+                "daySchedules.*" => "nullable|array",
+                "daySchedules.*.*" => "nullable|string"
             ]);
+            
+            // Validar formato dos horários manualmente (evitar problema com regex no Laravel)
+            if (isset($validated["daySchedules"]) && is_array($validated["daySchedules"])) {
+                foreach ($validated["daySchedules"] as $date => $times) {
+                    if (is_array($times)) {
+                        foreach ($times as $time) {
+                            if (!preg_match('/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/', $time)) {
+                                return response()->json([
+                                    "success" => false,
+                                    "message" => "Formato de horário inválido: {$time}. Use o formato HH:MM (ex: 08:00, 14:30)"
+                                ], 422);
+                            }
+                        }
+                    }
+                }
+            }
             
             $availabilityData = [
                 "availableDays" => $validated["availableDays"] ?? [], 
                 "daySchedules" => $validated["daySchedules"] ?? []
             ];
+            
+            Log::info("DoctorController.saveAvailability - Dados validados", [
+                'doctor_id' => $id,
+                'availableDays_count' => count($availabilityData["availableDays"]),
+                'daySchedules_count' => count($availabilityData["daySchedules"]),
+                'daySchedules' => $availabilityData["daySchedules"],
+            ]);
             
             // Verificar se a coluna availability existe
             if (!Schema::hasColumn('users', 'availability')) {

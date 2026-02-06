@@ -694,14 +694,6 @@ const ProfessionalCaregiverTabNavigator = () => {
         }}
       />
       <Tab.Screen 
-        name="Groups" 
-        component={GroupsStack}
-        options={{ 
-          tabBarLabel: 'Grupos',
-          tabBarTestID: 'tab-groups',
-        }}
-      />
-      <Tab.Screen 
         name="Notifications" 
         component={NotificationsStack}
         options={{ 
@@ -746,14 +738,6 @@ const ProfessionalCaregiverAndroidNavigator = () => {
         options={{ 
           tabBarLabel: 'Início',
           tabBarTestID: 'tab-home',
-        }}
-      />
-      <Tab.Screen 
-        name="Groups" 
-        component={GroupsStack}
-        options={{ 
-          tabBarLabel: 'Grupos',
-          tabBarTestID: 'tab-groups',
         }}
       />
       <Tab.Screen 

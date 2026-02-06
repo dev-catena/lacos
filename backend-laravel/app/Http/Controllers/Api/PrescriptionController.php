@@ -31,7 +31,7 @@ class PrescriptionController extends Controller
             }
         } catch (\Exception $e) {
             // Serviços não disponíveis, mas não é crítico para os novos métodos
-            Log::warning('PrescriptionController - Serviços PDFService/DigitalSignatureService não disponíveis: ' . $e->getMessage());
+            Log::warning('PrescriptionController - Serviços PDFService/DigitalSignatureService não disponíveis', ['error' => $e->getMessage()]);
         }
     }
 
@@ -248,7 +248,7 @@ class PrescriptionController extends Controller
                 'document_date' => now()->toDateString(),
                 'file_path' => $publicPath,
                 'file_name' => 'receita_' . $documentHash . '.pdf',
-                'file_type' => 'application/pdf',
+                'mime_type' => 'application/pdf',
                 'file_size' => Storage::disk('public')->size($publicPath),
                 'notes' => $validated['notes'] ?? null,
             ]);
@@ -499,7 +499,7 @@ class PrescriptionController extends Controller
                 'document_date' => now()->toDateString(),
                 'file_path' => $publicPath,
                 'file_name' => 'atestado_' . $documentHash . '.pdf',
-                'file_type' => 'application/pdf',
+                'mime_type' => 'application/pdf',
                 'file_size' => Storage::disk('public')->size($publicPath),
                 'notes' => $validated['notes'] ?? null,
             ]);
@@ -847,10 +847,10 @@ class PrescriptionController extends Controller
                 // Se for uma URL local (file://), tentar fazer upload
                 if (strpos($imageUrl, 'file://') === 0 || strpos($imageUrl, 'content://') === 0) {
                     // Não processar URLs locais do dispositivo - o frontend deve fazer upload primeiro
-                    Log::warning('PrescriptionController.store - URL local detectada, ignorando:', $imageUrl);
+                    Log::warning('PrescriptionController.store - URL local detectada, ignorando:', ['image_url' => $imageUrl]);
                     $imageUrl = null;
                 } else {
-                    Log::info('PrescriptionController.store - image_url válido, será salvo:', $imageUrl);
+                    Log::info('PrescriptionController.store - image_url válido, será salvo:', ['image_url' => $imageUrl]);
                 }
             } else {
                 Log::info('PrescriptionController.store - Nenhum image_url fornecido ou está vazio');

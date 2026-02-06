@@ -20,6 +20,7 @@ class AppointmentController extends Controller
         $groupId = $request->query('group_id');
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
+        $user = Auth::user();
 
         // Não usar with('doctor') pois pode causar timeout quando médico está em users
         // Buscaremos os dados do médico manualmente depois
@@ -35,6 +36,19 @@ class AppointmentController extends Controller
 
         if ($groupId) {
             $query->where('group_id', $groupId);
+        }
+
+        // Se o usuário for médico, filtrar teleconsultas não pagas
+        // Médicos só devem ver teleconsultas que já foram pagas
+        if ($user && $user->profile === 'doctor') {
+            $query->where(function($q) {
+                $q->where('is_teleconsultation', false) // Mostrar consultas normais
+                  ->orWhere(function($q2) {
+                      // Para teleconsultas, apenas mostrar se estiverem pagas
+                      $q2->where('is_teleconsultation', true)
+                         ->whereIn('payment_status', ['paid_held', 'paid', 'released']);
+                  });
+            });
         }
 
         // Usar scheduled_at com fallback para appointment_date quando scheduled_at for null
@@ -257,6 +271,103 @@ class AppointmentController extends Controller
             // Não bloquear a resposta por erro de atividade
         }
 
+        // Enviar notificações aos membros do grupo
+        try {
+            $notificationService = app(\App\Services\NotificationService::class);
+            $group = $appointment->group;
+            
+            if ($group) {
+                // Buscar membros do grupo (exceto quem criou)
+                $members = $group->members()->where('user_id', '!=', $user->id)->get();
+                
+                \Log::info('AppointmentController.store - Enviando notificações', [
+                    'members_count' => $members->count(),
+                    'group_id' => $appointment->group_id,
+                ]);
+                
+                $appointmentDate = \Carbon\Carbon::parse($appointment->scheduled_at ?? $appointment->appointment_date);
+                $typeLabels = [
+                    'common' => 'compromisso',
+                    'medical' => 'consulta médica',
+                    'fisioterapia' => 'sessão de fisioterapia',
+                    'exames' => 'exame',
+                ];
+                $typeLabel = $typeLabels[$appointment->type] ?? 'compromisso';
+                
+                foreach ($members as $member) {
+                    $memberUser = \App\Models\User::find($member->user_id);
+                    
+                    if (!$memberUser) {
+                        \Log::warning('AppointmentController.store - Usuário não encontrado', [
+                            'user_id' => $member->user_id,
+                        ]);
+                        continue;
+                    }
+                    
+                    // Verificar preferências de notificação
+                    $shouldNotify = $notificationService->hasNotificationPreference($memberUser, 'appointment_reminders');
+                    
+                    \Log::info('AppointmentController.store - Verificando preferência de notificação', [
+                        'user_id' => $memberUser->id,
+                        'shouldNotify' => $shouldNotify,
+                    ]);
+                    
+                    if (!$shouldNotify) {
+                        \Log::info('AppointmentController.store - Usuário desabilitou notificações de consultas', [
+                            'user_id' => $memberUser->id,
+                        ]);
+                        continue;
+                    }
+                    
+                    $title = 'Novo Compromisso Agendado';
+                    $message = "{$user->name} agendou um {$typeLabel}: {$appointment->title} para " . $appointmentDate->format('d/m/Y \à\s H:i');
+                    if ($appointment->location) {
+                        $message .= " em {$appointment->location}";
+                    }
+                    
+                    \Log::info('AppointmentController.store - Enviando notificação', [
+                        'user_id' => $memberUser->id,
+                        'title' => $title,
+                        'message' => $message,
+                    ]);
+                    
+                    $notification = $notificationService->sendNotification(
+                        $memberUser,
+                        'appointment',
+                        $title,
+                        $message,
+                        [
+                            'appointment_id' => $appointment->id,
+                            'group_id' => $appointment->group_id,
+                            'appointment_title' => $appointment->title,
+                            'appointment_date' => $appointmentDate->toIso8601String(),
+                            'appointment_type' => $appointment->type,
+                            'action_type' => 'appointment_created',
+                        ],
+                        false, // Não enviar WhatsApp
+                        $appointment->group_id
+                    );
+                    
+                    if ($notification) {
+                        \Log::info('AppointmentController.store - Notificação criada com sucesso', [
+                            'notification_id' => $notification->id,
+                            'user_id' => $memberUser->id,
+                        ]);
+                    } else {
+                        \Log::warning('AppointmentController.store - Falha ao criar notificação', [
+                            'user_id' => $memberUser->id,
+                        ]);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::error('AppointmentController.store - Erro ao enviar notificações de compromisso', [
+                'appointment_id' => $appointment->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
         // Retornar resposta rapidamente sem carregar relacionamentos pesados
         return response()->json($appointment, 201);
     }
@@ -431,24 +542,92 @@ class AppointmentController extends Controller
             $appointment = Appointment::findOrFail($id);
             $user = Auth::user();
             
-            // Verificar permissão
-            if ($appointment->group_id) {
-                $userGroups = $user->groups()->pluck('groups.id')->toArray();
-                if (!in_array($appointment->group_id, $userGroups)) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Você não tem permissão para cancelar esta consulta'
-                    ], 403);
-                }
-            }
-            
             $validated = $request->validate([
                 'cancelled_by' => 'required|in:doctor,patient',
                 'reason' => 'nullable|string|max:500',
             ]);
             
-            // Se tem pagamento em hold, reembolsar
-            if ($appointment->payment_status === 'paid_held') {
+            // Verificar permissão baseado em quem está cancelando
+            $hasPermission = false;
+            
+            if ($validated['cancelled_by'] === 'doctor') {
+                // Médico: verificar se é o médico da consulta
+                if ($appointment->doctor_id && $appointment->doctor_id == $user->id) {
+                    $hasPermission = true;
+                }
+            } else {
+                // Cuidador/Paciente: verificar se pertence ao grupo
+                if ($appointment->group_id) {
+                    // Verificar via relacionamento groups
+                    $userGroups = $user->groups()->pluck('groups.id')->toArray();
+                    if (in_array($appointment->group_id, $userGroups)) {
+                        $hasPermission = true;
+                    } else {
+                        // Verificar via group_members diretamente (fallback)
+                        $isMember = DB::table('group_members')
+                            ->where('group_id', $appointment->group_id)
+                            ->where('user_id', $user->id)
+                            ->where('is_active', true)
+                            ->exists();
+                        if ($isMember) {
+                            $hasPermission = true;
+                        }
+                    }
+                }
+            }
+            
+            if (!$hasPermission) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Você não tem permissão para cancelar esta consulta'
+                ], 403);
+            }
+            
+            // Verificar se a consulta já está cancelada
+            if ($appointment->status === 'cancelled') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Esta consulta já foi cancelada'
+                ], 400);
+            }
+            
+            // Verificar se a consulta já foi completada
+            if ($appointment->status === 'completed') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Não é possível cancelar uma consulta que já foi completada'
+                ], 400);
+            }
+            
+            // Validar regras de cancelamento baseado em quem está cancelando
+            $appointmentDate = \Carbon\Carbon::parse($appointment->appointment_date ?? $appointment->scheduled_at);
+            $now = \Carbon\Carbon::now();
+            
+            if ($validated['cancelled_by'] === 'doctor') {
+                // Médico pode cancelar até a hora da consulta
+                if ($now > $appointmentDate) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Não é possível cancelar uma consulta após o horário agendado'
+                    ], 400);
+                }
+            } else {
+                // Cuidador/amigo deve cancelar pelo menos 1 hora antes
+                $oneHourBefore = $appointmentDate->copy()->subHour();
+                if ($now > $oneHourBefore) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Não é possível cancelar. O cancelamento deve ser feito com pelo menos 1 hora de antecedência.'
+                    ], 400);
+                }
+            }
+            
+            // Se tem pagamento em hold e foi cancelado pelo menos 1 hora antes, reembolsar
+            $oneHourBefore = $appointmentDate->copy()->subHour();
+            $canRefund = $now <= $oneHourBefore;
+            
+            if ($appointment->payment_status === 'paid_held' && $canRefund) {
+                // Reembolsar se cancelado 1 hora antes
                 $paymentService = app(AppointmentPaymentService::class);
                 $result = $paymentService->cancelAndRefund($appointment, $validated['cancelled_by']);
                 
@@ -456,29 +635,153 @@ class AppointmentController extends Controller
                     return response()->json($result, 400);
                 }
                 
-                return response()->json([
-                    'success' => true,
-                    'appointment_id' => $appointment->id,
-                    'status' => $appointment->fresh()->status,
-                    'payment_status' => $appointment->fresh()->payment_status,
-                    'refund_id' => $result['refund_id'] ?? null,
-                    'refund_amount' => $result['refund_amount'] ?? null,
+                $appointment->refresh();
+            } elseif ($appointment->payment_status === 'paid_held' && !$canRefund) {
+                // Se tem pagamento mas não pode reembolsar (menos de 1 hora), apenas cancelar sem reembolso
+                $appointment->update([
+                    'status' => 'cancelled',
+                    'cancelled_by' => $validated['cancelled_by'],
+                    // Manter payment_status como 'paid_held' pois não houve reembolso
                 ]);
             } else {
-                // Apenas cancelar sem reembolso
+                // Apenas cancelar sem reembolso (sem pagamento ou pagamento já processado)
                 $appointment->update([
-                    'status' => 'cancelada',
+                    'status' => 'cancelled',
                     'cancelled_by' => $validated['cancelled_by'],
-                    'cancelled_at' => now(),
-                ]);
-                
-                return response()->json([
-                    'success' => true,
-                    'appointment_id' => $appointment->id,
-                    'status' => 'cancelada',
-                    'message' => 'Consulta cancelada',
                 ]);
             }
+            
+            // Criar atividade de grupo para aparecer na seção de últimas atualizações
+            try {
+                // Carregar o relacionamento group explicitamente
+                $appointment->load('group');
+                $group = $appointment->group;
+                
+                if ($group) {
+                    $doctorName = $user->name;
+                    $appointmentTitle = $appointment->title ?? 'Consulta';
+                    $appointmentType = $appointment->type ?? 'medical';
+                    
+                    Log::info('AppointmentController.cancel - Criando atividade de cancelamento', [
+                        'appointment_id' => $appointment->id,
+                        'group_id' => $appointment->group_id,
+                        'user_id' => $user->id,
+                        'user_name' => $doctorName,
+                        'appointment_title' => $appointmentTitle,
+                        'cancelled_by' => $validated['cancelled_by'],
+                    ]);
+                    
+                    $activity = GroupActivity::logAppointmentCancelled(
+                        $appointment->group_id,
+                        $user->id,
+                        $doctorName,
+                        $appointmentTitle,
+                        $appointmentDate->toIso8601String(),
+                        $appointmentType,
+                        $appointment->id,
+                        $validated['cancelled_by']
+                    );
+                    
+                    if ($activity) {
+                        Log::info('AppointmentController.cancel - Atividade de cancelamento criada com sucesso', [
+                            'activity_id' => $activity->id,
+                            'group_id' => $activity->group_id,
+                            'action_type' => $activity->action_type,
+                        ]);
+                    } else {
+                        Log::warning('AppointmentController.cancel - Atividade de cancelamento retornou null');
+                    }
+                } else {
+                    Log::warning('AppointmentController.cancel - Grupo não encontrado para o appointment', [
+                        'appointment_id' => $appointment->id,
+                        'group_id' => $appointment->group_id,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Erro ao criar atividade de cancelamento', [
+                    'appointment_id' => $appointment->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
+            
+            // Enviar notificações para cuidador e paciente
+            try {
+                $notificationService = app(\App\Services\NotificationService::class);
+                $group = $appointment->group;
+                
+                if ($group) {
+                    // Buscar membros do grupo (cuidador e paciente)
+                    $members = $group->members()->get();
+                    
+                    foreach ($members as $member) {
+                        $memberUser = $member->user ?? \App\Models\User::find($member->user_id);
+                        
+                        if (!$memberUser) continue;
+                        
+                        // Verificar preferências de notificação
+                        $preferences = $memberUser->notificationPreferences;
+                        if ($preferences && !$preferences->appointment_cancellation) {
+                            continue; // Usuário desabilitou notificações de cancelamento
+                        }
+                        
+                        // Buscar nome do paciente
+                        $patient = $members->firstWhere('role', 'patient');
+                        $patientName = $patient && $patient->user ? $patient->user->name : 'Paciente';
+                        
+                        $title = 'Consulta Cancelada';
+                        if ($validated['cancelled_by'] === 'doctor') {
+                            $message = "A consulta agendada para " . $appointmentDate->format('d/m/Y \à\s H:i');
+                            $message .= " com {$patientName} foi cancelada pelo médico";
+                        } else {
+                            $message = "A consulta agendada para " . $appointmentDate->format('d/m/Y \à\s H:i');
+                            $message .= " com {$patientName} foi cancelada pelo cuidador";
+                        }
+                        if ($validated['reason']) {
+                            $message .= ".\nMotivo: " . $validated['reason'];
+                        } else {
+                            $message .= ".";
+                        }
+                        
+                        // Adicionar informação de reembolso se aplicável
+                        $appointment->refresh();
+                        if ($appointment->payment_status === 'refunded' && $appointment->refund_id) {
+                            $message .= "\n\nO valor pago foi reembolsado.";
+                        }
+                        
+                        $notificationService->sendNotification(
+                            $memberUser,
+                            'appointment_cancelled',
+                            $title,
+                            $message,
+                            [
+                                'appointment_id' => $appointment->id,
+                                'group_id' => $appointment->group_id,
+                                'patient_id' => $patient && $patient->user ? $patient->user->id : null,
+                                'patient_name' => $patientName,
+                                'appointment_date' => $appointmentDate->toIso8601String(),
+                                'cancelled_by' => $validated['cancelled_by'],
+                                'reason' => $validated['reason'] ?? null,
+                            ],
+                            false, // Não enviar WhatsApp
+                            $appointment->group_id
+                        );
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Erro ao enviar notificações de cancelamento', [
+                    'appointment_id' => $appointment->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'appointment_id' => $appointment->id,
+                'status' => $appointment->fresh()->status,
+                'payment_status' => $appointment->fresh()->payment_status ?? null,
+                'message' => 'Consulta cancelada com sucesso',
+            ]);
             
         } catch (\Exception $e) {
             Log::error('Erro ao cancelar consulta', [

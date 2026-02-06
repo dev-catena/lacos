@@ -172,19 +172,187 @@ class VitalSignController extends Controller
 
             \Log::info('VitalSignController::store - Sinal vital criado com sucesso:', ['id' => $vitalSign->id]);
             
-            // Registrar atividade de registro de sinal vital
+            // Registrar atividade de registro de sinal vital (agrupando múltiplos sinais salvos em um período curto)
             if (class_exists('App\Models\GroupActivity')) {
                 try {
-                    \App\Models\GroupActivity::logVitalSignRecorded(
-                        $validated['group_id'],
-                        $user->id,
-                        $user->name,
-                        $validated['type'],
-                        $vitalSign->id
-                    );
+                    // Verificar se há uma atividade de sinal vital criada recentemente (últimos 5 segundos) pelo mesmo usuário no mesmo grupo
+                    $recentActivity = \App\Models\GroupActivity::where('group_id', $validated['group_id'])
+                        ->where('user_id', $user->id)
+                        ->where('action_type', 'vital_sign_recorded')
+                        ->where('created_at', '>=', now()->subSeconds(5))
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                    
+                    if ($recentActivity) {
+                        // Atualizar atividade existente para incluir este novo sinal vital
+                        $metadata = $recentActivity->metadata ?? [];
+                        $vitalSignTypes = $metadata['vital_sign_types'] ?? [];
+                        $vitalSignIds = $metadata['vital_sign_ids'] ?? [];
+                        
+                        // Adicionar novo tipo se ainda não estiver na lista
+                        if (!in_array($validated['type'], $vitalSignTypes)) {
+                            $vitalSignTypes[] = $validated['type'];
+                        }
+                        $vitalSignIds[] = $vitalSign->id;
+                        
+                        $typeLabels = [
+                            'blood_pressure' => 'pressão arterial',
+                            'heart_rate' => 'frequência cardíaca',
+                            'oxygen_saturation' => 'saturação de oxigênio',
+                            'blood_glucose' => 'glicemia',
+                            'temperature' => 'temperatura',
+                            'respiratory_rate' => 'frequência respiratória',
+                        ];
+                        
+                        $typeLabelsList = array_map(function($type) use ($typeLabels) {
+                            return $typeLabels[$type] ?? $type;
+                        }, $vitalSignTypes);
+                        
+                        $description = count($vitalSignTypes) > 1 
+                            ? "{$user->name} registrou " . implode(', ', array_slice($typeLabelsList, 0, -1)) . " e " . end($typeLabelsList)
+                            : "{$user->name} registrou " . ($typeLabels[$validated['type']] ?? $validated['type']);
+                        
+                        $recentActivity->update([
+                            'description' => $description,
+                            'metadata' => array_merge($metadata, [
+                                'vital_sign_types' => $vitalSignTypes,
+                                'vital_sign_ids' => $vitalSignIds,
+                            ]),
+                        ]);
+                    } else {
+                        // Criar nova atividade
+                        \App\Models\GroupActivity::logVitalSignRecorded(
+                            $validated['group_id'],
+                            $user->id,
+                            $user->name,
+                            $validated['type'],
+                            $vitalSign->id
+                        );
+                    }
                 } catch (\Exception $e) {
                     \Log::warning("Erro ao registrar atividade de sinal vital: " . $e->getMessage());
                 }
+            }
+            
+            // Enviar notificações aos membros do grupo
+            try {
+                $notificationService = app(\App\Services\NotificationService::class);
+                $group = \App\Models\Group::find($validated['group_id']);
+                
+                if ($group) {
+                    // Buscar membros do grupo (exceto quem registrou)
+                    $members = $group->members()->where('user_id', '!=', $user->id)->get();
+                    
+                    \Log::info('VitalSignController::store - Enviando notificações', [
+                        'members_count' => $members->count(),
+                        'group_id' => $validated['group_id'],
+                    ]);
+                    
+                    $typeLabels = [
+                        'blood_pressure' => 'pressão arterial',
+                        'heart_rate' => 'frequência cardíaca',
+                        'oxygen_saturation' => 'saturação de oxigênio',
+                        'blood_glucose' => 'glicemia',
+                        'temperature' => 'temperatura',
+                        'respiratory_rate' => 'frequência respiratória',
+                    ];
+                    
+                    $typeLabel = $typeLabels[$validated['type']] ?? $validated['type'];
+                    
+                    foreach ($members as $member) {
+                        $memberUser = \App\Models\User::find($member->user_id);
+                        
+                        if (!$memberUser) {
+                            \Log::warning('VitalSignController::store - Usuário não encontrado', [
+                                'user_id' => $member->user_id,
+                            ]);
+                            continue;
+                        }
+                        
+                        // Verificar preferências de notificação
+                        // Usar o método do NotificationService que já trata os casos padrão
+                        $shouldNotify = $notificationService->hasNotificationPreference($memberUser, 'vital_signs_alerts');
+                        
+                        \Log::info('VitalSignController::store - Verificando preferência de notificação', [
+                            'user_id' => $memberUser->id,
+                            'shouldNotify' => $shouldNotify,
+                            'has_preferences' => $memberUser->notificationPreferences ? 'sim' : 'não',
+                        ]);
+                        
+                        if (!$shouldNotify) {
+                            \Log::info('VitalSignController::store - Usuário desabilitou notificações de sinais vitais', [
+                                'user_id' => $memberUser->id,
+                            ]);
+                            continue;
+                        }
+                        
+                        \Log::info('VitalSignController::store - Enviando notificação para usuário', [
+                            'user_id' => $memberUser->id,
+                        ]);
+                        
+                        $title = 'Novo Sinal Vital Registrado';
+                        $message = "{$user->name} registrou {$typeLabel}";
+                        
+                        // Formatar valor para exibição
+                        $valueDisplay = '';
+                        if (is_array($vitalSign->value)) {
+                            // Se for pressão arterial (objeto com systolic/diastolic)
+                            if (isset($vitalSign->value['systolic']) && isset($vitalSign->value['diastolic'])) {
+                                $valueDisplay = $vitalSign->value['systolic'] . '/' . $vitalSign->value['diastolic'];
+                            } else {
+                                // Se for array simples, pegar primeiro valor
+                                $valueDisplay = is_array($vitalSign->value) ? reset($vitalSign->value) : $vitalSign->value;
+                            }
+                        } else {
+                            $valueDisplay = $vitalSign->value;
+                        }
+                        
+                        if ($valueDisplay) {
+                            $message .= ": {$valueDisplay}";
+                            if ($validated['unit']) {
+                                $message .= " {$validated['unit']}";
+                            }
+                        }
+                        
+                        \Log::info('VitalSignController::store - Enviando notificação', [
+                            'user_id' => $memberUser->id,
+                            'title' => $title,
+                            'message' => $message,
+                        ]);
+                        
+                        $notification = $notificationService->sendNotification(
+                            $memberUser,
+                            'vital_sign',
+                            $title,
+                            $message,
+                            [
+                                'vital_sign_id' => $vitalSign->id,
+                                'group_id' => $validated['group_id'],
+                                'vital_sign_type' => $validated['type'],
+                                'action_type' => 'vital_sign_recorded',
+                            ],
+                            false, // Não enviar WhatsApp
+                            $validated['group_id']
+                        );
+                        
+                        if ($notification) {
+                            \Log::info('VitalSignController::store - Notificação criada com sucesso', [
+                                'notification_id' => $notification->id,
+                                'user_id' => $memberUser->id,
+                            ]);
+                        } else {
+                            \Log::warning('VitalSignController::store - Falha ao criar notificação', [
+                                'user_id' => $memberUser->id,
+                            ]);
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                \Log::error('VitalSignController::store - Erro ao enviar notificações de sinal vital', [
+                    'vital_sign_id' => $vitalSign->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
             }
             
             return response()->json($vitalSign, 201);

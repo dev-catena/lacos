@@ -365,7 +365,27 @@ class GroupService {
   async getGroupMembers(groupId) {
     try {
       const response = await apiService.get(`/groups/${groupId}/members`);
-      return { success: true, data: response };
+      
+      // O backend retorna { success: true, data: [...] }
+      // Precisamos extrair o array de membros corretamente
+      let membersArray = [];
+      
+      if (response && typeof response === 'object') {
+        // Se response tem a propriedade data e é um array
+        if (response.data && Array.isArray(response.data)) {
+          membersArray = response.data;
+        }
+        // Se response é diretamente um array
+        else if (Array.isArray(response)) {
+          membersArray = response;
+        }
+        // Se response.success existe e response.data é um array
+        else if (response.success && response.data && Array.isArray(response.data)) {
+          membersArray = response.data;
+        }
+      }
+      
+      return { success: true, data: membersArray };
     } catch (error) {
       console.error('Erro ao buscar membros do grupo:', error);
       return { 
