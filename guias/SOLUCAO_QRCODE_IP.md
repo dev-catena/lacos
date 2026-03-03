@@ -2,7 +2,7 @@
 
 ## 🎯 Problema Resolvido
 
-O QR code estava gerando `localhost:8081` (que não funciona no celular), mas o IP correto é `10.102.0.103`.
+O QR code estava gerando `localhost:8081` (que não funciona no celular), mas o IP correto é `192.168.0.20`.
 
 ## ✅ Solução Aplicada
 
@@ -10,7 +10,7 @@ O QR code estava gerando `localhost:8081` (que não funciona no celular), mas o 
 
 O arquivo `INICIAR_EXPO_FIX.sh` foi atualizado para:
 - ✅ Usar modo `--lan` (ao invés de `--tunnel`)
-- ✅ Forçar IP `10.102.0.103` com `--host`
+- ✅ Forçar IP `192.168.0.20` com `--host`
 - ✅ Forçar porta `8081` com `--port`
 - ✅ Detectar automaticamente se usa `expo-dev-client` ou Expo Go
 
@@ -19,8 +19,8 @@ O arquivo `INICIAR_EXPO_FIX.sh` foi atualizado para:
 Os scripts `start` e `start:lan` agora usam o IP correto por padrão:
 
 ```json
-"start": "expo start --lan --host 10.102.0.103 --port 8081",
-"start:lan": "expo start --lan --host 10.102.0.103 --port 8081"
+"start": "expo start --lan --host 192.168.0.20 --port 8081",
+"start:lan": "expo start --lan --host 192.168.0.20 --port 8081"
 ```
 
 ## 🚀 Como Usar
@@ -49,7 +49,7 @@ npm run start:lan
 
 ```bash
 cd /home/darley/lacos
-npx expo start --lan --host 10.102.0.103 --port 8081 --clear
+npx expo start --lan --host 192.168.0.20 --port 8081 --clear
 ```
 
 ## 📱 O Que Deve Aparecer
@@ -57,15 +57,15 @@ npx expo start --lan --host 10.102.0.103 --port 8081 --clear
 Após iniciar, o terminal deve mostrar:
 
 ```
-› Metro waiting on exp://10.102.0.103:8081
+› Metro waiting on exp://192.168.0.20:8081
 ```
 
-E o QR code deve conter: `exp://10.102.0.103:8081`
+E o QR code deve conter: `exp://192.168.0.20:8081`
 
 ## ✅ Verificação
 
 1. Execute o script ou comando acima
-2. Verifique no terminal que aparece `exp://10.102.0.103:8081`
+2. Verifique no terminal que aparece `exp://192.168.0.20:8081`
 3. Escaneie o QR code com Expo Go
 4. O app deve conectar automaticamente!
 
@@ -77,20 +77,20 @@ E o QR code deve conter: `exp://10.102.0.103:8081`
 hostname -I
 ```
 
-Deve mostrar `10.102.0.103` (ou outro IP da sua rede local).
+Deve mostrar `192.168.0.20` (ou outro IP da sua rede local).
 
 ### Se o IP Mudar
 
 Se o IP da sua máquina mudar, atualize:
 
-1. **No script** `INICIAR_EXPO_FIX.sh`: linha com `EXPO_IP="10.102.0.103"`
+1. **No script** `INICIAR_EXPO_FIX.sh`: linha com `EXPO_IP="192.168.0.20"`
 2. **No package.json**: scripts `start` e `start:lan`
 
 ### Testar Conexão Manual
 
 No Expo Go, você pode digitar manualmente:
 ```
-exp://10.102.0.103:8081
+exp://192.168.0.20:8081
 ```
 
 Se funcionar manualmente, o problema é só o QR code (que agora está corrigido).
@@ -98,7 +98,7 @@ Se funcionar manualmente, o problema é só o QR code (que agora está corrigido
 ## 📝 Notas Importantes
 
 - ✅ Certifique-se que celular e computador estão na **mesma rede Wi-Fi**
-- ✅ O IP `10.102.0.103` é o IP local da sua máquina na rede
+- ✅ O IP `192.168.0.20` é o IP local da sua máquina na rede
 - ✅ Não use `localhost` ou `127.0.0.1` no celular (não funciona)
-- ✅ Use sempre o IP da rede local (`10.102.0.103`)
+- ✅ Use sempre o IP da rede local (`192.168.0.20`)
 

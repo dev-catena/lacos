@@ -88,7 +88,7 @@ public function register(Request $request)
 Após atualizar, testar o registro:
 
 ```bash
-curl -X POST http://10.102.0.103/api/register \
+curl -X POST http://192.168.0.20/api/register \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -d '{

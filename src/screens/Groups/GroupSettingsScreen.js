@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ import groupService from '../../services/groupService';
 import groupMemberService from '../../services/groupMemberService';
 import Toast from 'react-native-toast-message';
 import API_CONFIG from '../../config/api';
+import { BACKEND_HOST } from '../../config/env';
 import {
   VitalSignsIcon,
   PermissionsIcon,
@@ -84,6 +85,62 @@ const GroupSettingsScreen = ({ route, navigation }) => {
     accompanied_access_chat: false,
   });
 
+  // URL da foto calculada no render - prioriza groupData para evitar race conditions
+  const displayPhotoUrl = useMemo(() => {
+    if (newGroupPhoto) return newGroupPhoto;
+    if (groupPhotoUrl) return groupPhotoUrl;
+    if (!groupData) return null;
+    const baseUrl = API_CONFIG.BASE_URL.replace(/\/api\/?$/, '');
+    const photoPath = groupData.photo;
+    const photoUrlFromApi = groupData.photo_url || groupData.photo;
+    if (photoPath && typeof photoPath === 'string' && !photoPath.startsWith('http')) {
+      return `${baseUrl}/storage/${photoPath.replace(/^\//, '')}`;
+    }
+    if (photoUrlFromApi && typeof photoUrlFromApi === 'string') {
+      if (photoUrlFromApi.startsWith('http')) {
+        // Backend pode retornar localhost - extrair path e reconstruir com host do app
+        try {
+          const url = new URL(photoUrlFromApi);
+          const appUrl = new URL(baseUrl);
+          if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+            const path = groupData.photo || url.pathname.replace(/^\/storage\//, '');
+            return `${appUrl.origin}/storage/${path.replace(/^\//, '').replace(/^storage\//, '')}`;
+          }
+          return photoUrlFromApi;
+        } catch {
+          return photoUrlFromApi;
+        }
+      }
+      return `${baseUrl}/storage/${(photoUrlFromApi || '').replace(/^\//, '')}`;
+    }
+    return null;
+  }, [newGroupPhoto, groupPhotoUrl, groupData]);
+
+  // Fallback: quando groupData tem foto mas groupPhotoUrl está vazio (ex: race condition)
+  useEffect(() => {
+    if (!groupPhotoUrl && groupData && (groupData.photo || groupData.photo_url)) {
+      const baseUrl = API_CONFIG.BASE_URL.replace(/\/api\/?$/, '');
+      const photoPath = groupData.photo;
+      const photoUrlFromApi = groupData.photo_url || groupData.photo;
+      let fullPhotoUrl;
+      if (photoPath && typeof photoPath === 'string' && !photoPath.startsWith('http')) {
+        fullPhotoUrl = `${baseUrl}/storage/${photoPath.replace(/^\//, '')}`;
+      } else if (photoUrlFromApi && typeof photoUrlFromApi === 'string') {
+        if (photoUrlFromApi.startsWith('http')) {
+          fullPhotoUrl = photoUrlFromApi;
+        } else {
+          fullPhotoUrl = `${baseUrl}/storage/${(photoUrlFromApi || '').replace(/^\//, '')}`;
+        }
+      }
+      if (fullPhotoUrl) {
+        const urlWithCache = `${fullPhotoUrl}${fullPhotoUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+        setGroupPhotoUrl(urlWithCache);
+        setImageSource({ uri: urlWithCache, cache: 'reload' });
+        setPhotoKey(Date.now());
+      }
+    }
+  }, [groupData, groupPhotoUrl]);
+
   useFocusEffect(
     React.useCallback(() => {
       let isMounted = true;
@@ -111,59 +168,92 @@ const GroupSettingsScreen = ({ route, navigation }) => {
 
   const loadGroupData = async () => {
     setLoading(true);
+    let data = null; // Escopo amplo para uso na seção de membros
     try {
+      if (!groupId) {
+        Alert.alert('Erro', 'ID do grupo não informado. Volte e tente novamente.');
+        setLoading(false);
+        return;
+      }
       console.log('🔄 GroupSettings - Carregando grupo da API:', groupId);
-      const result = await groupService.getGroup(groupId);
+      let result = await groupService.getGroup(groupId);
       
-      if (result.success && result.data) {
-        console.log('✅ GroupSettings - Grupo carregado:', result.data);
-        console.log('📸 GroupSettings - photo_url do servidor:', result.data.photo_url);
-        console.log('🔑 GroupSettings - access_code:', result.data.access_code);
-        console.log('🔑 GroupSettings - code:', result.data.code);
-        setGroupData(result.data);
-        setEditedGroupName(result.data.name || '');
-        setEditedDescription(result.data.description || '');
+      // Fallback: se getGroup falhar, tentar buscar da lista (usuário vê o grupo mas show retorna 403)
+      if (!result.success && result.error) {
+        console.log('⚠️ GroupSettings - getGroup falhou, tentando fallback via getMyGroups...');
+        const listResult = await groupService.getMyGroups();
+        if (listResult?.success && Array.isArray(listResult?.data)) {
+          const groupFromList = listResult.data.find(g => String(g.id) === String(groupId));
+          if (groupFromList) {
+            console.log('✅ GroupSettings - Grupo encontrado na lista, usando como fallback');
+            result = { success: true, data: groupFromList };
+          }
+        }
+      }
+      
+      if (result?.success && result?.data) {
+        // Suportar resposta direta ou wrapped em { data: ... }
+        data = result.data?.data || result.data;
+        console.log('✅ GroupSettings - Grupo carregado:', data);
+        console.log('📸 GroupSettings - photo_url do servidor:', data.photo_url);
+        console.log('📸 GroupSettings - photo (path) do servidor:', data.photo);
+        console.log('🔑 GroupSettings - access_code:', data.access_code);
+        console.log('🔑 GroupSettings - code:', data.code);
+        setGroupData(data);
+        setEditedGroupName(data.name || '');
+        setEditedDescription(data.description || '');
         
         // Carregar configurações de sinais vitais
-        if (result.data) {
+        if (data) {
           setVitalSigns({
-            monitor_blood_pressure: result.data.monitor_blood_pressure || false,
-            monitor_heart_rate: result.data.monitor_heart_rate || false,
-            monitor_oxygen_saturation: result.data.monitor_oxygen_saturation || false,
-            monitor_blood_glucose: result.data.monitor_blood_glucose || false,
-            monitor_temperature: result.data.monitor_temperature || false,
-            monitor_respiratory_rate: result.data.monitor_respiratory_rate || false,
+            monitor_blood_pressure: data.monitor_blood_pressure || false,
+            monitor_heart_rate: data.monitor_heart_rate || false,
+            monitor_oxygen_saturation: data.monitor_oxygen_saturation || false,
+            monitor_blood_glucose: data.monitor_blood_glucose || false,
+            monitor_temperature: data.monitor_temperature || false,
+            monitor_respiratory_rate: data.monitor_respiratory_rate || false,
           });
           
           // Carregar permissões do acompanhado
           setPermissions({
-            accompanied_notify_medication: result.data.accompanied_notify_medication !== undefined ? result.data.accompanied_notify_medication : true,
-            accompanied_notify_appointment: result.data.accompanied_notify_appointment !== undefined ? result.data.accompanied_notify_appointment : true,
-            accompanied_access_history: result.data.accompanied_access_history !== undefined ? result.data.accompanied_access_history : true,
-            accompanied_access_medication: result.data.accompanied_access_medication !== undefined ? result.data.accompanied_access_medication : true,
-            accompanied_access_schedule: result.data.accompanied_access_schedule !== undefined ? result.data.accompanied_access_schedule : true,
-            accompanied_access_chat: result.data.accompanied_access_chat !== undefined ? result.data.accompanied_access_chat : false,
+            accompanied_notify_medication: data.accompanied_notify_medication !== undefined ? data.accompanied_notify_medication : true,
+            accompanied_notify_appointment: data.accompanied_notify_appointment !== undefined ? data.accompanied_notify_appointment : true,
+            accompanied_access_history: data.accompanied_access_history !== undefined ? data.accompanied_access_history : true,
+            accompanied_access_medication: data.accompanied_access_medication !== undefined ? data.accompanied_access_medication : true,
+            accompanied_access_schedule: data.accompanied_access_schedule !== undefined ? data.accompanied_access_schedule : true,
+            accompanied_access_chat: data.accompanied_access_chat !== undefined ? data.accompanied_access_chat : false,
           });
         }
         
         // Adicionar cache-busting na URL da foto para forçar reload
-        // Sempre atualizar groupPhotoUrl com a foto do servidor
-        const photoUrl = result.data.photo_url;
-        console.log('📸 GroupSettings.loadGroupData - photo_url do servidor:', photoUrl);
+        // Usar photo_url ou photo (path) - mesma lógica do GroupsScreen
+        const photoUrlFromApi = data.photo_url || data.photo;
+        const photoPath = data.photo;
+        console.log('📸 GroupSettings.loadGroupData - photo_url do servidor:', data.photo_url);
+        console.log('📸 GroupSettings.loadGroupData - photo (path) do servidor:', photoPath);
         console.log('📸 GroupSettings.loadGroupData - newGroupPhoto existe?', !!newGroupPhoto);
         console.log('📸 GroupSettings.loadGroupData - groupPhotoUrl atual:', groupPhotoUrl);
         
-        if (photoUrl) {
-          // Construir URL completa se necessário
-          let fullPhotoUrl = photoUrl;
-          if (!photoUrl.startsWith('http')) {
-            // Se não for URL completa, construir usando a base URL da API
-            const baseUrl = API_CONFIG.BASE_URL.replace('/api', ''); // Remover /api do final
-            fullPhotoUrl = photoUrl.startsWith('/') 
-              ? `${baseUrl}${photoUrl}` 
-              : `${baseUrl}/${photoUrl}`;
+        if (photoUrlFromApi || photoPath) {
+          const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+          let fullPhotoUrl;
+          
+          // Preferir construir a partir do path para garantir host correto (evita localhost no mobile)
+          if (photoPath && typeof photoPath === 'string' && !photoPath.startsWith('http')) {
+            fullPhotoUrl = `${baseUrl}/storage/${photoPath.replace(/^\//, '')}`;
+          } else if (photoUrlFromApi && typeof photoUrlFromApi === 'string') {
+            if (photoUrlFromApi.startsWith('http')) {
+              fullPhotoUrl = photoUrlFromApi;
+            } else {
+              fullPhotoUrl = photoUrlFromApi.startsWith('/') 
+                ? `${baseUrl}${photoUrlFromApi}` 
+                : `${baseUrl}/storage/${photoUrlFromApi}`;
+            }
+          } else {
+            fullPhotoUrl = null;
           }
           
+          if (fullPhotoUrl) {
           // SEMPRE atualizar com cache-busting para forçar reload
           const separator = fullPhotoUrl.includes('?') ? '&' : '?';
           const timestamp = Date.now();
@@ -192,6 +282,10 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           if (newGroupPhoto) {
             console.log('📸 GroupSettings.loadGroupData - newGroupPhoto existe, mantendo para salvar');
           }
+          } else {
+            setGroupPhotoUrl(null);
+            setPhotoKey(Date.now());
+          }
         } else {
           console.log('📸 GroupSettings.loadGroupData - Sem photo_url, limpando groupPhotoUrl');
           setGroupPhotoUrl(null);
@@ -199,7 +293,9 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         }
       } else {
         console.error('❌ GroupSettings - Erro ao carregar grupo:', result.error);
-        Alert.alert('Erro', 'Não foi possível carregar os dados do grupo');
+        const err = result.error;
+        const errMsg = typeof err === 'object' && err?.message ? err.message : (err || 'Erro desconhecido').toString();
+        Alert.alert('Erro', `Não foi possível carregar os dados do grupo.\n\nDetalhe: ${errMsg}\n\nDica: Verifique se o dispositivo está na mesma rede do servidor (${BACKEND_HOST}) e se o backend está rodando.`);
         setLoading(false);
         return; // Não continuar se o grupo não foi carregado
       }
@@ -209,22 +305,27 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       
       // Primeiro, tentar pegar membros do método getGroup (se disponível)
       let membersFromGroup = [];
-      if (result.success && result.data && result.data.group_members) {
-        membersFromGroup = result.data.group_members;
+      if (result?.success && data && Array.isArray(data?.group_members)) {
+        membersFromGroup = data.group_members;
         console.log('📋 GroupSettings - Membros do getGroup:', membersFromGroup.length);
       }
       
-      // Depois, tentar pegar do método members
-      const membersResult = await groupMemberService.getGroupMembers(groupId);
+      // Depois, tentar pegar do método members (com proteção contra resposta inesperada)
       let membersFromApi = [];
-      if (membersResult.success && membersResult.data) {
-        membersFromApi = membersResult.data;
-        console.log('✅ GroupSettings - Membros carregados da API:', membersFromApi.length);
+      let membersResult = null;
+      try {
+        membersResult = await groupMemberService.getGroupMembers(groupId);
+        if (membersResult && membersResult.success && Array.isArray(membersResult?.data)) {
+          membersFromApi = membersResult.data;
+          console.log('✅ GroupSettings - Membros carregados da API:', membersFromApi.length);
+        }
+      } catch (membersErr) {
+        console.warn('⚠️ GroupSettings - Erro ao carregar membros (usando fallback):', membersErr?.message || membersErr);
       }
       
       // Usar membros da API se disponível, senão usar do getGroup
       const finalMembers = membersFromApi.length > 0 ? membersFromApi : membersFromGroup;
-      console.log('📋 GroupSettings - Dados do grupo carregado:', JSON.stringify(result.data, null, 2));
+      console.log('📋 GroupSettings - Dados do grupo carregado:', data ? JSON.stringify(data, null, 2) : 'null');
       console.log('👤 GroupSettings - Usuário logado ID:', user?.id);
       console.log('👥 GroupSettings - Membros finais:', finalMembers.length, JSON.stringify(finalMembers, null, 2));
       setMembers(finalMembers);
@@ -232,8 +333,8 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       if (finalMembers.length > 0) {
         
         // Verificar se o usuário logado é admin
-        // Usar result.data diretamente (dados do grupo já carregados) ao invés de groupData (state pode não estar atualizado)
-        const loadedGroupData = result.data;
+        // Usar data diretamente (dados do grupo já carregados) ao invés de groupData (state pode não estar atualizado)
+        const loadedGroupData = data;
         
         // 1. Verificar se é criador do grupo
         const isCreator = loadedGroupData?.created_by === user?.id;
@@ -269,7 +370,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           );
         }
       } else {
-        console.warn('⚠️ GroupSettings - Erro ao carregar membros:', membersResult.error);
+        console.warn('⚠️ GroupSettings - Erro ao carregar membros:', membersResult?.error ?? 'N/A');
         // Se não conseguiu carregar membros da API, mas tem membros no getGroup, usar esses
         if (membersFromGroup.length > 0) {
           console.log('📋 GroupSettings - Usando membros do getGroup como fallback');
@@ -277,10 +378,17 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         } else {
           setMembers([]);
         }
+        // Mesmo sem membros, verificar se é criador (is_admin vem do backend)
+        const loadedGroupData = data;
+        const isCreator = loadedGroupData?.created_by === user?.id || loadedGroupData?.admin_user_id === user?.id;
+        const userIsAdmin = isCreator || loadedGroupData?.is_admin === true;
+        setIsAdmin(userIsAdmin);
+        console.log(`👤 GroupSettings - Sem membros, é admin? ${userIsAdmin} (criador: ${isCreator}, is_admin do backend: ${loadedGroupData?.is_admin})`);
       }
     } catch (error) {
       console.error('❌ GroupSettings - Erro ao carregar dados do grupo:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os dados do grupo');
+      const errMsg = (typeof error === 'object' && error?.message) || error?.toString?.() || 'Erro desconhecido';
+      Alert.alert('Erro', `Não foi possível carregar os dados do grupo.\n\nDetalhe: ${errMsg}\n\nDica: Verifique se o dispositivo está na mesma rede do servidor (${BACKEND_HOST}) e se o backend está rodando.`);
     } finally {
       setLoading(false);
     }
@@ -1370,38 +1478,30 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             <Text style={styles.sectionTitle}>Informações do Grupo</Text>
           </View>
 
-          {/* Foto do Grupo */}
-          {isAdmin && (
-            <View style={styles.photoSection}>
-              <Text style={styles.label}>Foto do Grupo</Text>
-              {(newGroupPhoto || groupPhotoUrl) ? (
-                <View style={styles.photoContainer}>
-                  <Image 
-                    key={`photo-${photoKey}-${newGroupPhoto ? 'local-' + Date.now() : 'server-' + (groupPhotoUrl ? groupPhotoUrl.split('/').pop() : 'none')}`}
-                    source={newGroupPhoto 
-                      ? { uri: newGroupPhoto, cache: 'reload' }
-                      : (imageSource || { uri: groupPhotoUrl, cache: 'reload' })
-                    } 
-                    style={styles.groupPhotoLarge}
-                    onError={(error) => {
-                      console.error('❌ Erro ao carregar imagem:', error);
-                      console.error('❌ URI tentada:', newGroupPhoto || groupPhotoUrl);
-                      console.error('❌ newGroupPhoto existe?', !!newGroupPhoto);
-                      console.error('❌ groupPhotoUrl:', groupPhotoUrl);
-                      // Se a foto do servidor falhar e tiver foto local, usar a local
-                      if (!newGroupPhoto && groupPhotoUrl) {
-                        console.log('⚠️ Tentando recarregar foto do servidor...');
-                        setTimeout(() => {
-                          setPhotoKey(Date.now());
-                        }, 1000);
-                      }
-                    }}
-                    onLoad={() => {
-                      console.log('✅ Imagem carregada com sucesso');
-                      console.log('✅ URI carregada:', newGroupPhoto || groupPhotoUrl);
-                      console.log('✅ newGroupPhoto existe?', !!newGroupPhoto);
-                    }}
-                  />
+          {/* Foto do Grupo - thumbnail visível para todos, edição só para admin */}
+          <View style={styles.photoSection}>
+            <Text style={styles.label}>Foto do Grupo</Text>
+            {displayPhotoUrl ? (
+              <View style={styles.photoContainer}>
+                <Image 
+                  key={`photo-${photoKey}-${displayPhotoUrl}`}
+                  source={{ uri: displayPhotoUrl }}
+                  style={styles.groupPhotoLarge}
+                  resizeMode="cover"
+                  onError={(error) => {
+                    console.error('❌ Erro ao carregar imagem:', error);
+                    console.error('❌ URI tentada:', displayPhotoUrl);
+                    console.error('❌ groupData.photo:', groupData?.photo);
+                    console.error('❌ groupData.photo_url:', groupData?.photo_url);
+                    if (!newGroupPhoto && displayPhotoUrl) {
+                      setTimeout(() => setPhotoKey(Date.now()), 1000);
+                    }
+                  }}
+                  onLoad={() => {
+                    console.log('✅ Imagem carregada:', displayPhotoUrl);
+                  }}
+                />
+                {isAdmin && (
                   <View style={styles.photoActions}>
                     <TouchableOpacity
                       style={styles.photoActionButton}
@@ -1433,19 +1533,24 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                       <Text style={[styles.photoActionText, { color: colors.error }]}>Remover</Text>
                     </TouchableOpacity>
                   </View>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.addPhotoButton}
-                  onPress={pickGroupPhoto}
-                  activeOpacity={0.7}
-                >
-                  <SafeIcon name="camera" size={48} color={colors.primary} />
-                  <Text style={styles.addPhotoText}>Adicionar Foto</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+                )}
+              </View>
+            ) : isAdmin ? (
+              <TouchableOpacity
+                style={styles.addPhotoButton}
+                onPress={pickGroupPhoto}
+                activeOpacity={0.7}
+              >
+                <SafeIcon name="camera" size={48} color={colors.primary} />
+                <Text style={styles.addPhotoText}>Adicionar Foto</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.addPhotoButton, { opacity: 0.6 }]}>
+                <SafeIcon name="image-outline" size={48} color={colors.gray400} />
+                <Text style={[styles.addPhotoText, { color: colors.gray400 }]}>Sem foto</Text>
+              </View>
+            )}
+          </View>
           
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Nome do Grupo</Text>

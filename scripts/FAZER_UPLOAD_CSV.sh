@@ -5,10 +5,10 @@
 echo "📤 Fazendo upload do arquivo CSV..."
 
 # Copiar para o diretório home primeiro (sem precisar de permissão sudo)
-scp farmacias_credenciadas.csv darley@10.102.0.103:~/
+scp farmacias_credenciadas.csv darley@192.168.0.20:~/
 
 # Mover para o diretório correto no servidor
-sshpass -p "yhvh77" ssh darley@10.102.0.103 << 'EOF'
+sshpass -p "yhvh77" ssh darley@192.168.0.20 << 'EOF'
 echo "yhvh77" | sudo -S mv ~/farmacias_credenciadas.csv /var/www/lacos-backend/farmacias_populares.csv
 echo "yhvh77" | sudo -S chown www-data:www-data /var/www/lacos-backend/farmacias_populares.csv
 echo "yhvh77" | sudo -S chmod 644 /var/www/lacos-backend/farmacias_populares.csv

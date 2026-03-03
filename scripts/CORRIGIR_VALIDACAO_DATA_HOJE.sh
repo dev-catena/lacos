@@ -6,7 +6,7 @@
 
 set -e
 
-SERVER="darley@10.102.0.103"
+SERVER="darley@192.168.0.20"
 SSH_PORT="63022"
 BACKEND_PATH="/var/www/lacos-backend"
 

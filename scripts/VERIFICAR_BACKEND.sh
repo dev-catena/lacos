@@ -8,14 +8,14 @@ echo "🔍 VERIFICANDO CONECTIVIDADE COM BACKEND"
 echo "========================================="
 echo ""
 
-BACKEND_URL="http://10.102.0.103/api"
+BACKEND_URL="http://192.168.0.20/api"
 
 echo "📡 Backend URL: $BACKEND_URL"
 echo ""
 
 # 1. Testar conectividade básica
 echo "1️⃣ Testando conectividade básica..."
-if ping -c 2 -W 2 10.102.0.103 > /dev/null 2>&1; then
+if ping -c 2 -W 2 192.168.0.20 > /dev/null 2>&1; then
     echo "✅ Servidor responde ao ping"
 else
     echo "❌ Servidor NÃO responde ao ping"
@@ -86,7 +86,7 @@ if [ "$HTTP_CODE" = "000" ]; then
     echo "💡 SOLUÇÕES:"
     echo ""
     echo "1. Verificar se backend está rodando:"
-    echo "   ssh darley@10.102.0.103"
+    echo "   ssh darley@192.168.0.20"
     echo "   cd /var/www/lacos-backend"
     echo "   php artisan serve"
     echo ""

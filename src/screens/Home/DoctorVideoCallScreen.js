@@ -39,6 +39,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import colors from '../../constants/colors';
 import videoCallService from '../../services/videoCallService';
+import appointmentService from '../../services/appointmentService';
 import { useAuth } from '../../contexts/AuthContext';
 // Importar RTCView do Agora.io (será disponível após build)
 // import { RtcSurfaceView, RtcSurfaceViewMode } from 'react-native-agora';
@@ -97,6 +98,11 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
       const joinResult = await videoCallService.joinChannel(channelName, userId);
       if (!joinResult.success) {
         throw new Error(joinResult.error || 'Erro ao entrar no canal');
+      }
+
+      // Registrar entrada do médico no backend (para rastreamento de no-show)
+      if (appointment?.id) {
+        appointmentService.videoJoin(appointment.id, 'doctor');
       }
 
       setIsCallActive(true);

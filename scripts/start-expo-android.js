@@ -3,7 +3,7 @@
 // Script para iniciar Expo com IP correto para Android
 // Versão simplificada que permite o QR code aparecer
 
-const EXPO_IP = '10.102.0.103';
+const EXPO_IP = '192.168.0.20';
 const EXPO_PORT = '8081';
 const EXPO_URL = `exp://${EXPO_IP}:${EXPO_PORT}`;
 

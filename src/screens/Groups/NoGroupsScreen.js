@@ -251,6 +251,7 @@ const NoGroupsScreen = ({ navigation, route, onGroupJoined }) => {
         transparent={true}
         onRequestClose={() => setInviteModalVisible(false)}
         statusBarTranslucent={true}
+        presentationStyle="overFullScreen"
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -425,7 +426,7 @@ const styles = StyleSheet.create({
   },
   // Modal
   modalOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'flex-end',
     zIndex: 1000,

@@ -63,7 +63,11 @@ class NotificationApiService {
         count: 0,
       };
     } catch (error) {
-      console.error('❌ notificationApiService - Erro ao contar notificações não lidas:', error);
+      // 401 Unauthenticated: silenciar (usuário não logado ou token expirado)
+      const is401 = error?.status === 401 || error?._rawErrorData?.status === 401;
+      if (!is401) {
+        console.warn('⚠️ notificationApiService - Erro ao contar notificações:', error?.message || error);
+      }
       return {
         success: false,
         count: 0,

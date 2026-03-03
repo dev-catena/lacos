@@ -6,7 +6,7 @@
 set -e
 
 # Configurações do servidor
-SERVER_HOST="10.102.0.103"
+SERVER_HOST="192.168.0.20"
 SERVER_PORT="63022"
 SERVER_USER="darley"
 SERVER_PASS="yhvh77"
@@ -146,8 +146,8 @@ if [ $? -eq 0 ]; then
     echo "🎉 Pronto! Os medicamentos estão disponíveis na API."
     echo ""
     echo "📝 Teste a API:"
-    echo "   GET http://10.102.0.103/api/medications/search?q=paracetamol"
-    echo "   GET http://10.102.0.103/api/medications/stats"
+    echo "   GET http://192.168.0.20/api/medications/search?q=paracetamol"
+    echo "   GET http://192.168.0.20/api/medications/stats"
 else
     echo ""
     echo "❌ Erro na importação"

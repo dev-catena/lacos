@@ -3,7 +3,7 @@
 # Script para listar e baixar arquivos do servidor
 # Se a autenticação SSH automática não funcionar, este script gera comandos manuais
 
-SERVER="darley@10.102.0.103"
+SERVER="darley@192.168.0.20"
 PORT="63022"
 REMOTE_PATH="/var/www/lacos-backend"
 LOCAL_PATH="/home/darley/lacos/backend-laravel"
@@ -82,6 +82,9 @@ echo "Para executar os downloads, você pode:"
 echo "  1. Executar: bash $COMMANDS_FILE"
 echo "  2. Ou fazer o download manualmente usando os comandos listados acima"
 echo ""
+
+
+
 
 
 

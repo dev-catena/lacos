@@ -1,7 +1,7 @@
 # 🌐 Solução: Acesso de Outros Dispositivos
 
 ## ❌ Problema
-A aplicação funciona localmente em `http://10.102.0.103:8081`, mas não é acessível de outros dispositivos na rede.
+A aplicação funciona localmente em `http://192.168.0.20:8081`, mas não é acessível de outros dispositivos na rede.
 
 ## ✅ Soluções
 
@@ -16,10 +16,10 @@ A aplicação funciona localmente em `http://10.102.0.103:8081`, mas não é ace
 Execute no dispositivo que está tentando acessar:
 ```bash
 # Android (via ADB ou terminal)
-ping 10.102.0.103
+ping 192.168.0.20
 
 # Ou teste no navegador do dispositivo
-# Abra: http://10.102.0.103:8081
+# Abra: http://192.168.0.20:8081
 ```
 
 ### 3. Verificar firewall do roteador
@@ -66,12 +66,12 @@ Este script verifica:
 
 1. **No computador (servidor)**:
    ```bash
-   curl http://10.102.0.103:8081
+   curl http://192.168.0.20:8081
    ```
 
 2. **No dispositivo móvel**:
    - Abra navegador
-   - Acesse: `http://10.102.0.103:8081`
+   - Acesse: `http://192.168.0.20:8081`
    - Se não carregar, veja o erro no console do navegador
 
 3. **Verificar logs do servidor**:

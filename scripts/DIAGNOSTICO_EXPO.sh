@@ -11,7 +11,7 @@ echo ""
 # 1. Verificar IP
 echo "1️⃣ Verificando IP da máquina..."
 IP=$(hostname -I | awk '{print $1}')
-EXPO_IP="10.102.0.103"
+EXPO_IP="192.168.0.20"
 echo "   IP atual: $IP"
 echo "   IP esperado: $EXPO_IP"
 if [ "$IP" != "$EXPO_IP" ]; then
@@ -78,7 +78,7 @@ echo ""
 echo "6️⃣ Verificando metro.config.js..."
 if [ -f "metro.config.js" ]; then
     echo "   ✅ metro.config.js existe"
-    if grep -q "10.102.0.103\|$EXPO_IP" metro.config.js; then
+    if grep -q "192.168.0.20\|$EXPO_IP" metro.config.js; then
         echo "   ✅ IP configurado no Metro"
     else
         echo "   ⚠️  IP não encontrado no Metro config"

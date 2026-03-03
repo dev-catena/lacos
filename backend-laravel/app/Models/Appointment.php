@@ -43,6 +43,12 @@ class Appointment extends Model
         'cancelled_by',
         'doctor_amount',
         'platform_amount',
+        'reserved_until',
+        // Rastreamento de entrada na videoconferência (janela: 15 min antes até 40 min depois)
+        'doctor_joined_at',
+        'patient_joined_at',
+        'patient_joined_by_user_id',
+        'absence_detected_at',
     ];
 
     protected $casts = [
@@ -59,6 +65,10 @@ class Appointment extends Model
         'released_at' => 'datetime',
         'refunded_at' => 'datetime',
         'confirmed_at' => 'datetime',
+        'reserved_until' => 'datetime',
+        'doctor_joined_at' => 'datetime',
+        'patient_joined_at' => 'datetime',
+        'absence_detected_at' => 'datetime',
     ];
 
     // Relacionamentos

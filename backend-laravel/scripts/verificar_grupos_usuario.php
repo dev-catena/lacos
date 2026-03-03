@@ -89,3 +89,6 @@ echo "✅ Verificação concluída!\n";
 
 
 
+
+
+

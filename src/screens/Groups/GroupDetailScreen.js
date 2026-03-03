@@ -34,6 +34,7 @@ import {
   ChatIcon,
   InfoIcon,
   DocumentIcon,
+  VideoCamOutlineIcon,
 } from '../../components/CustomIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
@@ -294,6 +295,21 @@ const GroupDetailScreen = ({ route, navigation }) => {
       }),
     },
     {
+      id: 'teleconsulta',
+      featureKey: 'teleconsulta',
+      title: 'Teleconsulta',
+      subtitle: 'Consultas e compromissos',
+      icon: 'videocam',
+      IconComponent: VideoCamOutlineIcon,
+      color: '#6366f1',
+      backgroundColor: '#6366f120',
+      onPress: () => navigation.navigate('Agenda', { 
+        groupId, 
+        groupName,
+        isTeleconsultation: true,
+      }),
+    },
+    {
       id: 'doctors',
       featureKey: 'medicos',
       title: 'Médicos',
@@ -414,6 +430,12 @@ const GroupDetailScreen = ({ route, navigation }) => {
         userPlan: userPlan ? userPlan.name : 'não carregado'
       });
       return isAdmin; // Sempre mostrar para admins, independente do plano
+    }
+    
+    // "Encontrar Cuidador Profissional" não aparece para cuidador profissional participante
+    // (ele É o cuidador, não precisa buscar outro)
+    if (item.id === 'caregivers' && user?.profile === 'professional_caregiver' && !isAdmin) {
+      return false;
     }
     
     // Se o plano ainda não foi carregado, não mostrar outros itens

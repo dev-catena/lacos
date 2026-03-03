@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script simples para testar WhatsApp via curl
-SERVER="10.102.0.103"
+SERVER="192.168.0.20"
 PORT="63022"
 USER="darley"
 PASSWORD="yhvh77"

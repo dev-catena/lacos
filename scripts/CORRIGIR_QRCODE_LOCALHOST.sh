@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🔧 Corrigindo QR code para usar IP 10.102.0.103 (não localhost)..."
+echo "🔧 Corrigindo QR code para usar IP 192.168.0.20 (não localhost)..."
 echo ""
 
 cd /home/darley/lacos || exit 1
@@ -26,7 +26,7 @@ if lsof -i :8081 > /dev/null 2>&1; then
 fi
 
 # IP correto
-EXPO_IP="10.102.0.103"
+EXPO_IP="192.168.0.20"
 EXPO_PORT="8081"
 
 echo ""

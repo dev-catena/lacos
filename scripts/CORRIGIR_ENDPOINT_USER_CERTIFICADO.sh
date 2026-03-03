@@ -3,7 +3,7 @@
 # Script para garantir que o endpoint /user retorna os campos do certificado
 
 SSH_USER="darley"
-SSH_HOST="10.102.0.103"
+SSH_HOST="192.168.0.20"
 SSH_PORT="63022"
 SSH_PASS="yhvh77"
 BACKEND_PATH="/var/www/lacos-backend"
@@ -120,7 +120,7 @@ if [ $? -eq 0 ]; then
     echo "✅ Endpoint /user corrigido com sucesso!"
     echo ""
     echo "📋 Próximos passos:"
-    echo "   1. Teste o endpoint: curl -H 'Authorization: Bearer TOKEN' http://10.102.0.103/api/user"
+    echo "   1. Teste o endpoint: curl -H 'Authorization: Bearer TOKEN' http://192.168.0.20/api/user"
     echo "   2. Verifique se os campos certificate_* aparecem na resposta"
 else
     echo "❌ Erro ao corrigir endpoint /user"

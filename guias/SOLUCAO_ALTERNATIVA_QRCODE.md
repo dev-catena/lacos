@@ -12,14 +12,14 @@ Se o QR code não pode ser corrigido, você pode usar a URL manualmente:
 
 1. Abra o Expo Go
 2. Toque em **"Enter URL manually"** (ou similar)
-3. Digite: `exp://10.102.0.103:8081`
+3. Digite: `exp://192.168.0.20:8081`
 4. Toque em **"Connect"**
 
 ### No App Customizado (expo-dev-client):
 
 1. Abra o app customizado
 2. Procure por **"Enter URL"** ou **"Connect to Dev Server"**
-3. Digite: `exp://10.102.0.103:8081`
+3. Digite: `exp://192.168.0.20:8081`
 4. Toque em **"Connect"**
 
 ## 🔧 Tentar Corrigir Novamente
@@ -35,7 +35,7 @@ Este script:
 - ✅ Modifica metro.config.js para forçar IP
 - ✅ Limpa todo cache
 - ✅ Passa todas as variáveis de ambiente possíveis
-- ✅ Usa `--lan --host 10.102.0.103`
+- ✅ Usa `--lan --host 192.168.0.20`
 
 ### Passo 2: Verificar o Que Está Acontecendo
 
@@ -55,13 +55,13 @@ Após executar `./FORCAR_IP_METRO.sh`, verifique no terminal:
 
 1. **Procure por esta linha:**
    ```
-   📱 Metro configurado para usar IP: 10.102.0.103:8081
+   📱 Metro configurado para usar IP: 192.168.0.20:8081
    ```
    Se aparecer, o metro.config.js está sendo carregado.
 
 2. **Procure pela URL do Metro:**
    ```
-   › Metro waiting on exp://10.102.0.103:8081
+   › Metro waiting on exp://192.168.0.20:8081
    ```
    Se aparecer `localhost`, o problema persiste.
 
@@ -102,7 +102,7 @@ O tunnel cria uma URL `exp.direct` que funciona de qualquer lugar, mas pode ser 
 
 ## 📝 Resumo
 
-1. **Solução Imediata**: Use URL manual `exp://10.102.0.103:8081` no Expo Go
+1. **Solução Imediata**: Use URL manual `exp://192.168.0.20:8081` no Expo Go
 2. **Tentar Corrigir**: Execute `./FORCAR_IP_METRO.sh` e verifique logs
 3. **Verificar**: Execute `./VERIFICAR_QRCODE.sh` para diagnóstico
 4. **Último Recurso**: Use `--tunnel` mode

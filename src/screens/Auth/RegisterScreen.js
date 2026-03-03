@@ -22,11 +22,28 @@ import { useAuth } from '../../contexts/AuthContext';
 import { LacosLogoFull } from '../../components/LacosLogo';
 import { ArrowBackIcon, ChevronDownIcon, EyeIcon, EyeOffIcon } from '../../components/CustomIcons';
 import medicalSpecialtyService from '../../services/medicalSpecialtyService';
-import { navigationRef } from '../../../App';
+import { navigationRef } from '../../navigation/navigationRef';
 import { BR_UFS } from '../../constants/brUfs';
 import { parseCrm, formatCrmValue } from '../../utils/crm';
 import { formatCPF, validateCPF, unformatCPF } from '../../utils/cpf';
 import Svg, { Path, Circle } from 'react-native-svg';
+
+// Máscara de reais: formata valor para exibição (R$ 1.234,56)
+const formatReaisDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return '';
+  const num = parseFloat(String(value).replace(',', '.'));
+  if (isNaN(num)) return '';
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Extrai apenas números e uma vírgula/ponto para o valor numérico
+const parseReaisInput = (text) => {
+  const cleaned = text.replace(/[^\d,.]/g, '').replace(',', '.');
+  const parts = cleaned.split('.');
+  if (parts.length > 2) return parts[0] + '.' + parts.slice(1).join('');
+  if (parts.length === 2 && parts[1].length > 2) return parts[0] + '.' + parts[1].slice(0, 2);
+  return cleaned;
+};
 
 const RegisterScreen = ({ navigation }) => {
   const { signUp, clearRegistering, savedFormData, getSavedFormData, isRegistering } = useAuth();
@@ -1079,18 +1096,21 @@ const RegisterScreen = ({ navigation }) => {
                     </View>
 
                     <View style={styles.inputContainer}>
-                      <Text style={styles.label}>Valor por hora (R$) *</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Ex: 50.00"
-                        placeholderTextColor={colors.placeholder}
-                        value={formData.hourly_rate}
-                        onChangeText={(value) => {
-                          const cleaned = value.replace(/[^0-9.]/g, '');
-                          updateFormData('hourly_rate', cleaned);
-                        }}
-                        keyboardType="decimal-pad"
-                      />
+                      <Text style={styles.label}>Valor por hora *</Text>
+                      <View style={styles.currencyInputWrapper}>
+                        <Text style={styles.currencyPrefix}>R$</Text>
+                        <TextInput
+                          style={[styles.input, styles.currencyInput]}
+                          placeholder="0,00"
+                          placeholderTextColor={colors.placeholder}
+                          value={formatReaisDisplay(formData.hourly_rate)}
+                          onChangeText={(value) => {
+                            const parsed = parseReaisInput(value);
+                            updateFormData('hourly_rate', parsed);
+                          }}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
                     </View>
                   </>
                 )}
@@ -1605,6 +1625,26 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: colors.text,
+  },
+  currencyInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingLeft: 16,
+  },
+  currencyPrefix: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginRight: 8,
+  },
+  currencyInput: {
+    flex: 1,
+    borderWidth: 0,
+    paddingLeft: 0,
   },
   crmRow: {
     flexDirection: 'row',

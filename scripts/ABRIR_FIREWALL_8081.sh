@@ -39,7 +39,7 @@ echo ""
 echo "💡 Agora tente conectar o Android novamente"
 echo "   Se ainda não funcionar, verifique:"
 echo "   1. Celular e PC na mesma rede Wi-Fi"
-echo "   2. IP do PC é 10.102.0.103"
+echo "   2. IP do PC é 192.168.0.20"
 echo "   3. Expo Go está atualizado no celular"
 
 

@@ -169,7 +169,7 @@ npx expo start --clear
 # Ver IP da máquina
 hostname -I
 
-# Deve mostrar: 10.102.0.103
+# Deve mostrar: 192.168.0.20
 # Esse IP deve estar configurado em src/config/api.js
 ```
 
@@ -187,7 +187,7 @@ curl http://localhost:8000/api/health
 **Verificar configuração:**
 ```bash
 # Abrir src/config/api.js
-# BASE_URL deve ser: 'http://10.102.0.103:8000/api'
+# BASE_URL deve ser: 'http://192.168.0.20:8000/api'
 ```
 
 ### App trava ao carregar
@@ -312,7 +312,7 @@ ps aux | grep php   # Laravel
 - [ ] Frontend rodando (QR code visível no terminal)
 - [ ] Expo Go instalado no celular
 - [ ] Mesmo Wi-Fi (celular e PC)
-- [ ] IP correto em `src/config/api.js` (`10.102.0.103`)
+- [ ] IP correto em `src/config/api.js` (`192.168.0.20`)
 - [ ] QR code escaneado
 - [ ] App carregou no celular
 - [ ] Login funciona

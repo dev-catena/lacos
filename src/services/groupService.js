@@ -65,11 +65,13 @@ class GroupService {
       if (Array.isArray(response)) {
         groupsArray = response;
       } else if (response && typeof response === 'object') {
-        // Se response é um objeto, pode ter uma propriedade data ou ser o próprio array
-        if (Array.isArray(response.data)) {
-          groupsArray = response.data;
-        } else if (Array.isArray(response.groups)) {
-          groupsArray = response.groups;
+        // Se response é um objeto, pode ter uma propriedade data ou ser o próprio array (usar ?. para evitar ReferenceError)
+        const responseData = response?.data;
+        const responseGroups = response?.groups;
+        if (Array.isArray(responseData)) {
+          groupsArray = responseData;
+        } else if (Array.isArray(responseGroups)) {
+          groupsArray = responseGroups;
         } else {
           // Se não encontrou array, tentar converter para array
           groupsArray = [];
@@ -86,12 +88,18 @@ class GroupService {
         data: groupsArray 
       };
     } catch (error) {
-      console.error('❌ GroupService.getMyGroups - Erro ao buscar grupos:', error);
-      console.error('❌ GroupService.getMyGroups - Detalhes do erro:', {
-        message: error.message,
-        status: error.status,
-        response: error.response
-      });
+      const status = error.status ?? error._rawErrorData?.status;
+      if (status === 404) {
+        // 404: rota /groups não encontrada. O backend deve ser lacos/backend-laravel (não outro projeto).
+        console.warn('⚠️ GroupService.getMyGroups - 404 em /groups. Suba o backend: cd /home/darley/lacos/backend-laravel && php artisan serve --host=0.0.0.0 --port=8000. Confira BACKEND_HOST/BACKEND_PORT em src/config/env.js.');
+      } else {
+        console.error('❌ GroupService.getMyGroups - Erro ao buscar grupos:', error);
+        console.error('❌ GroupService.getMyGroups - Detalhes do erro:', {
+          message: error.message,
+          status: error.status,
+          response: error.response
+        });
+      }
       return { 
         success: false, 
         error: error.message || 'Erro ao buscar grupos',

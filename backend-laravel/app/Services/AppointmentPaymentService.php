@@ -94,6 +94,7 @@ class AppointmentPaymentService
                 'payment_hold_id' => $paymentResult['hold_id'],
                 'paid_at' => now(),
                 'held_at' => now(),
+                'reserved_until' => null, // Limpar reserva quando pagamento é confirmado
             ]);
 
             Log::info('AppointmentPaymentService.processPayment - Pagamento processado', [
@@ -180,7 +181,7 @@ class AppointmentPaymentService
 
             // Atualizar appointment
             $appointment->update([
-                'status' => 'concluida',
+                'status' => 'completed',
                 'payment_status' => 'released',
                 'confirmed_by' => $confirmedBy,
                 'confirmed_at' => now(),
@@ -199,7 +200,7 @@ class AppointmentPaymentService
             return [
                 'success' => true,
                 'appointment_id' => $appointment->id,
-                'status' => 'concluida',
+                'status' => 'completed',
                 'payment_status' => 'released',
                 'transfers' => $releaseResult['transfers'],
                 'doctor_amount' => $doctorAmount,
@@ -281,6 +282,114 @@ class AppointmentPaymentService
             return [
                 'success' => false,
                 'message' => 'Erro ao processar reembolso: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Médico não entrou na videoconferência (janela: 15 min antes até 40 min depois)
+     * Reembolsa integralmente o paciente.
+     */
+    public function handleDoctorAbsence(Appointment $appointment): array
+    {
+        try {
+            if ($appointment->payment_status !== 'paid_held') {
+                return [
+                    'success' => false,
+                    'message' => 'Pagamento não está em hold para reembolso.',
+                ];
+            }
+
+            $refundResult = $this->cancelAndRefund($appointment, 'system_doctor_absence');
+
+            if ($refundResult['success']) {
+                $appointment->update(['absence_detected_at' => now()]);
+            }
+
+            return $refundResult;
+        } catch (\Exception $e) {
+            Log::error('AppointmentPaymentService.handleDoctorAbsence - Erro', [
+                'appointment_id' => $appointment->id,
+                'error' => $e->getMessage(),
+            ]);
+            return [
+                'success' => false,
+                'message' => 'Erro ao processar reembolso: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Paciente não entrou na videoconferência (janela: 15 min antes até 40 min depois)
+     * Libera pagamento para o médico (80% médico, 20% plataforma). Status = cancelada.
+     */
+    public function handlePatientAbsence(Appointment $appointment): array
+    {
+        try {
+            if ($appointment->payment_status !== 'paid_held') {
+                return [
+                    'success' => false,
+                    'message' => 'Pagamento não está em hold para liberar.',
+                ];
+            }
+
+            $originalPrice = round($appointment->amount / 1.20, 2);
+            $doctorAmount = $originalPrice;
+            $platformAmount = round($appointment->amount - $originalPrice, 2);
+            $doctorPercentage = round(($doctorAmount / $appointment->amount) * 100, 2);
+            $platformPercentage = round(($platformAmount / $appointment->amount) * 100, 2);
+
+            $releaseResult = $this->paymentService->releaseHold(
+                $appointment->payment_hold_id,
+                $appointment->amount,
+                [
+                    'doctor_percentage' => $doctorPercentage,
+                    'platform_percentage' => $platformPercentage,
+                    'doctor_account_id' => $this->getDoctorAccountId($appointment->doctor_id),
+                    'platform_account_id' => $this->getPlatformAccountId(),
+                ]
+            );
+
+            if (!$releaseResult['success']) {
+                return [
+                    'success' => false,
+                    'message' => 'Erro ao liberar pagamento no gateway.',
+                ];
+            }
+
+            $appointment->update([
+                'status' => 'cancelled',
+                'payment_status' => 'released',
+                'cancelled_by' => 'system_patient_absence',
+                'released_at' => now(),
+                'absence_detected_at' => now(),
+                'doctor_amount' => $doctorAmount,
+                'platform_amount' => $platformAmount,
+            ]);
+
+            Log::info('AppointmentPaymentService.handlePatientAbsence - Pagamento liberado (paciente ausente)', [
+                'appointment_id' => $appointment->id,
+                'doctor_amount' => $doctorAmount,
+                'platform_amount' => $platformAmount,
+            ]);
+
+            return [
+                'success' => true,
+                'appointment_id' => $appointment->id,
+                'status' => 'cancelled',
+                'payment_status' => 'released',
+                'transfers' => $releaseResult['transfers'],
+                'doctor_amount' => $doctorAmount,
+                'platform_amount' => $platformAmount,
+            ];
+        } catch (\Exception $e) {
+            Log::error('AppointmentPaymentService.handlePatientAbsence - Erro', [
+                'appointment_id' => $appointment->id,
+                'error' => $e->getMessage(),
+            ]);
+            return [
+                'success' => false,
+                'message' => 'Erro ao liberar pagamento: ' . $e->getMessage(),
             ];
         }
     }

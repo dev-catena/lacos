@@ -4,7 +4,7 @@ echo "🔧 Corrigindo especialidades médicas duplicadas..."
 echo ""
 
 SERVER_USER="darley"
-SERVER_HOST="10.102.0.103"
+SERVER_HOST="192.168.0.20"
 SERVER_PASS="yhvh77"
 SERVER_PATH="/var/www/lacos-backend"
 CONTROLLER_FILE="app/Http/Controllers/Api/MedicalSpecialtyController.php"

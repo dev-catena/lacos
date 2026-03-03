@@ -10,7 +10,7 @@
 Execute no servidor:
 
 ```bash
-ssh darley@10.102.0.103
+ssh darley@192.168.0.20
 cd /var/www/lacos-backend
 
 # Opção 1: Usar script automatizado

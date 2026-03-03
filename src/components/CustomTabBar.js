@@ -3,8 +3,10 @@ import { View, Text, TouchableOpacity, StyleSheet, AppState } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import colors from '../constants/colors';
-import { HomeIcon, GroupsIcon, NotificationIcon, ProfileIcon, PeopleIcon } from './CustomIcons';
+import { HomeIcon, GroupsIcon, NotificationIcon, ProfileIcon, PeopleIcon, MessagesIcon } from './CustomIcons';
 import notificationApiService from '../services/notificationApiService';
+import chatService from '../services/chatService';
+import { useAuth } from '../contexts/AuthContext';
 
 // Componente para renderizar ícone SVG profissional
 const TabIcon = ({ routeName, isFocused, size = 24 }) => {
@@ -26,6 +28,8 @@ const TabIcon = ({ routeName, isFocused, size = 24 }) => {
         return <ProfileIcon size={size} color={color} filled={isFocused} />;
       case 'Clients':
         return <GroupsIcon size={size} color={color} filled={isFocused} />;
+      case 'Messages':
+        return <MessagesIcon size={size} color={color} />;
       default:
         return <View style={{ width: size, height: size }} />;
     }
@@ -36,40 +40,70 @@ const TabIcon = ({ routeName, isFocused, size = 24 }) => {
 };
 
 const CustomTabBar = ({ state, descriptors, navigation }) => {
+  const { signed } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [messagesUnreadCount, setMessagesUnreadCount] = useState(0);
   const intervalRef = React.useRef(null);
 
   const loadUnreadCount = React.useCallback(async () => {
+    if (!signed) {
+      setUnreadCount(0);
+      return;
+    }
     try {
-      console.log('🔔 CustomTabBar - Carregando contador de notificações...');
       const result = await notificationApiService.getUnreadCount();
-      console.log('🔔 CustomTabBar - Resultado do getUnreadCount:', JSON.stringify(result));
       if (result.success) {
-        const count = result.count || 0;
-        console.log('🔔 CustomTabBar - Contador de notificações atualizado:', count);
-        setUnreadCount(count);
+        setUnreadCount(result.count ?? 0);
       } else {
-        console.warn('⚠️ CustomTabBar - Erro ao obter contador:', result.error);
         setUnreadCount(0);
       }
     } catch (error) {
-      console.error('❌ CustomTabBar - Erro ao carregar contador de notificações:', error);
       setUnreadCount(0);
     }
-  }, []);
-  
-  // Carregar contador na inicialização
+  }, [signed]);
+
+  const loadMessagesUnreadCount = React.useCallback(async () => {
+    if (!signed) {
+      setMessagesUnreadCount(0);
+      return;
+    }
+    try {
+      const result = await chatService.getUnreadCount();
+      if (result.success) {
+        setMessagesUnreadCount(result.count ?? 0);
+      } else {
+        setMessagesUnreadCount(0);
+      }
+    } catch (error) {
+      setMessagesUnreadCount(0);
+    }
+  }, [signed]);
+
+  // Resetar contador e parar intervalo quando deslogar
   React.useEffect(() => {
-    console.log('🔔 CustomTabBar - Componente montado, carregando contador inicial...');
+    if (!signed) {
+      setUnreadCount(0);
+      setMessagesUnreadCount(0);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+  }, [signed]);
+
+  // Carregar contadores na inicialização
+  React.useEffect(() => {
     loadUnreadCount();
-  }, [loadUnreadCount]);
+    loadMessagesUnreadCount();
+  }, [loadUnreadCount, loadMessagesUnreadCount]);
 
   // Monitorar estado do app (ativo/background)
   React.useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
-        // App voltou para primeiro plano - recarregar contador e reiniciar intervalo
+        // App voltou para primeiro plano - recarregar contadores e reiniciar intervalo
         loadUnreadCount();
+        loadMessagesUnreadCount();
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
@@ -77,6 +111,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
           // Verificar se app ainda está ativo antes de fazer requisição
           if (AppState.currentState === 'active') {
             loadUnreadCount();
+            loadMessagesUnreadCount();
           }
         }, 10000); // Aumentado para 10 segundos para reduzir requisições
       } else if (nextAppState === 'background' || nextAppState === 'inactive') {
@@ -103,6 +138,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
       // Só atualizar se o app estiver ativo
       if (AppState.currentState === 'active') {
         loadUnreadCount();
+        loadMessagesUnreadCount();
         
         // Limpar intervalo anterior se existir
         if (intervalRef.current) {
@@ -115,6 +151,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
           // Verificar se app ainda está ativo antes de fazer requisição
           if (AppState.currentState === 'active') {
             loadUnreadCount();
+            loadMessagesUnreadCount();
           }
         }, 10000);
       }
@@ -125,22 +162,15 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
           intervalRef.current = null;
         }
       };
-    }, [])
+    }, [loadUnreadCount])
   );
 
-  // Carregar contador na inicialização
+  // Atualizar contadores quando mudar de rota (detectar mudanças no state.index)
   React.useEffect(() => {
-    console.log('🔔 CustomTabBar - Componente montado, carregando contador inicial...');
+    // Atualizar contadores quando o usuário navega entre as tabs
     loadUnreadCount();
-  }, [loadUnreadCount]);
-
-  // Atualizar contador quando mudar de rota (detectar mudanças no state.index)
-  React.useEffect(() => {
-    // Atualizar contador quando o índice da rota mudar
-    // Isso detecta quando o usuário navega entre as tabs
-    console.log('🔔 CustomTabBar - Rota mudou, atualizando contador...');
-    loadUnreadCount();
-  }, [state.index, loadUnreadCount]);
+    loadMessagesUnreadCount();
+  }, [state.index, loadUnreadCount, loadMessagesUnreadCount]);
 
   try {
     return (
@@ -150,7 +180,10 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
             const { options } = descriptors[route.key];
             const label = options.tabBarLabel || route.name;
             const isFocused = state.index === index;
-            const showBadge = route.name === 'Notifications' && unreadCount > 0;
+            const showNotificationsBadge = route.name === 'Notifications' && unreadCount > 0;
+            const showMessagesBadge = route.name === 'Messages' && messagesUnreadCount > 0;
+            const showBadge = showNotificationsBadge || showMessagesBadge;
+            const badgeCount = showNotificationsBadge ? unreadCount : (showMessagesBadge ? messagesUnreadCount : 0);
 
             const onPress = () => {
               const event = navigation.emit({
@@ -192,7 +225,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                   {showBadge && (
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>
-                        {unreadCount > 99 ? '99+' : unreadCount}
+                        {badgeCount > 99 ? '99+' : badgeCount}
                       </Text>
                     </View>
                   )}

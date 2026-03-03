@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para testar envio de WhatsApp no servidor
-SERVER="10.102.0.103"
+SERVER="192.168.0.20"
 PORT="63022"
 USER="darley"
 PASSWORD="yhvh77"

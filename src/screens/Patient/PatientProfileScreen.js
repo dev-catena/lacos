@@ -34,7 +34,12 @@ import { LacosIcon } from '../../components/LacosLogo';
 import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import userService from '../../services/userService';
+import activityService from '../../services/activityService';
 import Toast from 'react-native-toast-message';
+import moment from 'moment';
+import 'moment/locale/pt-br';
+import { Ionicons } from '@expo/vector-icons';
+moment.locale('pt-br');
 
 const PATIENT_SESSION_KEY = '@lacos_patient_session';
 
@@ -48,6 +53,8 @@ const PatientProfileScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [photoUri, setPhotoUri] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
   
   // Calcular padding bottom para o ScrollView (altura do tab bar + inset do Android)
   const tabBarHeight = 60;
@@ -101,11 +108,48 @@ const PatientProfileScreen = ({ navigation }) => {
             setAdminName(admin.user.name);
           }
         }
+        
+        // Carregar atividades recentes do grupo
+        await loadRecentActivities(patientGroup.id);
       }
     } catch (error) {
       console.error('Erro ao carregar dados do perfil:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRecentActivities = async (groupId) => {
+    try {
+      setLoadingActivities(true);
+      const result = await activityService.getGroupActivities(groupId, 5);
+      
+      if (result.success && result.data) {
+        const activities = Array.isArray(result.data) ? result.data : [];
+        
+        const formattedActivities = activities.map(activity => {
+          return {
+            id: activity.id,
+            title: activityService.getActivityTypeLabel(activity.action_type),
+            description: activity.description,
+            icon: activityService.getActivityIcon(activity.action_type),
+            color: activityService.getActivityColor(activity.action_type),
+            time: moment(activity.created_at).fromNow(),
+            dateTime: moment(activity.created_at).format('DD/MM/YYYY [às] HH:mm'),
+            timestamp: activity.created_at,
+            action_type: activity.action_type,
+          };
+        });
+        
+        setRecentActivities(formattedActivities);
+      } else {
+        setRecentActivities([]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar atividades:', error);
+      setRecentActivities([]);
+    } finally {
+      setLoadingActivities(false);
     }
   };
 
@@ -350,6 +394,37 @@ const PatientProfileScreen = ({ navigation }) => {
             color={colors.info}
           />
         </View>
+
+        {/* Últimas Atualizações Section */}
+        {recentActivities.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Últimas Atualizações</Text>
+            
+            {loadingActivities ? (
+              <View style={styles.activitiesLoading}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.activitiesLoadingText}>Carregando...</Text>
+              </View>
+            ) : (
+              recentActivities.map((activity) => (
+                <View key={activity.id} style={styles.activityCard}>
+                  <View style={[styles.activityIcon, { backgroundColor: activity.color + '20' }]}>
+                    <Ionicons name={activity.icon} size={24} color={activity.color} />
+                  </View>
+                  <View style={styles.activityContent}>
+                    <Text style={styles.activityTitle}>{activity.title}</Text>
+                    {activity.description && (
+                      <Text style={styles.activityDescription} numberOfLines={2}>
+                        {activity.description}
+                      </Text>
+                    )}
+                    <Text style={styles.activityTime}>{activity.time}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        )}
 
         {/* Help Section */}
         <View style={styles.section}>
@@ -618,6 +693,51 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: colors.text,
+  },
+  activityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  activityIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  activityDescription: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 4,
+  },
+  activityTime: {
+    fontSize: 12,
+    color: colors.textLight,
+  },
+  activitiesLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    gap: 12,
+  },
+  activitiesLoadingText: {
+    fontSize: 14,
+    color: colors.textLight,
   },
 });
 

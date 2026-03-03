@@ -40,7 +40,7 @@ O backend precisa permitir requisições do Expo Web. O Expo Web geralmente roda
     'http://localhost:19006',
     'http://127.0.0.1:8081',
     'http://127.0.0.1:19006',
-    'http://10.102.0.103:8081',  // Seu IP local
+    'http://192.168.0.20:8081',  // Seu IP local
     // ... outros
 ],
 ```
@@ -56,7 +56,7 @@ export default {
   server: {
     proxy: {
       '/api': {
-        target: 'http://10.102.0.103',
+        target: 'http://192.168.0.20',
         changeOrigin: true,
       }
     }
@@ -83,7 +83,7 @@ Use variável de ambiente para desenvolvimento local:
 
 ```javascript
 // web/src/config/api.js
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://10.102.0.103/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://192.168.0.20/api';
 ```
 
 E criar `.env`:

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para iniciar Expo com QR code CORRETO (sem localhost)
-# Gera QR code customizado com exp://10.102.0.103:8081
+# Gera QR code customizado com exp://192.168.0.20:8081
 
 set -e
 
@@ -12,7 +12,7 @@ echo "====================================="
 echo ""
 
 # IP e Porta
-EXPO_IP="10.102.0.103"
+EXPO_IP="192.168.0.20"
 EXPO_PORT="8081"
 EXPO_URL="exp://${EXPO_IP}:${EXPO_PORT}"
 

@@ -51,7 +51,7 @@ O problema mais comum é CORS não permitir requisições do Expo Web.
 - `http://localhost:8081` (Expo Web)
 - `http://localhost:19006` (Expo Web alternativo)
 - `http://127.0.0.1:8081`
-- `http://10.102.0.103:8081` (seu IP local)
+- `http://192.168.0.20:8081` (seu IP local)
 - Padrões para IPs locais
 
 ### Solução 2: Verificar Backend
@@ -75,7 +75,7 @@ Se firewall está bloqueando:
 
 **No servidor:**
 ```bash
-ssh -p 63022 darley@10.102.0.103
+ssh -p 63022 darley@192.168.0.20
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw reload
@@ -87,7 +87,7 @@ Se nginx/apache não está rodando:
 
 **No servidor:**
 ```bash
-ssh -p 63022 darley@10.102.0.103
+ssh -p 63022 darley@192.168.0.20
 sudo systemctl status nginx
 # ou
 sudo systemctl status apache2

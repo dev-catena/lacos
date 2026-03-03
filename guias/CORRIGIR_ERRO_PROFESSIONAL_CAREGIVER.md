@@ -15,7 +15,7 @@ A coluna `profile` existe na tabela `users`, mas pode ter uma constraint ENUM qu
 Conecte-se ao servidor e execute:
 
 ```bash
-ssh darley@10.102.0.103
+ssh darley@192.168.0.20
 cd /var/www/lacos-backend
 ```
 
@@ -38,7 +38,7 @@ ALTER TABLE users MODIFY COLUMN profile VARCHAR(50) NULL;
 
 1. Conecte-se ao servidor:
 ```bash
-ssh darley@10.102.0.103
+ssh darley@192.168.0.20
 cd /var/www/lacos-backend
 ```
 
@@ -98,7 +98,7 @@ php artisan route:clear
 Após aplicar a correção, teste criando uma conta:
 
 ```bash
-curl -X POST http://10.102.0.103/api/register \
+curl -X POST http://192.168.0.20/api/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Teste Profissional",

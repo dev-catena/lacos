@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -67,6 +67,42 @@ const formatPhone = (value) => {
   }
 };
 
+// Função para formatar CPF do backend (aplica máscara 000.000.000-00)
+const formatCPFFromBackend = (cpfString) => {
+  if (!cpfString) return '';
+  const numbers = cpfString.toString().replace(/\D/g, '');
+  if (numbers.length === 0) return '';
+  if (numbers.length <= 3) return numbers;
+  if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+  if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+  return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+};
+
+// Função para validar CPF (dígitos verificadores e regras)
+const validateCPF = (cpf) => {
+  const numbers = cpf.replace(/\D/g, '');
+  if (numbers.length !== 11) return false;
+  // Rejeitar CPFs com todos os dígitos iguais
+  if (/^(\d)\1{10}$/.test(numbers)) return false;
+  // Validar primeiro dígito verificador
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(numbers[i]) * (10 - i);
+  }
+  let digit = (sum * 10) % 11;
+  if (digit === 10) digit = 0;
+  if (digit !== parseInt(numbers[9])) return false;
+  // Validar segundo dígito verificador
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(numbers[i]) * (11 - i);
+  }
+  digit = (sum * 10) % 11;
+  if (digit === 10) digit = 0;
+  if (digit !== parseInt(numbers[10])) return false;
+  return true;
+};
+
 // Função para formatar telefone do backend (remove +55 se existir)
 const formatPhoneFromBackend = (phoneString) => {
   if (!phoneString) return '+55';
@@ -81,13 +117,24 @@ const formatPhoneFromBackend = (phoneString) => {
 const EditPersonalDataScreen = ({ navigation }) => {
   const { user, updateUser } = useAuth();
 
+  // Converter gênero de inglês para português ao carregar
+  const genderMapFromEnglish = {
+    'male': 'Masculino',
+    'female': 'Feminino',
+    'masculino': 'Masculino',
+    'feminino': 'Feminino',
+    'outro': 'Outro',
+    'other': 'Outro',
+  };
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     lastName: user?.lastName || user?.last_name || '',
     email: user?.email || '',
     phone: formatPhoneFromBackend(user?.phone || ''),
-    cpf: user?.cpf || '',
+    cpf: formatCPFFromBackend(user?.cpf || ''),
     birthDate: formatDateFromBackend(user?.birthDate || user?.birth_date || ''),
+    gender: user?.gender ? (genderMapFromEnglish[user.gender] || user.gender) : '',
     address: user?.address || '',
     addressNumber: user?.address_number || user?.addressNumber || '',
     addressComplement: user?.address_complement || user?.addressComplement || '',
@@ -98,9 +145,36 @@ const EditPersonalDataScreen = ({ navigation }) => {
 
   const [loading, setLoading] = useState(false);
   const [loadingCEP, setLoadingCEP] = useState(false);
+  const [cpfError, setCpfError] = useState('');
   const cepTimeoutRef = useRef(null);
 
+  const isProfessionalCaregiver = user?.profile === 'professional_caregiver';
+
+  // Sincronizar formData quando user mudar (ex: ao voltar de outra tela)
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.name || prev.name,
+        lastName: user.lastName || user.last_name || prev.lastName,
+        email: user.email || prev.email,
+        phone: formatPhoneFromBackend(user.phone || '') || prev.phone,
+        cpf: formatCPFFromBackend(user.cpf || '') || prev.cpf,
+        birthDate: formatDateFromBackend(user.birthDate || user.birth_date || '') || prev.birthDate,
+        gender: user.gender ? (genderMapFromEnglish[user.gender] || user.gender) : prev.gender,
+        address: user.address || prev.address,
+        addressNumber: user.address_number || user.addressNumber || prev.addressNumber,
+        addressComplement: user.address_complement || user.addressComplement || prev.addressComplement,
+        city: user.city || prev.city,
+        state: user.state || prev.state,
+        zipCode: user.zipCode || user.zip_code || prev.zipCode,
+      }));
+    }
+  }, [user]);
+
   const handleSave = async () => {
+    setCpfError('');
+
     // Validações básicas
     if (!formData.name.trim()) {
       Alert.alert('Erro', 'Nome é obrigatório');
@@ -110,6 +184,29 @@ const EditPersonalDataScreen = ({ navigation }) => {
     if (!formData.email.trim()) {
       Alert.alert('Erro', 'E-mail é obrigatório');
       return;
+    }
+
+    // Validação CPF para cuidador profissional
+    if (isProfessionalCaregiver) {
+      const cleanCPF = formData.cpf?.replace(/\D/g, '') || '';
+      if (!cleanCPF || cleanCPF.length < 11) {
+        setCpfError('CPF é obrigatório para cuidador profissional');
+        Alert.alert('Atenção', 'CPF é obrigatório para cuidador profissional');
+        return;
+      }
+      if (!validateCPF(formData.cpf)) {
+        setCpfError('CPF inválido. Verifique os números digitados.');
+        Alert.alert('CPF inválido', 'O CPF informado não é válido. Verifique os números digitados.');
+        return;
+      }
+    } else if (formData.cpf?.trim()) {
+      // Para outros perfis: se CPF preenchido, validar
+      const cleanCPF = formData.cpf.replace(/\D/g, '');
+      if (cleanCPF.length === 11 && !validateCPF(formData.cpf)) {
+        setCpfError('CPF inválido. Verifique os números digitados.');
+        Alert.alert('CPF inválido', 'O CPF informado não é válido. Verifique os números digitados.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -136,12 +233,11 @@ const EditPersonalDataScreen = ({ navigation }) => {
         dataToUpdate.phone = phoneNumbers.startsWith('55') ? phoneNumbers : `55${phoneNumbers}`;
       }
       if (formData.cpf && formData.cpf.trim()) {
-        // Remover formatação do CPF antes de enviar
         const cleanCPF = formData.cpf.replace(/\D/g, '');
-        if (cleanCPF.length === 11) {
+        if (cleanCPF.length === 11 && validateCPF(formData.cpf)) {
           dataToUpdate.cpf = cleanCPF;
-        } else {
-          dataToUpdate.cpf = formData.cpf.trim();
+        } else if (cleanCPF.length === 11) {
+          dataToUpdate.cpf = cleanCPF;
         }
       }
       if (formData.birthDate) {
@@ -154,6 +250,17 @@ const EditPersonalDataScreen = ({ navigation }) => {
           // Se não estiver no formato correto, enviar como está
           dataToUpdate.birth_date = formData.birthDate;
         }
+      }
+      if (formData.gender) {
+        const genderMap = {
+          'Masculino': 'masculino',
+          'Feminino': 'feminino',
+          'Outro': 'outro',
+          'male': 'masculino',
+          'female': 'feminino',
+          'other': 'outro',
+        };
+        dataToUpdate.gender = genderMap[formData.gender] || formData.gender?.toLowerCase() || formData.gender;
       }
       if (formData.address && formData.address.trim()) {
         dataToUpdate.address = formData.address.trim();
@@ -292,8 +399,24 @@ const EditPersonalDataScreen = ({ navigation }) => {
 
   // Função para lidar com mudança no CPF
   const handleCPFChange = (text) => {
+    setCpfError('');
     const formatted = formatCPF(text);
     updateField('cpf', formatted);
+  };
+
+  const handleCPFBlur = () => {
+    if (formData.cpf?.trim()) {
+      const cleanCPF = formData.cpf.replace(/\D/g, '');
+      if (cleanCPF.length === 11 && !validateCPF(formData.cpf)) {
+        setCpfError('CPF inválido');
+      } else {
+        setCpfError('');
+      }
+    } else if (isProfessionalCaregiver) {
+      setCpfError('CPF é obrigatório');
+    } else {
+      setCpfError('');
+    }
   };
 
   // Função para buscar CEP usando ViaCEP
@@ -471,18 +594,37 @@ const EditPersonalDataScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>CPF</Text>
-              <View style={styles.inputWrapper}>
-                <SafeIcon name="card-outline" size={20} color={colors.gray400} />
+              <Text style={styles.label}>
+                CPF {isProfessionalCaregiver && '*'}
+              </Text>
+              {isProfessionalCaregiver && (
+                <Text style={styles.labelSubtitle}>
+                  Obrigatório para cuidador profissional
+                </Text>
+              )}
+              <View style={[
+                styles.inputWrapper,
+                cpfError && styles.inputWrapperError,
+              ]}>
+                <SafeIcon
+                  name="card-outline"
+                  size={20}
+                  color={cpfError ? colors.error : colors.gray400}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="000.000.000-00"
                   value={formData.cpf}
                   onChangeText={handleCPFChange}
+                  onBlur={handleCPFBlur}
                   keyboardType="number-pad"
                   maxLength={14}
+                  placeholderTextColor={colors.placeholder}
                 />
               </View>
+              {cpfError ? (
+                <Text style={styles.errorText}>{cpfError}</Text>
+              ) : null}
             </View>
 
             <View style={styles.inputContainer}>
@@ -497,6 +639,31 @@ const EditPersonalDataScreen = ({ navigation }) => {
                   keyboardType="number-pad"
                   maxLength={10}
                 />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Sexo</Text>
+              <View style={styles.genderSelector}>
+                {['Masculino', 'Feminino'].map((gender) => (
+                  <TouchableOpacity
+                    key={gender}
+                    style={[
+                      styles.genderOption,
+                      formData.gender === gender && styles.genderOptionActive,
+                    ]}
+                    onPress={() => updateField('gender', gender)}
+                  >
+                    <Text
+                      style={[
+                        styles.genderOptionText,
+                        formData.gender === gender && styles.genderOptionTextActive,
+                      ]}
+                    >
+                      {gender}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           </View>
@@ -681,6 +848,21 @@ const styles = StyleSheet.create({
     minHeight: 52,
     gap: 12,
   },
+  inputWrapperError: {
+    borderColor: colors.error,
+    backgroundColor: colors.error + '08',
+  },
+  labelSubtitle: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginBottom: 6,
+  },
+  errorText: {
+    fontSize: 12,
+    color: colors.error,
+    marginTop: 4,
+    marginLeft: 4,
+  },
   input: {
     flex: 1,
     fontSize: 16,
@@ -711,6 +893,32 @@ const styles = StyleSheet.create({
     color: colors.textWhite,
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  genderSelector: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  genderOption: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  genderOptionActive: {
+    borderColor: colors.success,
+    backgroundColor: colors.success + '20',
+  },
+  genderOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  genderOptionTextActive: {
+    color: colors.success,
   },
 });
 

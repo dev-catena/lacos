@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\AppointmentException;
+use App\Models\DoctorReview;
 use App\Models\GroupActivity;
 use App\Services\AppointmentPaymentService;
 use Illuminate\Http\Request;
@@ -37,6 +38,9 @@ class AppointmentController extends Controller
         if ($groupId) {
             $query->where('group_id', $groupId);
         }
+
+        // Não mostrar consultas canceladas
+        $query->where('status', '!=', 'cancelled');
 
         // Se o usuário for médico, filtrar teleconsultas não pagas
         // Médicos só devem ver teleconsultas que já foram pagas
@@ -199,9 +203,11 @@ class AppointmentController extends Controller
             $validated['created_by_user_id'] = $user->id;
         }
 
-        // Se for teleconsulta, definir payment_status como 'pending'
+        // Se for teleconsulta, definir payment_status como 'pending' e reservar horário por 10 minutos
         if (isset($validated['is_teleconsultation']) && $validated['is_teleconsultation']) {
             $validated['payment_status'] = 'pending';
+            // Reservar horário por 10 minutos para dar tempo de pagamento
+            $validated['reserved_until'] = now()->addMinutes(10);
             // Definir valor padrão se não foi fornecido
             if (!isset($validated['amount'])) {
                 // Buscar valor do médico
@@ -277,15 +283,21 @@ class AppointmentController extends Controller
             $group = $appointment->group;
             
             if ($group) {
-                // Buscar membros do grupo (exceto quem criou)
-                $members = $group->members()->where('user_id', '!=', $user->id)->get();
+                // Buscar membros ativos do grupo (exceto quem criou)
+                $members = $group->members()
+                    ->where('user_id', '!=', $user->id)
+                    ->where('is_active', true)
+                    ->get();
                 
                 \Log::info('AppointmentController.store - Enviando notificações', [
                     'members_count' => $members->count(),
                     'group_id' => $appointment->group_id,
                 ]);
                 
-                $appointmentDate = \Carbon\Carbon::parse($appointment->scheduled_at ?? $appointment->appointment_date);
+                // Usar timezone do Brasil (GMT-3) para formatar a data
+                $timezone = 'America/Sao_Paulo';
+                $appointmentDate = \Carbon\Carbon::parse($appointment->scheduled_at ?? $appointment->appointment_date)
+                    ->setTimezone($timezone);
                 $typeLabels = [
                     'common' => 'compromisso',
                     'medical' => 'consulta médica',
@@ -380,13 +392,23 @@ class AppointmentController extends Controller
             $withRelations[] = 'exceptions';
         }
         // Não usar with('doctor') pois pode causar timeout quando médico está em users
-        
+
         $query = Appointment::query();
         if (!empty($withRelations)) {
             $query->with($withRelations);
         }
         $appointment = $query->findOrFail($id);
-        return response()->json($appointment);
+        $data = $appointment->toArray();
+
+        // Para teleconsultas realizadas: indicar se o usuário já avaliou o médico
+        if (Schema::hasTable('doctor_reviews') && Auth::check()) {
+            $hasReview = \App\Models\DoctorReview::where('appointment_id', $appointment->id)
+                ->where('author_id', Auth::id())
+                ->exists();
+            $data['has_user_review'] = $hasReview;
+        }
+
+        return response()->json($data);
     }
 
     public function update(Request $request, $id)
@@ -476,24 +498,38 @@ class AppointmentController extends Controller
     /**
      * Confirmar consulta realizada
      * POST /api/appointments/{id}/confirm
+     * Body opcional: rating (1-5), comment (string) - avaliação do médico
      */
     public function confirm(Request $request, $id)
     {
         try {
             $appointment = Appointment::findOrFail($id);
             $user = Auth::user();
-            
-            // Verificar permissão
+
+            $validated = $request->validate([
+                'rating' => 'nullable|integer|min:1|max:5',
+                'comment' => 'nullable|string|max:500',
+            ]);
+
+            // Verificar permissão (paciente ou cuidador participante do grupo)
             if ($appointment->group_id) {
                 $userGroups = $user->groups()->pluck('groups.id')->toArray();
-                if (!in_array($appointment->group_id, $userGroups)) {
+                $isMember = in_array($appointment->group_id, $userGroups);
+                if (!$isMember) {
+                    $isMember = DB::table('group_members')
+                        ->where('group_id', $appointment->group_id)
+                        ->where('user_id', $user->id)
+                        ->where('is_active', true)
+                        ->exists();
+                }
+                if (!$isMember) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Você não tem permissão para confirmar esta consulta'
                     ], 403);
                 }
             }
-            
+
             // Verificar se pagamento está em hold
             if ($appointment->payment_status !== 'paid_held') {
                 return response()->json([
@@ -501,14 +537,39 @@ class AppointmentController extends Controller
                     'message' => 'Esta consulta não tem pagamento em hold para liberar'
                 ], 400);
             }
-            
+
             $paymentService = app(AppointmentPaymentService::class);
             $result = $paymentService->confirmAndRelease($appointment, 'patient');
-            
+
             if (!$result['success']) {
                 return response()->json($result, 400);
             }
-            
+
+            // Avaliação opcional do médico
+            $reviewCreated = false;
+            if (!empty($validated['rating']) && $appointment->doctor_id && Schema::hasTable('doctor_reviews')) {
+                try {
+                    $existing = DoctorReview::where('appointment_id', $appointment->id)
+                        ->where('author_id', $user->id)
+                        ->first();
+                    if (!$existing) {
+                        DoctorReview::create([
+                            'appointment_id' => $appointment->id,
+                            'doctor_id' => $appointment->doctor_id,
+                            'author_id' => $user->id,
+                            'rating' => $validated['rating'],
+                            'comment' => $validated['comment'] ?? null,
+                        ]);
+                        $reviewCreated = true;
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Erro ao criar avaliação do médico', [
+                        'appointment_id' => $appointment->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'appointment_id' => $appointment->id,
@@ -517,21 +578,236 @@ class AppointmentController extends Controller
                 'transfers' => $result['transfers'] ?? [],
                 'doctor_amount' => $result['doctor_amount'] ?? null,
                 'platform_amount' => $result['platform_amount'] ?? null,
+                'review_created' => $reviewCreated,
             ]);
-            
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Erro ao confirmar consulta', [
                 'appointment_id' => $id,
                 'error' => $e->getMessage(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erro ao confirmar consulta: ' . $e->getMessage()
             ], 500);
         }
     }
-    
+
+    /**
+     * Avaliar médico após teleconsulta realizada
+     * POST /api/appointments/{id}/reviews
+     */
+    public function createReview(Request $request, $id)
+    {
+        try {
+            $appointment = Appointment::findOrFail($id);
+            $user = Auth::user();
+
+            $validated = $request->validate([
+                'rating' => 'required|integer|min:1|max:5',
+                'comment' => 'nullable|string|max:500',
+            ]);
+
+            // Verificar permissão (paciente ou cuidador participante do grupo)
+            if ($appointment->group_id) {
+                $userGroups = $user->groups()->pluck('groups.id')->toArray();
+                $isMember = in_array($appointment->group_id, $userGroups);
+                if (!$isMember) {
+                    $isMember = DB::table('group_members')
+                        ->where('group_id', $appointment->group_id)
+                        ->where('user_id', $user->id)
+                        ->where('is_active', true)
+                        ->exists();
+                }
+                if (!$isMember) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Você não tem permissão para avaliar esta consulta'
+                    ], 403);
+                }
+            }
+
+            // Apenas teleconsultas realizadas podem ser avaliadas
+            if (!$appointment->is_teleconsultation) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Apenas teleconsultas podem ser avaliadas'
+                ], 400);
+            }
+
+            $isCompleted = $appointment->status === 'completed' || $appointment->payment_status === 'released';
+            if (!$isCompleted) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A consulta precisa ter sido realizada para avaliar o médico'
+                ], 400);
+            }
+
+            if (!$appointment->doctor_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Esta consulta não possui médico para avaliar'
+                ], 400);
+            }
+
+            if (!Schema::hasTable('doctor_reviews')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Avaliações não disponíveis'
+                ], 500);
+            }
+
+            $existing = DoctorReview::where('appointment_id', $appointment->id)
+                ->where('author_id', $user->id)
+                ->first();
+
+            if ($existing) {
+                $existing->update([
+                    'rating' => $validated['rating'],
+                    'comment' => $validated['comment'] ?? null,
+                ]);
+                $review = $existing;
+            } else {
+                $review = DoctorReview::create([
+                    'appointment_id' => $appointment->id,
+                    'doctor_id' => $appointment->doctor_id,
+                    'author_id' => $user->id,
+                    'rating' => $validated['rating'],
+                    'comment' => $validated['comment'] ?? null,
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'review' => $review,
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Erro ao criar avaliação do médico', [
+                'appointment_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao avaliar: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Registrar entrada na videoconferência
+     * POST /api/appointments/{id}/video-join
+     * Body: { "role": "doctor" | "patient" }
+     * Janela permitida: 15 min antes até 40 min depois do horário agendado.
+     * Usado para rastrear no-show (médico não entra → reembolso; paciente não entra → libera ao médico).
+     */
+    public function videoJoin(Request $request, $id)
+    {
+        try {
+            $appointment = Appointment::findOrFail($id);
+            $user = Auth::user();
+
+            $validated = $request->validate([
+                'role' => 'required|in:doctor,patient',
+            ]);
+
+            if (!$appointment->is_teleconsultation) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Este compromisso não é uma teleconsulta',
+                ], 400);
+            }
+
+            $scheduledAt = $appointment->scheduled_at ?? $appointment->appointment_date;
+            if (!$scheduledAt) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Horário da consulta não definido',
+                ], 400);
+            }
+
+            $now = now();
+            $windowStart = $scheduledAt->copy()->subMinutes(15);
+            $windowEnd = $scheduledAt->copy()->addMinutes(40);
+
+            if ($now->lt($windowStart)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A entrada na videoconferência é permitida a partir de 15 minutos antes do horário',
+                ], 400);
+            }
+            if ($now->gt($windowEnd)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'O horário para entrar na videoconferência já passou (40 minutos após o início)',
+                ], 400);
+            }
+
+            $updated = false;
+
+            if ($validated['role'] === 'doctor') {
+                if ((int) $appointment->doctor_id !== (int) $user->id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Apenas o médico da consulta pode registrar entrada como médico',
+                    ], 403);
+                }
+                if (!$appointment->doctor_joined_at) {
+                    $appointment->update(['doctor_joined_at' => $now]);
+                    $updated = true;
+                }
+            } else {
+                $isMember = false;
+                if ($appointment->group_id) {
+                    $userGroups = $user->groups()->pluck('groups.id')->toArray();
+                    $isMember = in_array($appointment->group_id, $userGroups);
+                    if (!$isMember) {
+                        $isMember = DB::table('group_members')
+                            ->where('group_id', $appointment->group_id)
+                            ->where('user_id', $user->id)
+                            ->where('is_active', true)
+                            ->exists();
+                    }
+                }
+                if (!$isMember) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Apenas participantes do grupo podem registrar entrada como paciente',
+                    ], 403);
+                }
+                if (!$appointment->patient_joined_at) {
+                    $appointment->update([
+                        'patient_joined_at' => $now,
+                        'patient_joined_by_user_id' => $user->id,
+                    ]);
+                    $updated = true;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'joined' => $updated,
+                'doctor_joined_at' => $appointment->fresh()->doctor_joined_at?->toIso8601String(),
+                'patient_joined_at' => $appointment->fresh()->patient_joined_at?->toIso8601String(),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Erro ao registrar entrada na videoconferência', [
+                'appointment_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao registrar entrada: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Cancelar consulta
      * POST /api/appointments/{id}/cancel
@@ -600,8 +876,11 @@ class AppointmentController extends Controller
             }
             
             // Validar regras de cancelamento baseado em quem está cancelando
-            $appointmentDate = \Carbon\Carbon::parse($appointment->appointment_date ?? $appointment->scheduled_at);
-            $now = \Carbon\Carbon::now();
+            // Usar timezone do Brasil (GMT-3) para comparações e formatação
+            $timezone = 'America/Sao_Paulo';
+            $appointmentDate = \Carbon\Carbon::parse($appointment->appointment_date ?? $appointment->scheduled_at)
+                ->setTimezone($timezone);
+            $now = \Carbon\Carbon::now()->setTimezone($timezone);
             
             if ($validated['cancelled_by'] === 'doctor') {
                 // Médico pode cancelar até a hora da consulta
@@ -730,11 +1009,13 @@ class AppointmentController extends Controller
                         $patientName = $patient && $patient->user ? $patient->user->name : 'Paciente';
                         
                         $title = 'Consulta Cancelada';
+                        // Garantir que a data está no timezone correto para formatação
+                        $formattedDate = $appointmentDate->setTimezone('America/Sao_Paulo')->format('d/m/Y \à\s H:i');
                         if ($validated['cancelled_by'] === 'doctor') {
-                            $message = "A consulta agendada para " . $appointmentDate->format('d/m/Y \à\s H:i');
+                            $message = "A consulta agendada para " . $formattedDate;
                             $message .= " com {$patientName} foi cancelada pelo médico";
                         } else {
-                            $message = "A consulta agendada para " . $appointmentDate->format('d/m/Y \à\s H:i');
+                            $message = "A consulta agendada para " . $formattedDate;
                             $message .= " com {$patientName} foi cancelada pelo cuidador";
                         }
                         if ($validated['reason']) {

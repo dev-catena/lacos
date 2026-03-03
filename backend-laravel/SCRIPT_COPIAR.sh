@@ -6,7 +6,7 @@
 echo "📦 Copiando arquivos para o servidor..."
 
 # Configurações
-SERVER="darley@10.102.0.103"
+SERVER="darley@192.168.0.20"
 REMOTE_HOME="~"
 
 echo "1. Copiando migrations..."
@@ -23,7 +23,7 @@ echo ""
 echo "✅ Arquivos copiados para ~/ no servidor"
 echo ""
 echo "📋 Próximos passos no servidor:"
-echo "   ssh darley@10.102.0.103"
+echo "   ssh darley@192.168.0.20"
 echo "   sudo mv ~/create_plans_table.php /var/www/lacos-backend/"
 echo "   sudo mv ~/create_user_plans_table.php /var/www/lacos-backend/"
 echo "   sudo mv ~/Plan.php /var/www/lacos-backend/app/Models/"

@@ -2,7 +2,7 @@
 
 ## ❌ Problema
 
-- O endereço `http://10.102.0.103:8081/` abre no navegador ✅
+- O endereço `http://192.168.0.20:8081/` abre no navegador ✅
 - Mas o Android dá **timeout** ao tentar conectar ❌
 
 ## 🔍 Causas Possíveis
@@ -47,7 +47,7 @@ npm start
 
 1. Abra **Expo Go** no celular
 2. Escaneie o QR code
-3. O QR code deve mostrar: `exp://10.102.0.103:8081`
+3. O QR code deve mostrar: `exp://192.168.0.20:8081`
 
 ---
 
@@ -57,7 +57,7 @@ npm start
 
 No **celular Android**, abra o navegador e tente acessar:
 ```
-http://10.102.0.103:8081/status
+http://192.168.0.20:8081/status
 ```
 
 **Se funcionar no navegador do celular:**
@@ -75,13 +75,13 @@ http://10.102.0.103:8081/status
 hostname -I
 ```
 
-Deve mostrar: `10.102.0.103`
+Deve mostrar: `192.168.0.20`
 
 ### Teste 3: Ping do Celular para PC
 
 No celular, instale um app de ping ou use terminal (se tiver root):
 ```
-ping 10.102.0.103
+ping 192.168.0.20
 ```
 
 **Se ping funcionar:**
@@ -123,7 +123,7 @@ No Android:
 
 O `metro.config.js` já está configurado para:
 - ✅ Escutar em `0.0.0.0` (todas as interfaces)
-- ✅ Substituir localhost por `10.102.0.103`
+- ✅ Substituir localhost por `192.168.0.20`
 - ✅ Adicionar CORS headers
 - ✅ Interceptar todas as respostas HTTP
 
@@ -145,7 +145,7 @@ sudo ufw status
 sudo ufw allow 8081/tcp
 
 # Testar conectividade
-curl http://10.102.0.103:8081/status
+curl http://192.168.0.20:8081/status
 ```
 
 ---
@@ -156,11 +156,11 @@ Antes de reportar problema, verifique:
 
 - [ ] Firewall está aberto? (`sudo ufw allow 8081/tcp`)
 - [ ] Celular e PC na mesma rede Wi-Fi?
-- [ ] IP do PC é `10.102.0.103`?
+- [ ] IP do PC é `192.168.0.20`?
 - [ ] Metro está rodando? (`netstat -tlnp | grep 8081`)
 - [ ] Expo Go está atualizado?
-- [ ] QR code mostra `exp://10.102.0.103:8081`?
-- [ ] Navegador do celular consegue acessar `http://10.102.0.103:8081`?
+- [ ] QR code mostra `exp://192.168.0.20:8081`?
+- [ ] Navegador do celular consegue acessar `http://192.168.0.20:8081`?
 
 ---
 

@@ -123,14 +123,14 @@ Este endpoint retorna:
 ### 1. Listar Planos
 
 ```bash
-curl -X GET http://10.102.0.103/api/plans \
+curl -X GET http://192.168.0.20/api/plans \
   -H "Authorization: Bearer SEU_TOKEN"
 ```
 
 ### 2. Atualizar Plano
 
 ```bash
-curl -X PUT http://10.102.0.103/api/plans/1 \
+curl -X PUT http://192.168.0.20/api/plans/1 \
   -H "Authorization: Bearer SEU_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -145,7 +145,7 @@ curl -X PUT http://10.102.0.103/api/plans/1 \
 ### 3. Obter Plano do Usuário
 
 ```bash
-curl -X GET http://10.102.0.103/api/user/plan \
+curl -X GET http://192.168.0.20/api/user/plan \
   -H "Authorization: Bearer SEU_TOKEN"
 ```
 

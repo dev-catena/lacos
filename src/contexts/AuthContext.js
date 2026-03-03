@@ -1,7 +1,7 @@
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          import React, { createContext, useState, useEffect, useContext } from 'react';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          import React, { createContext, useState, useEffect, useContext, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiService from '../services/apiService';
-import { navigationRef } from '../../App';
+import { navigationRef } from '../navigation/navigationRef';
 
 // Criação do contexto
 export const AuthContext = createContext({});
@@ -39,12 +39,28 @@ export const AuthProvider = ({ children }) => {
           console.log('✅ AuthContext - Token VÁLIDO, usuário:', response.name);
           setUser(response);
         } catch (error) {
-          // Token inválido, limpar dados
-          console.error('❌ AuthContext - Token INVÁLIDO, limpando dados...');
-          await AsyncStorage.removeItem('@lacos:user');
-          await AsyncStorage.removeItem('@lacos:token');
-          await AsyncStorage.removeItem('@lacos_patient_session');
-          setUser(null);
+          // Verificar se é erro 401 (Unauthenticated) - token inválido ou expirado
+          const isUnauthenticated = error.status === 401 || 
+                                   (error._rawErrorData && error._rawErrorData.status === 401) ||
+                                   (error.message && error.message.includes('Unauthenticated'));
+          
+          if (isUnauthenticated) {
+            // Token inválido ou expirado, limpar dados
+            console.error('❌ AuthContext - Token INVÁLIDO ou EXPIRADO (401), limpando dados...');
+            await AsyncStorage.removeItem('@lacos:user');
+            await AsyncStorage.removeItem('@lacos:token');
+            await AsyncStorage.removeItem('@lacos_patient_session');
+            setUser(null);
+          } else {
+            // Erro de rede ou servidor - manter sessão e dados salvos
+            console.warn('⚠️ AuthContext - Erro ao validar token (não é 401), mantendo sessão:', {
+              status: error.status,
+              message: error.message,
+              errorType: error._rawErrorData ? 'API Error' : 'Network Error'
+            });
+            // Manter usuário do storage mesmo com erro de rede
+            setUser(parsedUser);
+          }
         }
       } else {
         console.log('✅ AuthContext - Nenhum token armazenado (primeira vez ou logout)');
@@ -736,28 +752,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Atualiza dados do usuário
-  const updateUser = async (updatedData) => {
+  // Ref para ter sempre o user atual no updateUser (evita loop de re-renders)
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  // Atualiza dados do usuário - useCallback com ref para referência estável (evita loop)
+  const updateUser = useCallback(async (updatedData) => {
     try {
-      console.log('🔄 AuthContext - updateUser chamado com:', updatedData);
-      
-      if (!user) {
+      const currentUser = userRef.current;
+      if (!currentUser) {
         console.warn('⚠️ AuthContext - updateUser: user é null');
         return { success: false, error: 'Usuário não encontrado' };
       }
       
-      const updatedUser = { ...user, ...updatedData };
-      console.log('🔄 AuthContext - updatedUser criado:', {
-        has_certificate: updatedUser.has_certificate,
-        certificate_type: updatedUser.certificate_type,
-        certificate_path: updatedUser.certificate_path,
-      });
+      const updatedUser = { ...currentUser, ...updatedData };
       
       // Verificar se updatedUser é válido antes de salvar
       if (updatedUser && typeof updatedUser === 'object') {
         await AsyncStorage.setItem('@lacos:user', JSON.stringify(updatedUser));
         setUser(updatedUser);
-        console.log('✅ AuthContext - User atualizado no estado e storage');
         return { success: true, user: updatedUser };
       } else {
         console.error('❌ AuthContext - updatedUser inválido');
@@ -767,7 +780,7 @@ export const AuthProvider = ({ children }) => {
       console.error('❌ AuthContext - Erro ao atualizar usuário:', error);
       return { success: false, error: error.message };
     }
-  };
+  }, []); // Dependências vazias = referência estável, evita loop no useFocusEffect
 
   // Função de login com perfil selecionado
   const signInWithProfile = async (login, password, profileId) => {

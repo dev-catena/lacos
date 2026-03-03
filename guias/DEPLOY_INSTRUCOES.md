@@ -22,10 +22,10 @@ Você será solicitado a inserir a senha: `yhvh77`
 
 ```bash
 # Copiar ProductsManagement.jsx
-scp -P 63022 website/src/components/ProductsManagement.jsx darley@10.102.0.103:/var/www/lacos-website/src/components/ProductsManagement.jsx
+scp -P 63022 website/src/components/ProductsManagement.jsx darley@192.168.0.20:/var/www/lacos-website/src/components/ProductsManagement.jsx
 
 # Copiar supplierService.js
-scp -P 63022 website/src/services/supplierService.js darley@10.102.0.103:/var/www/lacos-website/src/services/supplierService.js
+scp -P 63022 website/src/services/supplierService.js darley@192.168.0.20:/var/www/lacos-website/src/services/supplierService.js
 ```
 
 Senha: `yhvh77`
@@ -33,7 +33,7 @@ Senha: `yhvh77`
 ### Passo 2: Conectar ao servidor e fazer build
 
 ```bash
-ssh -p 63022 darley@10.102.0.103
+ssh -p 63022 darley@192.168.0.20
 cd /var/www/lacos-website
 npm install  # Se necessário
 npm run build  # ou o comando de build que você usa

@@ -74,3 +74,6 @@ echo "   Restaure o backup: cp $BACKUP_FILE $API_CONFIG_FILE"
 
 
 
+
+
+

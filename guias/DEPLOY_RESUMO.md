@@ -14,7 +14,7 @@ Conecte ao servidor e execute os seguintes comandos:
 
 ```bash
 # 1. Conectar ao servidor
-ssh -p 63022 darley@10.102.0.103
+ssh -p 63022 darley@192.168.0.20
 # Senha: yhvh77
 
 # 2. Mover os arquivos para o diretório do website

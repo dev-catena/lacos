@@ -8,8 +8,8 @@ echo ""
 
 # Verificar se está no servidor
 if [ ! -d "/var/www/lacos-backend" ]; then
-    echo "❌ Este script deve ser executado no servidor (10.102.0.103)"
-    echo "   Execute: ssh -p 63022 root@10.102.0.103"
+    echo "❌ Este script deve ser executado no servidor (192.168.0.20)"
+    echo "   Execute: ssh -p 63022 root@192.168.0.20"
     exit 1
 fi
 

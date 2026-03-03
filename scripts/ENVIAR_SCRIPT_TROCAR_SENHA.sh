@@ -17,12 +17,12 @@ if [ -z "$1" ]; then
     echo "📋 Uso: $0 usuario@servidor"
     echo ""
     echo "Exemplo:"
-    echo "  $0 root@10.102.0.103"
+    echo "  $0 root@192.168.0.20"
     echo "  $0 usuario@servidor.com"
     echo ""
     echo "Ou configure as variáveis abaixo no script:"
     echo "  SERVER_USER=root"
-    echo "  SERVER_HOST=10.102.0.103"
+    echo "  SERVER_HOST=192.168.0.20"
     exit 1
 fi
 

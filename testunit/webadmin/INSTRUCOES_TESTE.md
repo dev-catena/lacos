@@ -21,7 +21,7 @@ npm run dev
 
 O web-admin estará disponível em:
 - **http://localhost:5173** (porta padrão do Vite)
-- **http://10.102.0.103:8081** (se usar o script INICIAR_ADMIN_WEB.sh)
+- **http://192.168.0.20:8081** (se usar o script INICIAR_ADMIN_WEB.sh)
 
 ## 🧪 Como Executar os Testes
 
@@ -34,7 +34,7 @@ source venv/bin/activate
 ### 2. Verificar se o web-admin está rodando
 Abra um navegador e acesse:
 - http://localhost:5173
-- Ou http://10.102.0.103:8081
+- Ou http://192.168.0.20:8081
 
 Se a página carregar, o web-admin está rodando! ✅
 
@@ -87,6 +87,9 @@ rm -rf ~/.wdm
   ```python
   chrome_options.add_argument('--headless')
   ```
+
+
+
 
 
 

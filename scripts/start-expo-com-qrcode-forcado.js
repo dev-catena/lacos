@@ -5,7 +5,7 @@
 const { spawn } = require('child_process');
 const { Transform } = require('stream');
 
-const EXPO_IP = '10.102.0.103';
+const EXPO_IP = '192.168.0.20';
 const EXPO_PORT = '8081';
 const EXPO_URL = `exp://${EXPO_IP}:${EXPO_PORT}`;
 
@@ -63,7 +63,7 @@ function gerarQRCode() {
     const qrcode = require('qrcode-terminal');
     console.log('\n');
     console.log('═'.repeat(70));
-    console.log('📱 QR CODE CORRETO (exp://10.102.0.103:8081)');
+    console.log('📱 QR CODE CORRETO (exp://192.168.0.20:8081)');
     console.log('═'.repeat(70));
     console.log('');
     qrcode.generate(EXPO_URL, { small: true }, (qr) => {

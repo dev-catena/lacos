@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Iniciando Expo com IP correto (10.102.0.103)..."
+echo "🚀 Iniciando Expo com IP correto (192.168.0.20)..."
 echo ""
 
 cd /home/darley/lacos || exit 1
@@ -24,7 +24,7 @@ if lsof -i :8081 > /dev/null 2>&1; then
 fi
 
 # IP correto (confirmado pelo usuário)
-EXPO_IP="10.102.0.103"
+EXPO_IP="192.168.0.20"
 EXPO_PORT="8081"
 
 echo ""

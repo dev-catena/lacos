@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Script para substituir todas as referências ao servidor 10.102.0.103 por 10.102.0.103
+# Script para substituir referências ao IP antigo (193.203.182.22) por 192.168.0.20
 
 echo "🔄 Substituindo referências ao servidor..."
-echo "   De: 10.102.0.103"
-echo "   Para: 10.102.0.103"
+echo "   De: 193.203.182.22"
+echo "   Para: 192.168.0.20"
 echo ""
 
 # Contar arquivos que serão modificados
@@ -21,27 +21,27 @@ echo ""
 
 # Substituir em arquivos JavaScript/JSX
 echo "📝 Substituindo em arquivos .js e .jsx..."
-find . -type f \( -name "*.js" -o -name "*.jsx" \) ! -path "*/node_modules/*" ! -path "*/.git/*" -exec sed -i.bak "s/193\.203\.182\.22/10.102.0.103/g" {} \; 2>/dev/null
+find . -type f \( -name "*.js" -o -name "*.jsx" \) ! -path "*/node_modules/*" ! -path "*/.git/*" -exec sed -i.bak "s/193\.203\.182\.22/192.168.0.20/g" {} \; 2>/dev/null
 echo "   ✅ Arquivos .js/.jsx atualizados"
 
 # Substituir em arquivos PHP
 echo "📝 Substituindo em arquivos .php..."
-find . -type f -name "*.php" ! -path "*/vendor/*" ! -path "*/.git/*" -exec sed -i.bak "s/193\.203\.182\.22/10.102.0.103/g" {} \; 2>/dev/null
+find . -type f -name "*.php" ! -path "*/vendor/*" ! -path "*/.git/*" -exec sed -i.bak "s/193\.203\.182\.22/192.168.0.20/g" {} \; 2>/dev/null
 echo "   ✅ Arquivos .php atualizados"
 
 # Substituir em arquivos Shell
 echo "📝 Substituindo em arquivos .sh..."
-find . -type f -name "*.sh" ! -path "*/.git/*" -exec sed -i.bak "s/193\.203\.182\.22/10.102.0.103/g" {} \; 2>/dev/null
+find . -type f -name "*.sh" ! -path "*/.git/*" -exec sed -i.bak "s/193\.203\.182\.22/192.168.0.20/g" {} \; 2>/dev/null
 echo "   ✅ Arquivos .sh atualizados"
 
 # Substituir em arquivos Markdown
 echo "📝 Substituindo em arquivos .md..."
-find . -type f -name "*.md" ! -path "*/.git/*" -exec sed -i.bak "s/193\.203\.182\.22/10.102.0.103/g" {} \; 2>/dev/null
+find . -type f -name "*.md" ! -path "*/.git/*" -exec sed -i.bak "s/193\.203\.182\.22/192.168.0.20/g" {} \; 2>/dev/null
 echo "   ✅ Arquivos .md atualizados"
 
 # Substituir em arquivos Python
 echo "📝 Substituindo em arquivos .py..."
-find . -type f -name "*.py" ! -path "*/.git/*" ! -path "*/venv/*" -exec sed -i.bak "s/193\.203\.182\.22/10.102.0.103/g" {} \; 2>/dev/null
+find . -type f -name "*.py" ! -path "*/.git/*" ! -path "*/venv/*" -exec sed -i.bak "s/193\.203\.182\.22/192.168.0.20/g" {} \; 2>/dev/null
 echo "   ✅ Arquivos .py atualizados"
 
 # Mover backups
@@ -62,6 +62,9 @@ else
     echo "   Verifique manualmente se necessário"
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+
+
 
 
 

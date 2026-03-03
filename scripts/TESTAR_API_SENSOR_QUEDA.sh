@@ -7,7 +7,7 @@ echo "🧪 Testando API do Sensor de Queda"
 echo ""
 
 # Configurações
-API_URL="http://10.102.0.103/api"
+API_URL="http://192.168.0.20/api"
 EMAIL="seu_email@exemplo.com"
 PASSWORD="sua_senha"
 GROUP_ID=1

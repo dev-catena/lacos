@@ -3,7 +3,7 @@
 set -e
 
 # Configurações do servidor
-SERVER="10.102.0.103"
+SERVER="192.168.0.20"
 USER="darley"
 PASSWORD="yhvh77"
 REMOTE_TMP="/tmp/telemedicina_backend"

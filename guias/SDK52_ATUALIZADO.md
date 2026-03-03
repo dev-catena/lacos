@@ -167,7 +167,7 @@ npx expo start --clear
 **Verifique:**
 1. ✅ Celular e PC no mesmo Wi-Fi
 2. ✅ Expo Go atualizado
-3. ✅ Backend rodando: `curl http://10.102.0.103:8000/api/health`
+3. ✅ Backend rodando: `curl http://192.168.0.20:8000/api/health`
 
 ### QR Code não aparece
 **Solução:**

@@ -3,7 +3,7 @@
 # Script para criar usuário admin no servidor remoto
 # Uso: ./CRIAR_USUARIO_ADMIN_SERVIDOR.sh
 
-SERVER="10.102.0.103"
+SERVER="192.168.0.20"
 PORT="63022"
 USER="darley"
 BACKEND_PATH="/var/www/lacos-backend"
@@ -54,6 +54,9 @@ else
     echo "   php artisan tinker"
     echo "   # Depois execute o código PHP acima"
 fi
+
+
+
 
 
 

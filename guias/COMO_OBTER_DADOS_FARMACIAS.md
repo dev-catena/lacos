@@ -85,7 +85,7 @@ Se você baixou o arquivo localmente:
 
 ```bash
 # Do seu computador local
-scp farmacias_populares.csv darley@10.102.0.103:/var/www/lacos-backend/
+scp farmacias_populares.csv darley@192.168.0.20:/var/www/lacos-backend/
 ```
 
 Ou via SFTP/FTP.

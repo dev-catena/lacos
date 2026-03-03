@@ -2,7 +2,7 @@
 
 ## ⚠️ Situação Atual
 
-O Expo CLI está mostrando `localhost:8081` na mensagem e no QR code, mas o Metro bundler está funcionando corretamente no IP `10.102.0.103:8081`.
+O Expo CLI está mostrando `localhost:8081` na mensagem e no QR code, mas o Metro bundler está funcionando corretamente no IP `192.168.0.20:8081`.
 
 **O QR code gerado pelo Expo não funciona** porque contém `localhost`, mas o servidor Metro está acessível pelo IP correto.
 
@@ -27,13 +27,13 @@ Em outro terminal, enquanto o Expo está rodando:
 ./gerar-qrcode-ip.sh
 ```
 
-Isso vai gerar um QR code com a URL correta: `exp://10.102.0.103:8081`
+Isso vai gerar um QR code com a URL correta: `exp://192.168.0.20:8081`
 
 ### Opção 3: Usar Manualmente no Expo Go
 
 1. Abra o **Expo Go** no seu celular
 2. Toque em **"Enter URL manually"** (ou "Inserir URL manualmente")
-3. Cole ou digite: `exp://10.102.0.103:8081`
+3. Cole ou digite: `exp://192.168.0.20:8081`
 4. Toque em **"Connect"** (ou "Conectar")
 
 ## 🔍 Verificar se Está Funcionando
@@ -41,14 +41,14 @@ Isso vai gerar um QR code com a URL correta: `exp://10.102.0.103:8081`
 Após iniciar o Expo, verifique se o Metro está acessível:
 
 ```bash
-curl http://10.102.0.103:8081/status
+curl http://192.168.0.20:8081/status
 ```
 
 Se retornar algo, o Metro está funcionando corretamente no IP!
 
 ## 📝 Nota Técnica
 
-O problema é que o Expo CLI determina o hostname antes de gerar o QR code, e está usando `localhost` mesmo com todas as variáveis de ambiente configuradas. O Metro bundler em si está funcionando corretamente e é acessível pelo IP `10.102.0.103:8081`.
+O problema é que o Expo CLI determina o hostname antes de gerar o QR code, e está usando `localhost` mesmo com todas as variáveis de ambiente configuradas. O Metro bundler em si está funcionando corretamente e é acessível pelo IP `192.168.0.20:8081`.
 
 ## 🎯 Comandos Rápidos
 
@@ -60,6 +60,6 @@ npm run start:lan
 ./gerar-qrcode-ip.sh
 
 # Verificar se Metro está acessível
-curl http://10.102.0.103:8081/status
+curl http://192.168.0.20:8081/status
 ```
 

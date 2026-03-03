@@ -4,7 +4,7 @@
 
 cd /home/darley/lacos || exit 1
 
-EXPO_IP="10.102.0.103"
+EXPO_IP="192.168.0.20"
 EXPO_PORT="8081"
 
 # Verificar IP atual

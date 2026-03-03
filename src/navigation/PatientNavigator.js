@@ -6,12 +6,14 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../constants/colors';
 import groupService from '../services/groupService';
-import { HomeIcon, PersonIcon } from '../components/CustomIcons';
+import { HomeIcon, PersonIcon, MessagesIcon } from '../components/CustomIcons';
 
 import PatientHomeScreen from '../screens/Patient/PatientHomeScreen';
 import AppointmentDetailsScreen from '../screens/Patient/AppointmentDetailsScreen';
+import AppointmentDetailsFullScreen from '../screens/Groups/AppointmentDetailsScreen';
 import RecordingScreen from '../screens/Patient/RecordingScreen';
 import PatientProfileScreen from '../screens/Patient/PatientProfileScreen';
+import PatientMessagesScreen from '../screens/Patient/PatientMessagesScreen';
 import PatientJoinGroupScreen from '../screens/Patient/PatientJoinGroupScreen';
 import PatientVideoCallScreen from '../screens/Patient/PatientVideoCallScreen';
 import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
@@ -69,6 +71,8 @@ const PatientTabNavigator = () => {
         tabBarIcon: ({ focused, color, size }) => {
           if (route.name === 'PatientHomeTab') {
             return <HomeIcon size={size || 24} color={color} filled={focused} />;
+          } else if (route.name === 'PatientMessagesTab') {
+            return <MessagesIcon size={size || 24} color={color} />;
           } else if (route.name === 'PatientProfileTab') {
             return <PersonIcon size={size || 24} color={color} filled={focused} />;
           }
@@ -80,6 +84,11 @@ const PatientTabNavigator = () => {
         name="PatientHomeTab" 
         component={PatientHomeScreen}
         options={{ tabBarLabel: 'Início' }}
+      />
+      <Tab.Screen 
+        name="PatientMessagesTab" 
+        component={PatientMessagesScreen}
+        options={{ tabBarLabel: 'Mensagens' }}
       />
       <Tab.Screen 
         name="PatientProfileTab" 
@@ -256,6 +265,11 @@ const PatientNavigator = () => {
       <Stack.Screen 
         name="AppointmentDetails" 
         component={AppointmentDetailsScreen} 
+      />
+      <Stack.Screen 
+        name="AppointmentDetailsFull" 
+        component={AppointmentDetailsFullScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="PatientVideoCall" 

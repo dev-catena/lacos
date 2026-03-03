@@ -25,7 +25,7 @@ hostname -I | awk '{print $1}'
 ip addr show | grep "inet " | grep -v 127.0.0.1 | head -1
 ```
 
-**IP encontrado**: `10.102.0.103`
+**IP encontrado**: `192.168.0.20`
 
 ### 2. Atualizar configuração da API
 
@@ -38,14 +38,14 @@ BASE_URL: 'http://localhost:8000/api',
 
 **Depois:**
 ```javascript
-BASE_URL: 'http://10.102.0.103:8000/api',
+BASE_URL: 'http://192.168.0.20:8000/api',
 ```
 
 ### 3. Verificar se o servidor está acessível
 
 ```bash
 # Testar do computador
-curl http://10.102.0.103:8000/api/gateway/status
+curl http://192.168.0.20:8000/api/gateway/status
 
 # Deve retornar JSON:
 # {"status":"ativo"}
@@ -71,7 +71,7 @@ sudo ufw disable
 // src/config/api.js
 const getBaseURL = () => {
   if (Platform.OS === 'android') {
-    return 'http://10.102.0.103:8000/api'; // IP da máquina
+    return 'http://192.168.0.20:8000/api'; // IP da máquina
   } else if (Platform.OS === 'ios') {
     return 'http://localhost:8000/api'; // iOS Simulator pode usar localhost
   }
@@ -88,7 +88,7 @@ const API_CONFIG = {
 
 Criar arquivo `.env`:
 ```
-API_BASE_URL=http://10.102.0.103:8000/api
+API_BASE_URL=http://192.168.0.20:8000/api
 ```
 
 E usar no código:
@@ -125,7 +125,7 @@ POST   api/login ................ AuthController@login
 ### 3. Testar endpoint manualmente
 
 ```bash
-curl -X POST http://10.102.0.103:8000/api/login \
+curl -X POST http://192.168.0.20:8000/api/login \
   -H "Content-Type: application/json" \
   -d '{"login":"test@test.com","password":"123456"}'
 ```
@@ -153,6 +153,9 @@ curl -X POST http://10.102.0.103:8000/api/login \
   adb reverse tcp:8000 tcp:8000
   ```
   Depois usar `http://localhost:8000/api` no app
+
+
+
 
 
 

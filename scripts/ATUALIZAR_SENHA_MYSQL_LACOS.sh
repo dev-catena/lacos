@@ -92,3 +92,6 @@ echo "   bash scripts/TESTAR_CONEXAO_BANCO.sh"
 
 
 
+
+
+

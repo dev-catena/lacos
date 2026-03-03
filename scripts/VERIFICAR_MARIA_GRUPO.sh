@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Script para verificar se Maria está no grupo e qual especialidade ela tem
-# Servidor: 10.102.0.103
+# Servidor: 192.168.0.20
 # Usuário: darley
 # Senha: yhvh77
 
 echo "🔍 Verificando Maria no banco de dados..."
 
-sshpass -p 'yhvh77' ssh darley@10.102.0.103 << 'ENDSSH'
+sshpass -p 'yhvh77' ssh darley@192.168.0.20 << 'ENDSSH'
 cd /var/www/lacos-backend
 
 echo "📋 Buscando usuário Maria..."

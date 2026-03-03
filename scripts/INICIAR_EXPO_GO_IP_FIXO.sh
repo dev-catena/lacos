@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Script para iniciar Expo Go com IP FIXO
-# GARANTE que o QR code sempre mostra: exp://10.102.0.103:8081
+# GARANTE que o QR code sempre mostra: exp://192.168.0.20:8081
 # NUNCA, NUNCA, NUNCA usa localhost
 
 echo ""
 echo "🚀 ============================================"
-echo "🚀 EXPO GO - IP FIXO (10.102.0.103:8081)"
+echo "🚀 EXPO GO - IP FIXO (192.168.0.20:8081)"
 echo "🚀 ============================================"
 echo ""
 
@@ -35,9 +35,9 @@ rm -rf .metro 2>/dev/null || true
 echo ""
 echo "✅ Preparação concluída!"
 echo ""
-echo "📱 IP FIXO: 10.102.0.103"
+echo "📱 IP FIXO: 192.168.0.20"
 echo "📱 PORTA: 8081"
-echo "📱 QR CODE: exp://10.102.0.103:8081"
+echo "📱 QR CODE: exp://192.168.0.20:8081"
 echo ""
 echo "⚠️  GARANTINDO QUE NUNCA USE LOCALHOST!"
 echo ""

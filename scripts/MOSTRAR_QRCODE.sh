@@ -48,13 +48,13 @@ else
         echo "💡 Para ver o QR code:"
         echo "   1. Vá para o terminal onde o Expo está rodando"
         echo "   2. Pressione 's' para mostrar o QR code"
-        echo "   3. Ou use a URL: exp://10.102.0.103:8081"
+        echo "   3. Ou use a URL: exp://192.168.0.20:8081"
     else
         echo "⚠️  Não foi possível obter URL automaticamente"
         echo ""
         echo "💡 Tente:"
         echo "   1. Pressione 's' no terminal do Expo para mostrar QR code"
-        echo "   2. Ou use: exp://10.102.0.103:8081"
+        echo "   2. Ou use: exp://192.168.0.20:8081"
     fi
 fi
 
@@ -70,7 +70,7 @@ echo "2. Ou use a URL manualmente no Expo Go:"
 if [ -n "$TUNNEL_URL" ]; then
     echo "   $TUNNEL_URL"
 else
-    echo "   exp://10.102.0.103:8081"
+    echo "   exp://192.168.0.20:8081"
 fi
 echo ""
 echo "3. No Expo Go:"

@@ -5,7 +5,7 @@
 # Remove "Novo Membro" e "Cuidador bom foi removido"
 ##############################################
 
-SERVER="10.102.0.103"
+SERVER="192.168.0.20"
 USER="darley"
 PASSWORD="yhvh77"
 

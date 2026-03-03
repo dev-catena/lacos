@@ -25,7 +25,7 @@ Você será solicitado a inserir a senha: `yhvh77`
 ```bash
 # 1. Enviar arquivos buildados
 cd /Users/darley/lacos/website
-scp -P 63022 -r dist/* darley@10.102.0.103:~/deploy-dist/
+scp -P 63022 -r dist/* darley@192.168.0.20:~/deploy-dist/
 
 # Senha: yhvh77
 ```
@@ -34,7 +34,7 @@ scp -P 63022 -r dist/* darley@10.102.0.103:~/deploy-dist/
 
 ```bash
 cd /Users/darley/lacos/website
-rsync -avz --delete -e "ssh -p 63022" dist/ darley@10.102.0.103:~/deploy-dist/
+rsync -avz --delete -e "ssh -p 63022" dist/ darley@192.168.0.20:~/deploy-dist/
 ```
 
 ## 🔧 Finalizar no Servidor:
@@ -43,7 +43,7 @@ Após enviar os arquivos, conecte ao servidor e execute:
 
 ```bash
 # Conectar
-ssh -p 63022 darley@10.102.0.103
+ssh -p 63022 darley@192.168.0.20
 # Senha: yhvh77
 
 # Mover arquivos para produção

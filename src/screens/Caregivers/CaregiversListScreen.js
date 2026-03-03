@@ -139,14 +139,18 @@ const CaregiversListScreen = ({ navigation }) => {
         city: caregiver.city || '',
         neighborhood: caregiver.neighborhood || '',
         gender: caregiver.gender === 'male' ? 'Masculino' : caregiver.gender === 'female' ? 'Feminino' : (caregiver.gender || ''),
-        rating: parseFloat(caregiver.rating) || 0,
+        rating: parseFloat(caregiver.rating || caregiver.average_rating) || 0,
         formation: caregiver.formation || caregiver.formation_details || 'Não informado',
+        formation_details: caregiver.formation_details || caregiver.formation || '',
+        formation_description: caregiver.formation_description || '',
+        hourly_rate: caregiver.hourly_rate,
         hourlyRate: parseFloat(caregiver.hourly_rate || caregiver.hourlyRate) || 0,
         availability: caregiver.availability || 'Não informado',
         latitude: caregiver.latitude,
         longitude: caregiver.longitude,
-        photo_url: caregiver.photo_url || null,
-        photo: caregiver.photo || null,
+        photo_url: caregiver.photo_url || caregiver.photo || null,
+        photo: caregiver.photo || caregiver.photo_url || null,
+        courses: caregiver.courses || [],
       }));
       
       console.log('✅ Cuidadores carregados:', caregivers.length);

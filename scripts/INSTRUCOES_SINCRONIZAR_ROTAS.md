@@ -16,10 +16,10 @@ Se a autenticação SSH automática não funcionar:
 
 ```bash
 # Opção 1: Usando SCP
-scp -P 63022 darley@10.102.0.103:/var/www/lacos-backend/routes/api.php /tmp/api_servidor.php
+scp -P 63022 darley@192.168.0.20:/var/www/lacos-backend/routes/api.php /tmp/api_servidor.php
 
 # Opção 2: Usando SSH
-ssh -p 63022 darley@10.102.0.103 'cat /var/www/lacos-backend/routes/api.php' > /tmp/api_servidor.php
+ssh -p 63022 darley@192.168.0.20 'cat /var/www/lacos-backend/routes/api.php' > /tmp/api_servidor.php
 ```
 
 ### Passo 2: Executar o script de sincronização
@@ -72,6 +72,9 @@ O script irá:
 ✅ Adicionadas 2 rotas faltantes
 ✅ Arquivo atualizado com sucesso!
 ```
+
+
+
 
 
 

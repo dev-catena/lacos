@@ -47,6 +47,7 @@ class UserController extends Controller
             // Campos específicos de cuidador profissional
             'neighborhood' => 'sometimes|nullable|string|max:100',
             'formation_details' => 'sometimes|nullable|string',
+            'formation_description' => 'sometimes|nullable|string',
             'hourly_rate' => 'sometimes|nullable|numeric|min:0',
             'availability' => 'sometimes|nullable|string',
             'is_available' => 'sometimes|nullable|boolean',
@@ -105,6 +106,7 @@ class UserController extends Controller
         $caregiverFields = [
             'neighborhood',
             'formation_details',
+            'formation_description',
             'hourly_rate',
             'availability',
             'is_available',
@@ -116,6 +118,23 @@ class UserController extends Controller
             if ($request->has($field) && Schema::hasColumn('users', $field)) {
                 $data[$field] = $request->input($field);
             }
+        }
+
+        // Garantir que formation_description seja salvo (campo de texto "Detalhes da Formação")
+        if (Schema::hasColumn('users', 'formation_description')) {
+            $formationDesc = $request->input('formation_description');
+            if ($request->has('formation_description') || $formationDesc !== null) {
+                $data['formation_description'] = is_string($formationDesc) ? trim($formationDesc) : ($formationDesc ?: null);
+            }
+        }
+
+        if (config('app.debug')) {
+            Log::debug('UserController::update - formation_description', [
+                'has_field' => $request->has('formation_description'),
+                'column_exists' => Schema::hasColumn('users', 'formation_description'),
+                'value' => $request->input('formation_description'),
+                'in_data' => isset($data['formation_description']),
+            ]);
         }
         
         // Campos específicos de médico (verificar se existem)
@@ -154,92 +173,66 @@ class UserController extends Controller
         elseif (isset($request->all()['courses'])) {
             $coursesData = $request->all()['courses'];
         }
-        
-        Log::info('UserController::update - Verificando cursos', [
-            'has_courses' => $request->has('courses'),
-            'is_json' => $request->isJson(),
-            'json_has_courses' => $request->isJson() ? $request->json()->has('courses') : false,
-            'courses_type' => $coursesData ? gettype($coursesData) : 'null',
-            'courses_is_array' => is_array($coursesData),
-            'courses_count' => is_array($coursesData) ? count($coursesData) : 0,
-            'courses_data' => $coursesData,
-            'user_id' => $user->id,
-            'user_profile' => $user->profile,
-            'request_all_keys' => array_keys($request->all()),
-        ]);
-        
-        // Processar cursos se encontrados
-        if ($coursesData && is_array($coursesData) && count($coursesData) > 0) {
-            Log::info('UserController::update - Processando cursos', [
-                'courses_count' => count($coursesData),
-                'courses' => $coursesData,
-            ]);
-            
-            // Deletar cursos antigos
-            $deletedCount = $user->caregiverCourses()->delete();
-            Log::info('UserController::update - Cursos antigos deletados', ['count' => $deletedCount]);
-            
-            // Criar novos cursos
-            $createdCount = 0;
-            foreach ($coursesData as $index => $course) {
-                // Garantir que course é um array
-                if (is_object($course)) {
-                    $course = (array) $course;
-                }
-                
-                Log::info("UserController::update - Processando curso {$index}", [
-                    'course' => $course,
-                    'course_type' => gettype($course),
-                    'has_name' => !empty($course['name'] ?? null),
-                    'has_institution' => !empty($course['institution'] ?? null),
-                ]);
-                
-                $courseName = $course['name'] ?? null;
-                $courseInstitution = $course['institution'] ?? null;
-                
-                if (!empty($courseName) && !empty($courseInstitution)) {
-                    try {
-                        $created = $user->caregiverCourses()->create([
-                            'name' => $courseName,
-                            'institution' => $courseInstitution,
-                            'year' => $course['year'] ?? null,
-                            'description' => $course['description'] ?? null,
-                            'certificate_url' => $course['certificate_url'] ?? null,
-                        ]);
-                        $createdCount++;
-                        Log::info("UserController::update - Curso {$index} criado com sucesso", [
-                            'id' => $created->id,
-                            'name' => $created->name,
-                            'institution' => $created->institution,
-                        ]);
-                    } catch (\Exception $e) {
-                        Log::error("UserController::update - Erro ao criar curso {$index}", [
-                            'error' => $e->getMessage(),
-                            'trace' => $e->getTraceAsString(),
-                            'course' => $course,
-                        ]);
-                    }
-                } else {
-                    Log::warning("UserController::update - Curso {$index} ignorado (campos obrigatórios vazios)", [
-                        'course' => $course,
-                        'name' => $courseName,
-                        'institution' => $courseInstitution,
-                    ]);
+        // Tentar 4: Parse direto do body JSON (para requests application/json)
+        elseif ($request->header('Content-Type') && str_contains($request->header('Content-Type'), 'application/json')) {
+            $content = $request->getContent();
+            if (!empty($content)) {
+                $decoded = json_decode($content, true);
+                if (is_array($decoded) && isset($decoded['courses']) && is_array($decoded['courses'])) {
+                    $coursesData = $decoded['courses'];
                 }
             }
-            
-            Log::info('UserController::update - Cursos processados', [
-                'created_count' => $createdCount,
-                'total_received' => count($coursesData),
-            ]);
-        } else {
-            Log::info('UserController::update - Nenhum curso fornecido ou formato inválido', [
+        }
+
+        if (config('app.debug')) {
+            Log::debug('UserController::update - Cursos', [
                 'has_courses' => $request->has('courses'),
-                'is_json' => $request->isJson(),
-                'courses_data' => $coursesData,
-                'is_array' => is_array($coursesData),
-                'is_null' => is_null($coursesData),
+                'courses_count' => is_array($coursesData) ? count($coursesData) : 0,
+                'user_id' => $user->id,
             ]);
+        }
+        
+        // Processar cursos quando fornecidos (array com itens ou vazio para deletar todos)
+        if ($coursesData !== null && is_array($coursesData)) {
+            // Sempre deletar cursos antigos antes de criar novos
+            $user->caregiverCourses()->delete();
+
+            if (count($coursesData) > 0) {
+                // Criar novos cursos
+                foreach ($coursesData as $index => $course) {
+                    // Garantir que course é um array
+                    if (is_object($course)) {
+                        $course = (array) $course;
+                    }
+
+                    $courseName = $course['name'] ?? null;
+                    $courseInstitution = $course['institution'] ?? null;
+
+                    if (!empty($courseName) && !empty($courseInstitution)) {
+                        try {
+                            $year = $course['year'] ?? null;
+                            if ($year === null || $year === '' || (is_numeric($year) && (int) $year < 1900)) {
+                                $year = (int) date('Y');
+                            } else {
+                                $year = (int) $year;
+                            }
+                            $user->caregiverCourses()->create([
+                                'name' => $courseName,
+                                'institution' => $courseInstitution,
+                                'year' => $year,
+                                'description' => $course['description'] ?? null,
+                                'certificate_url' => $course['certificate_url'] ?? null,
+                            ]);
+                        } catch (\Exception $e) {
+                            Log::error("UserController::update - Erro ao criar curso {$index}", [
+                                'error' => $e->getMessage(),
+                                'trace' => $e->getTraceAsString(),
+                                'course' => $course,
+                            ]);
+                        }
+                    }
+                }
+            }
         }
 
         // Handle photo upload
@@ -288,22 +281,85 @@ class UserController extends Controller
         
         $userData['caregiver_courses'] = $courses;
         $userData['caregiverCourses'] = $courses; // Para compatibilidade com frontend
-        
-        Log::info('UserController::update - Usuário atualizado com cursos', [
-            'user_id' => $user->id,
-            'courses_count' => count($courses),
-            'courses' => $courses,
-            'userData_keys' => array_keys($userData),
-            'has_caregiver_courses' => isset($userData['caregiver_courses']),
-            'has_caregiverCourses' => isset($userData['caregiverCourses']),
-        ]);
-        
-        // Log adicional para debug
-        Log::info('UserController::update - Resposta completa (primeiros 1000 chars)', [
-            'response_preview' => substr(json_encode($userData), 0, 1000),
-        ]);
-        
+
         return response()->json($userData);
+    }
+
+    /**
+     * Atualizar cursos e certificações do cuidador/médico
+     * PUT /api/users/{id}/caregiver-courses
+     * Body: { "courses": [ { "name": "...", "institution": "...", "year": 2024, "description": "..." } ] }
+     */
+    public function updateCaregiverCourses(Request $request, $id)
+    {
+        $id = (int) $id;
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json(['message' => 'Usuário não encontrado'], 404);
+        }
+        if (Auth::id() !== $id) {
+            Log::warning('UserController::updateCaregiverCourses - Não autorizado', [
+                'auth_id' => Auth::id(),
+                'requested_id' => $id,
+            ]);
+            return response()->json(['message' => 'Não autorizado'], 403);
+        }
+
+        $coursesData = $request->input('courses');
+        if ($coursesData === null && $request->header('Content-Type') && str_contains($request->header('Content-Type'), 'application/json')) {
+            $decoded = json_decode($request->getContent(), true);
+            $coursesData = $decoded['courses'] ?? null;
+        }
+        if (!is_array($coursesData)) {
+            Log::warning('UserController::updateCaregiverCourses - courses inválido', [
+                'user_id' => $id,
+                'courses_type' => gettype($coursesData),
+                'content_type' => $request->header('Content-Type'),
+            ]);
+            return response()->json(['message' => 'Campo courses deve ser um array'], 422);
+        }
+
+        $user->caregiverCourses()->delete();
+
+        foreach ($coursesData as $course) {
+            if (is_object($course)) {
+                $course = (array) $course;
+            }
+            $name = trim($course['name'] ?? '');
+            $institution = trim($course['institution'] ?? '');
+            if ($name === '' || $institution === '') {
+                continue;
+            }
+            $year = $course['year'] ?? null;
+            if ($year === null || $year === '' || (is_numeric($year) && (int) $year < 1900)) {
+                $year = (int) date('Y');
+            } else {
+                $year = (int) $year;
+            }
+            $user->caregiverCourses()->create([
+                'name' => $name,
+                'institution' => $institution,
+                'year' => $year,
+                'description' => $course['description'] ?? null,
+                'certificate_url' => $course['certificate_url'] ?? null,
+            ]);
+        }
+
+        $user->load('caregiverCourses');
+        $courses = $user->caregiverCourses->map(fn($c) => [
+            'id' => $c->id,
+            'name' => $c->name,
+            'institution' => $c->institution,
+            'year' => $c->year,
+            'description' => $c->description,
+            'certificate_url' => $c->certificate_url,
+        ])->toArray();
+
+        return response()->json([
+            'success' => true,
+            'caregiver_courses' => $courses,
+            'caregiverCourses' => $courses,
+        ]);
     }
 
     /**

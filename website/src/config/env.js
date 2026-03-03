@@ -8,7 +8,7 @@
 // do sistema ou arquivo .env (se usando Vite com dotenv)
 
 // IP padrão do servidor backend local
-const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST || '10.102.0.103';
+const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST || '192.168.0.20';
 const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || '8000';
 
 // Construir URL base da API
@@ -23,6 +23,9 @@ console.log('🌐 Configuração do Backend (Website):', {
   baseUrl: BACKEND_BASE_URL,
   source: import.meta.env.VITE_BACKEND_HOST ? 'env' : 'default'
 });
+
+
+
 
 
 

@@ -11,7 +11,7 @@ return [
     |
     */
 
-    'host' => env('APP_HOST', '10.102.0.103'),
+    'host' => env('APP_HOST', '192.168.0.20'),
     'port' => env('APP_PORT', '8000'),
     
     /*
@@ -24,6 +24,6 @@ return [
     */
     
     // base_url: usar APP_URL se definido, senão construir a partir de host e port
-    'base_url' => env('APP_URL', 'http://' . env('APP_HOST', '10.102.0.103') . ':' . env('APP_PORT', '8000')),
+    'base_url' => env('APP_URL', 'http://' . env('APP_HOST', '192.168.0.20') . ':' . env('APP_PORT', '8000')),
 ];
 

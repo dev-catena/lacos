@@ -53,6 +53,7 @@ import ShowGroupCodesScreen from '../screens/Debug/ShowGroupCodesScreen';
 import CaregiversListScreen from '../screens/Caregivers/CaregiversListScreen';
 import CaregiverDetailsScreen from '../screens/Caregivers/CaregiverDetailsScreen';
 import CaregiverChatScreen from '../screens/Caregivers/CaregiverChatScreen';
+import CaregiverMessagesListScreen from '../screens/Caregivers/CaregiverMessagesListScreen';
 import ClientsListScreen from '../screens/Clients/ClientsListScreen';
 import ClientDetailsScreen from '../screens/Clients/ClientDetailsScreen';
 import ClientChatScreen from '../screens/Clients/ClientChatScreen';
@@ -159,6 +160,13 @@ const HomeStack = () => {
       />
       <Stack.Screen 
         name="AppointmentDetails" 
+        component={AppointmentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AppointmentDetailsFull" 
         component={AppointmentDetailsScreen}
         options={{ 
           headerShown: false 
@@ -460,6 +468,13 @@ const GroupsStack = () => {
         }}
       />
       <Stack.Screen 
+        name="AppointmentDetailsFull" 
+        component={AppointmentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Medications" 
         component={MedicationsScreen}
         options={{ 
@@ -624,6 +639,30 @@ const GroupsStack = () => {
   );
 };
 
+// Stack Navigator para Mensagens (cuidador profissional)
+const MessagesStack = () => {
+  return (
+    <Stack.Navigator
+      initialRouteName="MessagesMain"
+    >
+      <Stack.Screen 
+        name="MessagesMain" 
+        component={CaregiverMessagesListScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="CaregiverChat" 
+        component={CaregiverChatScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+    </Stack.Navigator>
+  );
+};
+
 // Stack Navigator para Clientes
 const ClientsStack = () => {
   return (
@@ -694,6 +733,14 @@ const ProfessionalCaregiverTabNavigator = () => {
         }}
       />
       <Tab.Screen 
+        name="Messages" 
+        component={MessagesStack}
+        options={{ 
+          tabBarLabel: 'Mensagens',
+          tabBarTestID: 'tab-messages',
+        }}
+      />
+      <Tab.Screen 
         name="Notifications" 
         component={NotificationsStack}
         options={{ 
@@ -738,6 +785,14 @@ const ProfessionalCaregiverAndroidNavigator = () => {
         options={{ 
           tabBarLabel: 'Início',
           tabBarTestID: 'tab-home',
+        }}
+      />
+      <Tab.Screen 
+        name="Messages" 
+        component={MessagesStack}
+        options={{ 
+          tabBarLabel: 'Mensagens',
+          tabBarTestID: 'tab-messages',
         }}
       />
       <Tab.Screen 

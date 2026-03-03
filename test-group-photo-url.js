@@ -6,11 +6,11 @@
  */
 
 const API_CONFIG = {
-  BASE_URL: 'http://10.102.0.103:8000/api',
+  BASE_URL: 'http://192.168.0.20:8000/api',
 };
 
 // Simular o que o backend retorna
-const testPhotoUrl = 'http://10.102.0.103:8000/storage/groups/photo.jpg';
+const testPhotoUrl = 'http://192.168.0.20:8000/storage/groups/photo.jpg';
 const testPhotoUrlRelative = '/storage/groups/photo.jpg';
 const testPhotoUrlNoSlash = 'storage/groups/photo.jpg';
 
@@ -49,6 +49,9 @@ console.log('📋 RESUMO:');
 console.log('   Base URL:', baseUrl1);
 console.log('   Todas as URLs devem ser acessíveis via HTTP GET');
 console.log('   Verifique se o servidor está servindo arquivos de storage corretamente');
+
+
+
 
 
 

@@ -50,7 +50,7 @@ class Group extends Model {
     public function getPhotoUrlAttribute() {
         if ($this->photo) {
             // Construir URL diretamente em vez de usar asset() para garantir URL correta
-            $baseUrl = config('app.url', 'http://10.102.0.103:8000');
+            $baseUrl = config('app.url', 'http://192.168.0.20:8000');
             $baseUrl = rtrim($baseUrl, '/');
             $photoPath = ltrim($this->photo, '/');
             return $baseUrl . '/storage/' . $photoPath;

@@ -15,7 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import SafeIcon from '../../components/SafeIcon';
 import colors from '../../constants/colors';
 import Toast from 'react-native-toast-message';
 import apiService from '../../services/apiService';
@@ -71,10 +71,15 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
         }
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar detalhes do cuidador:', error);
-      // Se falhar, usar dados do parâmetro
-      if (caregiverParam) {
-        setCaregiver(caregiverParam);
+      const is404 = error?.status === 404 || error?._rawErrorData?.status === 404;
+      if (is404) {
+        // Cuidador não encontrado (ex: perfil alterado para cuidador amigo) - não usar fallback
+        setCaregiver(null);
+      } else {
+        // Erro de rede: usar dados do parâmetro como fallback
+        if (caregiverParam) {
+          setCaregiver(caregiverParam);
+        }
       }
     } finally {
       setLoading(false);
@@ -86,8 +91,11 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
       <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
         <StatusBar style="dark" />
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
+          <SafeIcon name="alert-circle-outline" size={64} color={colors.error} />
           <Text style={styles.errorText}>Cuidador não encontrado</Text>
+          <Text style={styles.errorSubtext}>
+            Este cuidador não está mais disponível na lista de profissionais.
+          </Text>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -106,20 +114,20 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
 
     for (let i = 0; i < fullStars; i++) {
       stars.push(
-        <Ionicons key={i} name="star" size={20} color={colors.warning} />
+        <SafeIcon key={i} name="star" size={20} color={colors.warning} />
       );
     }
 
     if (hasHalfStar) {
       stars.push(
-        <Ionicons key="half" name="star-half" size={20} color={colors.warning} />
+        <SafeIcon key="half" name="star-half" size={20} color={colors.warning} />
       );
     }
 
     const emptyStars = 5 - Math.ceil(rating);
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
-        <Ionicons key={`empty-${i}`} name="star-outline" size={20} color={colors.gray400} />
+        <SafeIcon key={`empty-${i}`} name="star-outline" size={20} color={colors.gray400} />
       );
     }
 
@@ -214,7 +222,7 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
           onPress={() => setReviewRating(i)}
           activeOpacity={0.7}
         >
-          <Ionicons
+          <SafeIcon
             name={i <= reviewRating ? 'star' : 'star-outline'}
             size={40}
             color={i <= reviewRating ? colors.warning : colors.gray400}
@@ -236,7 +244,7 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
+            <SafeIcon name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Detalhes do Cuidador</Text>
           <View style={styles.headerRight} />
@@ -249,6 +257,22 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
     );
   }
 
+  // Formatar sexo para exibição (male/feminino -> Masculino/Feminino)
+  const formatGenderDisplay = (val) => {
+    if (!val) return null;
+    const g = String(val).toLowerCase();
+    if (g === 'male' || g === 'masculino' || g === 'm') return 'Masculino';
+    if (g === 'female' || g === 'feminino' || g === 'f') return 'Feminino';
+    if (g === 'other' || g === 'outro') return 'Outro';
+    return val;
+  };
+
+  // Sexo: priorizar API; se vazio e for o próprio perfil, usar dados do contexto
+  const isOwnProfile = user?.id === caregiver?.id;
+  const genderDisplay = caregiver?.gender
+    ? formatGenderDisplay(caregiver.gender)
+    : (isOwnProfile && user?.gender ? formatGenderDisplay(user.gender) : null);
+
   // Usar dados da API ou dados do parâmetro como fallback
   const caregiverDetails = {
     ...caregiver,
@@ -257,6 +281,7 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
     rating: caregiver?.rating || 0,
     reviews_count: caregiver?.reviews_count || reviews.length,
     formation_details: caregiver?.formation_details || caregiver?.formation || 'Não informado',
+    gender: genderDisplay || caregiver?.gender,
   };
   
   console.log('🔍 caregiverDetails:', {
@@ -276,7 +301,7 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detalhes do Cuidador</Text>
         <View style={styles.headerRight} />
@@ -297,8 +322,8 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
                   style={styles.avatarImage}
                 />
               ) : (
-                <Ionicons
-                  name={caregiver.gender === 'Feminino' ? 'person' : 'person-outline'}
+                <SafeIcon
+                  name={genderDisplay === 'Feminino' ? 'person' : 'person-outline'}
                   size={48}
                   color={colors.primary}
                 />
@@ -309,7 +334,7 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
           <Text style={styles.name}>{caregiver.name}</Text>
           
           <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={16} color={colors.textLight} />
+            <SafeIcon name="location-outline" size={16} color={colors.textLight} />
             <Text style={styles.locationText}>
               {caregiver.neighborhood}, {caregiver.city}
             </Text>
@@ -329,31 +354,31 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
           <Text style={styles.sectionTitle}>Informações</Text>
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
-              <Ionicons name="medical-outline" size={20} color={colors.primary} />
+              <SafeIcon name="medical-outline" size={20} color={colors.primary} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Formação</Text>
                 <Text style={styles.infoValue}>{caregiver?.formation || caregiver?.formation_details || 'Não informado'}</Text>
               </View>
             </View>
             <View style={styles.infoRow}>
-              <Ionicons name="cash-outline" size={20} color={colors.primary} />
+              <SafeIcon name="cash-outline" size={20} color={colors.primary} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Valor/Hora</Text>
                 <Text style={styles.infoValue}>R$ {Number(caregiver?.hourly_rate || caregiver?.hourlyRate || 0).toFixed(2)}</Text>
               </View>
             </View>
             <View style={styles.infoRow}>
-              <Ionicons name="time-outline" size={20} color={colors.primary} />
+              <SafeIcon name="time-outline" size={20} color={colors.primary} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Disponibilidade</Text>
                 <Text style={styles.infoValue}>{caregiver?.availability || 'Não informado'}</Text>
               </View>
             </View>
             <View style={styles.infoRow}>
-              <Ionicons name="person-outline" size={20} color={colors.primary} />
+              <SafeIcon name="person-outline" size={20} color={colors.primary} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Sexo</Text>
-                <Text style={styles.infoValue}>{caregiver.gender}</Text>
+                <Text style={styles.infoValue}>{genderDisplay || 'Não informado'}</Text>
               </View>
             </View>
           </View>
@@ -361,9 +386,11 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
 
         {/* Detalhes de Formação */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Formação</Text>
+          <Text style={styles.sectionTitle}>Detalhes de formação</Text>
           <View style={styles.formationCard}>
-            <Text style={styles.formationText}>{caregiver?.formation_details || 'Não informado'}</Text>
+            <Text style={styles.formationText}>
+              {caregiver?.formation_description || caregiver?.formation_details || 'Não informado'}
+            </Text>
           </View>
         </View>
 
@@ -374,7 +401,7 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
             caregiverDetails.courses.map((course) => (
               <View key={course.id} style={styles.courseCard}>
                 <View style={styles.courseIcon}>
-                  <Ionicons name="school-outline" size={24} color={colors.primary} />
+                  <SafeIcon name="school-outline" size={24} color={colors.primary} />
                 </View>
                 <View style={styles.courseContent}>
                   <Text style={styles.courseName}>{course.name}</Text>
@@ -398,14 +425,16 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
               <Text style={styles.reviewsCount}>
                 {caregiverDetails.reviews.length} avaliação(ões)
               </Text>
-              <TouchableOpacity
-                style={styles.addReviewButton}
-                onPress={handleAddReview}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add-circle-outline" size={20} color="#C8A8E9" />
-                <Text style={styles.addReviewButtonText}>Avaliar</Text>
-              </TouchableOpacity>
+              {caregiver?.can_review && (
+                <TouchableOpacity
+                  style={styles.addReviewButton}
+                  onPress={handleAddReview}
+                  activeOpacity={0.7}
+                >
+                  <SafeIcon name="add-circle-outline" size={20} color="#C8A8E9" />
+                  <Text style={styles.addReviewButtonText}>Avaliar</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
           
@@ -415,7 +444,7 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
               <View style={styles.reviewHeader}>
                 <View style={styles.reviewAuthorInfo}>
                   <View style={styles.reviewAvatar}>
-                    <Ionicons name="person" size={20} color={colors.primary} />
+                    <SafeIcon name="person" size={20} color={colors.primary} />
                   </View>
                   <View style={styles.reviewAuthorDetails}>
                     <Text style={styles.reviewAuthorName}>{review.author}</Text>
@@ -463,7 +492,7 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
                 onPress={() => setShowReviewModal(false)}
                 activeOpacity={0.7}
               >
-                <Ionicons name="close" size={28} color={colors.text} />
+                <SafeIcon name="close" size={28} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -539,7 +568,7 @@ const CaregiverDetailsScreen = ({ route, navigation }) => {
         onPress={handleContact}
         activeOpacity={0.8}
       >
-        <Ionicons name="chatbubble-ellipses" size={24} color="#2D1B3D" />
+        <SafeIcon name="chatbubble-ellipses" size={24} color="#2D1B3D" />
         <Text style={styles.contactButtonText}>Contatar Cuidador</Text>
       </TouchableOpacity>
     </SafeAreaView>
@@ -562,6 +591,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.error,
     marginTop: 16,
+    marginBottom: 8,
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: colors.textLight,
+    textAlign: 'center',
     marginBottom: 24,
   },
   header: {
@@ -604,11 +639,12 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 16,
     alignItems: 'center',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: Platform.OS === 'android' ? 0 : 3,
   },
   avatarContainer: {
     marginBottom: 16,

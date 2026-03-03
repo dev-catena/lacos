@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Script para atualizar AppointmentController e Appointment Model
-# Servidor: 10.102.0.103
+# Servidor: 192.168.0.20
 # Usuário: darley
 # Senha: yhvh77
 
 echo "🔧 Atualizando AppointmentController e Appointment Model..."
 
 # Configurações
-SERVER="darley@10.102.0.103"
+SERVER="darley@192.168.0.20"
 SERVER_PATH="/var/www/lacos-backend"
 LOCAL_CONTROLLER="AppointmentController_CORRIGIDO.php"
 LOCAL_MODEL="Appointment_MODEL_CORRIGIDO.php"

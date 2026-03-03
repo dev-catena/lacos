@@ -201,6 +201,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/store/conversations/{id}/messages', [StoreController::class, 'sendMessage']);
     
     Route::put('/users/{id}', [App\Http\Controllers\Api\UserController::class, 'update']);
+    Route::put('/users/{id}/caregiver-courses', [App\Http\Controllers\Api\UserController::class, 'updateCaregiverCourses']);
     Route::post('/users/{id}/certificate', [App\Http\Controllers\Api\UserController::class, 'uploadCertificate']);
     
     // Grupos - Gestão de Grupos
@@ -240,6 +241,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
     Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
     Route::post('/appointments/{id}/confirm', [AppointmentController::class, 'confirm']);
+    Route::post('/appointments/{id}/video-join', [AppointmentController::class, 'videoJoin']);
+    Route::post('/appointments/{id}/reviews', [AppointmentController::class, 'createReview']);
     Route::post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
     Route::post('/appointments/{id}/payment', [AppointmentController::class, 'processPayment']);
     Route::get('/appointments/{id}/payment-status', [AppointmentController::class, 'paymentStatus']);
@@ -269,6 +272,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Médicos - Gestão de Médicos do Grupo e Agenda
     Route::get('/doctors', [DoctorController::class, 'index']);
     Route::post('/doctors', [DoctorController::class, 'store']); // Criar novo médico
+    Route::get('/doctors/{id}', [DoctorController::class, 'show']); // Buscar médico específico
+    Route::put('/doctors/{id}', [DoctorController::class, 'update']); // Atualizar médico
+    Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']); // Deletar médico
     Route::get('/doctors/{id}/availability', [DoctorController::class, 'getAvailability']);
     Route::post('/doctors/{id}/availability', [DoctorController::class, 'saveAvailability']);
     
@@ -285,6 +291,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/caregivers/clients', [CaregiverController::class, 'getClients']);
     Route::get('/caregivers/clients/{id}', [CaregiverController::class, 'getClientDetails']);
     Route::get('/caregivers', [CaregiverController::class, 'index']);
+    Route::post('/caregivers/{id}/reviews', [CaregiverController::class, 'createReview']);
     Route::get('/caregivers/{id}', [CaregiverController::class, 'show']);
     
     // Mensagens - Chat entre usuários
@@ -324,6 +331,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payments/confirm', [PaymentController::class, 'confirm']);
     Route::get('/payments/status/{paymentIntentId}', [PaymentController::class, 'checkStatus']);
     
+    Route::get('/messages/conversations', [MessageController::class, 'getConversations']);
+    Route::get('/messages/unread-count', [MessageController::class, 'unreadCount']);
     Route::get('/messages/conversation/{userId}', [MessageController::class, 'getConversation']);
     Route::post('/messages', [MessageController::class, 'sendMessage']);
     Route::post('/messages/image', [MessageController::class, 'sendImage']);

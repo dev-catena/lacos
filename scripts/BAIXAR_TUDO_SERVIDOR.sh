@@ -3,7 +3,7 @@
 # Script principal para baixar todos os arquivos do servidor
 # Tenta diferentes métodos de autenticação
 
-SERVER="darley@10.102.0.103"
+SERVER="darley@192.168.0.20"
 PORT="63022"
 REMOTE_PATH="/var/www/lacos-backend"
 LOCAL_PATH="/home/darley/lacos/backend-laravel"
@@ -58,6 +58,9 @@ echo "  rsync -avz -e \"ssh -p $PORT\" $SERVER:$REMOTE_PATH/app/Models/ $LOCAL_P
 echo "  rsync -avz -e \"ssh -p $PORT\" $SERVER:$REMOTE_PATH/database/migrations/ $LOCAL_PATH/database/migrations/"
 echo ""
 echo "📖 Veja mais detalhes em: scripts/INSTRUCOES_BAIXAR_SERVIDOR.md"
+
+
+
 
 
 

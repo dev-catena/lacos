@@ -9,7 +9,7 @@ echo "================================"
 echo ""
 
 SERVER_USER="darley"
-SERVER_HOST="10.102.0.103"
+SERVER_HOST="192.168.0.20"
 SERVER_PORT="63022"
 BACKEND_PATH="/var/www/lacos-backend"
 
@@ -53,10 +53,10 @@ return [
         'http://localhost:19006',
         'http://127.0.0.1:8081',
         'http://127.0.0.1:19006',
-        'http://10.102.0.103:8081',
-        'http://10.102.0.103:19006',
-        'http://10.102.0.103',
-        'https://10.102.0.103',
+        'http://192.168.0.20:8081',
+        'http://192.168.0.20:19006',
+        'http://192.168.0.20',
+        'https://192.168.0.20',
     ],
     'allowed_origins_patterns' => [
         '#^http://localhost(:\d+)?$#',
@@ -79,7 +79,7 @@ echo "📋 Origens permitidas:"
 echo "   - http://localhost:8081 (Expo Web)"
 echo "   - http://localhost:19006 (Expo Web alternativo)"
 echo "   - http://127.0.0.1:8081"
-echo "   - http://10.102.0.103:8081 (seu IP local)"
+echo "   - http://192.168.0.20:8081 (seu IP local)"
 echo "   - Padrões para IPs locais"
 echo ""
 

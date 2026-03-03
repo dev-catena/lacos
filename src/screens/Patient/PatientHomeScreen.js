@@ -381,7 +381,7 @@ const PatientHomeScreen = ({ navigation }) => {
             id: `appointment-${appointment.id}`,
             type: 'appointment',
             title: appointment.title || 'Consulta',
-            description: appointment.description || appointment.type || '',
+            description: appointment.description || (appointment.type === 'medical' ? 'Médico' : appointment.type === 'common' ? 'Compromisso' : appointment.type === 'fisioterapia' ? 'Fisioterapia' : appointment.type === 'exames' ? 'Exames' : appointment.type) || '',
             time: `${hours}:${minutes}`,
             date: dateLabel,
             icon: appointment.is_teleconsultation ? 'videocam' : 'calendar',
@@ -1143,21 +1143,37 @@ const PatientHomeScreen = ({ navigation }) => {
                   
                   <View style={styles.appointmentActions}>
                     {isTeleconsultation ? (
-                      <TouchableOpacity
-                        style={[
-                          styles.actionButton,
-                          styles.videoCallButton,
-                          !canStartVideoCall && styles.actionButtonDisabled
-                        ]}
-                        onPress={() => handleStartVideoCall(appointment)}
-                        disabled={!canStartVideoCall}
-                        activeOpacity={0.7}
-                      >
-                        <VideoCamIcon size={20} color="#FFFFFF" />
-                        <Text style={styles.actionButtonText}>
-                          {canStartVideoCall ? 'Entrar na Videoconferência' : 'Aguarde o horário'}
-                        </Text>
-                      </TouchableOpacity>
+                      <>
+                        <TouchableOpacity
+                          style={[
+                            styles.actionButton,
+                            styles.videoCallButton,
+                            !canStartVideoCall && styles.actionButtonDisabled
+                          ]}
+                          onPress={() => handleStartVideoCall(appointment)}
+                          disabled={!canStartVideoCall}
+                          activeOpacity={0.7}
+                        >
+                          <VideoCamIcon size={20} color="#FFFFFF" />
+                          <Text style={styles.actionButtonText}>
+                            {canStartVideoCall ? 'Entrar na Videoconferência' : 'Aguarde o horário'}
+                          </Text>
+                        </TouchableOpacity>
+                        {(appointment.data?.payment_status === 'paid_held' || appointment.payment_status === 'paid_held') && (
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.confirmButton]}
+                            onPress={() => navigation.navigate('AppointmentDetailsFull', {
+                              appointmentId: appointment.data?.id || appointment.id,
+                              appointment: appointment.data || appointment,
+                              groupId: groupId,
+                            })}
+                            activeOpacity={0.7}
+                          >
+                            <CalendarIcon size={20} color="#FFFFFF" />
+                            <Text style={styles.actionButtonText}>Confirmar que foi realizada</Text>
+                          </TouchableOpacity>
+                        )}
+                      </>
                     ) : (
                       <TouchableOpacity
                         style={[styles.actionButton, styles.recordingButton]}
@@ -1522,6 +1538,10 @@ const styles = StyleSheet.create({
   },
   recordingButton: {
     backgroundColor: colors.secondary,
+  },
+  confirmButton: {
+    backgroundColor: colors.success,
+    marginTop: 8,
   },
   actionButtonDisabled: {
     backgroundColor: colors.gray400,

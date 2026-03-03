@@ -8,7 +8,7 @@ echo "🔧 Corrigindo metro.config.js..."
 
 # Verificar IP atual
 IP=$(hostname -I | awk '{print $1}')
-EXPO_IP="10.102.0.103"
+EXPO_IP="192.168.0.20"
 
 if [ "$IP" != "$EXPO_IP" ]; then
     echo "⚠️  IP atual ($IP) diferente do esperado ($EXPO_IP)"

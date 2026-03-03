@@ -60,6 +60,11 @@ import {
   PlayCircleIcon,
   PauseCircleIcon,
   MusicalNotesIcon,
+  StarIcon,
+  StarHalfIcon,
+  StarOutlineIcon,
+  SchoolIcon,
+  AlertCircleOutlineIcon,
 } from './CustomIcons';
 
 /**
@@ -163,7 +168,12 @@ const iconMap = {
   'person-outline': PersonIcon, // Pessoa/usuário
   'card-outline': DocumentIcon, // Cartão/documento
   'navigate-outline': LocationOutlineIcon, // Navegação
-  'star': CheckmarkCircleIcon, // Estrela/favorito
+  'star': StarIcon, // Estrela para avaliações
+  'star-half': StarHalfIcon, // Meia estrela
+  'star-outline': StarOutlineIcon, // Estrela vazia
+  'alert-circle-outline': AlertCircleOutlineIcon, // Alerta outline
+  'school-outline': SchoolIcon, // Escola/formação
+  'chatbubble-ellipses': MessagesIcon, // Chat/bolhas de conversa
   // Ícones para PanicSettingsScreen
   'mic-outline': MicIcon, // Microfone
   'mic': MicIcon, // Microfone (preenchido)

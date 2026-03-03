@@ -21,7 +21,7 @@ Este script garante que **NENHUMA URL use localhost**:
 1. ✅ Para todos os processos Expo/Metro
 2. ✅ Limpa cache completamente
 3. ✅ Configura metro.config.js para interceptar TODAS as respostas HTTP
-4. ✅ Substitui localhost pelo IP correto (10.102.0.103) em:
+4. ✅ Substitui localhost pelo IP correto (192.168.0.20) em:
    - URLs nas respostas HTTP
    - Headers HTTP
    - Corpo das respostas JSON
@@ -48,8 +48,8 @@ res.write = function(chunk) {
 Todas as variáveis são configuradas antes de iniciar:
 
 ```bash
-export REACT_NATIVE_PACKAGER_HOSTNAME="10.102.0.103"
-export EXPO_PACKAGER_HOSTNAME="10.102.0.103"
+export REACT_NATIVE_PACKAGER_HOSTNAME="192.168.0.20"
+export EXPO_PACKAGER_HOSTNAME="192.168.0.20"
 export EXPO_NO_LOCALHOST="1"
 export EXPO_USE_LOCALHOST="0"
 ```
@@ -83,7 +83,7 @@ pkill -f "expo start"
 ### Passo 4: Usar no Expo Go
 
 **LAN Mode:**
-- URL: `exp://10.102.0.103:8081`
+- URL: `exp://192.168.0.20:8081`
 - Cole manualmente no Expo Go
 
 **Tunnel Mode:**
@@ -96,17 +96,17 @@ Após iniciar, teste:
 
 ```bash
 # Verificar se Metro está acessível no IP correto
-curl http://10.102.0.103:8081/status
+curl http://192.168.0.20:8081/status
 
 # Verificar se NÃO há localhost nas respostas
-curl http://10.102.0.103:8081 | grep -i localhost
+curl http://192.168.0.20:8081 | grep -i localhost
 # (Não deve retornar nada)
 ```
 
 ## ⚠️ Importante
 
 - ✅ **NUNCA** use URLs com localhost no Expo Go
-- ✅ **SEMPRE** use o IP correto: `exp://10.102.0.103:8081`
+- ✅ **SEMPRE** use o IP correto: `exp://192.168.0.20:8081`
 - ✅ O script garante que mesmo se o Expo gerar localhost, será substituído
 - ✅ O metro.config.js intercepta TODAS as respostas HTTP
 
@@ -115,7 +115,7 @@ curl http://10.102.0.103:8081 | grep -i localhost
 1. **Verificar se está na mesma rede** (LAN mode):
    ```bash
    # No iOS/Android, verificar IP
-   # Deve estar na mesma rede que 10.102.0.103
+   # Deve estar na mesma rede que 192.168.0.20
    ```
 
 2. **Usar Tunnel Mode**:
@@ -132,14 +132,14 @@ curl http://10.102.0.103:8081 | grep -i localhost
 4. **Verificar se Metro está rodando**:
    ```bash
    lsof -i :8081
-   curl http://10.102.0.103:8081/status
+   curl http://192.168.0.20:8081/status
    ```
 
 ## 📋 Resumo
 
 1. Execute: `./INICIAR_EXPO_SEM_LOCALHOST_DEFINITIVO.sh`
 2. Escolha LAN ou Tunnel
-3. Use a URL `exp://10.102.0.103:8081` no Expo Go
+3. Use a URL `exp://192.168.0.20:8081` no Expo Go
 4. O metro.config.js garante que NENHUMA resposta use localhost
 
 **Resultado**: iOS e Android conseguem baixar o bundle corretamente! ✅

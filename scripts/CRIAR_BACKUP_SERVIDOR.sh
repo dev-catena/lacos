@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para ser executado NO SERVIDOR para criar backup dos arquivos
-# Execute este script no servidor: ssh darley@10.102.0.103 -p 63022
+# Execute este script no servidor: ssh darley@192.168.0.20 -p 63022
 
 REMOTE_PATH="/var/www/lacos-backend"
 BACKUP_DIR="/tmp/lacos_backup_$$"
@@ -57,11 +57,14 @@ echo ""
 echo "✅ Backup criado: $BACKUP_FILE"
 echo ""
 echo "Para baixar o arquivo, execute no seu computador local:"
-echo "  scp -P 63022 darley@10.102.0.103:$BACKUP_FILE /tmp/lacos_backup.tar.gz"
+echo "  scp -P 63022 darley@192.168.0.20:$BACKUP_FILE /tmp/lacos_backup.tar.gz"
 echo ""
 echo "Depois extraia com:"
 echo "  cd /home/darley/lacos/backend-laravel"
 echo "  tar -xzf /tmp/lacos_backup.tar.gz"
+
+
+
 
 
 

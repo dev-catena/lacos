@@ -14,12 +14,10 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import colors from './src/constants/colors';
+import { navigationRef } from './src/navigation/navigationRef';
 
 // Manter splash screen visível enquanto carrega fontes
 SplashScreen.preventAutoHideAsync();
-
-// Criar navigationRef para preservar estado de navegação
-export const navigationRef = React.createRef();
 
 // Função para extrair código de convite da URL
 // Suporta: lacos.com (produção) e 192.168.1.105 (desenvolvimento local)
@@ -47,6 +45,7 @@ const extractInviteCodeFromUrl = (url) => {
       'lacos.com',
       'www.lacos.com',
       '192.168.1.105',
+      '192.168.0.20',
       'localhost',
       '127.0.0.1'
     ];

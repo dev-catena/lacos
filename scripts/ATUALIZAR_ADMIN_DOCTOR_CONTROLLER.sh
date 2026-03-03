@@ -16,7 +16,7 @@ if [ -f "/tmp/AdminDoctorController.php" ]; then
     echo "✅ AdminDoctorController atualizado"
 else
     echo "❌ Arquivo não encontrado em /tmp/"
-    echo "   Execute: scp AdminDoctorController.php darley@10.102.0.103:/tmp/"
+    echo "   Execute: scp AdminDoctorController.php darley@192.168.0.20:/tmp/"
     exit 1
 fi
 

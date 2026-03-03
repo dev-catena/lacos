@@ -152,5 +152,5 @@ echo ""
 echo "📝 Se ainda houver erro CSRF:"
 echo "   1. Verifique se o servidor web foi reiniciado"
 echo "   2. Verifique se não há outro middleware aplicando CSRF"
-echo "   3. Teste com: curl -X POST http://10.102.0.103/api/admin/login -H 'Content-Type: application/json' -d '{\"email\":\"root@lacos.com\",\"password\":\"yhvh77\"}'"
+echo "   3. Teste com: curl -X POST http://192.168.0.20/api/admin/login -H 'Content-Type: application/json' -d '{\"email\":\"root@lacos.com\",\"password\":\"yhvh77\"}'"
 

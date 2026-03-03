@@ -4,7 +4,7 @@
 
 Este script **GARANTE** que o QR code sempre mostra:
 ```
-exp://10.102.0.103:8081
+exp://192.168.0.20:8081
 ```
 
 **NUNCA, NUNCA, NUNCA usa localhost!**
@@ -41,7 +41,7 @@ node start-expo-ip-forcado.js
 1. **Para processos antigos** - Garante que não há conflitos
 2. **Libera a porta 8081** - Remove processos que possam estar usando
 3. **Limpa cache** - Remove `.expo`, `node_modules/.cache`, `.metro`
-4. **Configura IP fixo** - Força `10.102.0.103:8081`
+4. **Configura IP fixo** - Força `192.168.0.20:8081`
 5. **Bloqueia localhost** - Define variáveis para nunca usar localhost
 6. **Inicia Expo Go** - Com todas as configurações corretas
 
@@ -53,7 +53,7 @@ Quando o Expo iniciar, você deve ver no terminal:
 
 ```
 📱 O QR CODE DEVE MOSTRAR:
-   exp://10.102.0.103:8081
+   exp://192.168.0.20:8081
 ```
 
 **Se aparecer `localhost` ou `127.0.0.1` em qualquer lugar, PARE e avise!**
@@ -64,7 +64,7 @@ Quando o Expo iniciar, você deve ver no terminal:
 
 1. Abra o **Expo Go** no seu celular
 2. Escaneie o QR code que aparece no terminal
-3. O app deve carregar de `exp://10.102.0.103:8081`
+3. O app deve carregar de `exp://192.168.0.20:8081`
 
 ---
 
@@ -90,7 +90,7 @@ lsof -ti :8081 | xargs kill -9
 
 **Verifique:**
 1. Celular e computador estão na mesma rede Wi-Fi?
-2. IP do computador é realmente `10.102.0.103`?
+2. IP do computador é realmente `192.168.0.20`?
 3. Firewall não está bloqueando a porta 8081?
 
 ---
@@ -99,8 +99,8 @@ lsof -ti :8081 | xargs kill -9
 
 O script configura automaticamente:
 
-- `REACT_NATIVE_PACKAGER_HOSTNAME=10.102.0.103`
-- `EXPO_PACKAGER_HOSTNAME=10.102.0.103`
+- `REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.20`
+- `EXPO_PACKAGER_HOSTNAME=192.168.0.20`
 - `EXPO_NO_LOCALHOST=1`
 - `EXPO_USE_LOCALHOST=0`
 - `RCT_METRO_PORT=8081`
@@ -111,7 +111,7 @@ O script configura automaticamente:
 ## 📝 Notas
 
 - Este script é **específico para Expo Go** (não dev-client)
-- O IP `10.102.0.103` está **hardcoded** no script
+- O IP `192.168.0.20` está **hardcoded** no script
 - Se precisar mudar o IP, edite `start-expo-ip-forcado.js`
 - O script sempre limpa cache antes de iniciar
 

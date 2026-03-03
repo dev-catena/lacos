@@ -20,6 +20,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.lacos.app",
       "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
         "NSMicrophoneUsageDescription": "Este app precisa acessar o microfone para gravar anotações de áudio sobre consultas.",
         "NSContactsUsageDescription": "Este app precisa acessar seus contatos para facilitar as ligações.",
         "NSLocationWhenInUseUsageDescription": "Este app precisa da sua localização para encontrar a farmácia popular mais próxima.",
@@ -35,19 +38,34 @@
     "android": {
       "package": "com.lacos.app",
       "permissions": [
-        "RECORD_AUDIO",
-        "CALL_PHONE",
-        "READ_CONTACTS",
-        "WRITE_CONTACTS",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "POST_NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM",
-        "CAMERA",
-        "BLUETOOTH",
-        "BLUETOOTH_ADMIN",
-        "BLUETOOTH_SCAN",
-        "BLUETOOTH_CONNECT"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CALL_PHONE",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.CAMERA",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CALL_PHONE",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.CAMERA",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "softwareKeyboardLayoutMode": "pan"
     },
@@ -81,11 +99,6 @@
         }
       ]
     ],
-    "extra": {
-      "eas": {
-        "projectId": "your-project-id"
-      }
-    },
     "scheme": "lacos"
   }
 }

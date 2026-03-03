@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Http\Controllers\Api;
-use AppModelsCaregiverReview;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -29,6 +28,17 @@ class CaregiverController extends Controller
                 $profile = $request->profile;
                 if ($profile === 'doctor') {
                     $query->where('profile', 'doctor');
+                    // Apenas médicos aprovados (para teleconsultas)
+                    if (Schema::hasColumn('users', 'doctor_approved_at')) {
+                        $query->whereNotNull('doctor_approved_at')
+                            ->where('doctor_approved_at', '!=', '0000-00-00 00:00:00');
+                    }
+                    // Excluir médicos bloqueados
+                    if (Schema::hasColumn('users', 'is_blocked')) {
+                        $query->where(function ($q) {
+                            $q->where('is_blocked', false)->orWhereNull('is_blocked');
+                        });
+                    }
                 } elseif ($profile === 'professional_caregiver') {
                     $query->where('profile', 'professional_caregiver');
                 } else {
@@ -69,7 +79,9 @@ class CaregiverController extends Controller
             if (Schema::hasTable('caregiver_reviews')) {
                 $withRelations[] = 'caregiverReviews';
             }
-            $withRelations[] = 'medicalSpecialty';
+            if (Schema::hasTable('medical_specialties')) {
+                $withRelations[] = 'medicalSpecialty';
+            }
             
             if (!empty($withRelations)) {
                 $query->with($withRelations);
@@ -124,6 +136,9 @@ class CaregiverController extends Controller
                     $courses = $caregiver->caregiverCourses;
                 }
                 
+                $g = $caregiver->gender ? strtolower($caregiver->gender) : null;
+                $genderDisplay = $g ? (($g === 'male' || $g === 'masculino' || $g === 'm') ? 'Masculino' : (($g === 'female' || $g === 'feminino' || $g === 'f') ? 'Feminino' : (($g === 'other' || $g === 'outro') ? 'Outro' : $caregiver->gender))) : null;
+
                 return [
                     'id' => $caregiver->id,
                     'name' => $caregiver->name,
@@ -131,9 +146,11 @@ class CaregiverController extends Controller
                     'city' => $caregiver->city,
                     'neighborhood' => $caregiver->neighborhood,
                     'formation_details' => $caregiver->formation_details,
+                    'formation_description' => $caregiver->formation_description ?? null,
                     'hourly_rate' => $caregiver->hourly_rate,
                     'availability' => $caregiver->availability,
                     'is_available' => $caregiver->is_available,
+                    'gender' => $genderDisplay,
                     'average_rating' => $avgRating ? round($avgRating, 1) : null,
                     'total_reviews' => $totalReviews,
                     'courses' => $courses,
@@ -172,9 +189,14 @@ class CaregiverController extends Controller
                 $withRelations[] = 'caregiverCourses';
             }
             if (Schema::hasTable('caregiver_reviews')) {
-                $withRelations[] = 'caregiverReviews';
+                // Carregar caregiverReviews com author e group (evitar nested array que causa "Method name must be a string")
+                $withRelations['caregiverReviews'] = function ($q) {
+                    $q->with('author', 'group');
+                };
             }
-            $withRelations[] = 'medicalSpecialty';
+            if (Schema::hasTable('medical_specialties')) {
+                $withRelations[] = 'medicalSpecialty';
+            }
             
             $query = User::whereIn('profile', ['professional_caregiver', 'doctor']);
             if (!empty($withRelations)) {
@@ -203,6 +225,25 @@ class CaregiverController extends Controller
                 $courses = $caregiver->caregiverCourses;
             }
 
+            // Formatar gender para exibição (male/female -> Masculino/Feminino)
+            $genderDisplay = null;
+            if ($caregiver->gender) {
+                $g = strtolower($caregiver->gender);
+                $genderDisplay = ($g === 'male' || $g === 'masculino' || $g === 'm') ? 'Masculino'
+                    : (($g === 'female' || $g === 'feminino' || $g === 'f') ? 'Feminino'
+                    : (($g === 'other' || $g === 'outro') ? 'Outro' : $caregiver->gender));
+            }
+
+            // Verificar se o usuário pode avaliar: só se o cuidador foi integrante de algum grupo do usuário
+            $canReview = false;
+            if (Auth::check() && Schema::hasTable('group_members')) {
+                $user = Auth::user();
+                $userGroupIds = DB::table('group_members')->where('user_id', $user->id)->pluck('group_id');
+                $caregiverGroupIds = DB::table('group_members')->where('user_id', $caregiver->id)->pluck('group_id');
+                $commonGroups = $userGroupIds->intersect($caregiverGroupIds);
+                $canReview = $commonGroups->isNotEmpty();
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -212,13 +253,32 @@ class CaregiverController extends Controller
                     'city' => $caregiver->city,
                     'neighborhood' => $caregiver->neighborhood,
                     'formation_details' => $caregiver->formation_details,
+                    'formation_description' => $caregiver->formation_description ?? null,
+                    'formation' => $caregiver->formation,
                     'hourly_rate' => $caregiver->hourly_rate,
                     'availability' => $caregiver->availability,
                     'is_available' => $caregiver->is_available,
+                    'gender' => $genderDisplay,
                     'average_rating' => $avgRating ? round($avgRating, 1) : null,
-                    'total_reviews' => $totalReviews,
+                    'rating' => $avgRating ? round($avgRating, 1) : 0,
+                    'reviews_count' => $totalReviews,
+                    'reviews' => $caregiver->relationLoaded('caregiverReviews') ? $caregiver->caregiverReviews->map(function ($r) {
+                        $author = $r->relationLoaded('author') ? $r->author : null;
+                        $group = $r->relationLoaded('group') ? $r->group : null;
+                        $role = $author && $author->profile === 'caregiver' ? 'Amigo/Cuidador' : ($author && $author->profile === 'admin' ? 'Admin' : '');
+                        return [
+                            'id' => $r->id,
+                            'rating' => $r->rating,
+                            'comment' => $r->comment,
+                            'author' => $author?->name ?? 'Anônimo',
+                            'role' => $role,
+                            'group' => $group?->name ?? null,
+                            'date' => $r->created_at?->toISOString(),
+                        ];
+                    })->values()->all() : [],
                     'courses' => $courses,
                     'profile' => $caregiver->profile,
+                    'can_review' => $canReview,
                     // Campos específicos de médico
                     'crm' => $caregiver->crm,
                     'medical_specialty_id' => $caregiver->medical_specialty_id,
@@ -233,6 +293,86 @@ class CaregiverController extends Controller
                 'success' => false,
                 'message' => 'Erro ao buscar cuidador: ' . $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * Criar/atualizar avaliação de cuidador profissional
+     * POST /api/caregivers/{id}/reviews
+     * Só permite se o cuidador foi integrante de algum grupo do usuário
+     */
+    public function createReview(Request $request, $id)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['success' => false, 'message' => 'Não autenticado'], 401);
+            }
+
+            $validated = $request->validate([
+                'rating' => 'required|integer|min:1|max:5',
+                'comment' => 'required|string|min:10|max:500',
+            ]);
+
+            $caregiver = User::whereIn('profile', ['professional_caregiver', 'doctor'])->find($id);
+            if (!$caregiver) {
+                return response()->json(['success' => false, 'message' => 'Cuidador não encontrado'], 404);
+            }
+
+            // Verificar se o usuário pode avaliar: só se compartilham algum grupo
+            if (!Schema::hasTable('group_members')) {
+                return response()->json(['success' => false, 'message' => 'Você não pode avaliar este cuidador'], 403);
+            }
+            $userGroupIds = DB::table('group_members')->where('user_id', $user->id)->pluck('group_id');
+            $caregiverGroupIds = DB::table('group_members')->where('user_id', $caregiver->id)->pluck('group_id');
+            $commonGroups = $userGroupIds->intersect($caregiverGroupIds);
+            if ($commonGroups->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Só é possível avaliar cuidadores que foram integrantes do seu grupo',
+                ], 403);
+            }
+            $groupId = $commonGroups->first();
+
+            $existing = CaregiverReview::where('caregiver_id', $caregiver->id)
+                ->where('author_id', $user->id)
+                ->first();
+
+            if ($existing) {
+                $existing->update([
+                    'rating' => $validated['rating'],
+                    'comment' => $validated['comment'],
+                    'group_id' => $groupId,
+                ]);
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Avaliação atualizada com sucesso',
+                    'data' => $existing->fresh(),
+                ]);
+            }
+
+            $review = CaregiverReview::create([
+                'caregiver_id' => $caregiver->id,
+                'author_id' => $user->id,
+                'group_id' => $groupId,
+                'rating' => $validated['rating'],
+                'comment' => $validated['comment'],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Avaliação criada com sucesso',
+                'data' => $review,
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dados inválidos',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Erro ao criar avaliação de cuidador: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao salvar avaliação'], 500);
         }
     }
 

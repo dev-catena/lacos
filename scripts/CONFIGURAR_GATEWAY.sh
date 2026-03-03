@@ -4,7 +4,7 @@ echo "🔧 Configurando gateway.lacosapp.com no Nginx..."
 echo ""
 
 # Variáveis
-SERVER_IP="10.102.0.103"
+SERVER_IP="192.168.0.20"
 SERVER_USER="darley"
 SERVER_PASSWORD="yhvh77"
 DOMAIN="gateway.lacosapp.com"

@@ -3,7 +3,7 @@
 ## 📋 Problema
 - ❌ QR code não funciona no iOS (não tem campo para digitar URL)
 - ⚠️ QR code não funciona no Android (só funciona digitando URL manualmente)
-- ✅ Funciona digitando URL manualmente no Android: `exp://10.102.0.103:8081`
+- ✅ Funciona digitando URL manualmente no Android: `exp://192.168.0.20:8081`
 
 ## ✅ Solução Imediata (Recomendada)
 
@@ -74,7 +74,7 @@ O iOS não tem campo para digitar URL, então:
 
 1. **Use Tunnel Mode** (mais fácil)
 2. **Ou compartilhe URL via AirDrop/Email:**
-   - Copie a URL do terminal: `exp://10.102.0.103:8081`
+   - Copie a URL do terminal: `exp://192.168.0.20:8081`
    - Envie para o iPhone
    - Toque na URL para abrir no Expo Go
 

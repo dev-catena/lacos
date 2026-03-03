@@ -23,8 +23,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import chatService from '../../services/chatService';
 import moment from 'moment';
 
-const GroupChatScreen = ({ route, navigation }) => {
-  const { groupId, groupName } = route.params || {};
+const GroupChatScreen = ({ route, navigation, groupId: groupIdProp, groupName: groupNameProp }) => {
+  const params = route?.params || {};
+  const groupId = groupIdProp ?? params.groupId;
+  const groupName = groupNameProp ?? params.groupName;
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState([]);

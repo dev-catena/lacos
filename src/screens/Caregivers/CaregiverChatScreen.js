@@ -12,6 +12,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import chatService from '../../services/chatService';
+import groupService from '../../services/groupService';
 import moment from 'moment';
 
 const CaregiverChatScreen = ({ route, navigation }) => {
@@ -31,11 +33,62 @@ const CaregiverChatScreen = ({ route, navigation }) => {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [groupsModalVisible, setGroupsModalVisible] = useState(false);
+  const [myGroups, setMyGroups] = useState([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
   const flatListRef = useRef(null);
   const pollingIntervalRef = useRef(null);
-  
+
+  // Só o cuidador amigo (quem contrata) vê o botão de compartilhar código - NÃO o cuidador profissional.
+  // O cuidador profissional é quem RECEBE o código para entrar no grupo, não quem compartilha.
+  const canShareGroupCode = user?.id && caregiverId &&
+    String(user.id) !== String(caregiverId) &&
+    user?.profile !== 'professional_caregiver';
+
   // Foto do caregiver
   const caregiverPhoto = caregiver?.photo_url || caregiver?.photo || null;
+
+  const loadGroupsForShare = async () => {
+    if (!canShareGroupCode) return;
+    setLoadingGroups(true);
+    try {
+      const result = await groupService.getMyGroups();
+      if (result.success && result.data) {
+        const groups = result.data;
+        const withCode = groups.filter(g => {
+          const code = g.code || g.access_code || g.patient_code;
+          return code && code !== 'NULL' && code !== 'null' && String(code).trim() !== '';
+        });
+        setMyGroups(withCode);
+      } else {
+        setMyGroups([]);
+      }
+    } catch (err) {
+      setMyGroups([]);
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  const handleShareGroupCode = async (group) => {
+    const code = group.code || group.access_code || group.patient_code;
+    if (!code || !caregiverId) return;
+    setGroupsModalVisible(false);
+    setSending(true);
+    try {
+      const messageText = `🔑 Código para entrar no grupo "${group.name || 'Grupo'}": ${code}\n\nUse este código em Perfil > Entrar em grupo com código para participar.`;
+      const result = await chatService.sendTextMessage(caregiverId, messageText);
+      if (result.success) {
+        await loadMessages();
+      } else {
+        Alert.alert('Erro', result.error || 'Erro ao enviar');
+      }
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível enviar o código');
+    } finally {
+      setSending(false);
+    }
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -294,6 +347,20 @@ const CaregiverChatScreen = ({ route, navigation }) => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <View style={styles.inputContainer}>
+          {canShareGroupCode && (
+            <TouchableOpacity
+              style={[styles.shareCodeButton, sending && styles.shareCodeButtonDisabled]}
+              onPress={() => {
+                setGroupsModalVisible(true);
+                loadGroupsForShare();
+              }}
+              disabled={sending}
+              activeOpacity={0.7}
+              accessibilityLabel="Compartilhar código do grupo"
+            >
+              <Ionicons name="key-outline" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.imageButton}
             onPress={handlePickImage}
@@ -329,6 +396,68 @@ const CaregiverChatScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Modal para escolher grupo e enviar código */}
+      <Modal
+        visible={groupsModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setGroupsModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setGroupsModalVisible(false)}
+        >
+          <View style={styles.groupsModalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.groupsModalHeader}>
+              <Text style={styles.groupsModalTitle}>Enviar código do grupo</Text>
+              <TouchableOpacity onPress={() => setGroupsModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.groupsModalSubtitle}>
+              Escolha o grupo para enviar o código à cuidadora
+            </Text>
+            {loadingGroups ? (
+              <View style={styles.groupsModalLoading}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : myGroups.length === 0 ? (
+              <View style={styles.groupsModalEmpty}>
+                <Ionicons name="people-outline" size={48} color={colors.gray400} />
+                <Text style={styles.groupsModalEmptyText}>
+                  Você não participa de nenhum grupo com código ou não tem grupos cadastrados.
+                </Text>
+                <Text style={styles.groupsModalEmptyHint}>
+                  Crie um grupo ou peça o código para entrar em um grupo existente.
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={myGroups}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.groupCard}
+                    onPress={() => handleShareGroupCode(item)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.groupCardContent}>
+                      <Text style={styles.groupCardName}>{item.name || 'Grupo'}</Text>
+                      <Text style={styles.groupCardCode}>
+                        Código: {item.code || item.access_code || item.patient_code}
+                      </Text>
+                    </View>
+                    <Ionicons name="send" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
+                style={styles.groupsList}
+              />
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -488,6 +617,95 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: colors.backgroundLight,
+  },
+  shareCodeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+  },
+  shareCodeButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  groupsModalContent: {
+    backgroundColor: colors.backgroundLight,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+    maxHeight: '70%',
+  },
+  groupsModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  groupsModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  groupsModalSubtitle: {
+    fontSize: 14,
+    color: colors.textLight,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  groupsModalLoading: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  groupsModalEmpty: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  groupsModalEmptyText: {
+    fontSize: 15,
+    color: colors.text,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  groupsModalEmptyHint: {
+    fontSize: 13,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  groupsList: {
+    paddingHorizontal: 16,
+  },
+  groupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  groupCardContent: {
+    flex: 1,
+  },
+  groupCardName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  groupCardCode: {
+    fontSize: 13,
+    color: colors.textLight,
+    marginTop: 4,
   },
   loadingContainer: {
     flex: 1,

@@ -170,7 +170,6 @@ const DoctorsScreen = ({ route, navigation }) => {
       <View style={styles.badgesContainer}>
         {item.is_primary && (
           <View style={styles.primaryBadge}>
-            <StarIcon size={12} color={colors.white} filled={true} />
             <Text style={styles.primaryBadgeText}>Principal</Text>
           </View>
         )}
@@ -419,7 +418,7 @@ const styles = StyleSheet.create({
   primaryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: '#a5b4fc', // Azul pastel
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -428,7 +427,7 @@ const styles = StyleSheet.create({
   primaryBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.white,
+    color: '#FFFFFF', // Branco puro
   },
   platformBadge: {
     flexDirection: 'row',

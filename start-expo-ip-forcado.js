@@ -2,15 +2,15 @@
 
 /**
  * Script para iniciar Expo Go com IP FORÇADO
- * GARANTE que o QR code sempre mostra: exp://10.102.0.103:8081
+ * GARANTE que o QR code sempre mostra: exp://192.168.0.20:8081
  * NUNCA, NUNCA, NUNCA usa localhost
  */
 
 const { spawn } = require('child_process');
 const path = require('path');
 
-// IP FIXO - NUNCA MUDAR
-const FORCED_IP = '10.102.0.103';
+// IP: use variável EXPO_IP para override, ou 192.168.0.20 como padrão
+const FORCED_IP = process.env.EXPO_IP || '192.168.0.20';
 const FORCED_PORT = '8081';
 
 console.log('');
@@ -109,26 +109,23 @@ console.log(`   EXPO_NO_LOCALHOST=${env.EXPO_NO_LOCALHOST}`);
 console.log(`   EXPO_USE_LOCALHOST=${env.EXPO_USE_LOCALHOST}`);
 console.log('');
 
-// Argumentos para expo start
-// NÃO usar --host junto com --lan (causa erro)
-// As variáveis de ambiente já forçam o IP
+// Argumentos para expo start - NÃO usar --lan e --tunnel juntos (Expo não permite)
+const userArgs = process.argv.slice(2);
+const useTunnel = userArgs.includes('--tunnel');
+
 const args = [
   'start',
-  '--lan',                    // Modo LAN (não tunnel, não localhost)
-  '--port', FORCED_PORT,       // Forçar porta
-  '--go',                      // Usar Expo Go
-  '--clear',                   // Limpar cache
-  // NÃO usar --offline aqui, pois pode bloquear conexões
-  // O EXPO_OFFLINE=1 nas variáveis de ambiente já evita autenticação
+  useTunnel ? '--tunnel' : '--lan',  // Um ou outro, nunca ambos
+  '--port', FORCED_PORT,
+  '--go',
+  '--clear',
 ];
 
-// Adicionar argumentos passados via linha de comando (exceto os que conflitam)
-const userArgs = process.argv.slice(2);
-const forbiddenArgs = ['--tunnel', '--localhost', '--offline', '--host'];
-const filteredArgs = userArgs.filter(arg => {
-  return !forbiddenArgs.some(forbidden => arg === forbidden || arg.startsWith(forbidden + '='));
-});
-
+if (useTunnel) {
+  console.log('📱 MODO TUNNEL ativado - use quando LAN não funcionar (Android travado em "downloading")');
+}
+const forbiddenArgs = ['--localhost', '--offline', '--host', '--tunnel', '--lan'];
+const filteredArgs = userArgs.filter(arg => !forbiddenArgs.some(f => arg === f || arg.startsWith(f + '=')));
 if (filteredArgs.length > 0) {
   console.log('📝 Argumentos adicionais:', filteredArgs.join(' '));
   args.push(...filteredArgs);
@@ -137,10 +134,13 @@ if (filteredArgs.length > 0) {
 console.log('');
 console.log('🚀 Iniciando Expo Go...');
 console.log('');
-console.log('📱 O QR CODE DEVE MOSTRAR:');
-console.log(`   exp://${FORCED_IP}:${FORCED_PORT}`);
-console.log('');
-console.log('⚠️  SE APARECER localhost, PARE E AVISE!');
+if (useTunnel) {
+  console.log('📱 MODO TUNNEL: Aguarde o QR code (pode levar 1-2 min). Escaneie com Expo Go.');
+  console.log('   O URL será diferente (expo.dev) - funciona mesmo com rede/firewall!');
+} else {
+  console.log('📱 O QR CODE DEVE MOSTRAR:');
+  console.log(`   exp://${FORCED_IP}:${FORCED_PORT}`);
+}
 console.log('');
 
 // Iniciar Expo

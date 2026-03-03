@@ -23,10 +23,10 @@ Foi criado um script corrigido que:
 
 ```bash
 # 1. Copiar o script para o servidor
-scp /home/darley/lacos/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh darley@10.102.0.103:/tmp/
+scp /home/darley/lacos/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh darley@192.168.0.20:/tmp/
 
 # 2. Conectar ao servidor
-ssh darley@10.102.0.103
+ssh darley@192.168.0.20
 
 # 3. Executar o script
 sudo bash /tmp/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh
@@ -35,7 +35,7 @@ sudo bash /tmp/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh
 ### Opção 2: Executar diretamente via SSH
 
 ```bash
-ssh darley@10.102.0.103 "sudo bash -s" < /home/darley/lacos/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh
+ssh darley@192.168.0.20 "sudo bash -s" < /home/darley/lacos/CORRIGIR_CREATE_CLIENT_REVIEW_CORRETO.sh
 ```
 
 ## 📋 O que o script faz

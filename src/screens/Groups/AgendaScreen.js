@@ -32,7 +32,7 @@ import appointmentService from '../../services/appointmentService';
 import { useAuth } from '../../contexts/AuthContext';
 
 const AgendaScreen = ({ route, navigation }) => {
-  let { groupId, groupName } = route.params || {};
+  let { groupId, groupName, isTeleconsultation } = route.params || {};
   const { user } = useAuth();
   
   // TEMPORÁRIO: Se groupId é um timestamp, usar o grupo de teste
@@ -140,10 +140,23 @@ const AgendaScreen = ({ route, navigation }) => {
   const loadAppointments = async () => {
     try {
       setLoading(true);
+      console.log('📥 AgendaScreen - Carregando compromissos para grupo:', groupId);
       const result = await appointmentService.getAppointments(groupId);
       
       if (result.success) {
         const rawAppointments = result.data || [];
+        console.log('📋 AgendaScreen - Compromissos recebidos da API:', {
+          total: rawAppointments.length,
+          groupId,
+          isTeleconsultation,
+          appointments: rawAppointments.map(apt => ({
+            id: apt.id,
+            title: apt.title,
+            type: apt.type,
+            is_teleconsultation: apt.is_teleconsultation,
+            appointment_date: apt.appointment_date || apt.scheduled_at,
+          })),
+        });
         
         // Log para debug - verificar se doctorUser está presente
         rawAppointments.forEach(apt => {
@@ -164,10 +177,19 @@ const AgendaScreen = ({ route, navigation }) => {
         // Expandir compromissos recorrentes
         const expandedAppointments = expandRecurringAppointments(rawAppointments);
         
-        // Filtrar consultas não pagas para pacientes
+        // Filtrar consultas não pagas para pacientes e consultas canceladas
         // Pacientes só devem ver teleconsultas que já foram pagas
         const isPatient = user?.profile === 'accompanied';
         const filteredAppointments = expandedAppointments.filter(apt => {
+          // Não mostrar consultas canceladas
+          if (apt.status === 'cancelled') {
+            console.log('🚫 AgendaScreen - Ocultando consulta cancelada:', {
+              appointmentId: apt.id,
+              status: apt.status,
+            });
+            return false;
+          }
+          
           // Se for teleconsulta e o usuário for paciente
           if (apt.is_teleconsultation && isPatient) {
             // Só mostrar se já foi paga (paid_held, released) ou se não tem status de pagamento (consultas antigas)
@@ -204,8 +226,12 @@ const AgendaScreen = ({ route, navigation }) => {
   // Recarregar quando a tela ganhar foco
   useFocusEffect(
     React.useCallback(() => {
+      console.log('🔄 AgendaScreen - Tela ganhou foco, recarregando compromissos:', {
+        groupId,
+        isTeleconsultation,
+      });
       loadAppointments();
-    }, [groupId])
+    }, [groupId, isTeleconsultation])
   );
 
   const formatDate = (dateStr) => {
@@ -227,18 +253,52 @@ const AgendaScreen = ({ route, navigation }) => {
     // Garantir que estamos comparando apenas o tempo (milissegundos desde epoch)
     const nowTime = now.getTime();
 
-    return appointments.filter(item => {
+    console.log('🔍 AgendaScreen - getFilteredAppointments:', {
+      totalAppointments: appointments.length,
+      activeFilter,
+      isTeleconsultation,
+      groupId,
+    });
+
+    const filtered = appointments.filter(item => {
       const dateStr = item.appointment_date || item.scheduled_at || item.date;
-      if (!dateStr) return false;
+      if (!dateStr) {
+        console.log('⚠️ AgendaScreen - Item sem data:', item.id, item.title);
+        return false;
+      }
 
       const appointmentDate = new Date(dateStr);
       // Garantir que a data é válida
       if (isNaN(appointmentDate.getTime())) {
-        console.warn('⚠️ AgendaScreen - Data inválida:', dateStr);
+        console.warn('⚠️ AgendaScreen - Data inválida:', dateStr, item.id, item.title);
         return false;
       }
 
       const appointmentTime = appointmentDate.getTime();
+
+      // Se estiver no modo teleconsulta, filtrar APENAS teleconsultas
+      if (isTeleconsultation) {
+        // Verificar se é teleconsulta (is_teleconsultation deve ser true)
+        if (!item.is_teleconsultation) {
+          console.log('🚫 AgendaScreen - Ocultando consulta presencial no modo teleconsulta:', {
+            id: item.id,
+            title: item.title,
+            is_teleconsultation: item.is_teleconsultation,
+          });
+          return false; // Não mostrar consultas presenciais no modo teleconsulta
+        }
+      } else {
+        // Se NÃO estiver no modo teleconsulta (aba Agenda normal), excluir teleconsultas
+        // Teleconsultas agora têm aba própria
+        if (item.is_teleconsultation) {
+          console.log('🚫 AgendaScreen - Ocultando teleconsulta na aba Agenda normal:', {
+            id: item.id,
+            title: item.title,
+            is_teleconsultation: item.is_teleconsultation,
+          });
+          return false; // Não mostrar teleconsultas na aba Agenda normal
+        }
+      }
 
       if (activeFilter === 'upcoming') {
         // Próximos: data/hora > agora (ainda não aconteceu)
@@ -267,6 +327,15 @@ const AgendaScreen = ({ route, navigation }) => {
       }
       return true;
     });
+
+    console.log('✅ AgendaScreen - getFilteredAppointments resultado:', {
+      total: appointments.length,
+      filtered: filtered.length,
+      activeFilter,
+      isTeleconsultation,
+    });
+
+    return filtered;
   };
 
   const handleCancelAppointment = (appointment) => {
@@ -412,7 +481,9 @@ const AgendaScreen = ({ route, navigation }) => {
       <TouchableOpacity 
         style={styles.appointmentCard}
         onPress={() => {
-          navigation.navigate('AppointmentDetails', {
+          // Teleconsultas: usar tela completa com opção de confirmar realização
+          const targetScreen = item.is_teleconsultation ? 'AppointmentDetailsFull' : 'AppointmentDetails';
+          navigation.navigate(targetScreen, {
             appointmentId: item.id,
             appointment: item,
             groupId,
@@ -652,7 +723,9 @@ const AgendaScreen = ({ route, navigation }) => {
           <ArrowBackIcon size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Agenda</Text>
+          <Text style={styles.headerTitle}>
+            {isTeleconsultation ? 'Teleconsultas' : 'Agenda'}
+          </Text>
           <Text style={styles.headerSubtitle}>{groupName || 'Grupo'}</Text>
         </View>
         <View style={styles.placeholder} />
@@ -697,11 +770,23 @@ const AgendaScreen = ({ route, navigation }) => {
         ) : (
           <View style={styles.emptyState}>
             <AppointmentIcon size={64} color={colors.gray300} />
-            <Text style={styles.emptyTitle}>Nenhum compromisso</Text>
+            <Text style={styles.emptyTitle}>
+              {isTeleconsultation ? 'Nenhuma teleconsulta' : 'Nenhum compromisso'}
+            </Text>
             <Text style={styles.emptyText}>
-              {activeFilter === 'upcoming' && 'Nenhum compromisso futuro encontrado'}
-              {activeFilter === 'past' && 'Nenhum compromisso passado encontrado'}
-              {!activeFilter && 'Toque no botão + para agendar um compromisso ou consulta'}
+              {isTeleconsultation ? (
+                activeFilter === 'upcoming' || !activeFilter 
+                  ? 'Nenhuma teleconsulta futura com nosso time agendada'
+                  : activeFilter === 'past'
+                    ? 'Nenhuma teleconsulta passada encontrada'
+                    : 'Toque no botão + para agendar uma teleconsulta'
+              ) : (
+                <>
+                  {activeFilter === 'upcoming' && 'Nenhum compromisso futuro encontrado'}
+                  {activeFilter === 'past' && 'Nenhum compromisso passado encontrado'}
+                  {!activeFilter && 'Toque no botão + para agendar um compromisso ou consulta'}
+                </>
+              )}
             </Text>
           </View>
         );
@@ -713,6 +798,7 @@ const AgendaScreen = ({ route, navigation }) => {
         onPress={() => navigation.navigate('AddAppointment', {
           groupId,
           groupName,
+          isTeleconsultation: isTeleconsultation || false,
         })}
       >
         <AddIcon size={28} color={colors.textWhite} />

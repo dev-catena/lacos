@@ -4,7 +4,7 @@
 # Uso: ./VERIFICAR_AGENDA_MEDICA_V2.sh <email_medico>
 
 EMAIL_MEDICO="${1:-dudarubackgoncalves@gmail.com}"
-SERVER="darley@10.102.0.103"
+SERVER="darley@192.168.0.20"
 
 echo "🔍 Verificando agenda da médica: $EMAIL_MEDICO"
 echo ""

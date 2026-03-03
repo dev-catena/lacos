@@ -156,7 +156,7 @@ python3 test_supplier_wizard.py https://gateway.lacosapp.com/api root@lacos.com 
 python3 test_supplier_wizard.py https://gateway.lacosapp.com/api seu_email@lacos.com sua_senha
 
 # Para ambiente local (se testando localmente)
-python3 test_supplier_wizard.py http://10.102.0.103/api seu_email@lacos.com sua_senha
+python3 test_supplier_wizard.py http://192.168.0.20/api seu_email@lacos.com sua_senha
 ```
 
 #### Usando o Script Helper
@@ -210,8 +210,8 @@ O script gera dois tipos de relatórios:
 ### URLs da API
 
 - **Produção (HTTPS):** `https://gateway.lacosapp.com/api`
-- **Produção (HTTP):** `http://10.102.0.103/api`
-- **Local (desenvolvimento):** `http://localhost/api` ou `http://10.102.0.103/api`
+- **Produção (HTTP):** `http://192.168.0.20/api`
+- **Local (desenvolvimento):** `http://localhost/api` ou `http://192.168.0.20/api`
 
 ### Credenciais de Teste
 
@@ -452,7 +452,7 @@ Erro na execução do teste (problema de conexão, timeout, etc.)
 3. **Rate Limiting**: O script inclui delays entre requisições (0.5s) para evitar sobrecarga
 4. **Ambiente**: Certifique-se de estar testando no ambiente correto:
    - **Produção:** `https://gateway.lacosapp.com/api`
-   - **Desenvolvimento:** `http://10.102.0.103/api`
+   - **Desenvolvimento:** `http://192.168.0.20/api`
 5. **Dados Únicos**: Cada execução usa dados únicos (timestamp) para evitar conflitos
 6. **Retry Automático**: Se um teste falhar por "Already registered", o script tenta limpar e repetir
 
@@ -513,12 +513,12 @@ python3 test_appointment_flow.py <API_URL> <DOCTOR_CPF> <DOCTOR_PASSWORD> <CAREG
 
 **Exemplo:**
 ```bash
-python3 test_appointment_flow.py http://10.102.0.103:8000/api 40780462319 11111111 cpf_ou_email_cuidador senha_cuidador
+python3 test_appointment_flow.py http://192.168.0.20:8000/api 40780462319 11111111 cpf_ou_email_cuidador senha_cuidador
 ```
 
 #### Usando o Script Helper
 ```bash
-./run_appointment_test.sh http://10.102.0.103:8000/api 40780462319 11111111 cpf_ou_email_cuidador senha_cuidador
+./run_appointment_test.sh http://192.168.0.20:8000/api 40780462319 11111111 cpf_ou_email_cuidador senha_cuidador
 ```
 
 ### Relatório
@@ -535,7 +535,7 @@ O script gera um relatório JSON com:
 ================================================================================
 🧪 TESTE FUNCIONAL - FLUXO DE AGENDAMENTO
 ================================================================================
-API: http://10.102.0.103:8000/api
+API: http://192.168.0.20:8000/api
 Médico CPF: 40780462319
 Cuidador: cpf_ou_email_cuidador
 ================================================================================

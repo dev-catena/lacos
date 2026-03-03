@@ -51,7 +51,7 @@ Se o QR code não aparecer, você pode usar a URL manualmente:
    - Procure no terminal por "exp://" seguido de ".exp.direct"
 
 2. **Se estiver em LAN Mode:**
-   - Use: `exp://10.102.0.103:8081`
+   - Use: `exp://192.168.0.20:8081`
 
 3. **No Expo Go:**
    - Toque em "Enter URL manually"
@@ -74,7 +74,7 @@ O QR code **não é obrigatório**! Você pode sempre usar a URL manualmente:
 ./MOSTRAR_QRCODE.sh
 
 # Ou simplesmente use:
-exp://10.102.0.103:8081  # LAN mode
+exp://192.168.0.20:8081  # LAN mode
 # ou
 exp://XXXXX-XXXXX.exp.direct:80  # Tunnel mode (veja no terminal)
 ```

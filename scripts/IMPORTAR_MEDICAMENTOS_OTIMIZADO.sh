@@ -8,7 +8,7 @@ set -e
 CSV_FILE="scripts/DADOS_ABERTOS_MEDICAMENTOS.csv"
 PROCESSED_CSV="/tmp/medicamentos_processados.csv"
 
-SERVER_HOST="10.102.0.103"
+SERVER_HOST="192.168.0.20"
 SERVER_PORT="63022"
 SERVER_USER="darley"
 SERVER_PASS="yhvh77"

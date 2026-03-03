@@ -56,7 +56,7 @@ Os arquivos de produção estarão na pasta `dist/`
 
 ## 🔌 Integração com API
 
-A aplicação se conecta à API Laravel em `http://10.102.0.103/api`.
+A aplicação se conecta à API Laravel em `http://192.168.0.20/api`.
 
 ### Endpoints Esperados
 

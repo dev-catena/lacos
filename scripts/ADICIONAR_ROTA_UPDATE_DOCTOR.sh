@@ -4,7 +4,7 @@
 
 set -e
 
-SERVER="10.102.0.103"
+SERVER="192.168.0.20"
 USER="darley"
 PASSWORD="yhvh77"
 PORT="63022"

@@ -44,6 +44,8 @@ class ApiService {
         const token = await this.getToken();
         if (token) {
           requestHeaders['Authorization'] = `Bearer ${token}`;
+        } else {
+          console.warn(`⚠️ apiService - Token não encontrado para requisição autenticada: ${endpoint}`);
         }
         
         // LOG: Identificar usuário
@@ -152,23 +154,25 @@ class ApiService {
               }
             }
             
-            // #region agent log
-            const responseTextLog = {
-              location: 'apiService.js:105',
-              message: 'Error response text',
-              data: {
-                responseText: responseText.substring(0,1000),
-                textLength: responseText.length,
-                endpoint: endpoint,
-                status: response.status
-              },
-              timestamp: Date.now(),
-              sessionId: 'debug-session',
-              runId: 'run1',
-              hypothesisId: 'I'
-            };
-            console.log('🔍 DEBUG RESPONSE TEXT:', JSON.stringify(responseTextLog, null, 2));
-            fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(responseTextLog)}).catch(()=>{});
+            // #region agent log (omitir para 401 - Unauthenticated é esperado em alguns fluxos)
+            if (response.status !== 401) {
+              const responseTextLog = {
+                location: 'apiService.js:105',
+                message: 'Error response text',
+                data: {
+                  responseText: responseText.substring(0,1000),
+                  textLength: responseText.length,
+                  endpoint: endpoint,
+                  status: response.status
+                },
+                timestamp: Date.now(),
+                sessionId: 'debug-session',
+                runId: 'run1',
+                hypothesisId: 'I'
+              };
+              console.log('🔍 DEBUG RESPONSE TEXT:', JSON.stringify(responseTextLog, null, 2));
+              fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(responseTextLog)}).catch(()=>{});
+            }
             // #endregion
             
             // Limpar texto: remover qualquer conteúdo antes do primeiro { ou [
@@ -223,30 +227,34 @@ class ApiService {
           _rawErrorData: errorData,
         };
         
-        // #region agent log
-        const errorObjLog = {
-          location: 'apiService.js:128',
-          message: 'Error object created',
-          data: {
-            errorObj: errorObj,
-            isNonCritical: isNonCriticalEndpoint,
-            isPharmacy404: isPharmacyPrice404,
-            errorData: errorData,
-            endpoint: endpoint,
-            status: response.status
-          },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          runId: 'run1',
-          hypothesisId: 'M'
-        };
-        console.log('🔍 DEBUG ERROR OBJ:', JSON.stringify(errorObjLog, null, 2));
-        fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(errorObjLog)}).catch(()=>{});
+        // #region agent log (omitir para 401 - Unauthenticated é esperado em alguns fluxos)
+        if (response.status !== 401) {
+          const errorObjLog = {
+            location: 'apiService.js:128',
+            message: 'Error object created',
+            data: {
+              errorObj: errorObj,
+              isNonCritical: isNonCriticalEndpoint,
+              isPharmacy404: isPharmacyPrice404,
+              errorData: errorData,
+              endpoint: endpoint,
+              status: response.status
+            },
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            runId: 'run1',
+            hypothesisId: 'M'
+          };
+          console.log('🔍 DEBUG ERROR OBJ:', JSON.stringify(errorObjLog, null, 2));
+          fetch('http://127.0.0.1:7242/ingest/51b97caa-ec63-41d9-9fe3-852605fb57dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(errorObjLog)}).catch(()=>{});
+        }
         // #endregion
         
         // Não logar 404 de preços de farmácia como erro (é esperado quando não há preço informado)
         // Não logar 500 em endpoints não críticos
-        const shouldLogError = !isPharmacyPrice404 && (!isNonCriticalEndpoint || response.status !== 500);
+        // 401 Unauthenticated: silenciar (token expirado ou não logado - AuthContext trata)
+        const is401 = response.status === 401;
+        const shouldLogError = !isPharmacyPrice404 && !is401 && (!isNonCriticalEndpoint || response.status !== 500);
         if (shouldLogError) {
           console.error(`❌ API Error:`, errorMessage);
           // Log detalhado para debug
@@ -326,10 +334,10 @@ class ApiService {
       const isNonCriticalEndpoint = endpoint.includes('/alerts/active');
       const isPharmacyPrice404 = error.status === 404 && endpoint.includes('pharmacy-prices/last');
       const isNonCriticalError = isNonCriticalEndpoint && (error.status === 500 || error.status >= 500);
+      const is401 = error.status === 401 || error?._rawErrorData?.status === 401;
       
-      // Não logar 404 de preços de farmácia (é esperado quando não há preço informado)
-      // Não logar erros não críticos
-      if (!isPharmacyPrice404 && !isNonCriticalError) {
+      // Não logar 404 de preços de farmácia, 401 (token expirado) ou erros não críticos
+      if (!isPharmacyPrice404 && !is401 && !isNonCriticalError) {
         console.error('API Error:', error);
       }
       // Para erros não críticos, não logar nada - o serviço específico vai tratar

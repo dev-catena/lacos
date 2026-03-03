@@ -33,8 +33,8 @@ echo "📋 Verificando configurações..."
 echo ""
 
 # Verificar metro.config.js
-if grep -q "10.102.0.103" metro.config.js 2>/dev/null; then
-    echo "✅ metro.config.js configurado com IP 10.102.0.103"
+if grep -q "192.168.0.20" metro.config.js 2>/dev/null; then
+    echo "✅ metro.config.js configurado com IP 192.168.0.20"
 else
     echo "⚠️  metro.config.js não tem IP configurado"
 fi

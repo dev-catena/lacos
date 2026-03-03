@@ -141,7 +141,7 @@ Route::middleware('auth:sanctum')->group(function () {
 Após implementar, teste o endpoint:
 
 ```bash
-curl -X GET "http://10.102.0.103/api/medications/price?name=Losartana" \
+curl -X GET "http://192.168.0.20/api/medications/price?name=Losartana" \
   -H "Authorization: Bearer {seu_token}"
 ```
 

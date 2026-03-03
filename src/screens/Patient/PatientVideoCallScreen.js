@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import colors from '../../constants/colors';
 import videoCallService from '../../services/videoCallService';
+import appointmentService from '../../services/appointmentService';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   AlertCircleIcon,
@@ -79,6 +80,11 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
       const joinResult = await videoCallService.joinChannel(channelName, userId);
       if (!joinResult.success) {
         throw new Error(joinResult.error || 'Erro ao entrar no canal');
+      }
+
+      // Registrar entrada do paciente no backend (para rastreamento de no-show)
+      if (appointment?.id) {
+        appointmentService.videoJoin(appointment.id, 'patient');
       }
 
       setIsCallActive(true);

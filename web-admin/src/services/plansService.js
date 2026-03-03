@@ -133,6 +133,7 @@ class PlansService {
           smartwatch: false,
           sensorQuedas: false,
           cameras: false,
+          teleconsulta: false,
         },
         isDefault: true,
       },
@@ -156,6 +157,7 @@ class PlansService {
           smartwatch: false,
           sensorQuedas: false,
           cameras: false,
+          teleconsulta: false,
         },
         isDefault: false,
       },
@@ -179,6 +181,7 @@ class PlansService {
           smartwatch: false,
           sensorQuedas: false,
           cameras: false,
+          teleconsulta: false,
         },
         isDefault: false,
       },
@@ -202,6 +205,7 @@ class PlansService {
           smartwatch: false,
           sensorQuedas: false,
           cameras: false,
+          teleconsulta: false,
         },
         isDefault: false,
       },
@@ -225,6 +229,7 @@ class PlansService {
       { key: 'smartwatch', label: 'Smartwatch', description: 'Integração com smartwatch (ainda não implementado na aplicação)' },
       { key: 'sensorQuedas', label: 'Sensor de Quedas', description: 'Monitoramento de quedas (ainda não implementado na aplicação)' },
       { key: 'cameras', label: 'Câmeras', description: 'Acesso às câmeras (ainda não implementado na aplicação)' },
+      { key: 'teleconsulta', label: 'Teleconsulta', description: 'Acesso ao módulo de teleconsultas' },
     ];
   }
 }

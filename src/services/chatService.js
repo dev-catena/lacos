@@ -2,6 +2,70 @@ import apiService from './apiService';
 
 class ChatService {
   /**
+   * Listar conversas do usuário (quem enviou/recebeu mensagens)
+   */
+  async getConversations() {
+    try {
+      const response = await apiService.request('/messages/conversations', {
+        method: 'GET',
+      });
+
+      if (response.success && response.data) {
+        return {
+          success: true,
+          data: response.data,
+        };
+      }
+
+      return {
+        success: false,
+        error: response.message || 'Erro ao carregar conversas',
+        data: [],
+      };
+    } catch (error) {
+      console.error('❌ ChatService - Erro ao carregar conversas:', error);
+      return {
+        success: false,
+        error: error.message || 'Erro ao carregar conversas',
+        data: [],
+      };
+    }
+  }
+
+  /**
+   * Contador de mensagens não lidas
+   */
+  async getUnreadCount() {
+    try {
+      const response = await apiService.request('/messages/unread-count', {
+        method: 'GET',
+      });
+
+      if (response.success && typeof response.unread_count === 'number') {
+        return {
+          success: true,
+          count: response.unread_count,
+        };
+      }
+
+      return {
+        success: true,
+        count: 0,
+      };
+    } catch (error) {
+      // 401 Unauthenticated: silenciar (token expirado ou não logado)
+      const is401 = error?.status === 401 || error?._rawErrorData?.status === 401;
+      if (!is401) {
+        console.error('❌ ChatService - Erro ao obter contador:', error);
+      }
+      return {
+        success: true,
+        count: 0,
+      };
+    }
+  }
+
+  /**
    * Obter conversa com outro usuário
    */
   async getConversation(otherUserId) {

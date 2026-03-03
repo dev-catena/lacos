@@ -2,7 +2,7 @@
 
 ## ❌ Problema
 
-Quando você acessa `http://10.102.0.103:8081`, está vendo a **interface admin** ao invés do **app mobile Laços**.
+Quando você acessa `http://192.168.0.20:8081`, está vendo a **interface admin** ao invés do **app mobile Laços**.
 
 ## 🔍 Causa
 
@@ -21,7 +21,7 @@ Use o script que renomeia temporariamente a pasta `web/`:
 **O que faz:**
 - ✅ Renomeia `web/` para `web-admin/` temporariamente
 - ✅ Expo usa `App.js` (app mobile) ao invés da pasta web/
-- ✅ Inicia servidor em `http://10.102.0.103:8081`
+- ✅ Inicia servidor em `http://192.168.0.20:8081`
 - ✅ Ao sair (Ctrl+C), restaura a pasta `web/`
 
 ### Solução 2: Iniciar Interface Admin no Web
@@ -35,15 +35,15 @@ Use o script que inicia o Vite diretamente da pasta `web/`:
 **O que faz:**
 - ✅ Restaura `web-admin/` para `web/` se necessário
 - ✅ Inicia Vite diretamente da pasta `web/`
-- ✅ Serve a interface admin em `http://10.102.0.103:8081`
+- ✅ Serve a interface admin em `http://192.168.0.20:8081`
 
 ## 📋 Resumo dos Scripts
 
 | Script | O que inicia | URL |
 |--------|--------------|-----|
-| `./INICIAR_APP_MOBILE_WEB.sh` | **App Mobile** (App.js) | `http://10.102.0.103:8081` |
-| `./INICIAR_ADMIN_WEB.sh` | **Interface Admin** (web/) | `http://10.102.0.103:8081` |
-| `./INICIAR_WEB_IP.sh` | Interface Admin (via Expo) | `http://10.102.0.103:8081` |
+| `./INICIAR_APP_MOBILE_WEB.sh` | **App Mobile** (App.js) | `http://192.168.0.20:8081` |
+| `./INICIAR_ADMIN_WEB.sh` | **Interface Admin** (web/) | `http://192.168.0.20:8081` |
+| `./INICIAR_WEB_IP.sh` | Interface Admin (via Expo) | `http://192.168.0.20:8081` |
 
 ## 🎯 Como Usar
 
@@ -53,7 +53,7 @@ Use o script que inicia o Vite diretamente da pasta `web/`:
 ./INICIAR_APP_MOBILE_WEB.sh
 ```
 
-Acesse: `http://10.102.0.103:8081` → Verá o **app mobile Laços**
+Acesse: `http://192.168.0.20:8081` → Verá o **app mobile Laços**
 
 ### Para usar a Interface Admin:
 
@@ -61,7 +61,7 @@ Acesse: `http://10.102.0.103:8081` → Verá o **app mobile Laços**
 ./INICIAR_ADMIN_WEB.sh
 ```
 
-Acesse: `http://10.102.0.103:8081` → Verá a **interface admin**
+Acesse: `http://192.168.0.20:8081` → Verá a **interface admin**
 
 ## 🔄 Alternar Entre App e Admin
 

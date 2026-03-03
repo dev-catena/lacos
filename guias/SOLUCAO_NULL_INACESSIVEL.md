@@ -61,7 +61,7 @@ EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0 npx expo start --clear
 
 Depois, no app:
 - Expo Go → "Enter URL manually"
-- Digite: `exp://10.102.0.103:8081`
+- Digite: `exp://192.168.0.20:8081`
 
 ### Opção C: Usar Dev Client
 

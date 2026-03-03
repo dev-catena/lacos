@@ -9,29 +9,23 @@ class GroupMemberService {
       console.log(`📋 Buscando membros do grupo ${groupId}...`);
       const response = await apiService.get(`/groups/${groupId}/members`);
       
-      console.log(`📋 Resposta completa do API:`, JSON.stringify(response, null, 2));
-      
-      // O backend retorna { success: true, data: [...] }
-      // O apiService.get() retorna o objeto completo, então precisamos extrair response.data
       let membersArray = [];
-      
-      if (response && typeof response === 'object') {
-        // Se response tem a propriedade data e é um array
-        if (response.data && Array.isArray(response.data)) {
-          membersArray = response.data;
+      try {
+        if (response && typeof response === 'object') {
+          const responseData = response?.data;
+          if (responseData && Array.isArray(responseData)) {
+            membersArray = responseData;
+          } else if (Array.isArray(response)) {
+            membersArray = response;
+          } else if (response?.success && responseData && Array.isArray(responseData)) {
+            membersArray = responseData;
+          }
         }
-        // Se response é diretamente um array
-        else if (Array.isArray(response)) {
-          membersArray = response;
-        }
-        // Se response.success existe e response.data é um array
-        else if (response.success && response.data && Array.isArray(response.data)) {
-          membersArray = response.data;
-        }
+      } catch (parseErr) {
+        console.warn('⚠️ groupMemberService - Resposta inesperada, usando array vazio:', parseErr?.message);
       }
       
       console.log(`✅ ${membersArray.length} membros encontrados`);
-      console.log(`📋 Membros:`, JSON.stringify(membersArray, null, 2));
       return { success: true, data: membersArray };
     } catch (error) {
       console.error('❌ Erro ao buscar membros:', error);

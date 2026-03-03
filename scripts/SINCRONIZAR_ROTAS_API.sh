@@ -2,7 +2,7 @@
 
 # Script para sincronizar routes/api.php do servidor com o local
 
-SERVER="darley@10.102.0.103"
+SERVER="darley@192.168.0.20"
 PORT="63022"
 REMOTE_FILE="/var/www/lacos-backend/routes/api.php"
 LOCAL_FILE="/home/darley/lacos/backend-laravel/routes/api.php"

@@ -56,7 +56,7 @@ Este script vai:
 Conectar ao servidor e verificar:
 
 ```bash
-ssh darley@10.102.0.103
+ssh darley@192.168.0.20
 cd /var/www/lacos-backend
 ```
 

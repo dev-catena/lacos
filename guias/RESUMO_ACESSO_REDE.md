@@ -5,7 +5,7 @@
 O servidor está **configurado corretamente**:
 - ✅ Escutando em `0.0.0.0` (todas as interfaces)
 - ✅ Acessível localmente
-- ✅ Acessível por IP (`10.102.0.103:8081`)
+- ✅ Acessível por IP (`192.168.0.20:8081`)
 - ✅ CORS configurado
 - ✅ Firewall inativo
 
@@ -63,7 +63,7 @@ ngrok http 8081
 
 1. Certifique-se que estão na **mesma rede Wi-Fi**
 2. Abra navegador no dispositivo
-3. Acesse: `http://10.102.0.103:8081`
+3. Acesse: `http://192.168.0.20:8081`
 
 ## ⚠️ Se Ainda Não Funcionar
 

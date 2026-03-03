@@ -23,7 +23,7 @@ class MessageController extends Controller
     {
         $user = Auth::user();
         
-        // Verificar se os usuários estão no mesmo grupo
+        // Verificar se os usuários estão no mesmo grupo (para conversas em grupo)
         $groupIdsQuery = DB::table('group_members')
             ->where('user_id', $user->id);
         
@@ -43,17 +43,11 @@ class MessageController extends Controller
         $otherUserGroupIds = $otherUserGroupIdsQuery->pluck('group_id')->toArray();
         
         $commonGroups = array_intersect($groupIds, $otherUserGroupIds);
-        
-        if (empty($commonGroups)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Usuários não estão no mesmo grupo',
-            ], 403);
-        }
-        
-        $groupId = reset($commonGroups); // Pegar o primeiro grupo em comum
+        $groupId = !empty($commonGroups) ? reset($commonGroups) : null;
         
         // Buscar mensagens entre os dois usuários
+        // Se há grupo em comum: filtrar por group_id
+        // Se não há (ex: usuário contatou cuidador pela busca): filtrar por group_id null
         $messages = UserMessage::where(function($query) use ($user, $otherUserId) {
                 $query->where('sender_id', $user->id)
                       ->where('receiver_id', $otherUserId);
@@ -62,7 +56,13 @@ class MessageController extends Controller
                 $query->where('sender_id', $otherUserId)
                       ->where('receiver_id', $user->id);
             })
-            ->where('group_id', $groupId)
+            ->where(function($query) use ($groupId) {
+                if ($groupId) {
+                    $query->where('group_id', $groupId);
+                } else {
+                    $query->whereNull('group_id');
+                }
+            })
             ->with(['sender', 'receiver'])
             ->orderBy('created_at', 'asc')
             ->get();
@@ -84,7 +84,8 @@ class MessageController extends Controller
     }
 
     /**
-     * Enviar mensagem de texto
+     * Enviar mensagem de texto (1:1)
+     * Permite envio entre usuários no mesmo grupo OU entre usuário e cuidador (busca de cuidadores)
      * POST /api/messages
      */
     public function sendMessage(Request $request)
@@ -107,7 +108,7 @@ class MessageController extends Controller
         $user = Auth::user();
         $receiverId = $request->receiver_id;
         
-        // Verificar se os usuários estão no mesmo grupo
+        // Verificar se os usuários estão no mesmo grupo (para conversas em grupo)
         $groupIdsQuery = DB::table('group_members')
             ->where('user_id', $user->id);
         
@@ -127,15 +128,8 @@ class MessageController extends Controller
         $receiverGroupIds = $receiverGroupIdsQuery->pluck('group_id')->toArray();
         
         $commonGroups = array_intersect($groupIds, $receiverGroupIds);
-        
-        if (empty($commonGroups)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Usuários não estão no mesmo grupo',
-            ], 403);
-        }
-        
-        $groupId = reset($commonGroups);
+        // Se há grupo em comum: usar. Senão (ex: usuário contatou cuidador pela busca): group_id null
+        $groupId = !empty($commonGroups) ? reset($commonGroups) : null;
         
         $imageUrl = null;
         if ($request->type === 'image' && $request->hasFile('image')) {
@@ -167,25 +161,21 @@ class MessageController extends Controller
     public function getConversations(Request $request)
     {
         $user = Auth::user();
-        
-        // Buscar últimas mensagens de cada conversa
-        $conversations = DB::table('messages')
-            ->select([
-                DB::raw('CASE 
-                    WHEN sender_id = ? THEN receiver_id 
-                    ELSE sender_id 
-                END as other_user_id'),
-                DB::raw('MAX(created_at) as last_message_at'),
-                DB::raw('MAX(id) as last_message_id'),
-            ])
-            ->where(function($query) use ($user) {
-                $query->where('sender_id', $user->id)
-                      ->orWhere('receiver_id', $user->id);
-            })
-            ->setBindings([$user->id])
-            ->groupBy('other_user_id')
-            ->orderBy('last_message_at', 'desc')
-            ->get();
+        $userId = $user->id;
+
+        // Buscar últimas mensagens de cada conversa (apenas 1:1, excluir mensagens de grupo)
+        // Usar MAX() nas colunas para compatibilidade com sql_mode=ONLY_FULL_GROUP_BY
+        $conversations = DB::select("
+            SELECT 
+                MAX(CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END) as other_user_id,
+                MAX(created_at) as last_message_at,
+                MAX(id) as last_message_id
+            FROM messages
+            WHERE receiver_id IS NOT NULL
+              AND (sender_id = ? OR receiver_id = ?)
+            GROUP BY CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END
+            ORDER BY last_message_at DESC
+        ", [$userId, $userId, $userId, $userId]);
         
         $conversationsData = [];
         foreach ($conversations as $conv) {
@@ -220,6 +210,24 @@ class MessageController extends Controller
         return response()->json([
             'success' => true,
             'data' => $conversationsData,
+        ]);
+    }
+
+    /**
+     * Contador de mensagens não lidas (1:1)
+     * GET /api/messages/unread-count
+     */
+    public function unreadCount(Request $request)
+    {
+        $user = Auth::user();
+
+        $count = UserMessage::where('receiver_id', $user->id)
+            ->where('is_read', false)
+            ->count();
+
+        return response()->json([
+            'success' => true,
+            'unread_count' => $count,
         ]);
     }
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script para corrigir permissão de médicos avaliarem pacientes
-# Execute NO SERVIDOR (10.102.0.103)
+# Execute NO SERVIDOR (192.168.0.20)
 
 cd /var/www/lacos-backend || exit 1
 

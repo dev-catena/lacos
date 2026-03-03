@@ -1,7 +1,7 @@
 // Configurações da API
 const API_CONFIG = {
   // URL base da API - Backend Laravel no servidor
-  BASE_URL: 'http://10.102.0.103:8000/api',
+  BASE_URL: 'http://192.168.0.20:8000/api',
   
   // Timeout para requisições (em ms)
   TIMEOUT: 30000,

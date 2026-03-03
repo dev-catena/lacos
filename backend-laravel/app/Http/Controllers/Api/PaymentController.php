@@ -217,25 +217,27 @@ class PaymentController extends Controller
                 // Atualizar appointment como pago
                 $appointment = Appointment::findOrFail($paymentIntent->metadata->appointment_id);
                 
-                // Tentar atualizar campos de pagamento
-                // Nota: Se as colunas payment_status, payment_intent_id ou paid_at não existirem,
-                // você precisará criar uma migration para adicioná-las
-                // Por enquanto, vamos tentar atualizar e ignorar erros se as colunas não existirem
+                // IMPORTANTE: Atualizar payment_status para 'paid_held' - sem isso a consulta
+                // não aparece para o médico (o backend filtra teleconsultas não pagas para médicos)
                 try {
                     $updateData = [
+                        'payment_status' => 'paid_held',
                         'payment_intent_id' => $paymentIntent->id,
                         'paid_at' => now(),
                     ];
                     
-                    // Tentar atualizar (pode falhar se as colunas não existirem)
+                    // Adicionar amount se vier no metadata (em centavos)
+                    if ($paymentIntent->amount && !$appointment->amount) {
+                        $updateData['amount'] = $paymentIntent->amount / 100;
+                    }
+                    
                     $appointment->update($updateData);
                 } catch (\Exception $e) {
-                    // Se falhar, apenas logar - não é crítico para o pagamento
-                    Log::warning('Não foi possível atualizar campos de pagamento no appointment', [
+                    Log::error('Erro ao atualizar appointment após pagamento', [
                         'appointment_id' => $appointment->id,
                         'error' => $e->getMessage(),
-                        'note' => 'Considere criar uma migration para adicionar payment_intent_id e paid_at à tabela appointments',
                     ]);
+                    // Não re-lançar: pagamento já foi processado no Stripe
                 }
 
                 Log::info('Pagamento confirmado com sucesso', [

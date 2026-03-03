@@ -20,7 +20,7 @@ import json
 from datetime import datetime
 
 # Configurações
-WEB_ADMIN_URL = "http://10.102.0.103:8082"  # URL do web-admin
+WEB_ADMIN_URL = "http://192.168.0.20:8082"  # URL do web-admin
 API_BASE_URL = "http://localhost:8000/api"  # Ajuste conforme necessário
 ADMIN_EMAIL = "admin@lacos.com"  # Usuário admin encontrado no banco
 ADMIN_PASSWORD = "admin123"  # Senha padrão do admin

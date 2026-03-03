@@ -9,8 +9,8 @@ const API_CONFIG = {
   // Para dispositivo físico: usar IP da máquina
   BASE_URL: BACKEND_BASE_URL,
   
-  // Timeout para requisições (em ms)
-  TIMEOUT: 30000,
+  // Timeout para requisições (em ms) - 60s para conexões lentas ou rede instável
+  TIMEOUT: 60000,
   
   // Headers padrão
   DEFAULT_HEADERS: {

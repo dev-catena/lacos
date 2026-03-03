@@ -53,12 +53,12 @@ npm run web:ip
 
 Após iniciar, você verá algo como:
 ```
-Metro waiting on exp://10.102.0.103:8081
+Metro waiting on exp://192.168.0.20:8081
 ```
 
 Acesse no navegador:
 - **Local**: http://localhost:8081
-- **Rede**: http://10.102.0.103:8081
+- **Rede**: http://192.168.0.20:8081
 
 ## ⚠️ Problemas Comuns
 

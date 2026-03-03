@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { View, ActivityIndicator, Text } from 'react-native';
-import { navigationRef } from '../../App';
+import { navigationRef } from './navigationRef';
 
 import { useAuth } from '../contexts/AuthContext';
 import AuthNavigator from './AuthNavigator';

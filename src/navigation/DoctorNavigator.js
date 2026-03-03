@@ -170,6 +170,13 @@ const HomeStack = () => {
         }}
       />
       <Stack.Screen 
+        name="AppointmentDetailsFull" 
+        component={AppointmentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="DoctorAppointmentDetails" 
         component={DoctorAppointmentDetailsScreen}
         options={{ 
@@ -488,6 +495,13 @@ const GroupsStack = () => {
       />
       <Stack.Screen 
         name="AppointmentDetails" 
+        component={AppointmentDetailsScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="AppointmentDetailsFull" 
         component={AppointmentDetailsScreen}
         options={{ 
           headerShown: false 

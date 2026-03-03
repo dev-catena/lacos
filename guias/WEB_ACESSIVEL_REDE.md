@@ -29,21 +29,21 @@ node start-web-ip.js
 ### No Mesmo Dispositivo
 
 ```
-http://10.102.0.103:8081
+http://192.168.0.20:8081
 ```
 
 ### De Outro Dispositivo (mesma rede)
 
 1. **Certifique-se que está na mesma rede Wi-Fi**
 2. **Abra navegador no dispositivo**
-3. **Acesse:** `http://10.102.0.103:8081`
+3. **Acesse:** `http://192.168.0.20:8081`
 
 ### Exemplos
 
-- **Celular Android:** Abra Chrome, digite `http://10.102.0.103:8081`
-- **iPhone:** Abra Safari, digite `http://10.102.0.103:8081`
-- **Tablet:** Abra navegador, digite `http://10.102.0.103:8081`
-- **Outro computador:** Abra navegador, digite `http://10.102.0.103:8081`
+- **Celular Android:** Abra Chrome, digite `http://192.168.0.20:8081`
+- **iPhone:** Abra Safari, digite `http://192.168.0.20:8081`
+- **Tablet:** Abra navegador, digite `http://192.168.0.20:8081`
+- **Outro computador:** Abra navegador, digite `http://192.168.0.20:8081`
 
 ## ⚠️ Importante
 
@@ -51,7 +51,7 @@ http://10.102.0.103:8081
 
 - ✅ Dispositivos devem estar na **mesma rede Wi-Fi**
 - ✅ Firewall não deve bloquear porta 8081
-- ✅ IP deve estar correto (10.102.0.103)
+- ✅ IP deve estar correto (192.168.0.20)
 
 ### Verificar IP
 
@@ -93,7 +93,7 @@ sudo ufw allow 8081/tcp
 
 1. **Execute:** `./INICIAR_WEB_IP.sh`
 2. **Aguarde** servidor iniciar
-3. **Acesse** de qualquer dispositivo: `http://10.102.0.103:8081`
+3. **Acesse** de qualquer dispositivo: `http://192.168.0.20:8081`
 
 **Pronto!** Agora você pode testar de qualquer dispositivo na rede! 🎉
 

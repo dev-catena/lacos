@@ -5,7 +5,7 @@
 O servidor está configurado corretamente:
 - ✅ Escutando em `0.0.0.0` (todas as interfaces)
 - ✅ Acessível localmente
-- ✅ Acessível por IP (`10.102.0.103:8081`)
+- ✅ Acessível por IP (`192.168.0.20:8081`)
 - ✅ Firewall inativo
 - ✅ Rede configurada
 
@@ -20,7 +20,7 @@ O servidor está configurado corretamente:
 - iOS: Configurações > Wi-Fi > (i) ao lado da rede > Endereço IP
 
 **Deve estar no mesmo range:**
-- Se o servidor está em `10.102.0.103`
+- Se o servidor está em `192.168.0.20`
 - O dispositivo deve estar em `10.102.0.x` (ex: `10.102.0.105`)
 
 ### 2. Verificar "Isolamento de AP" no roteador
@@ -37,7 +37,7 @@ Alguns roteadores têm "Isolamento de AP" ou "Client Isolation" que **bloqueia c
 
 **No dispositivo móvel, abra o navegador e tente:**
 ```
-http://10.102.0.103:8081
+http://192.168.0.20:8081
 ```
 
 **Se não carregar, veja o erro:**
@@ -85,7 +85,7 @@ Alguns roteadores têm firewall que bloqueia comunicação entre dispositivos:
 
 **No dispositivo móvel (via terminal ou app):**
 ```bash
-ping 10.102.0.103
+ping 192.168.0.20
 ```
 
 **Se não responder:**
@@ -96,7 +96,7 @@ ping 10.102.0.103
 
 **No dispositivo móvel, abra navegador:**
 ```
-http://10.102.0.103:8081
+http://192.168.0.20:8081
 ```
 
 **Se não carregar:**

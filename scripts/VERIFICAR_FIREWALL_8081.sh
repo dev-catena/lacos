@@ -21,15 +21,15 @@ echo ""
 # Testar conectividade
 echo "🌐 Testando conectividade:"
 echo "   IP local: $(hostname -I | awk '{print $1}')"
-echo "   IP esperado: 10.102.0.103"
+echo "   IP esperado: 192.168.0.20"
 echo ""
 
 # Verificar se o Metro está escutando corretamente
 echo "📱 Verificando se Metro está acessível:"
-if curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://10.102.0.103:8081/status 2>/dev/null | grep -q "200\|404"; then
-    echo "   ✅ Metro está respondendo em http://10.102.0.103:8081"
+if curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://192.168.0.20:8081/status 2>/dev/null | grep -q "200\|404"; then
+    echo "   ✅ Metro está respondendo em http://192.168.0.20:8081"
 else
-    echo "   ❌ Metro NÃO está respondendo em http://10.102.0.103:8081"
+    echo "   ❌ Metro NÃO está respondendo em http://192.168.0.20:8081"
     echo "   ⚠️  Pode ser firewall ou Metro não está escutando no IP correto"
 fi
 echo ""
@@ -37,7 +37,7 @@ echo ""
 echo "💡 Se o Android não conectar, tente:"
 echo "   1. Verificar se celular e PC estão na mesma rede Wi-Fi"
 echo "   2. Abrir porta 8081 no firewall: sudo ufw allow 8081/tcp"
-echo "   3. Verificar se o IP do PC é realmente 10.102.0.103"
+echo "   3. Verificar se o IP do PC é realmente 192.168.0.20"
 
 
 

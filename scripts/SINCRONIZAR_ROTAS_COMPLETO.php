@@ -11,9 +11,9 @@ $apiServidor = '/tmp/api_servidor.php';
 if (!file_exists($apiServidor)) {
     echo "❌ Arquivo do servidor não encontrado: $apiServidor\n\n";
     echo "📥 Por favor, baixe o arquivo primeiro:\n";
-    echo "   scp -P 63022 darley@10.102.0.103:/var/www/lacos-backend/routes/api.php $apiServidor\n";
+    echo "   scp -P 63022 darley@192.168.0.20:/var/www/lacos-backend/routes/api.php $apiServidor\n";
     echo "\n   Ou:\n";
-    echo "   ssh -p 63022 darley@10.102.0.103 'cat /var/www/lacos-backend/routes/api.php' > $apiServidor\n";
+    echo "   ssh -p 63022 darley@192.168.0.20 'cat /var/www/lacos-backend/routes/api.php' > $apiServidor\n";
     exit(1);
 }
 

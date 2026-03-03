@@ -248,18 +248,15 @@ const GroupsScreen = ({ navigation, route }) => {
               >
             <View style={styles.groupHeader}>
               {(() => {
-                const photoUrl = group.photo_url || group.photo;
+                const photoUrl = group.photo || group.photo_url;
                 
                 if (photoUrl) {
-                  // Construir URL completa
+                  // Construir URL completa (path "groups/xxx.png" precisa de /storage/)
                   let fullPhotoUrl = photoUrl;
-                  
-                  // Se não é URL completa, construir
                   if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
                     const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
-                    fullPhotoUrl = photoUrl.startsWith('/') 
-                      ? `${baseUrl}${photoUrl}` 
-                      : `${baseUrl}/${photoUrl}`;
+                    const path = photoUrl.replace(/^\//, '');
+                    fullPhotoUrl = path.startsWith('storage/') ? `${baseUrl}/${path}` : `${baseUrl}/storage/${path}`;
                   }
                   
                   return (
@@ -393,18 +390,15 @@ const GroupsScreen = ({ navigation, route }) => {
               >
                 <View style={styles.groupCardHeader}>
                   {(() => {
-                    const photoUrl = group.photo_url || group.photo;
+                    const photoUrl = group.photo || group.photo_url;
                     
                     if (photoUrl) {
-                      // Construir URL completa
+                      // Construir URL completa (path "groups/xxx.png" precisa de /storage/)
                       let fullPhotoUrl = photoUrl;
-                      
-                      // Se não é URL completa, construir
                       if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
                         const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
-                        fullPhotoUrl = photoUrl.startsWith('/') 
-                          ? `${baseUrl}${photoUrl}` 
-                          : `${baseUrl}/${photoUrl}`;
+                        const path = photoUrl.replace(/^\//, '');
+                        fullPhotoUrl = path.startsWith('storage/') ? `${baseUrl}/${path}` : `${baseUrl}/storage/${path}`;
                       }
                       
                       return (
@@ -522,6 +516,7 @@ const GroupsScreen = ({ navigation, route }) => {
         transparent={true}
         onRequestClose={() => setInviteModalVisible(false)}
         statusBarTranslucent={true}
+        presentationStyle="overFullScreen"
       >
         <TouchableOpacity 
           activeOpacity={1}
@@ -819,11 +814,11 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   modalOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
     zIndex: 1000,
   },
   modalContent: {

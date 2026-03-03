@@ -3,7 +3,7 @@
 # Script para ver os logs relacionados ao upload de certificado
 
 SSH_USER="darley"
-SSH_HOST="10.102.0.103"
+SSH_HOST="192.168.0.20"
 SSH_PORT="63022"
 SSH_PASS="yhvh77"
 

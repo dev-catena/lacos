@@ -44,7 +44,7 @@ echo ""
 # 4. Verificar IP atual
 echo "4️⃣ Verificando IP da máquina..."
 IP_ATUAL=$(hostname -I | awk '{print $1}')
-IP_EXPECTED="10.102.0.103"
+IP_EXPECTED="192.168.0.20"
 echo "   IP atual: $IP_ATUAL"
 echo "   IP esperado: $IP_EXPECTED"
 if [ "$IP_ATUAL" != "$IP_EXPECTED" ]; then

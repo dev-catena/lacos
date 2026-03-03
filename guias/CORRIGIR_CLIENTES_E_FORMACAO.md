@@ -23,7 +23,7 @@ As rotas para listar e detalhar clientes foram adicionadas ao backend.
 Execute no servidor:
 
 ```bash
-ssh darley@10.102.0.103
+ssh darley@192.168.0.20
 sudo bash /tmp/ADICIONAR_ROTA_CLIENTES.sh
 ```
 

@@ -157,6 +157,88 @@ class AppointmentService {
   }
 
   /**
+   * Registrar entrada na videoconferência (para rastreamento de no-show)
+   * Janela: 15 min antes até 40 min depois do horário agendado
+   * @param {number} appointmentId
+   * @param {string} role - 'doctor' | 'patient'
+   */
+  async videoJoin(appointmentId, role) {
+    try {
+      const response = await apiService.post(`/appointments/${appointmentId}/video-join`, { role });
+      return { success: true, data: response };
+    } catch (error) {
+      console.warn('Erro ao registrar entrada na videoconferência:', error?.message);
+      return { success: false, error: error?.message };
+    }
+  },
+
+  /**
+   * Confirmar que a teleconsulta foi realizada (paciente/cuidador)
+   * Libera o pagamento e opcionalmente registra avaliação do médico
+   * @param {number} appointmentId
+   * @param {object} options - { rating?: 1-5, comment?: string }
+   */
+  async confirmAppointment(appointmentId, options = {}) {
+    try {
+      const body = {};
+      if (options.rating != null) body.rating = options.rating;
+      if (options.comment != null) body.comment = options.comment;
+
+      const response = await apiService.post(`/appointments/${appointmentId}/confirm`, body);
+
+      return {
+        success: true,
+        data: response,
+        message: response.message || 'Consulta confirmada com sucesso',
+      };
+    } catch (error) {
+      console.error('Erro ao confirmar consulta:', error);
+
+      let errorMessage = 'Erro ao confirmar consulta';
+      if (error.message) errorMessage = error.message;
+      else if (error.errors) errorMessage = Object.values(error.errors).flat().join(', ');
+
+      return {
+        success: false,
+        error: errorMessage,
+        errors: error.errors,
+      };
+    }
+  },
+
+  /**
+   * Avaliar médico após teleconsulta realizada
+   * @param {number} appointmentId
+   * @param {object} data - { rating: 1-5, comment?: string }
+   */
+  async createAppointmentReview(appointmentId, data) {
+    try {
+      const response = await apiService.post(`/appointments/${appointmentId}/reviews`, {
+        rating: data.rating,
+        comment: data.comment || null,
+      });
+
+      return {
+        success: true,
+        data: response,
+        message: 'Avaliação enviada com sucesso',
+      };
+    } catch (error) {
+      console.error('Erro ao avaliar médico:', error);
+
+      let errorMessage = 'Erro ao enviar avaliação';
+      if (error.message) errorMessage = error.message;
+      else if (error.errors) errorMessage = Object.values(error.errors).flat().join(', ');
+
+      return {
+        success: false,
+        error: errorMessage,
+        errors: error.errors,
+      };
+    }
+  },
+
+  /**
    * Cancelar consulta
    */
   async cancelAppointment(appointmentId, cancelledBy = 'doctor', reason = null) {

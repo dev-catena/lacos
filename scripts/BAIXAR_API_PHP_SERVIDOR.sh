@@ -2,7 +2,7 @@
 
 # Script para baixar routes/api.php do servidor
 
-SERVER="darley@10.102.0.103"
+SERVER="darley@192.168.0.20"
 PORT="63022"
 REMOTE_FILE="/var/www/lacos-backend/routes/api.php"
 LOCAL_FILE="/tmp/api_servidor.php"
@@ -15,6 +15,9 @@ echo ""
 echo "Ou conecte via SSH e copie o conteúdo:"
 echo "  ssh -p $PORT $SERVER 'cat $REMOTE_FILE' > $LOCAL_FILE"
 echo ""
+
+
+
 
 
 

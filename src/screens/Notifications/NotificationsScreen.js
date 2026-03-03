@@ -47,8 +47,9 @@ const NotificationsScreen = ({ navigation }) => {
           
           switch (notification.type) {
             case 'appointment':
+            case 'appointment_cancelled':
               icon = 'calendar';
-              color = colors.warning;
+              color = notification.type === 'appointment_cancelled' ? colors.error : colors.warning;
               break;
             case 'vital_sign':
               icon = 'pulse';

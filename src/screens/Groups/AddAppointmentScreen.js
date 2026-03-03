@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -47,6 +48,8 @@ import {
   AlertIcon,
   FitnessOutlineIcon,
   FlaskOutlineIcon,
+  ArrowBackIcon,
+  AddIcon,
 } from '../../components/CustomIcons';
 import appointmentService from '../../services/appointmentService';
 import doctorService from '../../services/doctorService';
@@ -58,13 +61,16 @@ import { checkGoogleMapsConfig } from '../../utils/checkGoogleMapsConfig';
 import { formatCrmDisplay } from '../../utils/crm';
 
 const AddAppointmentScreen = ({ route, navigation }) => {
-  let { groupId, groupName, appointmentId, appointment } = route.params || {};
+  let { groupId, groupName, appointmentId, appointment, isTeleconsultation } = route.params || {};
   
   // TEMPORÁRIO: Se groupId é um timestamp (> 999999999999), usar o grupo de teste
   if (groupId && groupId > 999999999999) {
     console.warn('⚠️ GroupId é um timestamp! Usando grupo de teste (ID=1)');
     groupId = 1;
   }
+  
+  // Se isTeleconsultation for true, forçar tipo medical e teleconsulta
+  const isTeleconsultationMode = isTeleconsultation === true;
   
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -85,6 +91,11 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   const [doctorDetailsModalVisible, setDoctorDetailsModalVisible] = useState(false);
   const [selectedDoctorDetails, setSelectedDoctorDetails] = useState(null);
   
+  // Estados para médicos do grupo (quando tipo é "medical")
+  const [groupDoctors, setGroupDoctors] = useState([]);
+  const [loadingGroupDoctors, setLoadingGroupDoctors] = useState(false);
+  const [selectedGroupDoctor, setSelectedGroupDoctor] = useState(null);
+  
   // Estados para agenda do médico
   const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
   const [doctorAvailability, setDoctorAvailability] = useState(null);
@@ -95,20 +106,27 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   // Dados do compromisso
   const [formData, setFormData] = useState({
     title: '',
-    type: 'medical', // common, medical, fisioterapia, exames
+    type: isTeleconsultationMode ? 'medical' : 'medical', // common, medical, fisioterapia, exames
     date: new Date().toISOString(),
     duration: '60',
     address: '',
     notes: '',
     selectedDoctor: null,
     medicalSpecialtyId: null,
-    isTeleconsultation: false, // Teleconsulta
+    isTeleconsultation: isTeleconsultationMode, // Teleconsulta - apenas true no modo teleconsulta (sem toggle)
     recurrenceType: 'none', // none, daily, weekdays, custom
     recurrenceDays: [], // [0,1,2,3,4,5,6]
     recurrenceStart: new Date().toISOString(),
     recurrenceEnd: '',
     reminderOption: '3', // Opções pré-definidas
   });
+  
+  // Garantir que isTeleconsultation seja sempre false quando não for modo teleconsulta
+  useEffect(() => {
+    if (!isTeleconsultationMode && formData.isTeleconsultation) {
+      updateField('isTeleconsultation', false);
+    }
+  }, [isTeleconsultationMode]);
 
   // Carregar especialidades ao montar o componente
   useEffect(() => {
@@ -305,14 +323,104 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     }
   }, [formData.type, formData.medicalSpecialtyId, specialties, isEditing]);
 
-  // Carregar médicos quando teleconsulta estiver marcada e especialidade selecionada
+  // Carregar médicos da plataforma quando for modo teleconsulta (sem precisar de especialidade)
   useEffect(() => {
-    if (formData.isTeleconsultation && formData.medicalSpecialtyId && formData.type === 'medical') {
+    if (isTeleconsultationMode) {
+      // No modo teleconsulta, carregar todos os médicos da plataforma elegíveis
+      loadPlatformDoctors();
+    } else if (formData.isTeleconsultation && formData.medicalSpecialtyId && formData.type === 'medical') {
       loadDoctorsBySpecialty();
     } else {
       setDoctors([]);
     }
-  }, [formData.isTeleconsultation, formData.medicalSpecialtyId, formData.type]);
+  }, [isTeleconsultationMode, formData.isTeleconsultation, formData.medicalSpecialtyId, formData.type]);
+
+  // Função para carregar médicos da plataforma (elegíveis para teleconsultas)
+  // Usa getDoctors(groupId) que verifica acesso ao grupo e retorna médicos do grupo + plataforma
+  const loadPlatformDoctors = async () => {
+    if (!groupId) return;
+    
+    try {
+      setLoadingDoctors(true);
+      console.log('🔍 Carregando médicos para teleconsulta (grupo:', groupId, ')...');
+      
+      // Buscar via /doctors?group_id=X - verifica acesso ao grupo e retorna médicos da plataforma
+      const response = await doctorService.getDoctors(groupId);
+      
+      let doctorsList = [];
+      if (response?.success && Array.isArray(response.data)) {
+        doctorsList = response.data;
+      } else if (Array.isArray(response)) {
+        doctorsList = response;
+      }
+      
+      // Filtrar apenas médicos disponíveis (se tiver essa informação)
+      const availableDoctors = doctorsList.filter(doctor => {
+        return doctor.is_available !== false;
+      });
+      
+      // Ordenar médicos alfabeticamente por nome
+      const sortedDoctors = availableDoctors.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB, 'pt-BR');
+      });
+      
+      setDoctors(sortedDoctors);
+      console.log('✅ Médicos para teleconsulta carregados:', sortedDoctors.length);
+    } catch (error) {
+      console.error('❌ Erro ao carregar médicos para teleconsulta:', error);
+      setDoctors([]);
+    } finally {
+      setLoadingDoctors(false);
+    }
+  };
+
+  // Carregar médicos do grupo quando tipo for "medical"
+  useEffect(() => {
+    if (formData.type === 'medical' && groupId) {
+      loadGroupDoctors();
+    } else {
+      setGroupDoctors([]);
+      setSelectedGroupDoctor(null);
+    }
+  }, [formData.type, groupId]);
+
+  // Recarregar médicos quando a tela receber foco (após voltar do AddDoctorScreen)
+  useFocusEffect(
+    useCallback(() => {
+      if (formData.type === 'medical' && groupId) {
+        loadGroupDoctors();
+      }
+    }, [formData.type, groupId])
+  );
+
+  const loadGroupDoctors = async () => {
+    if (!groupId) return;
+    
+    try {
+      setLoadingGroupDoctors(true);
+      const response = await doctorService.getDoctors(groupId);
+      
+      if (response.success && response.data) {
+        // Ordenar médicos alfabeticamente por nome
+        const sortedDoctors = [...response.data].sort((a, b) => {
+          const nameA = (a.name || '').toLowerCase();
+          const nameB = (b.name || '').toLowerCase();
+          return nameA.localeCompare(nameB, 'pt-BR');
+        });
+        setGroupDoctors(sortedDoctors);
+        console.log('✅ Médicos do grupo carregados:', sortedDoctors.length);
+      } else {
+        setGroupDoctors([]);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar médicos do grupo:', error);
+      setGroupDoctors([]);
+    } finally {
+      setLoadingGroupDoctors(false);
+    }
+  };
 
   const loadDoctorsBySpecialty = async () => {
     if (!formData.medicalSpecialtyId || !groupId) return;
@@ -393,8 +501,15 @@ const AddAppointmentScreen = ({ route, navigation }) => {
         courses: doctor.courses || [],
       }));
       
-      setDoctors(doctorsFormatted);
-      console.log('📋 Médicos encontrados:', doctorsFormatted);
+      // Ordenar médicos alfabeticamente por nome
+      const sortedDoctors = doctorsFormatted.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB, 'pt-BR');
+      });
+      
+      setDoctors(sortedDoctors);
+      console.log('📋 Médicos encontrados:', sortedDoctors);
     } catch (error) {
       console.error('❌ Erro ao carregar médicos:', error);
       setDoctors([]);
@@ -458,24 +573,55 @@ const AddAppointmentScreen = ({ route, navigation }) => {
               if (isDoctorAppointment) {
                 const appointmentDate = appointment.appointment_date || appointment.scheduled_at;
                 if (appointmentDate) {
-                  // Criar data a partir da string ISO
-                  const dateObj = new Date(appointmentDate);
+                  // Verificar se a consulta está reservada (reserved_until > now)
+                  const reservedUntil = appointment.reserved_until;
+                  const isReserved = reservedUntil && new Date(reservedUntil) > new Date();
                   
-                  // Usar métodos LOCAIS (não UTC) para extrair data e hora
-                  // Isso garante que pegamos a data/hora no timezone local do dispositivo
-                  const year = dateObj.getFullYear();
-                  const month = dateObj.getMonth() + 1; // getMonth() retorna 0-11
-                  const day = dateObj.getDate();
-                  const hours = dateObj.getHours(); // getHours() retorna no timezone local
-                  const minutes = dateObj.getMinutes(); // getMinutes() retorna no timezone local
-                  
-                  const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                  const time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-                  
-                  if (!bookedTimesByDate[dateKey]) {
-                    bookedTimesByDate[dateKey] = new Set();
+                  // Se não está reservada ou a reserva expirou, considerar como agendada
+                  // Se está reservada, também bloquear o horário
+                  if (!isReserved || appointment.payment_status === 'paid_held' || appointment.payment_status === 'paid' || appointment.payment_status === 'released') {
+                    // Criar data a partir da string ISO
+                    const dateObj = new Date(appointmentDate);
+                    
+                    // Usar métodos LOCAIS (não UTC) para extrair data e hora
+                    // Isso garante que pegamos a data/hora no timezone local do dispositivo
+                    const year = dateObj.getFullYear();
+                    const month = dateObj.getMonth() + 1; // getMonth() retorna 0-11
+                    const day = dateObj.getDate();
+                    const hours = dateObj.getHours(); // getHours() retorna no timezone local
+                    const minutes = dateObj.getMinutes(); // getMinutes() retorna no timezone local
+                    
+                    const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                    
+                    if (!bookedTimesByDate[dateKey]) {
+                      bookedTimesByDate[dateKey] = new Set();
+                    }
+                    bookedTimesByDate[dateKey].add(time);
+                  } else {
+                    // Consulta está reservada, bloquear o horário também
+                    const dateObj = new Date(appointmentDate);
+                    const year = dateObj.getFullYear();
+                    const month = dateObj.getMonth() + 1;
+                    const day = dateObj.getDate();
+                    const hours = dateObj.getHours();
+                    const minutes = dateObj.getMinutes();
+                    
+                    const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                    
+                    if (!bookedTimesByDate[dateKey]) {
+                      bookedTimesByDate[dateKey] = new Set();
+                    }
+                    bookedTimesByDate[dateKey].add(time);
+                    
+                    console.log('🔒 loadDoctorAvailability - Horário reservado bloqueado:', {
+                      dateKey,
+                      time,
+                      reservedUntil,
+                      payment_status: appointment.payment_status,
+                    });
                   }
-                  bookedTimesByDate[dateKey].add(time);
                   
                   console.log('📅 loadDoctorAvailability - Horário agendado encontrado:', {
                     dateKey,
@@ -866,9 +1012,21 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   };
 
   const handleSave = async () => {
-    if (!formData.title.trim()) {
+    // Validar título apenas se não for tipo "medical" (que usa seleção de médico)
+    if (formData.type !== 'medical' && !formData.title.trim()) {
       Alert.alert('Atenção', 'Digite um título para o compromisso');
       return;
+    }
+    
+    // Validar médico selecionado se for tipo "medical" ou modo teleconsulta
+    if ((formData.type === 'medical' || isTeleconsultationMode) && !selectedGroupDoctor && !formData.selectedDoctor) {
+      Alert.alert('Atenção', 'Selecione um médico para o compromisso');
+      return;
+    }
+    
+    // Preencher título automaticamente se for modo teleconsulta e tiver médico selecionado
+    if (isTeleconsultationMode && formData.selectedDoctor && !formData.title.trim()) {
+      updateField('title', formData.selectedDoctor.name);
     }
 
     if (!groupId) {
@@ -1204,29 +1362,22 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             </View>
 
             <Text style={styles.title}>
-              {isEditing ? 'Editar Compromisso' : 'Agendar Compromisso'}
+              {isEditing 
+                ? 'Editar Compromisso' 
+                : isTeleconsultationMode 
+                  ? 'Agendar Teleconsulta' 
+                  : 'Agendar Compromisso'}
             </Text>
             <Text style={styles.subtitle}>
               {isEditing 
                 ? 'Edite as informações do compromisso'
-                : 'Crie um compromisso ou consulta médica para o acompanhado'}
+                : isTeleconsultationMode
+                  ? 'Agende uma teleconsulta com um médico da plataforma'
+                  : 'Crie um compromisso ou consulta médica presencial para o acompanhado'}
             </Text>
 
-            {/* Título */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Título *</Text>
-              <View style={styles.inputWrapper}>
-                <TextOutlineIcon size={20} color={colors.gray400} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ex: Consulta com Dr. João"
-                  value={formData.title}
-                  onChangeText={(value) => updateField('title', value)}
-                />
-              </View>
-            </View>
-
-            {/* Tipo */}
+            {/* Tipo - MOVIDO PARA O TOPO - Oculto no modo teleconsulta */}
+            {!isTeleconsultationMode && (
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Tipo de Compromisso *</Text>
               
@@ -1320,9 +1471,178 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
               </View>
             </View>
+            )}
 
-            {/* Especialidade Médica - apenas para compromissos médicos */}
-            {formData.type === 'medical' && (
+            {/* Título - apenas para tipos que não são "medical" */}
+            {formData.type !== 'medical' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Título *</Text>
+                <View style={styles.inputWrapper}>
+                  <TextOutlineIcon size={20} color={colors.gray400} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ex: Consulta com Dr. João"
+                    value={formData.title}
+                    onChangeText={(value) => updateField('title', value)}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Seleção de Médico - para tipo "medical" (médicos do grupo) */}
+            {formData.type === 'medical' && !isTeleconsultationMode && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Médico *</Text>
+                {loadingGroupDoctors ? (
+                  <View style={styles.loadingDoctorsContainer}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.loadingDoctorsText}>Carregando médicos...</Text>
+                  </View>
+                ) : groupDoctors.length > 0 ? (
+                  <>
+                    <View style={styles.doctorsListContainer}>
+                      <FlatList
+                        data={groupDoctors}
+                        keyExtractor={(item) => item.id.toString()}
+                        renderItem={({ item }) => (
+                          <TouchableOpacity
+                            style={[
+                              styles.doctorListItem,
+                              selectedGroupDoctor?.id === item.id && styles.doctorListItemSelected,
+                            ]}
+                            onPress={() => {
+                              setSelectedGroupDoctor(item);
+                              updateField('title', item.name);
+                              updateField('selectedDoctor', item);
+                            }}
+                          >
+                            <View style={styles.doctorListItemContent}>
+                              <View style={styles.doctorListItemAvatar}>
+                                <PersonIcon 
+                                  size={24} 
+                                  color={selectedGroupDoctor?.id === item.id ? colors.white : colors.primary} 
+                                />
+                              </View>
+                              <View style={styles.doctorListItemInfo}>
+                                <Text style={[
+                                  styles.doctorListItemName,
+                                  selectedGroupDoctor?.id === item.id && styles.doctorListItemNameSelected,
+                                ]}>
+                                  {item.name}
+                                </Text>
+                                {item.crm && (
+                                  <Text style={styles.doctorListItemCrm}>
+                                    CRM: {formatCrmDisplay(item.crm)}
+                                  </Text>
+                                )}
+                                {item.medical_specialty?.name && (
+                                  <Text style={styles.doctorListItemSpecialty}>
+                                    {item.medical_specialty.name}
+                                  </Text>
+                                )}
+                              </View>
+                            </View>
+                            {selectedGroupDoctor?.id === item.id && (
+                              <CheckmarkCircleIcon size={24} color={colors.primary} />
+                            )}
+                          </TouchableOpacity>
+                        )}
+                        scrollEnabled={true}
+                        nestedScrollEnabled={true}
+                        showsVerticalScrollIndicator={true}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      style={styles.addDoctorButton}
+                      onPress={() => {
+                        navigation.navigate('AddDoctor', {
+                          groupId,
+                          groupName,
+                          returnTo: 'AddAppointment',
+                        });
+                      }}
+                    >
+                      <AddIcon size={20} color={colors.primary} />
+                      <Text style={styles.addDoctorButtonText}>Adicionar Médico</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <View style={styles.noDoctorsContainer}>
+                    <AlertCircleOutlineIcon size={20} color={colors.warning} />
+                    <Text style={styles.noDoctorsText}>
+                      Nenhum médico cadastrado no grupo
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.addDoctorButton}
+                      onPress={() => {
+                        navigation.navigate('AddDoctor', {
+                          groupId,
+                          groupName,
+                          returnTo: 'AddAppointment',
+                        });
+                      }}
+                    >
+                      <AddIcon size={20} color={colors.primary} />
+                      <Text style={styles.addDoctorButtonText}>Adicionar Primeiro Médico</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Seleção de Médico da Plataforma - para modo teleconsulta */}
+            {isTeleconsultationMode && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Médico *</Text>
+                {loadingDoctors ? (
+                  <View style={styles.loadingDoctorsContainer}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.loadingDoctorsText}>Carregando médicos...</Text>
+                  </View>
+                ) : doctors.length > 0 ? (
+                  <TouchableOpacity
+                    style={styles.inputWrapper}
+                    onPress={() => setDoctorModalVisible(true)}
+                  >
+                    {formData.selectedDoctor ? (
+                      <View style={styles.selectedDoctorPreview}>
+                        {formData.selectedDoctor.photo || formData.selectedDoctor.photo_url ? (
+                          <Image
+                            source={{ uri: formData.selectedDoctor.photo_url || formData.selectedDoctor.photo }}
+                            style={styles.doctorThumbnail}
+                          />
+                        ) : (
+                          <View style={styles.doctorThumbnailPlaceholder}>
+                            <PersonIcon size={20} color={colors.gray400} />
+                          </View>
+                        )}
+                        <Text style={styles.input} numberOfLines={1}>
+                          {formData.selectedDoctor.name}
+                        </Text>
+                      </View>
+                    ) : (
+                      <>
+                        <PersonIcon size={20} color={colors.gray400} />
+                        <Text style={[styles.input, styles.placeholder]}>
+                          Selecione o médico...
+                        </Text>
+                      </>
+                    )}
+                    <ChevronDownIcon size={20} color={colors.gray400} />
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.noDoctorsContainer}>
+                    <AlertCircleOutlineIcon size={20} color={colors.warning} />
+                    <Text style={styles.noDoctorsText}>
+                      Nenhum médico disponível para teleconsulta
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Especialidade Médica - apenas para compromissos médicos (não no modo teleconsulta) */}
+            {formData.type === 'medical' && !isTeleconsultationMode && (
               <>
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Especialidade Médica</Text>
@@ -1353,29 +1673,8 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   </TouchableOpacity>
                 </View>
 
-                {/* Teleconsulta */}
-                <View style={styles.switchContainer}>
-                  <View style={styles.switchLabelContainer}>
-                    <VideoCamOutlineIcon size={20} color={colors.text} />
-                    <Text style={styles.switchLabel}>Teleconsulta</Text>
-                  </View>
-                  <Switch
-                    value={formData.isTeleconsultation}
-                    onValueChange={(value) => {
-                      updateField('isTeleconsultation', value);
-                      if (!value) {
-                        // Se desmarcar teleconsulta, limpar médico selecionado
-                        updateField('selectedDoctor', null);
-                      }
-                    }}
-                    trackColor={{ false: colors.gray300, true: colors.primary + '80' }}
-                    thumbColor={formData.isTeleconsultation ? colors.primary : colors.gray400}
-                    ios_backgroundColor={colors.gray300}
-                  />
-                </View>
-
-                {/* Seleção de Médico - apenas para teleconsulta */}
-                {formData.isTeleconsultation && formData.medicalSpecialtyId && (
+                {/* Seleção de Médico da Plataforma - apenas para modo teleconsulta */}
+                {isTeleconsultationMode && (
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>Selecione o Médico *</Text>
                     {loadingDoctors ? (
@@ -1610,7 +1909,10 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             {!formData.isTeleconsultation && (
             <View style={styles.inputContainer}>
               <View style={styles.labelWithHelp}>
-                <Text style={styles.label}>Endereço (opcional)</Text>
+                <View style={styles.labelWithIcon}>
+                  <LocationIcon size={18} color={colors.primary} />
+                  <Text style={styles.label}>Local do Compromisso</Text>
+                </View>
                 {GOOGLE_MAPS_CONFIG.API_KEY === 'SUA_API_KEY_AQUI' && (
                   <TouchableOpacity 
                     onPress={checkGoogleMapsConfig}
@@ -1626,16 +1928,39 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                 <View style={styles.autocompleteContainer}>
                   <GooglePlacesAutocomplete
                     ref={googlePlacesRef}
-                    placeholder="Digite o endereço..."
+                    placeholder="Buscar endereço no Google..."
                     fetchDetails={true}
                     onPress={(data, details = null) => {
                       try {
-                        if (data && data.description) {
-                          updateField('address', data.description);
-                        } else if (details && details.formatted_address) {
-                          updateField('address', details.formatted_address);
+                        let addressToSave = '';
+                        
+                        // Priorizar formatted_address dos detalhes
+                        if (details && details.formatted_address) {
+                          addressToSave = details.formatted_address;
+                        } else if (data && data.description) {
+                          addressToSave = data.description;
+                        } else if (data && data.structured_formatting) {
+                          addressToSave = data.structured_formatting.main_text + 
+                            (data.structured_formatting.secondary_text ? ', ' + data.structured_formatting.secondary_text : '');
+                        }
+                        
+                        if (addressToSave) {
+                          updateField('address', addressToSave);
+                          Toast.show({
+                            type: 'success',
+                            text1: 'Endereço selecionado',
+                            text2: addressToSave.length > 50 ? addressToSave.substring(0, 50) + '...' : addressToSave,
+                            position: 'bottom',
+                            visibilityTime: 2000,
+                          });
                         } else {
                           console.warn('Dados do endereço incompletos:', { data, details });
+                          Toast.show({
+                            type: 'warning',
+                            text1: 'Endereço incompleto',
+                            text2: 'Tente selecionar outro endereço',
+                            position: 'bottom',
+                          });
                         }
                       } catch (error) {
                         console.error('Erro ao processar endereço do Google:', error);
@@ -1649,68 +1974,113 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     }}
                     onFail={(error) => {
                       console.error('Erro no Google Places:', error);
+                      Toast.show({
+                        type: 'error',
+                        text1: 'Erro na busca',
+                        text2: 'Verifique sua conexão e tente novamente',
+                        position: 'bottom',
+                      });
                     }}
                     query={{
                       key: GOOGLE_MAPS_CONFIG.API_KEY,
-                      language: GOOGLE_MAPS_CONFIG.language,
+                      language: 'pt-BR',
                       components: 'country:br',
+                      types: 'address', // Buscar apenas endereços
                     }}
                     enablePoweredByContainer={false}
                     debounce={400}
+                    minLength={3}
+                    nearbyPlacesAPI="GooglePlacesSearch"
+                    filterReverseGeocodingByTypes={['locality', 'administrative_area_level_3']}
                     styles={{
                       container: {
                         flex: 0,
+                        zIndex: 1,
                       },
                       textInputContainer: {
+                        flexDirection: 'row',
+                        alignItems: 'center',
                         backgroundColor: colors.backgroundLight,
                         borderRadius: 12,
                         borderWidth: 1,
-                        borderColor: colors.border,
-                        paddingHorizontal: 8,
+                        borderColor: formData.address ? colors.primary : colors.border,
+                        paddingHorizontal: 12,
+                        paddingVertical: 4,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 4,
+                        elevation: 2,
                       },
                       textInput: {
-                        height: 52,
+                        height: 48,
                         color: colors.text,
                         fontSize: 16,
                         backgroundColor: 'transparent',
+                        flex: 1,
                       },
                       predefinedPlacesDescription: {
                         color: colors.primary,
                       },
                       listView: {
-                        backgroundColor: colors.backgroundLight,
+                        backgroundColor: colors.white,
                         borderRadius: 12,
                         marginTop: 8,
                         borderWidth: 1,
                         borderColor: colors.border,
+                        maxHeight: 200,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.15,
+                        shadowRadius: 8,
+                        elevation: 5,
                       },
                       row: {
-                        backgroundColor: colors.backgroundLight,
-                        paddingVertical: 12,
-                        paddingHorizontal: 12,
+                        backgroundColor: colors.white,
+                        paddingVertical: 14,
+                        paddingHorizontal: 16,
+                        borderBottomWidth: 0.5,
+                        borderBottomColor: colors.border,
                       },
                       separator: {
-                        height: 1,
-                        backgroundColor: colors.border,
+                        height: 0,
                       },
                       description: {
                         color: colors.text,
                         fontSize: 14,
+                        marginTop: 2,
                       },
                       poweredContainer: {
                         backgroundColor: colors.backgroundLight,
-                        paddingVertical: 4,
+                        paddingVertical: 8,
+                        borderTopWidth: 1,
+                        borderTopColor: colors.border,
                       },
                     }}
                     textInputProps={{
                       placeholderTextColor: colors.placeholder,
                       value: formData.address,
                       onChangeText: (text) => updateField('address', text),
+                      returnKeyType: 'search',
                     }}
-                    enablePoweredByContainer={true}
-                    nearbyPlacesAPI="GooglePlacesSearch"
-                    debounce={400}
-                    minLength={3}
+                    renderLeftButton={() => (
+                      <View style={styles.autocompleteLeftButton}>
+                        <LocationIcon size={20} color={colors.primary} />
+                      </View>
+                    )}
+                    renderRightButton={() => formData.address ? (
+                      <TouchableOpacity
+                        style={styles.autocompleteClearButton}
+                        onPress={() => {
+                          updateField('address', '');
+                          if (googlePlacesRef.current) {
+                            googlePlacesRef.current.setAddressText('');
+                          }
+                        }}
+                      >
+                        <CloseIcon size={18} color={colors.gray400} />
+                      </TouchableOpacity>
+                    ) : null}
                   />
                 </View>
               ) : (
@@ -1728,21 +2098,29 @@ const AddAppointmentScreen = ({ route, navigation }) => {
               )}
               
               {formData.address.trim() && (
-                <View style={styles.mapButtons}>
-                  <TouchableOpacity 
-                    style={styles.mapButton}
-                    onPress={openGoogleMaps}
-                  >
-                    <NavigateIcon size={16} color={colors.info} />
-                    <Text style={styles.mapButtonText}>Google Maps</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.mapButton}
-                    onPress={openWaze}
-                  >
-                    <NavigateIcon size={16} color={colors.info} />
-                    <Text style={styles.mapButtonText}>Waze</Text>
-                  </TouchableOpacity>
+                <View style={styles.addressPreviewContainer}>
+                  <View style={styles.addressPreview}>
+                    <LocationIcon size={16} color={colors.success} />
+                    <Text style={styles.addressPreviewText} numberOfLines={2}>
+                      {formData.address}
+                    </Text>
+                  </View>
+                  <View style={styles.mapButtons}>
+                    <TouchableOpacity 
+                      style={styles.mapButton}
+                      onPress={openGoogleMaps}
+                    >
+                      <NavigateIcon size={16} color={colors.info} />
+                      <Text style={styles.mapButtonText}>Google Maps</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.mapButton}
+                      onPress={openWaze}
+                    >
+                      <NavigateIcon size={16} color={colors.info} />
+                      <Text style={styles.mapButtonText}>Waze</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
@@ -1958,9 +2336,13 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                         ]}
                         onPress={async () => {
                           updateField('selectedDoctor', item);
+                          // Preencher título automaticamente com o nome do médico
+                          if (!formData.title.trim() || isTeleconsultationMode) {
+                            updateField('title', item.name);
+                          }
                           setDoctorModalVisible(false);
                           // Se for teleconsulta, buscar agenda do médico e abrir modal de seleção
-                          if (formData.isTeleconsultation) {
+                          if (formData.isTeleconsultation || isTeleconsultationMode) {
                             await loadDoctorAvailability(item.id);
                             setTimeout(() => {
                               setAvailabilityModalVisible(true);
@@ -2361,6 +2743,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             </View>
           </View>
         </Modal>
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -2454,6 +2837,7 @@ const styles = StyleSheet.create({
     flex: 1,
     zIndex: 1,
     minHeight: 52,
+    marginBottom: 8,
   },
   dateTimeRow: {
     flexDirection: 'row',
@@ -2601,6 +2985,42 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.info,
+  },
+  labelWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  autocompleteLeftButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  autocompleteClearButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    padding: 4,
+  },
+  addressPreviewContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: colors.success + '10',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.success + '30',
+  },
+  addressPreview: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 8,
+  },
+  addressPreviewText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
   },
   infoCard: {
     flexDirection: 'row',
@@ -2800,6 +3220,164 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.warning,
     flex: 1,
+  },
+  // Estilos para lista de médicos do grupo
+  doctorListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  doctorListItemSelected: {
+    backgroundColor: colors.primary + '15',
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  doctorListItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  doctorListItemAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  doctorListItemInfo: {
+    flex: 1,
+  },
+  doctorListItemName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  doctorListItemNameSelected: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  doctorListItemCrm: {
+    fontSize: 13,
+    color: colors.textLight,
+    marginBottom: 2,
+  },
+  doctorListItemSpecialty: {
+    fontSize: 12,
+    color: colors.textLight,
+  },
+  addDoctorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    marginTop: 8,
+  },
+  addDoctorButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.primary,
+  },
+  // Container para lista de médicos com scroll
+  doctorsListContainer: {
+    maxHeight: 300,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundLight,
+  },
+  // Estilos para modal de adicionar médico
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  modalKeyboardView: {
+    flex: 1,
+  },
+  modalScrollView: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalBackButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalHeaderRight: {
+    width: 40,
+  },
+  modalInputContainer: {
+    marginBottom: 16,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  modalInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text,
+  },
+  modalSaveButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  modalSaveButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalSaveButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
   // Estilos para modal de médicos
   doctorItem: {

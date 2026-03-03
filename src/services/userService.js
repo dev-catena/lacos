@@ -65,6 +65,7 @@ class UserService {
       const response = await apiService.request(`/users/${userId}`, {
         method: 'PUT',
         body: userData,
+        timeout: 60000, // 60s - atualização de perfil pode demorar em conexões lentas
       });
 
       console.log('📥 Response:', response);
@@ -100,6 +101,30 @@ class UserService {
         success: false,
         error: error.message || 'Erro ao atualizar dados',
       };
+    }
+  }
+
+  /**
+   * Atualizar cursos e certificações (endpoint dedicado)
+   * PUT /api/users/{id}/caregiver-courses
+   */
+  async updateCaregiverCourses(userId, courses) {
+    try {
+      const response = await apiService.request(`/users/${userId}/caregiver-courses`, {
+        method: 'PUT',
+        body: { courses },
+        timeout: 30000,
+      });
+      if (response && response.success) {
+        return {
+          success: true,
+          data: response.caregiver_courses || response.caregiverCourses || [],
+        };
+      }
+      return { success: false, error: 'Resposta inválida' };
+    } catch (error) {
+      console.error('❌ UserService - Erro ao atualizar cursos:', error);
+      return { success: false, error: error.message || 'Erro ao atualizar cursos' };
     }
   }
 

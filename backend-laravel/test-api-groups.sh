@@ -15,7 +15,7 @@ ls -ld public/storage 2>/dev/null
 echo ""
 
 echo "3. Testando acesso HTTP direto:"
-curl -I http://10.102.0.103:8000/storage/groups/yyTR90bXKMxgspM4Od0izSvwYXkSc7IVMudb2Jfh.jpg 2>&1 | head -3
+curl -I http://192.168.0.20:8000/storage/groups/yyTR90bXKMxgspM4Od0izSvwYXkSc7IVMudb2Jfh.jpg 2>&1 | head -3
 echo ""
 
 echo "4. Verificando permissões:"

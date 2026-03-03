@@ -134,7 +134,7 @@ Se precisar voltar ao servidor remoto:
 cp src/config/api.js.backup.* src/config/api.js
 
 # Ou editar manualmente
-# BASE_URL: 'http://10.102.0.103/api',
+# BASE_URL: 'http://192.168.0.20/api',
 ```
 
 ## 🛠️ Scripts Disponíveis
@@ -217,6 +217,9 @@ curl http://localhost:8000/api/gateway/status
 - O backup da configuração anterior está em: `src/config/api.js.backup.*`
 - Mudanças locais do backend foram salvas em stash: `git stash list`
 - Para restaurar mudanças: `cd backend-laravel && git stash pop`
+
+
+
 
 
 

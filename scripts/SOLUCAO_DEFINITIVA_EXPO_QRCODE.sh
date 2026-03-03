@@ -44,7 +44,7 @@ echo ""
 # 4. Verificar IP
 echo "4️⃣ Verificando IP da máquina..."
 IP=$(hostname -I | awk '{print $1}')
-EXPO_IP="10.102.0.103"
+EXPO_IP="192.168.0.20"
 EXPO_PORT="8081"
 
 echo "   IP atual: $IP"

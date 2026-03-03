@@ -7,7 +7,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const EXPO_IP = '10.102.0.103';
+const EXPO_IP = '192.168.0.20';
 const EXPO_PORT = '8081';
 
 console.log('\n');

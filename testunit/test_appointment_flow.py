@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 # Configurações padrão
-DEFAULT_API_URL = "http://10.102.0.103:8000/api"  # ou "https://gateway.lacosapp.com/api"
+DEFAULT_API_URL = "http://192.168.0.20:8000/api"  # ou "https://gateway.lacosapp.com/api"
 DOCTOR_CPF = "40780462319"
 DOCTOR_PASSWORD = "11111111"
 CAREGIVER_LOGIN = "amigo@gmail.com"  # Credenciais padrão do cuidador

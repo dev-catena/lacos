@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Script para adicionar campos de pagamento usando credenciais do .env
-# Servidor: 10.102.0.103
+# Servidor: 192.168.0.20
 
 echo "🔧 Adicionando campos de pagamento na tabela appointments..."
 
-sshpass -p 'yhvh77' ssh -p 63022 -o StrictHostKeyChecking=no darley@10.102.0.103 << 'ENDSSH'
+sshpass -p 'yhvh77' ssh -p 63022 -o StrictHostKeyChecking=no darley@192.168.0.20 << 'ENDSSH'
 cd /var/www/lacos-backend
 
 # Ler credenciais do .env

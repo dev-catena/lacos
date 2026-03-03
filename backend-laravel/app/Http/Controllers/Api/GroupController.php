@@ -22,7 +22,7 @@ class GroupController extends Controller
         if (!$photoPath) {
             return null;
         }
-        $baseUrl = config('app.url', 'http://10.102.0.103:8000');
+        $baseUrl = config('app.url', 'http://192.168.0.20:8000');
         // Garantir que não tenha barra dupla
         $baseUrl = rtrim($baseUrl, '/');
         $photoPath = ltrim($photoPath, '/');
@@ -1065,13 +1065,65 @@ class GroupController extends Controller
     /**
      * Deletar grupo
      * DELETE /api/groups/{id}
+     * Apenas o criador do grupo pode deletar.
      */
     public function destroy($id)
     {
-        // Implementação do destroy se necessário
-        return response()->json([
-            'message' => 'Método não implementado'
-        ], 501);
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Usuário não autenticado'], 401);
+            }
+
+            $group = DB::table('groups')->where('id', $id)->first();
+            if (!$group) {
+                return response()->json(['message' => 'Grupo não encontrado'], 404);
+            }
+
+            // Apenas o criador pode deletar o grupo
+            $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+            $isCreator = $createdBy && (int)$createdBy === (int)$user->id;
+
+            if (!$isCreator) {
+                Log::warning('GroupController::destroy - Tentativa de deletar grupo sem permissão', [
+                    'user_id' => $user->id,
+                    'group_id' => $id,
+                    'created_by' => $createdBy,
+                ]);
+                return response()->json([
+                    'message' => 'Apenas o criador do grupo pode excluí-lo'
+                ], 403);
+            }
+
+            // Deletar foto do grupo do storage se existir
+            if (!empty($group->photo)) {
+                try {
+                    if (Storage::disk('public')->exists($group->photo)) {
+                        Storage::disk('public')->delete($group->photo);
+                        Log::info("GroupController::destroy - Foto deletada: {$group->photo}");
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("GroupController::destroy - Erro ao deletar foto: " . $e->getMessage());
+                }
+            }
+
+            // Deletar o grupo (cascade nas FKs remove group_members, activities, medications, etc.)
+            DB::table('groups')->where('id', $id)->delete();
+
+            Log::info("GroupController::destroy - Grupo {$id} deletado com sucesso por usuário {$user->id}");
+
+            return response()->json([
+                'message' => 'Grupo excluído com sucesso',
+                'success' => true,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('GroupController::destroy - Erro: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'message' => 'Erro ao excluir grupo',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     public function members($id) {

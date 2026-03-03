@@ -11,7 +11,7 @@ ERROR  API Error: The route api/caregivers could not be found. (404)
 Execute no servidor com **sudo**:
 
 ```bash
-ssh darley@10.102.0.103
+ssh darley@192.168.0.20
 cd /var/www/lacos-backend
 sudo bash /tmp/add_caregivers_routes_final.sh
 ```

@@ -22,11 +22,11 @@ return [
         'http://localhost:5173',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:5173',
-        'http://10.102.0.103',
-        'http://10.102.0.103:3000',
-        'https://10.102.0.103',
-        'http://10.102.0.103:3000',
-        'http://10.102.0.103',
+        'http://192.168.0.20',
+        'http://192.168.0.20:3000',
+        'https://192.168.0.20',
+        'http://192.168.0.20:3000',
+        'http://192.168.0.20',
     ],
     // Permitir qualquer IP na rede local
     'allowed_origins_patterns' => [
@@ -57,8 +57,8 @@ echo ""
 echo "📋 IPs permitidos:"
 echo "   - localhost:3000"
 echo "   - 127.0.0.1:3000"
-echo "   - 10.102.0.103"
-echo "   - 10.102.0.103:3000"
+echo "   - 192.168.0.20"
+echo "   - 192.168.0.20:3000"
 echo "   - Qualquer IP 10.x.x.x (padrão)"
 echo "   - Qualquer IP 192.168.x.x (padrão)"
 echo ""

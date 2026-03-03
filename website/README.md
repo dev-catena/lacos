@@ -61,9 +61,9 @@ website/
 
 O site está configurado para se conectar ao backend Laravel:
 
-- **Desenvolvimento**: `http://10.102.0.103/api`
+- **Desenvolvimento**: `http://192.168.0.20/api`
 - **Produção (HTTPS)**: `https://gateway.lacosapp.com/api`
-- **Produção (HTTP)**: `http://10.102.0.103/api`
+- **Produção (HTTP)**: `http://192.168.0.20/api`
 
 A configuração é automática baseada no hostname atual.
 
@@ -128,7 +128,7 @@ Tokens são armazenados em `localStorage` com as chaves:
 
 ### Deploy Automático para o Servidor Remoto
 
-O site está configurado para fazer deploy automático no servidor remoto (10.102.0.103):
+O site está configurado para fazer deploy automático no servidor remoto (192.168.0.20):
 
 ```bash
 cd website
@@ -144,7 +144,7 @@ Este script irá:
 
 **Requisitos:**
 - `sshpass` instalado: `sudo apt install sshpass`
-- Acesso SSH ao servidor (10.102.0.103:63022)
+- Acesso SSH ao servidor (192.168.0.20:63022)
 - Certificados SSL configurados no servidor (ou o script tentará usar Let's Encrypt)
 
 ### Deploy Manual
@@ -182,3 +182,27 @@ server {
 }
 ```
 
+### crescentar dispositivo Apple
+
+
+```bash
+   cd /home/darley/lacos
+   eas device:create
+```
+
+
+### Fazer build
+
+```bash
+
+eas build --platform ios --profile preview
+
+```
+
+### Atualizar sem fazer build
+
+
+```bash
+
+eas update --channel preview --message "Correção do campo detalhes de formação"
+```

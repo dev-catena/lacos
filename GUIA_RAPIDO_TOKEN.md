@@ -32,3 +32,6 @@ python3 extrair_rotas_github_v2.py
 - `extrair_rotas_github.py` - Versão antiga (não funciona mais - GitHub bloqueou senha)
 
 
+
+
+

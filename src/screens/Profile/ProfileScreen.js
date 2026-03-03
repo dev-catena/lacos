@@ -9,6 +9,10 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -25,12 +29,15 @@ import {
   MedicalIcon,
   PersonIcon,
   HeartIcon,
+  InviteCodeIcon,
 } from '../../components/CustomIcons';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import { LacosIcon } from '../../components/LacosLogo';
 import userService from '../../services/userService';
+import groupService from '../../services/groupService';
 import Toast from 'react-native-toast-message';
 
 
@@ -39,6 +46,9 @@ const ProfileScreen = ({ navigation }) => {
   const [photoUri, setPhotoUri] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [joiningGroup, setJoiningGroup] = useState(false);
 
   useEffect(() => {
     // Carregar foto do usuário (preferir photo_url que tem URL completa)
@@ -127,6 +137,49 @@ const ProfileScreen = ({ navigation }) => {
       );
     } finally {
       setUploadingPhoto(false);
+    }
+  };
+
+  const handleJoinWithCode = async () => {
+    if (!inviteCode || !inviteCode.trim()) {
+      Toast.show({
+        type: 'info',
+        text1: 'Código necessário',
+        text2: 'Digite o código de convite',
+        position: 'bottom',
+      });
+      return;
+    }
+    setJoiningGroup(true);
+    try {
+      const result = await groupService.joinWithCode(inviteCode.trim());
+      if (result.success) {
+        setInviteModalVisible(false);
+        setInviteCode('');
+        Toast.show({
+          type: 'success',
+          text1: 'Entrou no grupo!',
+          text2: 'Você agora faz parte do grupo.',
+          position: 'bottom',
+        });
+        navigation.navigate('HomeMain');
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Não foi possível entrar',
+          text2: result.error || 'Código inválido ou expirado',
+          position: 'bottom',
+        });
+      }
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Erro',
+        text2: error.message || 'Não foi possível entrar no grupo',
+        position: 'bottom',
+      });
+    } finally {
+      setJoiningGroup(false);
     }
   };
 
@@ -301,6 +354,15 @@ const ProfileScreen = ({ navigation }) => {
               color={colors.warning}
               onPress={() => navigation.navigate('Security')}
             />
+            {user?.profile === 'professional_caregiver' && (
+              <MenuItem
+                icon={InviteCodeIcon}
+                title="Entrar em grupo com código"
+                subtitle="Digite o código de convite para participar de um grupo"
+                color={colors.secondary}
+                onPress={() => setInviteModalVisible(true)}
+              />
+            )}
             <MenuItem
               icon={NotificationsOutlineIcon}
               title="Notificações"
@@ -359,6 +421,70 @@ const ProfileScreen = ({ navigation }) => {
             <ChevronForwardIcon size={20} color={colors.textWhite} />
           </TouchableOpacity>
         </View>
+
+        {/* Modal Entrar em Grupo */}
+        <Modal
+          visible={inviteModalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setInviteModalVisible(false)}
+          statusBarTranslucent={true}
+          presentationStyle="overFullScreen"
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.modalOverlay}
+              onPress={() => setInviteModalVisible(false)}
+            >
+              <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Entrar no Grupo</Text>
+                  <TouchableOpacity
+                    onPress={() => setInviteModalVisible(false)}
+                    style={styles.modalCloseButton}
+                  >
+                    <Ionicons name="close" size={24} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.modalBody}>
+                  <Text style={styles.modalLabel}>
+                    Digite o código de convite que você recebeu:
+                  </Text>
+
+                  <View style={styles.codeInputContainer}>
+                    <Ionicons name="key-outline" size={20} color={colors.gray400} />
+                    <TextInput
+                      style={styles.codeInput}
+                      placeholder="Ex: ABC123XYZ"
+                      placeholderTextColor={colors.gray400}
+                      value={inviteCode}
+                      onChangeText={setInviteCode}
+                      autoCapitalize="characters"
+                      maxLength={20}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.joinButton, joiningGroup && styles.joinButtonDisabled]}
+                    onPress={handleJoinWithCode}
+                    disabled={joiningGroup}
+                  >
+                    {joiningGroup ? (
+                      <ActivityIndicator color={colors.textWhite} />
+                    ) : (
+                      <Text style={styles.joinButtonText}>Entrar no Grupo</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </Modal>
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -559,6 +685,80 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textLight,
     textAlign: 'center',
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalBody: {
+    padding: 20,
+    gap: 16,
+  },
+  modalLabel: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 8,
+  },
+  codeInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: 8,
+  },
+  codeInput: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    color: colors.text,
+  },
+  joinButton: {
+    backgroundColor: colors.secondary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  joinButtonDisabled: {
+    opacity: 0.6,
+  },
+  joinButtonText: {
+    color: colors.textWhite,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

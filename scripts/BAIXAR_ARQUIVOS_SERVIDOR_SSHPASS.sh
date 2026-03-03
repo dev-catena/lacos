@@ -2,7 +2,7 @@
 
 # Script para baixar controllers, models e migrations do servidor usando sshpass
 
-SERVER="darley@10.102.0.103"
+SERVER="darley@192.168.0.20"
 PORT="63022"
 PASSWORD="Lacos2025Secure"
 REMOTE_PATH="/var/www/lacos-backend"
@@ -18,7 +18,7 @@ fi
 echo "🔍 Conectando ao servidor e criando backup temporário..."
 
 # Criar diretório temporário no servidor e copiar arquivos
-sshpass -p "$PASSWORD" ssh -p $PORT -o StrictHostKeyChecking=no darley@10.102.0.103 << 'ENDSSH'
+sshpass -p "$PASSWORD" ssh -p $PORT -o StrictHostKeyChecking=no darley@192.168.0.20 << 'ENDSSH'
 mkdir -p /tmp/lacos_backup_$$
 cd /var/www/lacos-backend
 
@@ -49,7 +49,7 @@ echo "✅ Backup criado no servidor"
 echo "📥 Baixando arquivos..."
 
 # Baixar o arquivo tar
-sshpass -p "$PASSWORD" scp -P $PORT -o StrictHostKeyChecking=no darley@10.102.0.103:/tmp/lacos_backup.tar.gz /tmp/lacos_backup.tar.gz
+sshpass -p "$PASSWORD" scp -P $PORT -o StrictHostKeyChecking=no darley@192.168.0.20:/tmp/lacos_backup.tar.gz /tmp/lacos_backup.tar.gz
 
 if [ $? -ne 0 ]; then
     echo "❌ Erro ao baixar arquivo do servidor"
@@ -89,10 +89,13 @@ fi
 
 # Limpar arquivos temporários
 rm -rf /tmp/app /tmp/database /tmp/lacos_backup.tar.gz
-sshpass -p "$PASSWORD" ssh -p $PORT -o StrictHostKeyChecking=no darley@10.102.0.103 "rm -f /tmp/lacos_backup.tar.gz" 2>/dev/null
+sshpass -p "$PASSWORD" ssh -p $PORT -o StrictHostKeyChecking=no darley@192.168.0.20 "rm -f /tmp/lacos_backup.tar.gz" 2>/dev/null
 
 echo ""
 echo "✅ Sincronização concluída!"
+
+
+
 
 
 

@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   saveButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#a5b4fc', // Azul pastel
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',

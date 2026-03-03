@@ -120,14 +120,16 @@ jest.mock('../contexts/AuthContext', () => ({
   AuthProvider: ({ children }) => children,
 }));
 
-// Mock do App navigationRef
-jest.mock('../../App', () => ({
+// Mock do navigationRef (evita dependência circular com App)
+jest.mock('../navigation/navigationRef', () => ({
   navigationRef: {
     current: {
       navigate: jest.fn(),
+      getState: jest.fn(),
+      reset: jest.fn(),
     },
   },
-}), { virtual: true });
+}));
 
 // Mock do Expo completamente
 jest.mock('expo', () => {

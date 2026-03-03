@@ -22,7 +22,7 @@
 ### 1. Deploy do Frontend
 
 ```bash
-ssh -p 63022 darley@10.102.0.103
+ssh -p 63022 darley@192.168.0.20
 # Senha: yhvh77
 
 # Mover arquivos para produção

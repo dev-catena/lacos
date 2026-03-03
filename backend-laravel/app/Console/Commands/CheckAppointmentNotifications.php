@@ -104,7 +104,10 @@ class CheckAppointmentNotifications extends Command
                 }
 
                 // Enviar notificação ao médico
-                $appointmentTime = Carbon::parse($appointment->appointment_date);
+                // Usar timezone do Brasil (GMT-3) para formatar a data
+                $timezone = 'America/Sao_Paulo';
+                $appointmentTime = Carbon::parse($appointment->appointment_date)
+                    ->setTimezone($timezone);
                 $title = 'Consulta em 10 minutos';
                 $message = "Você tem uma consulta agendada em 10 minutos com {$patient->name}.\n";
                 $message .= "Horário: " . $appointmentTime->format('d/m/Y H:i') . "\n";

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para importar medicamentos da ANVISA no SERVIDOR
-# Este script deve ser executado NO SERVIDOR (10.102.0.103)
+# Este script deve ser executado NO SERVIDOR (192.168.0.20)
 # 
 # Uso no servidor:
 #   1. Copiar CSV para o servidor
@@ -10,7 +10,7 @@
 set -e
 
 echo "📥 Importando medicamentos da ANVISA para o banco de dados do SERVIDOR..."
-echo "⚠️  Este script deve ser executado NO SERVIDOR (10.102.0.103)"
+echo "⚠️  Este script deve ser executado NO SERVIDOR (192.168.0.20)"
 echo ""
 
 # Verificar se está no servidor (ajustar caminho conforme necessário)
@@ -31,7 +31,7 @@ if [ ! -f "$CSV_FILE" ]; then
     echo "⚠️  Arquivo CSV não encontrado em: $CSV_FILE"
     echo ""
     echo "📋 Você precisa copiar o arquivo CSV para o servidor primeiro:"
-    echo "   scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@10.102.0.103:/var/www/lacos-backend/"
+    echo "   scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@192.168.0.20:/var/www/lacos-backend/"
     echo ""
     read -p "Deseja continuar mesmo assim? (y/n) " -n 1 -r
     echo ""
@@ -88,8 +88,8 @@ if [ $? -eq 0 ]; then
     echo "🎉 Pronto! Os medicamentos estão disponíveis na API."
     echo ""
     echo "📝 Teste a API:"
-    echo "   GET http://10.102.0.103/api/medications/search?q=paracetamol"
-    echo "   GET http://10.102.0.103/api/medications/stats"
+    echo "   GET http://192.168.0.20/api/medications/search?q=paracetamol"
+    echo "   GET http://192.168.0.20/api/medications/stats"
 else
     echo ""
     echo "❌ Erro na importação"

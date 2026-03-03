@@ -110,13 +110,13 @@ Após iniciar, verifique:
 
 1. **No terminal**, deve mostrar:
    ```
-   Metro waiting on exp://10.102.0.103:8081
+   Metro waiting on exp://192.168.0.20:8081
    ```
    **NÃO deve mostrar:** `http://localhost:8081`
 
 2. **No QR code**, deve mostrar:
    ```
-   exp://10.102.0.103:8081
+   exp://192.168.0.20:8081
    ```
    **NÃO deve mostrar:** `http://localhost:8081`
 

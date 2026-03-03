@@ -2,7 +2,7 @@
 
 # Script para aplicar suporte a assinatura digital .apx no servidor
 
-SERVER="darley@10.102.0.103"
+SERVER="darley@192.168.0.20"
 PORT="63022"
 PASSWORD="yhvh77"
 TMP_DIR="/tmp"

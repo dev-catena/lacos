@@ -3,7 +3,7 @@
 # Script para instalar método saveAvailability no DoctorController
 # e adicionar rota POST no routes/api.php
 
-SERVER="10.102.0.103"
+SERVER="192.168.0.20"
 USER="darley"
 PASSWORD="yhvh77"
 BACKEND_PATH="/var/www/lacos-backend"

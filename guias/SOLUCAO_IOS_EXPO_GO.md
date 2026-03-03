@@ -30,7 +30,7 @@ O iOS precisa estar na **mesma rede Wi-Fi** que o computador:
 1. **No computador:**
    ```bash
    hostname -I
-   # Anote o IP (ex: 10.102.0.103)
+   # Anote o IP (ex: 192.168.0.20)
    ```
 
 2. **No iPhone:**
@@ -73,7 +73,7 @@ Se o QR code não funcionar, você pode compartilhar a URL:
    npx expo start --lan
    ```
 
-2. **Copiar a URL** que aparece no terminal (ex: `exp://10.102.0.103:8081`)
+2. **Copiar a URL** que aparece no terminal (ex: `exp://192.168.0.20:8081`)
 
 3. **Enviar para o iPhone:**
    - Via AirDrop

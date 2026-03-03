@@ -292,20 +292,45 @@ class DoctorController extends Controller
                     $query = DB::table('users')
                         ->where('profile', 'doctor');
                     
+                    // Apenas médicos aprovados (podem fazer login e ter agenda)
+                    if (Schema::hasColumn('users', 'doctor_approved_at')) {
+                        $query->whereNotNull('doctor_approved_at')
+                            ->where('doctor_approved_at', '!=', '0000-00-00 00:00:00');
+                    }
+                    
+                    // Excluir médicos bloqueados
+                    if (Schema::hasColumn('users', 'is_blocked')) {
+                        $query->where(function ($q) {
+                            $q->where('is_blocked', false)->orWhereNull('is_blocked');
+                        });
+                    }
+                    
                     // Verificar se a coluna is_active existe antes de filtrar
                     if (Schema::hasColumn('users', 'is_active')) {
                         $query->where('is_active', 1);
                     }
                     
                     // Selecionar colunas que existem na tabela users
-                    $selectColumns = ['id', 'name', 'email', 'crm', 'phone', 'profile_photo'];
+                    $selectColumns = ['id', 'name', 'email', 'crm', 'phone', 'profile_photo', 'medical_specialty_id'];
                     
                     $platformUsers = $query->select($selectColumns)->get();
                     
                     foreach ($platformUsers as $user) {
-                        // Buscar especialidade (não há medical_specialty_id na tabela users)
+                        // Buscar especialidade
                         $specialty = null;
-                        $specialtyId = null;
+                        $specialtyId = $user->medical_specialty_id ?? null;
+                        if ($specialtyId && Schema::hasTable('medical_specialties')) {
+                            $specialtyData = DB::table('medical_specialties')
+                                ->where('id', $specialtyId)
+                                ->select('id', 'name')
+                                ->first();
+                            if ($specialtyData) {
+                                $specialty = [
+                                    'id' => $specialtyData->id,
+                                    'name' => $specialtyData->name,
+                                ];
+                            }
+                        }
                         
                         // Construir URL da foto se houver
                         $photoUrl = null;
@@ -324,6 +349,7 @@ class DoctorController extends Controller
                             'medical_specialty_id' => $specialtyId,
                             'photo' => $user->profile_photo ?? null,
                             'photo_url' => $photoUrl,
+                            'is_available' => true, // Médicos da plataforma considerados disponíveis
                             'is_primary' => false, // Médicos da plataforma não são principais por padrão
                             'is_platform_doctor' => true, // Marcar como médico da plataforma
                         ];
@@ -707,6 +733,109 @@ class DoctorController extends Controller
     }
 
     /**
+     * Buscar um médico específico
+     * GET /api/doctors/{id}
+     */
+    public function show($id)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado',
+                ], 401);
+            }
+
+            // Verificar se o médico existe na tabela doctors
+            if (!Schema::hasTable('doctors')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tabela de médicos não configurada',
+                ], 500);
+            }
+
+            $doctor = Doctor::find($id);
+            
+            if (!$doctor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Médico não encontrado',
+                ], 404);
+            }
+
+            // Verificar se o usuário tem acesso ao grupo do médico
+            $hasAccess = false;
+            if (Schema::hasTable('group_members')) {
+                $hasAccess = DB::table('group_members')
+                    ->where('user_id', $user->id)
+                    ->where('group_id', $doctor->group_id)
+                    ->exists();
+            } else {
+                // Fallback: verificar se é criador do grupo
+                $hasAccess = DB::table('groups')
+                    ->where('id', $doctor->group_id)
+                    ->where('created_by', $user->id)
+                    ->exists();
+            }
+            
+            if (!$hasAccess) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Você não tem acesso a este grupo',
+                ], 403);
+            }
+
+            // Buscar especialidade
+            $specialty = null;
+            $specialtyId = null;
+            if ($doctor->specialty) {
+                $specialtyData = DB::table('medical_specialties')
+                    ->where('name', $doctor->specialty)
+                    ->select('id', 'name')
+                    ->first();
+                if ($specialtyData) {
+                    $specialty = [
+                        'id' => $specialtyData->id,
+                        'name' => $specialtyData->name,
+                    ];
+                    $specialtyId = $specialtyData->id;
+                } else {
+                    $specialty = [
+                        'id' => null,
+                        'name' => $doctor->specialty,
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->name,
+                    'crm' => $doctor->crm ?? null,
+                    'medical_specialty' => $specialty,
+                    'medical_specialty_id' => $specialtyId,
+                    'phone' => $doctor->phone ?? null,
+                    'email' => $doctor->email ?? null,
+                    'address' => $doctor->address ?? null,
+                    'notes' => $doctor->notes ?? null,
+                    'is_primary' => (bool) ($doctor->is_primary ?? false),
+                    'group_id' => $doctor->group_id,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao buscar médico: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao buscar médico',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Criar um novo médico para um grupo
      * POST /api/doctors
      * Cria um médico simples na tabela doctors (não registra como usuário)
@@ -825,6 +954,285 @@ class DoctorController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erro ao criar médico',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Atualizar um médico existente
+     * PUT /api/doctors/{id}
+     */
+    public function update(Request $request, $id)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado',
+                ], 401);
+            }
+
+            // Validação
+            $validated = $request->validate([
+                'group_id' => 'sometimes|required|integer|exists:groups,id',
+                'name' => 'sometimes|required|string|max:255',
+                'medical_specialty_id' => 'nullable|integer|exists:medical_specialties,id',
+                'crm' => 'nullable|string|max:20',
+                'phone' => 'nullable|string|max:20',
+                'email' => 'nullable|string|email|max:255',
+                'address' => 'nullable|string|max:500',
+                'notes' => 'nullable|string',
+                'is_primary' => 'nullable|boolean',
+            ]);
+
+            // Verificar se o médico existe na tabela doctors
+            if (!Schema::hasTable('doctors')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tabela de médicos não configurada',
+                ], 500);
+            }
+
+            $doctor = Doctor::find($id);
+            
+            if (!$doctor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Médico não encontrado',
+                ], 404);
+            }
+
+            // Verificar se o usuário tem acesso ao grupo do médico
+            $hasAccess = false;
+            if (Schema::hasTable('group_members')) {
+                $hasAccess = DB::table('group_members')
+                    ->where('user_id', $user->id)
+                    ->where('group_id', $doctor->group_id)
+                    ->exists();
+            } else {
+                // Fallback: verificar se é criador do grupo
+                $hasAccess = DB::table('groups')
+                    ->where('id', $doctor->group_id)
+                    ->where('created_by', $user->id)
+                    ->exists();
+            }
+            
+            if (!$hasAccess) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Você não tem acesso a este grupo',
+                ], 403);
+            }
+
+            // Se group_id foi fornecido e é diferente, verificar acesso ao novo grupo também
+            if (isset($validated['group_id']) && $validated['group_id'] != $doctor->group_id) {
+                $hasAccessToNewGroup = false;
+                if (Schema::hasTable('group_members')) {
+                    $hasAccessToNewGroup = DB::table('group_members')
+                        ->where('user_id', $user->id)
+                        ->where('group_id', $validated['group_id'])
+                        ->exists();
+                } else {
+                    $hasAccessToNewGroup = DB::table('groups')
+                        ->where('id', $validated['group_id'])
+                        ->where('created_by', $user->id)
+                        ->exists();
+                }
+                
+                if (!$hasAccessToNewGroup) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Você não tem acesso ao grupo informado',
+                    ], 403);
+                }
+            }
+
+            // Buscar nome da especialidade se medical_specialty_id foi informado
+            $specialtyName = null;
+            $specialtyId = null;
+            if (isset($validated['medical_specialty_id']) && $validated['medical_specialty_id']) {
+                $specialtyData = DB::table('medical_specialties')
+                    ->where('id', $validated['medical_specialty_id'])
+                    ->select('id', 'name')
+                    ->first();
+                if ($specialtyData) {
+                    $specialtyName = $specialtyData->name;
+                    $specialtyId = $specialtyData->id;
+                }
+            } elseif (isset($validated['medical_specialty_id']) && $validated['medical_specialty_id'] === null) {
+                // Se foi explicitamente passado null, limpar a especialidade
+                $specialtyName = null;
+                $specialtyId = null;
+            }
+
+            // Preparar dados para atualização
+            $updateData = [];
+            
+            if (isset($validated['name'])) {
+                $updateData['name'] = $validated['name'];
+            }
+            
+            if (isset($validated['group_id'])) {
+                $updateData['group_id'] = $validated['group_id'];
+            }
+            
+            if (isset($validated['crm'])) {
+                $updateData['crm'] = $validated['crm'];
+            }
+            
+            if (isset($validated['phone'])) {
+                $updateData['phone'] = $validated['phone'];
+            }
+            
+            if (isset($validated['email'])) {
+                $updateData['email'] = $validated['email'];
+            }
+            
+            if (isset($validated['address'])) {
+                $updateData['address'] = $validated['address'];
+            }
+            
+            if (isset($validated['notes'])) {
+                $updateData['notes'] = $validated['notes'];
+            }
+            
+            if (isset($validated['is_primary'])) {
+                $updateData['is_primary'] = $validated['is_primary'];
+            }
+            
+            // Atualizar especialidade se foi informada
+            if ($specialtyName !== null || (isset($validated['medical_specialty_id']) && $validated['medical_specialty_id'] === null)) {
+                $updateData['specialty'] = $specialtyName;
+            }
+
+            // Atualizar médico
+            $doctor->update($updateData);
+            $doctor->refresh();
+
+            // Buscar especialidade atualizada para resposta
+            $responseSpecialty = null;
+            $responseSpecialtyId = null;
+            if ($doctor->specialty) {
+                $specialtyData = DB::table('medical_specialties')
+                    ->where('name', $doctor->specialty)
+                    ->select('id', 'name')
+                    ->first();
+                if ($specialtyData) {
+                    $responseSpecialty = [
+                        'id' => $specialtyData->id,
+                        'name' => $specialtyData->name,
+                    ];
+                    $responseSpecialtyId = $specialtyData->id;
+                } else {
+                    $responseSpecialty = [
+                        'id' => null,
+                        'name' => $doctor->specialty,
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Médico atualizado com sucesso',
+                'data' => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->name,
+                    'crm' => $doctor->crm,
+                    'medical_specialty' => $responseSpecialty,
+                    'medical_specialty_id' => $responseSpecialtyId,
+                    'phone' => $doctor->phone,
+                    'email' => $doctor->email,
+                    'address' => $doctor->address,
+                    'notes' => $doctor->notes,
+                    'is_primary' => (bool) $doctor->is_primary,
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dados inválidos',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Erro ao atualizar médico: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao atualizar médico',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Deletar um médico
+     * DELETE /api/doctors/{id}
+     */
+    public function destroy($id)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado',
+                ], 401);
+            }
+
+            // Verificar se o médico existe na tabela doctors
+            if (!Schema::hasTable('doctors')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tabela de médicos não configurada',
+                ], 500);
+            }
+
+            $doctor = Doctor::find($id);
+            
+            if (!$doctor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Médico não encontrado',
+                ], 404);
+            }
+
+            // Verificar se o usuário tem acesso ao grupo do médico
+            $hasAccess = false;
+            if (Schema::hasTable('group_members')) {
+                $hasAccess = DB::table('group_members')
+                    ->where('user_id', $user->id)
+                    ->where('group_id', $doctor->group_id)
+                    ->exists();
+            } else {
+                // Fallback: verificar se é criador do grupo
+                $hasAccess = DB::table('groups')
+                    ->where('id', $doctor->group_id)
+                    ->where('created_by', $user->id)
+                    ->exists();
+            }
+            
+            if (!$hasAccess) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Você não tem acesso a este grupo',
+                ], 403);
+            }
+
+            // Deletar médico
+            $doctor->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Médico deletado com sucesso',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao deletar médico: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao deletar médico',
                 'error' => $e->getMessage(),
             ], 500);
         }

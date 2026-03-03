@@ -9,7 +9,7 @@
 
 ### ✅ TESTE 2: Endereço corresponde ao usado pelo componente?
 **RESPOSTA: SIM**
-- URL construída: `http://10.102.0.103:8000/storage/groups/yyTR90bXKMxgspM4Od0izSvwYXkSc7IVMudb2Jfh.jpg`
+- URL construída: `http://192.168.0.20:8000/storage/groups/yyTR90bXKMxgspM4Od0izSvwYXkSc7IVMudb2Jfh.jpg`
 - Link simbólico: ✅ Funcionando
 - Arquivo acessível: ✅ SIM
 - Status HTTP: ✅ 200 OK
@@ -48,6 +48,9 @@ php artisan tinker --execute="echo json_encode(DB::table('groups')->where('id', 
 # Testar upload simplificado
 php test-simple-upload.php
 ```
+
+
+
 
 
 

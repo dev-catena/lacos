@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para verificar agenda da médica Maria
-SERVER="10.102.0.103"
+SERVER="192.168.0.20"
 USER="darley"
 PASSWORD="yhvh77"
 

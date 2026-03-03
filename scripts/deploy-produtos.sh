@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Script de deploy das alterações de produtos para o servidor
-# Servidor: 10.102.0.103:63022
+# Servidor: 192.168.0.20:63022
 # Usuário: darley
 
-SERVER="10.102.0.103"
+SERVER="192.168.0.20"
 PORT="63022"
 USER="darley"
 WEBSITE_PATH="/var/www/lacos-website"

@@ -8,6 +8,10 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,11 +26,19 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
   const [appointment, setAppointment] = useState(initialAppointment);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
-      if (appointmentId && !initialAppointment) {
+      if (appointmentId) {
         loadAppointment();
+      } else if (initialAppointment) {
+        setAppointment(initialAppointment);
       }
     }, [appointmentId])
   );
@@ -327,6 +339,134 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
     }
   };
 
+  // Teleconsulta: confirmar que foi realizada (paciente/cuidador)
+  const handleOpenConfirmModal = () => {
+    setReviewRating(0);
+    setReviewComment('');
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmConsultation = async (withReview = false) => {
+    if (!appointment) return;
+
+    setConfirming(true);
+    try {
+      const options = {};
+      if (withReview && reviewRating >= 1) {
+        options.rating = reviewRating;
+        if (reviewComment.trim()) options.comment = reviewComment.trim();
+      }
+
+      const result = await appointmentService.confirmAppointment(appointment.id, options);
+
+      if (result.success) {
+        setShowConfirmModal(false);
+        setReviewRating(0);
+        setReviewComment('');
+        Toast.show({
+          type: 'success',
+          text1: 'Consulta confirmada',
+          text2: 'O pagamento foi liberado para o médico',
+          position: 'bottom',
+        });
+        await loadAppointment();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Erro',
+          text2: result.error || 'Não foi possível confirmar',
+          position: 'bottom',
+        });
+      }
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Erro',
+        text2: 'Não foi possível confirmar a consulta',
+        position: 'bottom',
+      });
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  // Avaliar médico (após consulta já realizada)
+  const handleOpenReviewModal = () => {
+    setReviewRating(0);
+    setReviewComment('');
+    setShowReviewModal(true);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!appointment || reviewRating < 1) {
+      Toast.show({
+        type: 'info',
+        text1: 'Atenção',
+        text2: 'Selecione uma avaliação (estrelas)',
+        position: 'bottom',
+      });
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      const result = await appointmentService.createAppointmentReview(appointment.id, {
+        rating: reviewRating,
+        comment: reviewComment.trim() || null,
+      });
+
+      if (result.success) {
+        setShowReviewModal(false);
+        setReviewRating(0);
+        setReviewComment('');
+        Toast.show({
+          type: 'success',
+          text1: 'Avaliação enviada',
+          text2: 'Sua avaliação foi registrada',
+          position: 'bottom',
+        });
+        await loadAppointment();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Erro',
+          text2: result.error || 'Não foi possível enviar a avaliação',
+          position: 'bottom',
+        });
+      }
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Erro',
+        text2: 'Não foi possível enviar a avaliação',
+        position: 'bottom',
+      });
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const renderStarSelector = () => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <TouchableOpacity
+          key={i}
+          onPress={() => setReviewRating(i)}
+          activeOpacity={0.7}
+          style={styles.starButton}
+        >
+          <Ionicons
+            name={i <= reviewRating ? 'star' : 'star-outline'}
+            size={36}
+            color={i <= reviewRating ? colors.warning : colors.gray400}
+          />
+        </TouchableOpacity>
+      );
+    }
+    return <View style={styles.starsRow}>{stars}</View>;
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -491,6 +631,55 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
           </View>
         )}
 
+        {/* Teleconsulta: Confirmar realização (paciente/cuidador) */}
+        {(appointment.is_teleconsultation || appointment.isTeleconsultation) && (
+          <View style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.iconWrapper}>
+                <Ionicons name="videocam-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.sectionTitle, { marginLeft: 8 }]}>Teleconsulta</Text>
+            </View>
+            {(appointment.payment_status === 'paid_held' || appointment.paymentStatus === 'paid_held') ? (
+              <>
+                <Text style={styles.teleconsultText}>
+                  A consulta foi realizada? Ao confirmar, o pagamento será liberado para o médico.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.confirmButton, confirming && styles.confirmButtonDisabled]}
+                  onPress={handleOpenConfirmModal}
+                  disabled={confirming}
+                >
+                  {confirming ? (
+                    <ActivityIndicator color={colors.white} />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle-outline" size={22} color={colors.white} />
+                      <Text style={styles.confirmButtonText}>Confirmar que a consulta foi realizada</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : (appointment.status === 'completed' || appointment.payment_status === 'released' || appointment.paymentStatus === 'released') ? (
+              <>
+                <View style={styles.completedBadge}>
+                  <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                  <Text style={styles.completedBadgeText}>Consulta realizada</Text>
+                </View>
+                {!appointment.has_user_review && (appointment.doctorUser || appointment.doctor) && (
+                  <TouchableOpacity
+                    style={styles.reviewButton}
+                    onPress={handleOpenReviewModal}
+                  >
+                    <Ionicons name="star-outline" size={20} color={colors.primary} />
+                    <Text style={styles.reviewButtonText}>Avaliar o médico</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : null}
+          </View>
+        )}
+
         {/* Botão de Excluir */}
         <TouchableOpacity
           style={[styles.deleteButton, deleting && styles.deleteButtonDisabled]}
@@ -509,6 +698,107 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Modal: Confirmar consulta realizada (com avaliação opcional) */}
+      <Modal
+        visible={showConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !confirming && setShowConfirmModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalContent}
+          >
+            <Text style={styles.modalTitle}>Confirmar consulta realizada</Text>
+            <Text style={styles.modalSubtitle}>
+              A teleconsulta foi realizada? Ao confirmar, o pagamento será liberado para o médico.
+            </Text>
+            <Text style={styles.optionalReviewLabel}>Avaliar o médico (opcional)</Text>
+            {renderStarSelector()}
+            <TextInput
+              style={styles.reviewCommentInput}
+              placeholder="Comentário (opcional)"
+              placeholderTextColor={colors.placeholder}
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              multiline
+              maxLength={500}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => !confirming && setShowConfirmModal(false)}
+                disabled={confirming}
+              >
+                <Text style={styles.modalButtonCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm, confirming && styles.confirmButtonDisabled]}
+                onPress={() => handleConfirmConsultation(reviewRating >= 1)}
+                disabled={confirming}
+              >
+                {confirming ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <Text style={styles.modalButtonConfirmText}>Confirmar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* Modal: Avaliar médico (após consulta já realizada) */}
+      <Modal
+        visible={showReviewModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !submittingReview && setShowReviewModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalContent}
+          >
+            <Text style={styles.modalTitle}>Avaliar o médico</Text>
+            <Text style={styles.modalSubtitle}>
+              Como foi sua experiência com a teleconsulta?
+            </Text>
+            {renderStarSelector()}
+            <TextInput
+              style={styles.reviewCommentInput}
+              placeholder="Comentário (opcional)"
+              placeholderTextColor={colors.placeholder}
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              multiline
+              maxLength={500}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => !submittingReview && setShowReviewModal(false)}
+                disabled={submittingReview}
+              >
+                <Text style={styles.modalButtonCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm, submittingReview && styles.confirmButtonDisabled]}
+                onPress={handleSubmitReview}
+                disabled={submittingReview}
+              >
+                {submittingReview ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <Text style={styles.modalButtonConfirmText}>Enviar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -696,6 +986,135 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textWhite,
+  },
+  teleconsultText: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  confirmButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.success,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  confirmButtonDisabled: {
+    opacity: 0.6,
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  completedBadgeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.success,
+  },
+  reviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: colors.primary + '20',
+    borderRadius: 12,
+    gap: 8,
+  },
+  reviewButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 20,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  optionalReviewLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  starButton: {
+    padding: 4,
+  },
+  reviewCommentInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    color: colors.text,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: colors.gray200,
+  },
+  modalButtonCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalButtonConfirm: {
+    backgroundColor: colors.primary,
+  },
+  modalButtonConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
   },
 });
 

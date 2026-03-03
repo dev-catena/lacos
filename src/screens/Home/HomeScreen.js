@@ -44,6 +44,37 @@ import {
   TrashIcon,
 } from '../../components/CustomIcons';
 
+/** Foto do grupo com fallback para ícone quando falha (timeout, 404, etc.) */
+const GroupPhoto = ({ group, photoUrl, style, iconColor }) => {
+  const [hasError, setHasError] = useState(false);
+  const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
+  let fullPhotoUrl = photoUrl;
+  if (photoUrl && !photoUrl.startsWith('http')) {
+    // Path do backend: "groups/group_X_xxx.png" → precisa de /storage/ na URL
+    const path = photoUrl.replace(/^\//, '');
+    fullPhotoUrl = path.startsWith('storage/') ? `${baseUrl}/${path}` : `${baseUrl}/storage/${path}`;
+  }
+  if (!photoUrl || hasError) {
+    return (
+      <View style={[styles.groupIcon, style]}>
+        <PeopleIcon size={32} color={iconColor || colors.primary} />
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri: fullPhotoUrl }}
+      style={[styles.groupPhoto, style]}
+      onError={(e) => {
+        const msg = e?.nativeEvent?.error || e?.message || 'Erro ao carregar';
+        console.warn(`⚠️ HomeScreen - Foto do grupo ${group.id} (${group.name}) falhou: ${msg}`);
+        setHasError(true);
+      }}
+      resizeMode="cover"
+    />
+  );
+};
+
 const HomeScreen = ({ navigation }) => {
   const { user, signed } = useAuth();
   const [myGroups, setMyGroups] = useState([]);
@@ -65,17 +96,18 @@ const HomeScreen = ({ navigation }) => {
   }, [signed, user]);
 
   // Carregar plano do usuário - PRIMEIRO, antes de tudo
+  // Usar user?.id (não user) para evitar reload quando updateUser atualiza detalhes (ex: formation_description)
   useEffect(() => {
-    if (signed && user) {
+    if (signed && user?.id) {
       console.log('🚀 HomeScreen - Carregando plano imediatamente...');
       loadUserPlan();
     }
-  }, [signed, user]);
+  }, [signed, user?.id]);
 
   // Carregar grupos e atividades quando a tela recebe foco
   useFocusEffect(
     React.useCallback(() => {
-      if (signed && user) {
+      if (signed && user?.id) {
         // Garantir que o plano seja carregado primeiro
         if (!userPlan) {
           console.log('🔄 HomeScreen - Plano não carregado ainda, recarregando...');
@@ -87,7 +119,7 @@ const HomeScreen = ({ navigation }) => {
         loadActivities(); // Carregar atividades independentemente dos grupos
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [signed, user])
+    }, [signed, user?.id])
   );
 
   const loadUserPlan = async () => {
@@ -472,15 +504,29 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           
-          {selectedTab === 'myGroups' && (
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => navigation.navigate('CreateGroup')}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="add" size={24} color={colors.primary} />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => {
+              Alert.alert(
+                'Grupos',
+                'O que deseja fazer?',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  {
+                    text: 'Criar novo grupo',
+                    onPress: () => navigation.navigate('CreateGroup'),
+                  },
+                  {
+                    text: 'Entrar com código',
+                    onPress: () => setInviteModalVisible(true),
+                  },
+                ]
+              );
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="add" size={24} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* Conteúdo das Tabs */}
@@ -499,91 +545,11 @@ const HomeScreen = ({ navigation }) => {
                   })}
                   activeOpacity={0.7}
                 >
-                  {(() => {
-                    const photoUrl = group.photo_url || group.photo;
-                    
-                    if (photoUrl) {
-                      // Construir URL completa se necessário (mesma lógica do GroupSettingsScreen que funciona)
-                      let fullPhotoUrl = photoUrl;
-                      if (!photoUrl.startsWith('http')) {
-                        // Se não for URL completa, construir usando a base URL da API
-                        const baseUrl = API_CONFIG.BASE_URL.replace('/api', ''); // Remover /api do final
-                        fullPhotoUrl = photoUrl.startsWith('/') 
-                          ? `${baseUrl}${photoUrl}` 
-                          : `${baseUrl}/${photoUrl}`;
-                      }
-                      
-                      // Adicionar cache-busting como no GroupSettingsScreen (que funciona)
-                      const separator = fullPhotoUrl.includes('?') ? '&' : '?';
-                      const timestamp = Date.now();
-                      const photoUrlWithCache = `${fullPhotoUrl}${separator}t=${timestamp}`;
-                      
-                      // INVESTIGAÇÃO: Testar se a URL está acessível antes de renderizar
-                      fetch(photoUrlWithCache, { method: 'HEAD' })
-                        .then(response => {
-                          console.log(`🔍 HomeScreen - TESTE FETCH HEAD para grupo ${group.id}:`, {
-                            url: photoUrlWithCache,
-                            status: response.status,
-                            statusText: response.statusText,
-                            ok: response.ok,
-                            headers: Object.fromEntries(response.headers.entries()),
-                          });
-                        })
-                        .catch(error => {
-                          console.error(`❌ HomeScreen - ERRO no FETCH HEAD para grupo ${group.id}:`, {
-                            url: photoUrlWithCache,
-                            error: error.message,
-                            stack: error.stack,
-                          });
-                        });
-                      
-                      console.log(`📸 HomeScreen - INVESTIGAÇÃO DETALHADA - Grupo ${group.id} (${group.name}):`, {
-                        original_photoUrl: photoUrl,
-                        original_photo_url_from_api: group.photo_url,
-                        original_photo_from_api: group.photo,
-                        fullPhotoUrl_construida: fullPhotoUrl,
-                        photoUrlWithCache_final: photoUrlWithCache,
-                        baseUrl: API_CONFIG.BASE_URL.replace('/api', ''),
-                        starts_with_http: fullPhotoUrl.startsWith('http'),
-                        includes_storage: fullPhotoUrl.includes('storage'),
-                      });
-                      
-                      return (
-                        <Image
-                          key={`group-photo-${group.id}-${timestamp}`}
-                          source={{ uri: photoUrlWithCache, cache: 'reload' }}
-                          style={styles.groupPhoto}
-                          onError={(error) => {
-                            console.error('❌ HomeScreen - ERRO NO COMPONENTE IMAGE para grupo:', {
-                              grupo_id: group.id,
-                              grupo_nome: group.name,
-                              error: error,
-                              nativeError: error.nativeEvent,
-                              photo_url_original: group.photo_url,
-                              photo_original: group.photo,
-                              uri_tentada: photoUrlWithCache,
-                              fullPhotoUrl: fullPhotoUrl,
-                            });
-                          }}
-                          onLoad={() => {
-                            console.log(`✅ HomeScreen - Foto do grupo ${group.id} carregada com sucesso:`, photoUrlWithCache);
-                          }}
-                          onLoadStart={() => {
-                            console.log(`🔄 HomeScreen - Iniciando carregamento da foto do grupo ${group.id}:`, photoUrlWithCache);
-                          }}
-                          resizeMode="cover"
-                        />
-                      );
-                    }
-                    
-                    // Se não há foto, mostrar ícone
-                    console.log(`⚠️ HomeScreen - Grupo ${group.id} (${group.name}) não tem foto`);
-                    return (
-                      <View style={styles.groupIcon}>
-                        <PeopleIcon size={32} color={colors.primary} />
-                      </View>
-                    );
-                  })()}
+                  <GroupPhoto
+                    group={group}
+                    photoUrl={group.photo || group.photo_url}
+                    iconColor={colors.primary}
+                  />
                   <View style={styles.groupInfo}>
                     <Text style={styles.groupName}>{group.name}</Text>
                     <Text style={styles.groupDescription}>
@@ -598,7 +564,7 @@ const HomeScreen = ({ navigation }) => {
                 <PeopleIcon size={48} color={colors.gray300} />
                 <Text style={styles.emptyStateTitle}>Nenhum grupo criado</Text>
                 <Text style={styles.emptyStateText}>
-                  Crie um grupo para acompanhar alguém especial
+                  Crie um grupo ou entre em um existente com código
                 </Text>
                 <TouchableOpacity 
                   style={styles.createButton}
@@ -607,6 +573,14 @@ const HomeScreen = ({ navigation }) => {
                 >
                   <AddIcon size={20} color={colors.textWhite} />
                   <Text style={styles.createButtonText}>Criar Grupo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.createButton, { backgroundColor: colors.secondary, marginTop: 12 }]}
+                  onPress={() => setInviteModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="key-outline" size={20} color={colors.textWhite} />
+                  <Text style={styles.createButtonText}>Entrar com Código</Text>
                 </TouchableOpacity>
               </View>
             )
@@ -624,91 +598,11 @@ const HomeScreen = ({ navigation }) => {
                   })}
                   activeOpacity={0.7}
                 >
-                  {(() => {
-                    const photoUrl = group.photo_url || group.photo;
-                    
-                    if (photoUrl) {
-                      // Construir URL completa se necessário (mesma lógica do GroupSettingsScreen que funciona)
-                      let fullPhotoUrl = photoUrl;
-                      if (!photoUrl.startsWith('http')) {
-                        // Se não for URL completa, construir usando a base URL da API
-                        const baseUrl = API_CONFIG.BASE_URL.replace('/api', ''); // Remover /api do final
-                        fullPhotoUrl = photoUrl.startsWith('/') 
-                          ? `${baseUrl}${photoUrl}` 
-                          : `${baseUrl}/${photoUrl}`;
-                      }
-                      
-                      // Adicionar cache-busting como no GroupSettingsScreen (que funciona)
-                      const separator = fullPhotoUrl.includes('?') ? '&' : '?';
-                      const timestamp = Date.now();
-                      const photoUrlWithCache = `${fullPhotoUrl}${separator}t=${timestamp}`;
-                      
-                      // INVESTIGAÇÃO: Testar se a URL está acessível antes de renderizar
-                      fetch(photoUrlWithCache, { method: 'HEAD' })
-                        .then(response => {
-                          console.log(`🔍 HomeScreen - TESTE FETCH HEAD para grupo ${group.id}:`, {
-                            url: photoUrlWithCache,
-                            status: response.status,
-                            statusText: response.statusText,
-                            ok: response.ok,
-                            headers: Object.fromEntries(response.headers.entries()),
-                          });
-                        })
-                        .catch(error => {
-                          console.error(`❌ HomeScreen - ERRO no FETCH HEAD para grupo ${group.id}:`, {
-                            url: photoUrlWithCache,
-                            error: error.message,
-                            stack: error.stack,
-                          });
-                        });
-                      
-                      console.log(`📸 HomeScreen - INVESTIGAÇÃO DETALHADA - Grupo ${group.id} (${group.name}):`, {
-                        original_photoUrl: photoUrl,
-                        original_photo_url_from_api: group.photo_url,
-                        original_photo_from_api: group.photo,
-                        fullPhotoUrl_construida: fullPhotoUrl,
-                        photoUrlWithCache_final: photoUrlWithCache,
-                        baseUrl: API_CONFIG.BASE_URL.replace('/api', ''),
-                        starts_with_http: fullPhotoUrl.startsWith('http'),
-                        includes_storage: fullPhotoUrl.includes('storage'),
-                      });
-                      
-                      return (
-                        <Image
-                          key={`group-photo-${group.id}-${timestamp}`}
-                          source={{ uri: photoUrlWithCache, cache: 'reload' }}
-                          style={styles.groupPhoto}
-                          onError={(error) => {
-                            console.error('❌ HomeScreen - ERRO NO COMPONENTE IMAGE para grupo:', {
-                              grupo_id: group.id,
-                              grupo_nome: group.name,
-                              error: error,
-                              nativeError: error.nativeEvent,
-                              photo_url_original: group.photo_url,
-                              photo_original: group.photo,
-                              uri_tentada: photoUrlWithCache,
-                              fullPhotoUrl: fullPhotoUrl,
-                            });
-                          }}
-                          onLoad={() => {
-                            console.log(`✅ HomeScreen - Foto do grupo ${group.id} carregada com sucesso:`, photoUrlWithCache);
-                          }}
-                          onLoadStart={() => {
-                            console.log(`🔄 HomeScreen - Iniciando carregamento da foto do grupo ${group.id}:`, photoUrlWithCache);
-                          }}
-                          resizeMode="cover"
-                        />
-                      );
-                    }
-                    
-                    // Se não há foto, mostrar ícone
-                    console.log(`⚠️ HomeScreen - Grupo ${group.id} (${group.name}) não tem foto`);
-                    return (
-                      <View style={styles.groupIcon}>
-                        <PeopleIcon size={32} color={colors.secondary} />
-                      </View>
-                    );
-                  })()}
+                  <GroupPhoto
+                    group={group}
+                    photoUrl={group.photo || group.photo_url}
+                    iconColor={colors.secondary}
+                  />
                   <View style={styles.groupInfo}>
                     <Text style={styles.groupName}>{group.name}</Text>
                     <Text style={styles.groupDescription}>
@@ -993,6 +887,8 @@ const HomeScreen = ({ navigation }) => {
         animationType="fade"
         transparent={true}
         onRequestClose={() => setInviteModalVisible(false)}
+        statusBarTranslucent={true}
+        presentationStyle="overFullScreen"
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1497,7 +1393,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   modalOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',

@@ -16,7 +16,7 @@ Resultados típicos:
 - ✅ Internet OK
 - ✅ DNS funcionando  
 - ✅ Gmail acessível (código 301 é normal - redirecionamento)
-- ✅ IP correto: 10.102.0.103
+- ✅ IP correto: 192.168.0.20
 - ❌ **Expo NÃO está rodando** ← Problema principal
 
 ## 🔧 Solução
@@ -57,7 +57,7 @@ Se estiver na mesma rede:
 
 Depois use no Expo Go:
 ```
-exp://10.102.0.103:8081
+exp://192.168.0.20:8081
 ```
 
 ## 🧪 Verificar se Funcionou
@@ -71,7 +71,7 @@ curl http://localhost:8081/status
 
 2. **Pela rede:**
 ```bash
-curl http://10.102.0.103:8081/status
+curl http://192.168.0.20:8081/status
 ```
 
 3. **Ver processos:**
@@ -85,7 +85,7 @@ lsof -i :8081
 ### Se usar LAN Mode:
 1. Abra Expo Go
 2. Toque em "Enter URL manually"
-3. Cole: `exp://10.102.0.103:8081`
+3. Cole: `exp://192.168.0.20:8081`
 
 ### Se usar Tunnel Mode:
 1. Abra Expo Go
@@ -112,7 +112,7 @@ lsof -i :8081
 
 ### QR code mostra localhost
 - **Causa**: Expo detectou localhost ao invés do IP
-- **Solução**: Ignore o QR code e use a URL manualmente: `exp://10.102.0.103:8081`
+- **Solução**: Ignore o QR code e use a URL manualmente: `exp://192.168.0.20:8081`
 
 ## 📞 Comandos Úteis
 

@@ -17,12 +17,12 @@ Execute o script que envia e executa automaticamente:
 
 1. **Copie o script para o servidor:**
    ```bash
-   scp -P 63022 scripts/CRIAR_PDF_SERVICE.sh darley@10.102.0.103:/tmp/
+   scp -P 63022 scripts/CRIAR_PDF_SERVICE.sh darley@192.168.0.20:/tmp/
    ```
 
 2. **Conecte-se ao servidor:**
    ```bash
-   ssh -p 63022 darley@10.102.0.103
+   ssh -p 63022 darley@192.168.0.20
    ```
 
 3. **Execute o script:**
@@ -37,7 +37,7 @@ Se preferir criar manualmente:
 
 1. **Conecte-se ao servidor:**
    ```bash
-   ssh -p 63022 darley@10.102.0.103
+   ssh -p 63022 darley@192.168.0.20
    ```
 
 2. **Criar diretório se não existir:**

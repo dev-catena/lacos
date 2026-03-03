@@ -3,7 +3,7 @@
 # Script para verificar se os campos do certificado estão sendo retornados no endpoint /user
 
 SSH_USER="darley"
-SSH_HOST="10.102.0.103"
+SSH_HOST="192.168.0.20"
 SSH_PORT="63022"
 BACKEND_PATH="/var/www/lacos-backend"
 
@@ -18,7 +18,7 @@ ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "cd $BACKEND_PATH && sudo mysql -u root
 
 echo ""
 echo "📋 Verificando se o endpoint /user retorna os campos do certificado..."
-echo "   (Execute manualmente: curl -H 'Authorization: Bearer TOKEN' http://10.102.0.103/api/user | grep certificate)"
+echo "   (Execute manualmente: curl -H 'Authorization: Bearer TOKEN' http://192.168.0.20/api/user | grep certificate)"
 
 
 

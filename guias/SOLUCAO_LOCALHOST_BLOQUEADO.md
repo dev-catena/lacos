@@ -6,7 +6,7 @@ O Expo está gerando URLs com `localhost` mesmo com todas as configurações, ca
 
 ## ✅ Solução: Script que Bloqueia Localhost
 
-Criei um script **ultra agressivo** que intercepta **TODAS** as saídas do Expo e substitui qualquer referência a `localhost` pelo IP correto (`10.102.0.103`).
+Criei um script **ultra agressivo** que intercepta **TODAS** as saídas do Expo e substitui qualquer referência a `localhost` pelo IP correto (`192.168.0.20`).
 
 ### Opção 1: Script Bash (Recomendado)
 
@@ -48,11 +48,11 @@ O script `start-expo-forced-ip-no-localhost.js`:
 1. **Configura TODAS as variáveis de ambiente** antes de iniciar
 2. **Intercepta stdout e stderr** do processo Expo
 3. **Substitui TODOS os padrões de localhost**:
-   - `http://localhost:8081` → `exp://10.102.0.103:8081`
-   - `https://localhost:8081` → `exp://10.102.0.103:8081`
-   - `exp://localhost:8081` → `exp://10.102.0.103:8081`
-   - `localhost:8081` → `10.102.0.103:8081`
-   - `127.0.0.1:8081` → `10.102.0.103:8081`
+   - `http://localhost:8081` → `exp://192.168.0.20:8081`
+   - `https://localhost:8081` → `exp://192.168.0.20:8081`
+   - `exp://localhost:8081` → `exp://192.168.0.20:8081`
+   - `localhost:8081` → `192.168.0.20:8081`
+   - `127.0.0.1:8081` → `192.168.0.20:8081`
    - E muitos outros padrões...
 
 4. **Adiciona avisos destacados** quando detecta substituições
@@ -63,14 +63,14 @@ Após iniciar, você verá no terminal:
 
 ```
 🎯 URL CORRIGIDA (localhost foi substituído):
-   exp://10.102.0.103:8081
+   exp://192.168.0.20:8081
    Use esta URL no Expo Go!
 ```
 
 **No Expo Go:**
 1. Abra o app
 2. Toque em "Enter URL manually"
-3. Cole: `exp://10.102.0.103:8081`
+3. Cole: `exp://192.168.0.20:8081`
 4. Conecte
 
 ## 🎯 Vantagens
@@ -83,7 +83,7 @@ Após iniciar, você verá no terminal:
 
 ## ⚠️ Nota Importante
 
-Mesmo que o Expo gere URLs com localhost internamente, **todas serão substituídas automaticamente** antes de aparecerem no terminal. O Metro bundler estará acessível no IP correto (`10.102.0.103:8081`).
+Mesmo que o Expo gere URLs com localhost internamente, **todas serão substituídas automaticamente** antes de aparecerem no terminal. O Metro bundler estará acessível no IP correto (`192.168.0.20:8081`).
 
 ## 🧪 Verificar se Funcionou
 
@@ -91,7 +91,7 @@ Após iniciar, teste:
 
 ```bash
 # Verificar se Metro está acessível no IP correto
-curl http://10.102.0.103:8081/status
+curl http://192.168.0.20:8081/status
 
 # Ver processos
 ps aux | grep expo
