@@ -170,7 +170,7 @@ class AppointmentService {
       console.warn('Erro ao registrar entrada na videoconferência:', error?.message);
       return { success: false, error: error?.message };
     }
-  },
+  }
 
   /**
    * Confirmar que a teleconsulta foi realizada (paciente/cuidador)
@@ -204,7 +204,7 @@ class AppointmentService {
         errors: error.errors,
       };
     }
-  },
+  }
 
   /**
    * Avaliar médico após teleconsulta realizada
@@ -236,7 +236,7 @@ class AppointmentService {
         errors: error.errors,
       };
     }
-  },
+  }
 
   /**
    * Cancelar consulta
