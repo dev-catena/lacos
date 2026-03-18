@@ -15,18 +15,16 @@ class PlansSeeder extends Seeder
     public function run()
     {
         $records = array (
-  0 => 
-  array (
+  0 => array (
     'id' => 1,
     'name' => 'Básico',
     'slug' => 'basico',
     'is_default' => 1,
-    'features' => '{"loja": false, "agenda": true, "midias": false, "cameras": false, "medicos": false, "arquivos": false, "receitas": true, "remedios": true, "historico": false, "smartwatch": true, "sensorQuedas": false, "sinaisVitais": true, "configuracoes": true, "grupoCuidados": true, "buscarCuidadores": true}',
+    'features' => '{"loja": false, "agenda": true, "midias": false, "cameras": false, "medicos": true, "arquivos": true, "receitas": true, "remedios": true, "historico": false, "smartwatch": false, "sensorQuedas": false, "sinaisVitais": true, "teleconsulta": true, "configuracoes": true, "grupoCuidados": true, "buscarCuidadores": true}',
     'created_at' => '2026-01-22 03:33:31',
-    'updated_at' => '2026-02-02 01:32:38',
+    'updated_at' => '2026-02-28 14:57:40',
   ),
-  1 => 
-  array (
+  1 => array (
     'id' => 2,
     'name' => 'Intermediário',
     'slug' => 'intermediario',
@@ -35,8 +33,7 @@ class PlansSeeder extends Seeder
     'created_at' => '2026-01-22 03:33:31',
     'updated_at' => '2026-01-22 03:33:31',
   ),
-  2 => 
-  array (
+  2 => array (
     'id' => 3,
     'name' => 'Avançado',
     'slug' => 'avancado',
@@ -45,8 +42,7 @@ class PlansSeeder extends Seeder
     'created_at' => '2026-01-22 03:33:31',
     'updated_at' => '2026-01-22 03:33:31',
   ),
-  3 => 
-  array (
+  3 => array (
     'id' => 4,
     'name' => 'Pleno',
     'slug' => 'pleno',

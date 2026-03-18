@@ -14,6 +14,13 @@ class OrdersSeeder extends Seeder
      */
     public function run()
     {
-        // Tabela vazia - nenhum dado para inserir
+        $records = array ();
+
+        foreach ($records as $record) {
+            DB::table('orders')->updateOrInsert(
+                ['id' => $record['id']],
+                $record
+            );
+        }
     }
 }

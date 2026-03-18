@@ -15,8 +15,7 @@ class DevicesSeeder extends Seeder
     public function run()
     {
         $records = array (
-  0 => 
-  array (
+  0 => array (
     'id' => 1,
     'nickname' => 'Bracelete',
     'type' => 'smartwatch',
@@ -26,8 +25,7 @@ class DevicesSeeder extends Seeder
     'created_at' => '2026-01-30 00:55:25',
     'updated_at' => '2026-01-30 00:55:25',
   ),
-  1 => 
-  array (
+  1 => array (
     'id' => 2,
     'nickname' => 'Smartsole',
     'type' => 'sensor',

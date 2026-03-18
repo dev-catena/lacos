@@ -14,6 +14,13 @@ class StoreOrdersSeeder extends Seeder
      */
     public function run()
     {
-        // Tabela vazia - nenhum dado para inserir
+        $records = array ();
+
+        foreach ($records as $record) {
+            DB::table('store_orders')->updateOrInsert(
+                ['id' => $record['id']],
+                $record
+            );
+        }
     }
 }
