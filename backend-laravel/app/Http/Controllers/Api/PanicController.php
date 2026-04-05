@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\GroupMember;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -79,17 +80,18 @@ class PanicController extends Controller
             ]);
 
             // Buscar contatos de emergência do grupo
-            // PRIORIDADE: Contatos SOS da tabela emergency_contacts (is_primary=true ou relationship='SOS')
+            // Apenas contatos marcados com toggle SOS (is_primary=1 ou relationship='SOS')
             $emergencyContacts = [];
             
-            // 1. Buscar contatos SOS da tabela emergency_contacts
+            // 1. Buscar APENAS contatos SOS da tabela emergency_contacts (toggle ativado em Gerenciar Contatos)
             if (Schema::hasTable('emergency_contacts')) {
                 $sosContacts = DB::table('emergency_contacts')
                     ->where('group_id', $groupId)
-                    ->where(function($q) {
-                        $q->where('is_primary', true)
-                          ->orWhere('relationship', 'SOS')
-                          ->orWhere('relationship', 'sos');
+                    ->whereNotNull('phone')
+                    ->where('phone', '!=', '')
+                    ->where(function ($q) {
+                        $q->where('is_primary', 1)
+                          ->orWhereRaw("LOWER(relationship) = 'sos'");
                     })
                     ->orderBy('is_primary', 'desc')
                     ->orderBy('created_at', 'asc')
@@ -117,7 +119,7 @@ class PanicController extends Controller
                 
                 $emergencyContacts = $sosContacts->toArray();
                 
-                Log::info('Contatos SOS encontrados', [
+                Log::info('Contatos SOS (toggle ativado) encontrados para pânico', [
                     'group_id' => $groupId,
                     'count' => count($emergencyContacts)
                 ]);
@@ -128,13 +130,14 @@ class PanicController extends Controller
                 $query = DB::table('group_members')
                     ->join('users', 'group_members.user_id', '=', 'users.id')
                     ->where('group_members.group_id', $groupId)
-                    ->where(function($q) {
-                        // Se a coluna is_emergency_contact existe, usar ela
+                    ->where(function ($q) {
+                        // Com is_emergency_contact: SÓ membros com toggle ligado (admin/cuidador inclusos).
+                        // Antes havia orWhere(role=admin), o que ignorava o toggle e acionava admins desabilitados.
                         if (Schema::hasColumn('group_members', 'is_emergency_contact')) {
                             $q->where('group_members.is_emergency_contact', true)
-                              ->orWhere('group_members.role', 'admin');
+                                ->whereNotIn('group_members.role', GroupMember::accompaniedPersonRoles());
                         } else {
-                            // Caso contrário, usar apenas admins
+                            // Legado sem coluna: apenas administradores do grupo
                             $q->where('group_members.role', 'admin');
                         }
                     });
@@ -393,33 +396,29 @@ class PanicController extends Controller
                 $panicEnabled = $group->panic_enabled ?? true;
             }
 
-            // Contar contatos de emergência
+            // Listar contatos de emergência (membros com is_emergency_contact=true)
+            $emergencyContacts = [];
             $emergencyContactsCount = 0;
-            if (Schema::hasTable('group_members')) {
-                $query = DB::table('group_members')
+            if (Schema::hasTable('group_members') && Schema::hasColumn('group_members', 'is_emergency_contact')) {
+                $emergencyContacts = DB::table('group_members')
                     ->join('users', 'group_members.user_id', '=', 'users.id')
                     ->where('group_members.group_id', $groupId)
-                    ->where(function($q) {
-                        if (Schema::hasColumn('group_members', 'is_emergency_contact')) {
-                            $q->where('group_members.is_emergency_contact', true)
-                              ->orWhere('group_members.role', 'admin');
-                        } else {
-                            $q->where('group_members.role', 'admin');
-                        }
-                    });
-                
-                // Verificar se a coluna is_active existe antes de usar
-                if (Schema::hasColumn('users', 'is_active')) {
-                    $query->where('users.is_active', 1);
-                }
-                
-                $emergencyContactsCount = $query->count();
+                    ->where('group_members.is_emergency_contact', true)
+                    ->whereNotIn('group_members.role', GroupMember::accompaniedPersonRoles())
+                    ->when(Schema::hasColumn('users', 'is_active'), fn($q) => $q->where('users.is_active', 1))
+                    ->select('group_members.user_id', 'users.name')
+                    ->get()
+                    ->map(fn($m) => ['user_id' => $m->user_id, 'name' => $m->name])
+                    ->toArray();
+                $emergencyContactsCount = count($emergencyContacts);
             }
 
             return response()->json([
                 'success' => true,
                 'data' => [
+                    'enabled' => $panicEnabled,
                     'panic_enabled' => $panicEnabled,
+                    'emergency_contacts' => $emergencyContacts,
                     'emergency_contacts_count' => $emergencyContactsCount,
                     'is_configured' => $panicEnabled && $emergencyContactsCount > 0,
                 ]

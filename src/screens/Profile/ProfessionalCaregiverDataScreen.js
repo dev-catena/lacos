@@ -25,6 +25,10 @@ import medicalSpecialtyService from '../../services/medicalSpecialtyService';
 import { BR_UFS } from '../../constants/brUfs';
 import { parseCrm, formatCrmValue } from '../../utils/crm';
 import SafeIcon from '../../components/SafeIcon';
+import {
+  DOCTOR_QUALIFICATION_LEVELS,
+  normalizeProfessionalQualificationLevels,
+} from '../../constants/doctorQualificationLevels';
 
 // Máscara de reais: formata valor para exibição (R$ 1.234,56)
 const formatReaisDisplay = (value) => {
@@ -63,6 +67,9 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
     crmUf: parsedCrm.uf || '',
     crmNumber: parsedCrm.number || '',
     medical_specialty_id: user?.medical_specialty_id || null,
+    professional_qualification_level: normalizeProfessionalQualificationLevels(
+      user?.professional_qualification_level
+    ),
     consultation_price: user?.consultation_price ? user.consultation_price.toString() : '',
   });
 
@@ -111,6 +118,9 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
         crmUf: parsedCrm.uf || prev.crmUf,
         crmNumber: parsedCrm.number || prev.crmNumber,
         medical_specialty_id: user?.medical_specialty_id ?? prev.medical_specialty_id,
+        professional_qualification_level: normalizeProfessionalQualificationLevels(
+          user?.professional_qualification_level ?? prev.professional_qualification_level
+        ),
         consultation_price: user?.consultation_price ? user.consultation_price.toString() : prev.consultation_price,
       }));
     }
@@ -157,6 +167,9 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
               crmUf: parsedCrm.uf || prev.crmUf,
               crmNumber: parsedCrm.number || prev.crmNumber,
               medical_specialty_id: data?.medical_specialty_id ?? prev.medical_specialty_id,
+              professional_qualification_level: normalizeProfessionalQualificationLevels(
+                data?.professional_qualification_level ?? prev.professional_qualification_level
+              ),
               consultation_price: data?.consultation_price != null ? String(data.consultation_price) : prev.consultation_price,
             }));
             if (data?.caregiver_courses || data?.caregiverCourses) {
@@ -295,6 +308,11 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
         Alert.alert('Atenção', 'Por favor, preencha CRM (UF e número) e Especialidade');
         return;
       }
+      const qualLevels = normalizeProfessionalQualificationLevels(formData.professional_qualification_level);
+      if (qualLevels.length === 0) {
+        Alert.alert('Atenção', 'Selecione pelo menos um nível de qualificação profissional');
+        return;
+      }
       // Validação do valor da consulta (opcional, mas se preenchido deve ser válido)
       if (formData.consultation_price && formData.consultation_price.trim()) {
         const priceValue = parseFloat(formData.consultation_price);
@@ -337,6 +355,9 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
         // Campos para médico
         dataToUpdate.crm = formatCrmValue(formData.crmUf, formData.crmNumber);
         dataToUpdate.medical_specialty_id = formData.medical_specialty_id;
+        dataToUpdate.professional_qualification_level = normalizeProfessionalQualificationLevels(
+          formData.professional_qualification_level
+        );
         // Sempre enviar consultation_price, mesmo que seja 0 ou vazio
         if (formData.consultation_price && formData.consultation_price.trim()) {
           const priceValue = parseFloat(formData.consultation_price);
@@ -649,6 +670,47 @@ const ProfessionalCaregiverDataScreen = ({ navigation }) => {
                   </Text>
                   <SafeIcon name="chevron-down" size={20} color={colors.gray400} />
                 </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Nível de qualificação *</Text>
+                <Text style={styles.labelSubtitle}>
+                  Titulação ou formação acadêmica — você pode marcar mais de uma opção (ex.: especialista e pós-doutorado)
+                </Text>
+                <View style={styles.qualificationSelectorWrap}>
+                  {DOCTOR_QUALIFICATION_LEVELS.map((opt) => {
+                    const selected = normalizeProfessionalQualificationLevels(
+                      formData.professional_qualification_level
+                    ).includes(opt.value);
+                    return (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[
+                          styles.qualificationChip,
+                          selected && styles.qualificationChipActive,
+                        ]}
+                        onPress={() => {
+                          const cur = normalizeProfessionalQualificationLevels(
+                            formData.professional_qualification_level
+                          );
+                          const next = selected
+                            ? cur.filter((v) => v !== opt.value)
+                            : [...cur, opt.value];
+                          updateFormData('professional_qualification_level', next);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.qualificationChipText,
+                            selected && styles.qualificationChipTextActive,
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
 
               <View style={styles.inputContainer}>
@@ -1322,6 +1384,32 @@ const styles = StyleSheet.create({
   formationSelector: {
     flexDirection: 'row',
     gap: 12,
+  },
+  qualificationSelectorWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  qualificationChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 2,
+    borderColor: colors.border,
+    marginBottom: 4,
+  },
+  qualificationChipActive: {
+    borderColor: '#B8E8D4',
+    backgroundColor: '#B8E8D4',
+  },
+  qualificationChipText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  qualificationChipTextActive: {
+    color: colors.text,
   },
   formationOption: {
     flex: 1,

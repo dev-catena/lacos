@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DoctorsSeeder extends Seeder
 {
@@ -15,8 +16,7 @@ class DoctorsSeeder extends Seeder
     public function run()
     {
         $records = array (
-  0 => 
-  array (
+  0 => array (
     'id' => 1,
     'group_id' => 1,
     'name' => 'Resultado da￼',
@@ -25,15 +25,14 @@ class DoctorsSeeder extends Seeder
     'phone' => '+5531985545451',
     'email' => 'vshdh@hsh.com',
     'address' => 'R. Cordisburgo - Kennedy, Contagem - MG, 32145-782, Brasil',
-    'address_latitude' => NULL,
-    'address_longitude' => NULL,
+    'address_latitude' => null,
+    'address_longitude' => null,
     'is_primary' => 1,
-    'notes' => NULL,
+    'notes' => null,
     'created_at' => '2026-01-25 01:06:38',
     'updated_at' => '2026-01-25 01:06:38',
   ),
-  1 => 
-  array (
+  1 => array (
     'id' => 2,
     'group_id' => 2,
     'name' => 'Hahah',
@@ -42,15 +41,14 @@ class DoctorsSeeder extends Seeder
     'phone' => '+55319545484',
     'email' => 'hsje@jshd.com',
     'address' => 'R. Cordisburgo - Kennedy, Contagem - MG, 32145-782, Brasil',
-    'address_latitude' => NULL,
-    'address_longitude' => NULL,
+    'address_latitude' => null,
+    'address_longitude' => null,
     'is_primary' => 1,
-    'notes' => NULL,
+    'notes' => null,
     'created_at' => '2026-01-25 01:11:41',
     'updated_at' => '2026-01-25 01:11:41',
   ),
-  2 => 
-  array (
+  2 => array (
     'id' => 3,
     'group_id' => 2,
     'name' => 'Darley',
@@ -58,38 +56,68 @@ class DoctorsSeeder extends Seeder
     'crm' => 'CE-548154',
     'phone' => '+5531985845464',
     'email' => 'vshd@hsh.com',
-    'address' => 'Cordisburgo',
-    'address_latitude' => NULL,
-    'address_longitude' => NULL,
+    'address' => 'R. das Pedras - Lot. Triangulo de Buzios, Armação dos Búzios - RJ, 28950-000, Brasil',
+    'address_latitude' => null,
+    'address_longitude' => null,
     'is_primary' => 1,
-    'notes' => NULL,
+    'notes' => null,
     'created_at' => '2026-01-25 01:16:36',
-    'updated_at' => '2026-01-25 01:16:36',
+    'updated_at' => '2026-02-07 14:15:28',
   ),
-  3 => 
-  array (
+  3 => array (
     'id' => 4,
     'group_id' => 1,
     'name' => 'Darkey',
-    'specialty' => NULL,
-    'crm' => NULL,
-    'phone' => NULL,
-    'email' => NULL,
-    'address' => NULL,
-    'address_latitude' => NULL,
-    'address_longitude' => NULL,
+    'specialty' => null,
+    'crm' => null,
+    'phone' => null,
+    'email' => null,
+    'address' => null,
+    'address_latitude' => null,
+    'address_longitude' => null,
     'is_primary' => 0,
-    'notes' => NULL,
+    'notes' => null,
     'created_at' => '2026-01-25 01:32:24',
     'updated_at' => '2026-01-25 01:32:24',
   ),
+  4 => array (
+    'id' => 5,
+    'group_id' => 8,
+    'name' => 'De Tolinho',
+    'specialty' => 'Angiologia',
+    'crm' => 'BA-258885',
+    'phone' => '+5531985485454',
+    'email' => 'tolo@gmail.com',
+    'address' => 'R. das Pedras - Lot. Triangulo de Buzios, Armação dos Búzios - RJ, 28950-000, Brasil',
+    'address_latitude' => null,
+    'address_longitude' => null,
+    'is_primary' => 1,
+    'notes' => 'Muito bom',
+    'created_at' => '2026-02-07 13:44:30',
+    'updated_at' => '2026-02-07 13:44:30',
+  ),
+  5 => array (
+    'id' => 6,
+    'group_id' => 2,
+    'name' => 'Rivelino Paulo Isidoro',
+    'specialty' => 'Cardiologia',
+    'crm' => 'MG-222222',
+    'phone' => '+5538585858888',
+    'email' => 'rivelino@gmail.com',
+    'address' => 'R. das Pedras - Lot. Triangulo de Buzios, Armação dos Búzios - RJ, 28950-000, Brasil',
+    'address_latitude' => null,
+    'address_longitude' => null,
+    'is_primary' => 0,
+    'notes' => null,
+    'created_at' => '2026-02-07 17:01:48',
+    'updated_at' => '2026-02-07 17:01:48',
+  ),
 );
 
+        $existingColumns = array_flip(Schema::getColumnListing('doctors'));
         foreach ($records as $record) {
-            DB::table('doctors')->updateOrInsert(
-                ['id' => $record['id']],
-                $record
-            );
+            $filtered = array_intersect_key($record, $existingColumns);
+            DB::table('doctors')->updateOrInsert(['id' => $record['id']], $filtered);
         }
     }
 }

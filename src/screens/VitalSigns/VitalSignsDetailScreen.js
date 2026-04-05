@@ -111,27 +111,36 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
 
           // Calcular basal (média de TODAS as medidas, não só as 20 mostradas)
           if (typeData.length > 0) {
-            const values = typeData.map(item => {
-              // Se value é array (formato do banco), pegar primeiro elemento ou objeto
-              let value = item.value;
-              if (Array.isArray(value) && value.length > 0) {
-                value = value[0];
-              }
-              
-              if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                // Objeto com systolic/diastolic
-                if (value.systolic && value.diastolic) {
-                  return (value.systolic + value.diastolic) / 2;
+            if (indicator.key === 'blood_pressure') {
+              // Pressão arterial: calcular média de sistólica e diastólica separadamente
+              const systolicValues = [];
+              const diastolicValues = [];
+              typeData.forEach(item => {
+                let value = item.value;
+                if (Array.isArray(value) && value.length > 0) value = value[0];
+                if (typeof value === 'object' && value !== null && value.systolic != null && value.diastolic != null) {
+                  systolicValues.push(parseFloat(value.systolic));
+                  diastolicValues.push(parseFloat(value.diastolic));
                 }
-                // Se for array dentro do objeto, pegar primeiro
-                if (Array.isArray(value) && value.length > 0) {
-                  return parseFloat(value[0]) || 0;
-                }
+              });
+              if (systolicValues.length > 0 && diastolicValues.length > 0) {
+                const avgSystolic = systolicValues.reduce((a, b) => a + b, 0) / systolicValues.length;
+                const avgDiastolic = diastolicValues.reduce((a, b) => a + b, 0) / diastolicValues.length;
+                basals[indicator.key] = { systolic: Math.round(avgSystolic), diastolic: Math.round(avgDiastolic) };
               }
-              return parseFloat(value) || 0;
-            });
-            const sum = values.reduce((a, b) => a + b, 0);
-            basals[indicator.key] = sum / values.length;
+            } else {
+              const values = typeData.map(item => {
+                let value = item.value;
+                if (Array.isArray(value) && value.length > 0) value = value[0];
+                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                  if (value.systolic && value.diastolic) return (value.systolic + value.diastolic) / 2;
+                  if (Array.isArray(value) && value.length > 0) return parseFloat(value[0]) || 0;
+                }
+                return parseFloat(value) || 0;
+              });
+              const sum = values.reduce((a, b) => a + b, 0);
+              basals[indicator.key] = sum / values.length;
+            }
           }
         });
 
@@ -144,7 +153,10 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
         indicatorsConfig.forEach(indicator => {
           const count = organized[indicator.key]?.length || 0;
           if (count > 0) {
-            console.log(`📊 ${indicator.label}: ${count} medidas, basal: ${basals[indicator.key]?.toFixed(2) || 'N/A'}`);
+            const basalStr = typeof basals[indicator.key] === 'object'
+              ? (basals[indicator.key]?.systolic != null ? `${basals[indicator.key].systolic}/${basals[indicator.key].diastolic}` : 'N/A')
+              : (basals[indicator.key]?.toFixed?.(2) || 'N/A');
+            console.log(`📊 ${indicator.label}: ${count} medidas, basal: ${basalStr}`);
           }
         });
       } else {

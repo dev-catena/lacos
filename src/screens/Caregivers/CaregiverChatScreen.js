@@ -55,7 +55,10 @@ const CaregiverChatScreen = ({ route, navigation }) => {
       const result = await groupService.getMyGroups();
       if (result.success && result.data) {
         const groups = result.data;
+        // Só grupos onde o usuário é administrador podem ter código compartilhado
         const withCode = groups.filter(g => {
+          const isAdmin = g.is_admin === true || g.is_creator === true;
+          if (!isAdmin) return false;
           const code = g.code || g.access_code || g.patient_code;
           return code && code !== 'NULL' && code !== 'null' && String(code).trim() !== '';
         });

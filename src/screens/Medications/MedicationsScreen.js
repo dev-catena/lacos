@@ -17,6 +17,7 @@ import { LacosIcon } from '../../components/LacosLogo';
 import { ArrowBackIcon } from '../../components/CustomIcons';
 import SafeIcon from '../../components/SafeIcon';
 import medicationService from '../../services/medicationService';
+import { normalizeMedicationSchedule } from '../../utils/medicationSchedule';
 
 const MedicationsScreen = ({ route, navigation }) => {
   let { groupId, groupName } = route.params || {};
@@ -111,7 +112,7 @@ const MedicationsScreen = ({ route, navigation }) => {
             unit: med.unit,
             route: med.administration_route,
             frequency: frequencyType === 'advanced' ? 'advanced' : (frequencyDetails.interval || '24'),
-            schedule: med.times || frequencyDetails.schedule || [],
+            schedule: normalizeMedicationSchedule(med.times, frequencyDetails.schedule),
             advancedFrequency: frequencyType === 'advanced' ? frequencyDetails : null,
             instructions: med.notes,
             durationType: duration.type || 'continuo',
@@ -155,8 +156,9 @@ const MedicationsScreen = ({ route, navigation }) => {
     };
 
     medications.forEach(med => {
-      if (med.schedule && med.schedule.length > 0) {
-        med.schedule.forEach(time => {
+      const sched = Array.isArray(med.schedule) ? med.schedule : [];
+      if (sched.length > 0) {
+        sched.forEach(time => {
           const hour = parseInt(time.split(':')[0]);
           if (hour >= 6 && hour < 12) {
             periods.morning.meds.push({ ...med, time });

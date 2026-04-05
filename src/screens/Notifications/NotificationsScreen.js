@@ -207,15 +207,22 @@ const NotificationsScreen = ({ navigation }) => {
     }
 
     // Navegar para o grupo se tiver groupId
-    if (notification.groupId) {
-      const targetCard = getCardFromNotificationType(notification);
-      
-      navigation.navigate('GroupDetail', {
-        groupId: notification.groupId,
-        groupName: notification.groupName,
-        openCard: targetCard, // Parâmetro para indicar qual card abrir
-      });
+    if (!notification.groupId) {
+      return;
     }
+
+    const targetCard = getCardFromNotificationType(notification);
+    const groupParams = {
+      groupId: notification.groupId,
+      groupName: notification.groupName,
+      openCard: targetCard,
+    };
+
+    // GroupDetail fica na stack do tab "Home" — navegar direto falha nas abas Notificações.
+    navigation.navigate('Home', {
+      screen: 'GroupDetail',
+      params: groupParams,
+    });
   };
 
   // Filtrar notificações baseado no filtro selecionado

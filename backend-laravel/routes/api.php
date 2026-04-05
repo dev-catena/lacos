@@ -81,6 +81,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('/users/{id}/unblock', [AdminUserController::class, 'unblock']);
     Route::get('/users/{id}/plan', [AdminUserController::class, 'getUserPlan']);
     Route::put('/users/{id}/plan', [AdminUserController::class, 'updateUserPlan']);
+    Route::put('/users/{id}/password', [AdminUserController::class, 'changePassword']);
     Route::delete('/users/{id}', [AdminUserController::class, 'destroy']);
     
     // Gestão de Médicos (apenas root/admin)
@@ -214,6 +215,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/groups/{id}', [GroupController::class, 'destroy']);
     Route::get('/groups/{id}/members', [GroupController::class, 'members']);
     Route::put('/groups/{groupId}/members/{memberId}/role', [GroupController::class, 'updateMemberRole']);
+    Route::put('/groups/{groupId}/members/{memberId}/emergency-contact', [GroupController::class, 'updateMemberEmergencyContact']);
     Route::delete('/groups/{groupId}/members/{memberId}', [GroupController::class, 'removeMember']);
     
     // Dispositivos - Dispositivos dos Grupos (Smartwatch e Sensores)
@@ -255,16 +257,19 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Medicamentos - Gestão de Medicamentos do Grupo
     Route::get('/medications', [MedicationController::class, 'index']);
+    Route::get('/medications/price', [MedicationController::class, 'getPrice']);
+    Route::get('/medications/{id}', [MedicationController::class, 'show'])->whereNumber('id');
     Route::post('/medications', [MedicationController::class, 'store']);
-    Route::put('/medications/{id}', [MedicationController::class, 'update']);
-    Route::delete('/medications/{id}', [MedicationController::class, 'destroy']);
-    Route::patch('/medications/{id}/toggle-active', [MedicationController::class, 'toggleActive']);
+    Route::put('/medications/{id}', [MedicationController::class, 'update'])->whereNumber('id');
+    Route::delete('/medications/{id}', [MedicationController::class, 'destroy'])->whereNumber('id');
+    Route::patch('/medications/{id}/toggle-active', [MedicationController::class, 'toggleActive'])->whereNumber('id');
     
     // Receitas - Gestão de Receitas do Grupo
     Route::get('/prescriptions', [PrescriptionController::class, 'index']);
     Route::post('/prescriptions', [PrescriptionController::class, 'store']);
     Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show']);
     Route::put('/prescriptions/{id}', [PrescriptionController::class, 'update']);
+    Route::delete('/prescriptions/{id}', [PrescriptionController::class, 'destroy'])->whereNumber('id');
     Route::post('/prescriptions/generate-signed-recipe', [PrescriptionController::class, 'generateSignedRecipe']);
     Route::post('/prescriptions/generate-signed-certificate', [PrescriptionController::class, 'generateSignedCertificate']);
     Route::get('/prescriptions/validate/{hash}', [PrescriptionController::class, 'validateDocument']);

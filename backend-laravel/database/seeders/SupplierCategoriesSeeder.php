@@ -15,24 +15,21 @@ class SupplierCategoriesSeeder extends Seeder
     public function run()
     {
         $records = array (
-  0 => 
-  array (
+  0 => array (
     'id' => 1,
     'supplier_id' => 1,
     'category' => 'Fisioterapia',
     'created_at' => '2026-02-01 16:07:38',
     'updated_at' => '2026-02-01 16:07:38',
   ),
-  1 => 
-  array (
+  1 => array (
     'id' => 2,
     'supplier_id' => 1,
     'category' => 'Equipamentos Médicos',
     'created_at' => '2026-02-01 16:07:38',
     'updated_at' => '2026-02-01 16:07:38',
   ),
-  2 => 
-  array (
+  2 => array (
     'id' => 3,
     'supplier_id' => 1,
     'category' => 'Dispositivos de Segurança',

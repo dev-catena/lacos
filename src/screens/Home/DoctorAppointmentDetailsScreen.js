@@ -17,6 +17,12 @@ import groupService from '../../services/groupService';
 import documentService from '../../services/documentService';
 import appointmentService from '../../services/appointmentService';
 import {
+  isTeleconsultPaidForVideoStart,
+  isTeleconsultAppointment,
+  isWithinTeleconsultVideoJoinWindow,
+  isTeleconsultVideoJoinWindowExpired,
+} from '../../utils/teleconsultationHonorarium';
+import {
   ReceiptIcon,
   CalendarIcon,
   DocumentIcon,
@@ -64,18 +70,26 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
 
   const checkCanStart = () => {
     if (!appointment) return;
-    
-    // Não pode iniciar se estiver cancelada
-    if (appointment.status === 'cancelled') {
+
+    if (appointment.status === 'cancelled' || appointment.status === 'completed') {
       setCanStart(false);
       return;
     }
-    
+
+    if (isTeleconsultAppointment(appointment) && !isTeleconsultPaidForVideoStart(appointment)) {
+      setCanStart(false);
+      return;
+    }
+
     const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at);
     const now = new Date();
     const fifteenMinutesBefore = new Date(appointmentDate.getTime() - 15 * 60 * 1000);
-    
-    // Pode iniciar se estiver até 15 minutos antes da consulta
+
+    if (isTeleconsultAppointment(appointment)) {
+      setCanStart(isWithinTeleconsultVideoJoinWindow(appointment, now.getTime()));
+      return;
+    }
+
     setCanStart(now >= fifteenMinutesBefore);
   };
 
@@ -101,9 +115,9 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
             hasUser: !!m.user
           })));
           
-          // Buscar membro com role 'patient'
-          const patientMember = members.find(m => {
-            const hasPatientRole = m.role === 'patient';
+          const patientRoles = ['patient', 'priority_contact', 'accompanied'];
+          const patientMember = members.find((m) => {
+            const hasPatientRole = patientRoles.includes(m.role);
             const hasUser = !!m.user;
             console.log(`🔍 Verificando membro: role="${m.role}", hasUser=${hasUser}, userName="${m.user?.name}"`);
             return hasPatientRole && hasUser;
@@ -314,11 +328,32 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
   };
 
   const handleStartConsultation = () => {
-    if (!canStart) {
+    if (isTeleconsultAppointment(appointment) && !isTeleconsultPaidForVideoStart(appointment)) {
       Alert.alert(
-        'Ainda não é possível iniciar',
-        'Você só pode iniciar a consulta até 15 minutos antes do horário agendado.'
+        'Pagamento pendente',
+        'A videochamada só pode ser iniciada depois que o paciente concluir o pagamento. Você pode acompanhar os detalhes desta tela até lá.'
       );
+      return;
+    }
+    if (isTeleconsultAppointment(appointment) && isTeleconsultVideoJoinWindowExpired(appointment)) {
+      Alert.alert(
+        'Prazo encerrado',
+        'O horário para iniciar a videochamada já passou (até 40 minutos após o horário agendado). Esta consulta consta como não realizada na lista.'
+      );
+      return;
+    }
+    if (!canStart) {
+      if (isTeleconsultAppointment(appointment)) {
+        Alert.alert(
+          'Ainda não é possível iniciar',
+          'A videochamada fica disponível a partir de 15 minutos antes do horário e até 40 minutos depois do início agendado.'
+        );
+      } else {
+        Alert.alert(
+          'Ainda não é possível iniciar',
+          'Você só pode iniciar a consulta a partir de 15 minutos antes do horário agendado.'
+        );
+      }
       return;
     }
 
@@ -435,6 +470,19 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
   const fifteenMinutesBefore = new Date(appointmentDate.getTime() - 15 * 60 * 1000);
   const timeUntilStart = fifteenMinutesBefore - now;
   const minutesUntilStart = Math.ceil(timeUntilStart / (1000 * 60));
+  const teleconsultAwaitingPayment =
+    isTeleconsultAppointment(appointment) &&
+    appointment.status !== 'cancelled' &&
+    appointment.status !== 'cancelada' &&
+    !isTeleconsultPaidForVideoStart(appointment);
+
+  const teleconsultVideoWindowExpired =
+    isTeleconsultAppointment(appointment) &&
+    !teleconsultAwaitingPayment &&
+    appointment.status !== 'cancelled' &&
+    appointment.status !== 'cancelada' &&
+    appointment.status !== 'completed' &&
+    isTeleconsultVideoJoinWindowExpired(appointment, now.getTime());
 
   return (
     <SafeAreaView style={styles.container}>
@@ -632,15 +680,47 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* Status de Início */}
-        {!canStart && appointment.status !== 'cancelled' && (
+        {/* Pagamento pendente (teleconsulta): valida antes da janela de 15 min */}
+        {teleconsultAwaitingPayment && (
+          <View style={styles.warningCard}>
+            <WarningIcon size={24} color={colors.warning} />
+            <Text style={styles.warningText}>Aguardando pagamento do paciente</Text>
+            <Text style={styles.warningSubtext}>
+              Esta consulta aparece na sua lista com este aviso. A videochamada só fica disponível após o
+              pagamento ser confirmado; até lá o botão para iniciar a chamada não é exibido.
+            </Text>
+          </View>
+        )}
+
+        {/* Janela da videochamada encerrada (teleconsulta paga, horário passou dos 40 min) */}
+        {teleconsultVideoWindowExpired && (
+          <View style={styles.warningCard}>
+            <TimeIcon size={24} color={colors.warning} />
+            <Text style={styles.warningText}>Prazo para iniciar a videochamada encerrado</Text>
+            <Text style={styles.warningSubtext}>
+              A entrada era permitida entre 15 minutos antes e 40 minutos após o horário agendado. Não é possível
+              iniciar a chamada agora; esta consulta permanece em &quot;Não realizadas&quot; até você tratá-la na
+              lista.
+            </Text>
+          </View>
+        )}
+
+        {/* Antes da janela (teleconsulta) ou antes dos 15 min (presencial) */}
+        {!canStart &&
+          appointment.status !== 'cancelled' &&
+          !teleconsultAwaitingPayment &&
+          !teleconsultVideoWindowExpired && (
           <View style={styles.warningCard}>
             <TimeIcon size={24} color={colors.warning} />
             <Text style={styles.warningText}>
-              Você poderá iniciar a consulta em {minutesUntilStart} minuto(s)
+              {isTeleconsultAppointment(appointment)
+                ? `Você poderá iniciar a videochamada em ${Math.max(0, minutesUntilStart)} minuto(s)`
+                : `Você poderá iniciar a consulta em ${Math.max(0, minutesUntilStart)} minuto(s)`}
             </Text>
             <Text style={styles.warningSubtext}>
-              A consulta pode ser iniciada até 15 minutos antes do horário agendado
+              {isTeleconsultAppointment(appointment)
+                ? 'Disponível de 15 min antes até 40 min após o horário agendado'
+                : 'A partir de 15 minutos antes do horário agendado'}
             </Text>
           </View>
         )}
@@ -669,26 +749,26 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
             return null;
           })()}
           
-          {/* Botão de Iniciar Consulta */}
-          <TouchableOpacity
-            style={[
-              styles.startButton,
-              !canStart && styles.startButtonDisabled
-            ]}
-            onPress={handleStartConsultation}
-            disabled={!canStart}
-          >
-            <VideoCamIcon 
-              size={24} 
-              color={canStart ? '#FFFFFF' : colors.textLight} 
-            />
-            <Text style={[
-              styles.startButtonText,
-              !canStart && styles.startButtonTextDisabled
-            ]}>
-              Iniciar Consulta
-            </Text>
-          </TouchableOpacity>
+          {/* Vídeo: pagamento ok, dentro da janela (tele); presencial segue regra dos 15 min */}
+          {!teleconsultAwaitingPayment && !teleconsultVideoWindowExpired && (
+            <TouchableOpacity
+              style={[styles.startButton, !canStart && styles.startButtonDisabled]}
+              onPress={handleStartConsultation}
+              disabled={!canStart}
+              activeOpacity={canStart ? 0.85 : 1}
+              accessibilityState={{ disabled: !canStart }}
+            >
+              <VideoCamIcon
+                size={24}
+                color={canStart ? '#FFFFFF' : colors.textLight}
+              />
+              <Text
+                style={[styles.startButtonText, !canStart && styles.startButtonTextDisabled]}
+              >
+                Iniciar consulta
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </SafeAreaView>

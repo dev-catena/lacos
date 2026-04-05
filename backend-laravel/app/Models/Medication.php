@@ -21,7 +21,8 @@ class Medication extends Model
         'dose_quantity', // Quantidade da dose
         'dose_quantity_unit', // Unidade da quantidade da dose
         'frequency',
-        'time', // Coluna existe como 'time' (singular), não 'times'
+        'times', // JSON: horários da grade (obrigatório no banco)
+        'time', // Primeiro horário / referência (varchar)
         'start_date',
         'end_date',
         'instructions',

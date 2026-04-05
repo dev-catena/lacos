@@ -1,4 +1,5 @@
 import apiService from './apiService';
+import { isAccompaniedPersonGroupRole } from '../utils/groupRoles';
 
 /**
  * Serviço para gerenciar contatos de emergência
@@ -134,8 +135,10 @@ class EmergencyContactService {
       const response = await apiService.get(`/groups/${groupId}/members`);
       
       if (response && Array.isArray(response)) {
-        // Filtrar apenas os que são contatos de emergência
-        const emergencyMembers = response.filter(member => member.is_emergency_contact);
+        const emergencyMembers = response.filter(
+          (member) =>
+            member.is_emergency_contact && !isAccompaniedPersonGroupRole(member.role)
+        );
         return { success: true, data: emergencyMembers };
       }
       

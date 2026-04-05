@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class GroupMembersSeeder extends Seeder
 {
@@ -15,8 +16,7 @@ class GroupMembersSeeder extends Seeder
     public function run()
     {
         $records = array (
-  0 => 
-  array (
+  0 => array (
     'id' => 1,
     'group_id' => 1,
     'user_id' => 1,
@@ -28,8 +28,7 @@ class GroupMembersSeeder extends Seeder
     'created_at' => '2026-01-22 03:05:40',
     'updated_at' => '2026-01-22 03:05:40',
   ),
-  1 => 
-  array (
+  1 => array (
     'id' => 2,
     'group_id' => 2,
     'user_id' => 1,
@@ -41,8 +40,7 @@ class GroupMembersSeeder extends Seeder
     'created_at' => '2026-01-22 03:15:34',
     'updated_at' => '2026-01-22 03:15:34',
   ),
-  2 => 
-  array (
+  2 => array (
     'id' => 4,
     'group_id' => 2,
     'user_id' => 9,
@@ -54,8 +52,7 @@ class GroupMembersSeeder extends Seeder
     'created_at' => '2026-01-24 19:45:41',
     'updated_at' => '2026-01-24 19:45:41',
   ),
-  3 => 
-  array (
+  3 => array (
     'id' => 6,
     'group_id' => 1,
     'user_id' => 8,
@@ -67,8 +64,7 @@ class GroupMembersSeeder extends Seeder
     'created_at' => '2026-01-24 23:12:53',
     'updated_at' => '2026-01-24 23:12:53',
   ),
-  4 => 
-  array (
+  4 => array (
     'id' => 7,
     'group_id' => 2,
     'user_id' => 3,
@@ -80,8 +76,7 @@ class GroupMembersSeeder extends Seeder
     'created_at' => '2026-01-25 14:19:19',
     'updated_at' => '2026-01-25 14:19:43',
   ),
-  5 => 
-  array (
+  5 => array (
     'id' => 8,
     'group_id' => 3,
     'user_id' => 16,
@@ -93,8 +88,7 @@ class GroupMembersSeeder extends Seeder
     'created_at' => '2026-01-27 18:43:52',
     'updated_at' => '2026-01-27 18:43:52',
   ),
-  6 => 
-  array (
+  6 => array (
     'id' => 9,
     'group_id' => 4,
     'user_id' => 16,
@@ -106,8 +100,7 @@ class GroupMembersSeeder extends Seeder
     'created_at' => '2026-01-27 18:45:32',
     'updated_at' => '2026-01-27 18:45:32',
   ),
-  7 => 
-  array (
+  7 => array (
     'id' => 13,
     'group_id' => 3,
     'user_id' => 10,
@@ -119,13 +112,158 @@ class GroupMembersSeeder extends Seeder
     'created_at' => '2026-01-28 19:36:02',
     'updated_at' => '2026-01-28 19:36:02',
   ),
+  8 => array (
+    'id' => 15,
+    'group_id' => 8,
+    'user_id' => 16,
+    'role' => 'admin',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-02-03 17:01:43',
+    'is_active' => 1,
+    'created_at' => '2026-02-03 17:01:43',
+    'updated_at' => '2026-02-03 17:01:43',
+  ),
+  9 => array (
+    'id' => 16,
+    'group_id' => 8,
+    'user_id' => 60,
+    'role' => 'priority_contact',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-02-05 19:23:34',
+    'is_active' => 1,
+    'created_at' => '2026-02-05 19:23:34',
+    'updated_at' => '2026-02-05 19:23:34',
+  ),
+  10 => array (
+    'id' => 17,
+    'group_id' => 8,
+    'user_id' => 64,
+    'role' => 'health_professional',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-02-07 19:28:03',
+    'is_active' => 1,
+    'created_at' => '2026-02-07 19:28:03',
+    'updated_at' => '2026-02-07 19:28:03',
+  ),
+  11 => array (
+    'id' => 18,
+    'group_id' => 9,
+    'user_id' => 64,
+    'role' => 'admin',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-02-07 19:36:54',
+    'is_active' => 1,
+    'created_at' => '2026-02-07 19:36:54',
+    'updated_at' => '2026-02-07 19:36:54',
+  ),
+  12 => array (
+    'id' => 19,
+    'group_id' => 8,
+    'user_id' => 67,
+    'role' => 'caregiver',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-02-07 20:01:29',
+    'is_active' => 1,
+    'created_at' => '2026-02-07 20:01:29',
+    'updated_at' => '2026-02-07 20:01:29',
+  ),
+  13 => array (
+    'id' => 20,
+    'group_id' => 8,
+    'user_id' => 1,
+    'role' => 'caregiver',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-02-07 20:10:56',
+    'is_active' => 1,
+    'created_at' => '2026-02-07 20:10:56',
+    'updated_at' => '2026-02-07 20:10:56',
+  ),
+  14 => array (
+    'id' => 21,
+    'group_id' => 2,
+    'user_id' => 16,
+    'role' => 'admin',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-02-07 20:13:14',
+    'is_active' => 1,
+    'created_at' => '2026-02-07 20:13:14',
+    'updated_at' => '2026-02-07 20:14:08',
+  ),
+  15 => array (
+    'id' => 22,
+    'group_id' => 8,
+    'user_id' => 68,
+    'role' => 'health_professional',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-02-27 14:57:46',
+    'is_active' => 1,
+    'created_at' => '2026-02-27 14:57:46',
+    'updated_at' => '2026-02-27 14:57:46',
+  ),
+  16 => array (
+    'id' => 23,
+    'group_id' => 10,
+    'user_id' => 70,
+    'role' => 'admin',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-02-28 14:35:16',
+    'is_active' => 1,
+    'created_at' => '2026-02-28 14:35:16',
+    'updated_at' => '2026-02-28 14:35:16',
+  ),
+  17 => array (
+    'id' => 24,
+    'group_id' => 10,
+    'user_id' => 69,
+    'role' => 'priority_contact',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-02-28 14:35:36',
+    'is_active' => 1,
+    'created_at' => '2026-02-28 14:35:36',
+    'updated_at' => '2026-02-28 14:35:36',
+  ),
+  18 => array (
+    'id' => 25,
+    'group_id' => 10,
+    'user_id' => 68,
+    'role' => 'health_professional',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-03-03 00:45:42',
+    'is_active' => 1,
+    'created_at' => '2026-03-03 00:45:42',
+    'updated_at' => '2026-03-03 00:45:42',
+  ),
+  19 => array (
+    'id' => 27,
+    'group_id' => 10,
+    'user_id' => 71,
+    'role' => 'health_professional',
+    'notifications_enabled' => 1,
+    'status' => 'active',
+    'joined_at' => '2026-03-06 18:29:54',
+    'is_active' => 1,
+    'created_at' => '2026-03-06 18:29:54',
+    'updated_at' => '2026-03-06 18:29:54',
+  ),
 );
 
+        $existingColumns = array_flip(Schema::getColumnListing('group_members'));
+        $validRoles = ['admin', 'member', 'viewer'];
         foreach ($records as $record) {
-            DB::table('group_members')->updateOrInsert(
-                ['id' => $record['id']],
-                $record
-            );
+            $filtered = array_intersect_key($record, $existingColumns);
+            if (isset($filtered['role']) && !in_array($filtered['role'], $validRoles)) $filtered['role'] = 'member';
+            DB::table('group_members')->updateOrInsert(['id' => $record['id']], $filtered);
         }
     }
 }

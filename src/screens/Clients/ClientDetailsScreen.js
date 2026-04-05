@@ -28,6 +28,7 @@ import documentService from '../../services/documentService';
 import planService from '../../services/planService';
 import API_CONFIG from '../../config/api';
 import appointmentService from '../../services/appointmentService';
+import { appointmentMatchesLoggedInDoctor } from '../../utils/appointmentDoctorMatch';
 
 const ClientDetailsScreen = ({ route, navigation }) => {
   const { client: clientParam } = route.params || {};
@@ -80,12 +81,19 @@ const ClientDetailsScreen = ({ route, navigation }) => {
         setReviews(response.data.reviews || []);
         
         let groupId = response.data.group_id;
-        
-        // Se for médico, buscar documentos diretamente do paciente (independente do grupo)
+
         if (user?.profile === 'doctor') {
-          console.log('🔍 ClientDetailsScreen - Médico acessando paciente, buscando documentos diretamente...');
-          // Buscar documentos do paciente usando patient_id
-          loadDocumentsForDoctor(clientParam.id);
+          const docPatientId = response.data.patient_user_id ?? response.data.id;
+          const negativeOrGroupOnly =
+            (typeof response.data.id === 'number' && response.data.id < 0) ||
+            (typeof clientParam?.id === 'number' && clientParam.id < 0);
+          if (negativeOrGroupOnly && groupId) {
+            loadDocuments(groupId);
+          } else if (docPatientId > 0) {
+            loadDocumentsForDoctor(docPatientId);
+          } else if (groupId) {
+            loadDocuments(groupId);
+          }
         } else {
           // Para outros perfis, usar lógica normal (por grupo)
           if (groupId) {
@@ -119,26 +127,11 @@ const ClientDetailsScreen = ({ route, navigation }) => {
         // Filtrar consultas do médico atual
         const currentDoctorId = Number(user?.id);
         const doctorAppointments = result.data.filter((appointment) => {
-          const appointmentDoctorId = appointment.doctor_id ? Number(appointment.doctor_id) : null;
-          const doctorUserId = appointment.doctorUser?.id ? Number(appointment.doctorUser.id) : null;
-          const doctorId = appointment.doctor?.id ? Number(appointment.doctor.id) : null;
-          
-          const isDoctorAppointment = 
-            appointmentDoctorId === currentDoctorId ||
-            doctorUserId === currentDoctorId ||
-            doctorId === currentDoctorId;
-          
-          // Se for teleconsulta, verificar se está paga
-          // Médicos só devem ver teleconsultas que já foram pagas
-          if (appointment.is_teleconsultation) {
-            const paymentStatus = appointment.payment_status;
-            const isPaid = paymentStatus === 'paid_held' || paymentStatus === 'paid' || paymentStatus === 'released';
-            if (!isPaid) {
-              // Teleconsulta não paga - não mostrar para o médico
-              return false;
-            }
-          }
-          
+          const isDoctorAppointment = appointmentMatchesLoggedInDoctor(
+            appointment,
+            currentDoctorId
+          );
+
           return isDoctorAppointment;
         });
 

@@ -9,8 +9,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
+use App\Models\Appointment;
 use App\Models\User;
 use App\Models\Doctor;
+use Carbon\Carbon;
 
 class DoctorController extends Controller
 {
@@ -75,16 +77,24 @@ class DoctorController extends Controller
                         'group_id' => $groupId
                     ]);
                     
-                    $doctorsFromGroup = DB::table('doctors')
+                    $doctorsFromGroupRaw = DB::table('doctors')
                         ->where('group_id', $groupId)
                         ->get();
-                    
+
+                    $genderByUserIdForGroup = [];
+                    if (Schema::hasColumn('users', 'gender') && Schema::hasColumn('doctors', 'user_id')) {
+                        $uids = $doctorsFromGroupRaw->pluck('user_id')->filter(fn ($id) => $id !== null && $id !== '')->unique()->values();
+                        if ($uids->isNotEmpty()) {
+                            $genderByUserIdForGroup = DB::table('users')->whereIn('id', $uids)->pluck('gender', 'id')->all();
+                        }
+                    }
+
                     Log::info('DoctorController.index - Médicos encontrados na tabela doctors', [
-                        'count' => $doctorsFromGroup->count(),
-                        'doctors' => $doctorsFromGroup->map(fn($d) => ['id' => $d->id, 'name' => $d->name, 'specialty' => $d->specialty])->toArray()
+                        'count' => $doctorsFromGroupRaw->count(),
+                        'doctors' => $doctorsFromGroupRaw->map(fn($d) => ['id' => $d->id, 'name' => $d->name, 'specialty' => $d->specialty])->toArray()
                     ]);
-                    
-                    $doctorsFromGroup = $doctorsFromGroup->map(function ($doctor) {
+
+                    $doctorsFromGroup = $doctorsFromGroupRaw->map(function ($doctor) use ($genderByUserIdForGroup) {
                             // Buscar especialidade pelo nome (specialty é string na tabela doctors)
                             $specialty = null;
                             $specialtyId = null;
@@ -108,8 +118,13 @@ class DoctorController extends Controller
                                     ];
                                 }
                             }
-                            
-                            return [
+
+                            $gender = null;
+                            if (isset($doctor->user_id) && isset($genderByUserIdForGroup[(int) $doctor->user_id])) {
+                                $gender = $genderByUserIdForGroup[(int) $doctor->user_id];
+                            }
+
+                            $row = [
                                 'id' => $doctor->id,
                                 'name' => $doctor->name,
                                 'crm' => $doctor->crm ?? null,
@@ -121,7 +136,13 @@ class DoctorController extends Controller
                                 'notes' => $doctor->notes ?? null,
                                 'is_primary' => (bool) ($doctor->is_primary ?? false),
                                 'is_group_doctor' => true, // Marcar como médico do grupo
+                                'gender' => $gender,
                             ];
+                            if (Schema::hasColumn('doctors', 'user_id')) {
+                                $row['user_id'] = isset($doctor->user_id) ? (int) $doctor->user_id : null;
+                            }
+
+                            return $row;
                         })
                         ->toArray();
                     
@@ -205,10 +226,19 @@ class DoctorController extends Controller
                         // Buscar médicos da tabela doctors
                         $doctorsFromTable = [];
                         if (Schema::hasTable('doctors')) {
-                            $doctorsFromTable = DB::table('doctors')
+                            $relationDoctorRows = DB::table('doctors')
                                 ->whereIn('id', $uniqueDoctorIds)
-                                ->get()
-                                ->map(function ($doctor) {
+                                ->get();
+
+                            $relGenderByUserId = [];
+                            if (Schema::hasColumn('doctors', 'user_id') && Schema::hasColumn('users', 'gender')) {
+                                $rUids = $relationDoctorRows->pluck('user_id')->filter(fn ($id) => $id !== null && $id !== '')->unique()->values();
+                                if ($rUids->isNotEmpty()) {
+                                    $relGenderByUserId = DB::table('users')->whereIn('id', $rUids)->pluck('gender', 'id')->all();
+                                }
+                            }
+
+                            $doctorsFromTable = $relationDoctorRows->map(function ($doctor) use ($relGenderByUserId) {
                                     // Buscar especialidade
                                     $specialty = null;
                                     if ($doctor->medical_specialty_id) {
@@ -223,7 +253,12 @@ class DoctorController extends Controller
                                             ];
                                         }
                                     }
-                                    
+
+                                    $g = null;
+                                    if (! empty($doctor->user_id) && isset($relGenderByUserId[(int) $doctor->user_id])) {
+                                        $g = $relGenderByUserId[(int) $doctor->user_id];
+                                    }
+
                                     return [
                                         'id' => $doctor->id,
                                         'name' => $doctor->name,
@@ -231,6 +266,8 @@ class DoctorController extends Controller
                                         'medical_specialty' => $specialty,
                                         'medical_specialty_id' => $doctor->medical_specialty_id,
                                         'is_primary' => (bool) ($doctor->is_primary ?? false),
+                                        'is_group_doctor' => true, // linha na tabela doctors (editar/excluir no app)
+                                        'gender' => $g,
                                     ];
                                 })
                                 ->toArray();
@@ -270,6 +307,7 @@ class DoctorController extends Controller
                                         'medical_specialty_id' => $user->medical_specialty_id,
                                         'is_primary' => false,
                                         'is_platform_doctor' => true,
+                                        'gender' => $user->gender ?? null,
                                     ];
                                 })
                                 ->toArray();
@@ -305,16 +343,51 @@ class DoctorController extends Controller
                         });
                     }
                     
-                    // Verificar se a coluna is_active existe antes de filtrar
+                    // Incluir médicos ativos (is_active=1) ou sem o campo definido (null = considerar ativo)
                     if (Schema::hasColumn('users', 'is_active')) {
-                        $query->where('is_active', 1);
+                        $query->where(function ($q) {
+                            $q->where('is_active', 1)->orWhereNull('is_active');
+                        });
                     }
                     
-                    // Selecionar colunas que existem na tabela users
-                    $selectColumns = ['id', 'name', 'email', 'crm', 'phone', 'profile_photo', 'medical_specialty_id'];
-                    
+                    // Selecionar colunas que existem na tabela users (profile_photo ou photo/photo_url)
+                    $selectColumns = ['id', 'name', 'email', 'crm', 'phone', 'medical_specialty_id'];
+                    if (Schema::hasColumn('users', 'professional_qualification_level')) {
+                        $selectColumns[] = 'professional_qualification_level';
+                    }
+                    if (Schema::hasColumn('users', 'gender')) {
+                        $selectColumns[] = 'gender';
+                    }
+                    if (Schema::hasColumn('users', 'profile_photo')) {
+                        $selectColumns[] = 'profile_photo';
+                    } elseif (Schema::hasColumn('users', 'photo')) {
+                        $selectColumns[] = 'photo';
+                    } elseif (Schema::hasColumn('users', 'photo_url')) {
+                        $selectColumns[] = 'photo_url';
+                    }
+                    foreach (['city', 'state', 'neighborhood', 'latitude', 'longitude', 'availability', 'formation_details', 'formation_description'] as $locCol) {
+                        if (Schema::hasColumn('users', $locCol)) {
+                            $selectColumns[] = $locCol;
+                        }
+                    }
+
                     $platformUsers = $query->select($selectColumns)->get();
-                    
+
+                    $timezone = 'America/Sao_Paulo';
+                    $nowTz = Carbon::now($timezone);
+                    $allPlatformUserIds = $platformUsers->pluck('id')->map(fn ($id) => (int) $id)->all();
+                    $occupiedByPlatformUser = Appointment::occupiedCalendarSlotKeyMapsForPlatformUserIds($allPlatformUserIds, $timezone);
+
+                    $jsonSlots = [];
+                    foreach ($platformUsers as $user) {
+                        $occ = $occupiedByPlatformUser[$user->id] ?? [];
+                        $slot = $this->earliestFutureSlotFromUserAvailability($user, $timezone, $occ);
+                        $jsonSlots[$user->id] = $slot;
+                    }
+                    $dbSlotByDoctor = ! empty($allPlatformUserIds)
+                        ? $this->batchEarliestSlotsFromDoctorAvailabilityTable($allPlatformUserIds, $nowTz, $timezone, $occupiedByPlatformUser)
+                        : [];
+
                     foreach ($platformUsers as $user) {
                         // Buscar especialidade
                         $specialty = null;
@@ -332,23 +405,39 @@ class DoctorController extends Controller
                             }
                         }
                         
-                        // Construir URL da foto se houver
-                        $photoUrl = null;
-                        if ($user->profile_photo) {
-                            // Construir URL completa da foto
-                            $photoUrl = url('storage/' . $user->profile_photo);
+                        // Construir URL da foto se houver (profile_photo, photo ou photo_url)
+                        $photoPath = $user->profile_photo ?? $user->photo ?? $user->photo_url ?? null;
+                        $photoUrl = $photoPath ? url('storage/' . ltrim($photoPath, '/')) : null;
+
+                        $jsonSlot = $jsonSlots[$user->id] ?? null;
+                        $dbSlot = $dbSlotByDoctor[$user->id] ?? null;
+                        $nextSlot = null;
+                        if ($jsonSlot && $dbSlot) {
+                            $nextSlot = $jsonSlot->lt($dbSlot) ? $jsonSlot : $dbSlot;
+                        } else {
+                            $nextSlot = $jsonSlot ?? $dbSlot;
                         }
-                        
+
                         $platformDoctors[] = [
                             'id' => $user->id,
                             'name' => $user->name,
-                            'email' => $user->email,
                             'crm' => $user->crm ?? null,
                             'phone' => $user->phone ?? null,
                             'medical_specialty' => $specialty,
                             'medical_specialty_id' => $specialtyId,
-                            'photo' => $user->profile_photo ?? null,
+                            'professional_qualification_level' => $user->professional_qualification_level ?? null,
+                            'gender' => $user->gender ?? null,
+                            'photo' => $photoPath,
                             'photo_url' => $photoUrl,
+                            'city' => isset($user->city) ? $user->city : null,
+                            'state' => isset($user->state) ? $user->state : null,
+                            'neighborhood' => isset($user->neighborhood) ? $user->neighborhood : null,
+                            'latitude' => isset($user->latitude) ? $user->latitude : null,
+                            'longitude' => isset($user->longitude) ? $user->longitude : null,
+                            'formation_details' => isset($user->formation_details) ? $user->formation_details : null,
+                            'formation_description' => isset($user->formation_description) ? $user->formation_description : null,
+                            'has_future_availability' => $nextSlot !== null,
+                            'next_slot_at' => $nextSlot ? $nextSlot->toIso8601String() : null,
                             'is_available' => true, // Médicos da plataforma considerados disponíveis
                             'is_primary' => false, // Médicos da plataforma não são principais por padrão
                             'is_platform_doctor' => true, // Marcar como médico da plataforma
@@ -380,18 +469,97 @@ class DoctorController extends Controller
                         $doctorsMap[$doctorId] = $doctor;
                     } else {
                         // Já existe, priorizar médico do grupo sobre médico da plataforma
-                        $existingIsGroup = $doctorsMap[$doctorId]['is_group_doctor'] ?? false;
+                        $existing = $doctorsMap[$doctorId];
+                        $existingIsGroup = $existing['is_group_doctor'] ?? false;
                         $newIsGroup = $doctor['is_group_doctor'] ?? false;
-                        
+
                         if ($newIsGroup && !$existingIsGroup) {
                             // Novo é do grupo e existente não é, substituir
                             $doctorsMap[$doctorId] = $doctor;
+                        } elseif (!$newIsGroup && !$existingIsGroup) {
+                            // Mesmo users.id: mesclar sem sobrescrever next_slot_at com null (array_merge faria isso).
+                            $merged = array_merge($existing, $doctor);
+                            $nextA = $existing['next_slot_at'] ?? null;
+                            $nextB = $doctor['next_slot_at'] ?? null;
+                            $merged['next_slot_at'] = ! empty($nextB) ? $nextB : $nextA;
+                            $merged['has_future_availability'] = ! empty($merged['next_slot_at'])
+                                || ($existing['has_future_availability'] ?? false)
+                                || ($doctor['has_future_availability'] ?? false);
+                            $doctorsMap[$doctorId] = $merged;
+                        } elseif (! $newIsGroup && $existingIsGroup && ($doctor['is_platform_doctor'] ?? false)) {
+                            // doctors.id na lista do grupo igual ao users.id do médico da plataforma (colisão numérica):
+                            // enriquecer registro do grupo com agenda calculada na plataforma.
+                            $uidGroup = (int) ($existing['user_id'] ?? 0);
+                            $uidPlat = (int) ($doctor['id'] ?? 0);
+                            if ($uidGroup > 0 && $uidGroup === $uidPlat) {
+                                $merged = array_merge($existing, $doctor);
+                                $merged['next_slot_at'] = $doctor['next_slot_at'] ?? $existing['next_slot_at'] ?? null;
+                                $merged['has_future_availability'] = ! empty($merged['next_slot_at'])
+                                    || ($doctor['has_future_availability'] ?? false);
+                                $doctorsMap[$doctorId] = $merged;
+                            }
                         }
-                        // Caso contrário, manter o existente
+                        // Caso contrário, manter o existente (ex.: já é do grupo)
                     }
                 }
                 $doctors = array_values($doctorsMap);
-                
+
+                // Garantir next_slot / has_future na lista a partir dos médicos da plataforma (users.id),
+                // inclusive quando o card exibido é o registro do grupo (user_id) ou houve mesclagem incompleta.
+                $slotHintByUserId = [];
+                foreach ($platformDoctors as $pd) {
+                    $puid = (int) ($pd['id'] ?? 0);
+                    if ($puid <= 0 || empty($pd['next_slot_at'])) {
+                        continue;
+                    }
+                    $slotHintByUserId[$puid] = [
+                        'next_slot_at' => $pd['next_slot_at'],
+                        'has_future_availability' => (bool) ($pd['has_future_availability'] ?? true),
+                    ];
+                }
+                foreach ($doctors as $idx => $row) {
+                    if (! empty($row['next_slot_at'])) {
+                        continue;
+                    }
+                    $resolveUid = null;
+                    if (! empty($row['is_platform_doctor'])) {
+                        $resolveUid = (int) ($row['id'] ?? 0);
+                    } elseif (! empty($row['user_id'])) {
+                        $resolveUid = (int) $row['user_id'];
+                    }
+                    if ($resolveUid > 0 && isset($slotHintByUserId[$resolveUid])) {
+                        $doctors[$idx] = array_merge($row, $slotHintByUserId[$resolveUid]);
+                    }
+                }
+
+                $userIdsForExtras = [];
+                foreach ($doctors as $d) {
+                    if (! empty($d['is_platform_doctor'])) {
+                        $userIdsForExtras[(int) ($d['id'] ?? 0)] = true;
+                    }
+                    if (! empty($d['user_id'])) {
+                        $userIdsForExtras[(int) $d['user_id']] = true;
+                    }
+                }
+                $coursesByUserId = $this->batchCaregiverCoursesByUserIds(array_keys(array_filter($userIdsForExtras)));
+
+                foreach ($doctors as $idx => $d) {
+                    $uid = null;
+                    if (! empty($d['is_platform_doctor'])) {
+                        $uid = (int) ($d['id'] ?? 0);
+                    } elseif (! empty($d['user_id'])) {
+                        $uid = (int) $d['user_id'];
+                    }
+                    if ($uid && isset($coursesByUserId[$uid])) {
+                        $doctors[$idx]['courses'] = $coursesByUserId[$uid];
+                    } else {
+                        $doctors[$idx]['courses'] = [];
+                    }
+                    if (! empty($d['is_platform_doctor'])) {
+                        unset($doctors[$idx]['email']);
+                    }
+                }
+
                 Log::info('DoctorController.index - Após remoção de duplicatas', [
                     'total' => count($doctors),
                     'doctors_ids' => array_map(fn($d) => $d['id'], $doctors),
@@ -446,7 +614,7 @@ class DoctorController extends Controller
      * Buscar agenda disponível de um médico
      * GET /api/doctors/{id}/availability
      */
-    public function getAvailability($id)
+    public function getAvailability(Request $request, $id)
     {
         try {
             $doctor = User::where("id", $id)->where("profile", "doctor")->firstOrFail();
@@ -455,13 +623,40 @@ class DoctorController extends Controller
             
             Log::info("DoctorController.getAvailability - Dados brutos", [
                 'doctor_id' => $id,
-                'availability_raw' => $availabilityRaw,
+                'availability_raw' => substr($availabilityRaw ?? '', 0, 200),
                 'availability_decoded' => $availability,
                 'is_array' => is_array($availability),
             ]);
             
             if (!$availability || !is_array($availability)) {
                 $availability = ["availableDays" => [], "daySchedules" => []];
+            }
+            
+            // Fallback: se users.availability está vazio, buscar de doctor_availability
+            $availableDays = $availability["availableDays"] ?? [];
+            if (empty($availableDays) && Schema::hasTable('doctor_availability') && Schema::hasTable('doctor_availability_times')) {
+                $records = DB::table('doctor_availability')
+                    ->where('doctor_id', $id)
+                    ->orderBy('date')
+                    ->get();
+                foreach ($records as $r) {
+                    $dateStr = $r->date instanceof \Carbon\Carbon ? $r->date->format('Y-m-d') : $r->date;
+                    $availableDays[] = $dateStr;
+                    $timesRaw = DB::table('doctor_availability_times')
+                        ->where('availability_id', $r->id)
+                        ->orderBy('time')
+                        ->pluck('time');
+                    $times = $timesRaw->map(function ($t) {
+                        $str = is_string($t) ? $t : (string) $t;
+                        return strlen($str) >= 5 ? substr($str, 0, 5) : $str;
+                    })->values()->toArray();
+                    $availability["daySchedules"][$dateStr] = $times;
+                }
+                $availability["availableDays"] = array_values(array_unique($availableDays));
+                Log::info("DoctorController.getAvailability - Dados carregados de doctor_availability", [
+                    'doctor_id' => $id,
+                    'days_count' => count($availableDays),
+                ]);
             }
 
             // Filtrar datas passadas - apenas retornar datas atuais e futuras
@@ -564,13 +759,14 @@ class DoctorController extends Controller
                         $currentTotalMinutes = $currentHour * 60 + $currentMinute;
                         
                         $validTimes = array_filter($times, function($time) use ($currentTotalMinutes) {
-                            $timeHour = (int)substr($time, 0, 2);
-                            $timeMinute = (int)substr($time, 3, 2);
+                            $timeStr = is_string($time) ? $time : (string) $time;
+                            $timeHour = (int)substr($timeStr, 0, 2);
+                            $timeMinute = (int)substr($timeStr, 3, 2);
                             $timeTotalMinutes = $timeHour * 60 + $timeMinute;
                             
-                            // Incluir se for futuro ou se passou há menos de 2 horas
+                            // Incluir se for futuro ou se passou há menos de 12 horas (cobre timezone)
                             $diffMinutes = $currentTotalMinutes - $timeTotalMinutes;
-                            return $diffMinutes <= 120; // 2 horas = 120 minutos
+                            return $diffMinutes <= 720; // 12 horas = 720 minutos
                         });
                         
                         $filteredDaySchedules[$date] = array_values($validTimes);
@@ -600,6 +796,17 @@ class DoctorController extends Controller
                 "availableDays" => $filteredAvailableDays,
                 "daySchedules" => $filteredDaySchedules
             ];
+
+            // Por padrão remove horários já ocupados por teleconsulta (evita dupla marcação).
+            // Tela do médico (edição da grade) deve enviar exclude_booked=0 para ver o template completo.
+            $excludeBookedParam = $request->query('exclude_booked');
+            $shouldExcludeBooked = $request->has('exclude_booked')
+                ? filter_var($excludeBookedParam, FILTER_VALIDATE_BOOL)
+                : true;
+
+            if ($shouldExcludeBooked) {
+                $filteredAvailability = $this->excludeBookedTeleconsultSlots((int) $id, $filteredAvailability, $timezone);
+            }
 
             Log::info("DoctorController.getAvailability - Agenda filtrada", [
                 'doctor_id' => $id,
@@ -701,9 +908,45 @@ class DoctorController extends Controller
                 ], 500);
             }
             
-            // Salvar disponibilidade
+            // Salvar disponibilidade em users.availability (formato JSON)
             $doctor->availability = json_encode($availabilityData);
             $doctor->save();
+            
+            // Também salvar nas tabelas doctor_availability para garantir que horários apareçam ao agendar
+            if (Schema::hasTable('doctor_availability') && Schema::hasTable('doctor_availability_times')) {
+                try {
+                    DB::table('doctor_availability')->where('doctor_id', $id)->delete();
+                    $availableDays = $availabilityData['availableDays'] ?? [];
+                    $daySchedules = $availabilityData['daySchedules'] ?? [];
+                    foreach ($availableDays as $date) {
+                        $times = $daySchedules[$date] ?? [];
+                        if (!empty($times)) {
+                            $availabilityId = DB::table('doctor_availability')->insertGetId([
+                                'doctor_id' => $id,
+                                'date' => $date,
+                                'is_available' => true,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                            foreach ($times as $time) {
+                                $timeFormatted = strlen($time) === 5 ? $time . ':00' : $time;
+                                DB::table('doctor_availability_times')->insertOrIgnore([
+                                    'availability_id' => $availabilityId,
+                                    'time' => $timeFormatted,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+                            }
+                        }
+                    }
+                    Log::info("DoctorController.saveAvailability - Agenda também salva em doctor_availability", [
+                        'doctor_id' => $id,
+                        'days_saved' => count($availableDays),
+                    ]);
+                } catch (\Exception $e) {
+                    Log::warning("DoctorController.saveAvailability - Erro ao salvar em doctor_availability (continuando): " . $e->getMessage());
+                }
+            }
             
             Log::info("DoctorController.saveAvailability - Agenda salva com sucesso", ['doctor_id' => $id]);
             
@@ -1236,5 +1479,247 @@ class DoctorController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Cursos e certificações (tabela caregiver_courses) por users.id — mesmos dados do cadastro profissional.
+     *
+     * @param  array<int>  $userIds
+     * @return array<int, array<int, array{name: string, institution: string, year: int|null, description: string|null, certificate_url: string|null}>>
+     */
+    private function batchCaregiverCoursesByUserIds(array $userIds): array
+    {
+        $userIds = array_values(array_unique(array_filter(array_map('intval', $userIds), fn ($id) => $id > 0)));
+        if ($userIds === [] || ! Schema::hasTable('caregiver_courses')) {
+            return [];
+        }
+
+        $rows = DB::table('caregiver_courses')
+            ->whereIn('user_id', $userIds)
+            ->orderByDesc('year')
+            ->orderBy('name')
+            ->get(['user_id', 'name', 'institution', 'year', 'description', 'certificate_url']);
+
+        $map = [];
+        foreach ($rows as $r) {
+            $uid = (int) $r->user_id;
+            if (! isset($map[$uid])) {
+                $map[$uid] = [];
+            }
+            $map[$uid][] = [
+                'name' => $r->name,
+                'institution' => $r->institution,
+                'year' => $r->year !== null ? (int) $r->year : null,
+                'description' => $r->description,
+                'certificate_url' => $r->certificate_url,
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * Próximo horário futuro a partir do JSON users.availability (telelista / filtros).
+     */
+    /**
+     * @param  array<string, true>  $occupiedSlotKeyMap  chaves Y-m-d H:i já marcadas (outros pacientes / grupos)
+     */
+    private function earliestFutureSlotFromUserAvailability(object $user, string $timezone, array $occupiedSlotKeyMap = []): ?Carbon
+    {
+        $raw = $user->availability ?? null;
+        $parsed = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($parsed)) {
+            $parsed = ['availableDays' => [], 'daySchedules' => []];
+        }
+
+        $days = $parsed['availableDays'] ?? [];
+        $schedules = $parsed['daySchedules'] ?? [];
+
+        return $this->minSlotFromDaysAndSchedules($days, $schedules, Carbon::now($timezone), $timezone, $occupiedSlotKeyMap);
+    }
+
+    /**
+     * Normaliza chaves de data da agenda (Y-m-d) no fuso informado.
+     */
+    private function normalizeAvailabilityDateKey($raw, string $timezone): ?string
+    {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        try {
+            return Carbon::parse(trim((string) $raw), $timezone)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Próximo slot a partir do JSON: considera a união de availableDays com as chaves de daySchedules
+     * (evita falso "sem horários" quando há horários hoje em daySchedules mas o dia faltou em availableDays).
+     */
+    /**
+     * @param  array<string, true>  $occupiedSlotKeyMap
+     */
+    private function minSlotFromDaysAndSchedules(array $availableDays, array $daySchedules, Carbon $now, string $timezone, array $occupiedSlotKeyMap = []): ?Carbon
+    {
+        $today = $now->format('Y-m-d');
+        $datesToScan = [];
+
+        foreach ($availableDays as $d) {
+            $n = $this->normalizeAvailabilityDateKey($d, $timezone);
+            if ($n !== null) {
+                $datesToScan[$n] = true;
+            }
+        }
+        foreach (array_keys($daySchedules) as $k) {
+            $n = $this->normalizeAvailabilityDateKey($k, $timezone);
+            if ($n !== null) {
+                $datesToScan[$n] = true;
+            }
+        }
+
+        $sortedDates = array_keys($datesToScan);
+        sort($sortedDates);
+
+        $best = null;
+
+        foreach ($sortedDates as $date) {
+            if ($date < $today) {
+                continue;
+            }
+
+            $timesForDate = [];
+            foreach ($daySchedules as $rawKey => $times) {
+                if (!is_array($times)) {
+                    continue;
+                }
+                $nk = $this->normalizeAvailabilityDateKey($rawKey, $timezone);
+                if ($nk !== $date) {
+                    continue;
+                }
+                foreach ($times as $t) {
+                    $timesForDate[] = $t;
+                }
+            }
+
+            foreach ($timesForDate as $time) {
+                $timeStr = is_string($time) ? $time : (string) $time;
+                $timeStr = strlen($timeStr) >= 5 ? substr($timeStr, 0, 5) : $timeStr;
+                try {
+                    $slot = Carbon::parse($date.' '.$timeStr, $timezone);
+                } catch (\Exception $e) {
+                    continue;
+                }
+                if ($date === $today && $slot->lt($now)) {
+                    continue;
+                }
+                $slotKey = $slot->copy()->timezone($timezone)->format('Y-m-d H:i');
+                if (! empty($occupiedSlotKeyMap[$slotKey])) {
+                    continue;
+                }
+                if ($best === null || $slot->lt($best)) {
+                    $best = $slot;
+                }
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * @param  array<int, array<string, true>>  $occupiedByPlatformUserId
+     * @return array<int, Carbon>
+     */
+    private function batchEarliestSlotsFromDoctorAvailabilityTable(array $doctorIds, Carbon $now, string $timezone, array $occupiedByPlatformUserId = []): array
+    {
+        $result = [];
+        if ($doctorIds === [] || !Schema::hasTable('doctor_availability') || !Schema::hasTable('doctor_availability_times')) {
+            return $result;
+        }
+
+        $today = $now->format('Y-m-d');
+        $rows = DB::table('doctor_availability as da')
+            ->join('doctor_availability_times as dat', 'dat.availability_id', '=', 'da.id')
+            ->whereIn('da.doctor_id', $doctorIds)
+            ->where('da.date', '>=', $today)
+            ->orderBy('da.date')
+            ->orderBy('dat.time')
+            ->select('da.doctor_id', 'da.date', 'dat.time')
+            ->get();
+
+        foreach ($rows as $r) {
+            $did = (int) $r->doctor_id;
+            if (isset($result[$did])) {
+                continue;
+            }
+            $dateStr = $r->date instanceof Carbon ? $r->date->format('Y-m-d') : (string) $r->date;
+            $t = $r->time;
+            if ($t instanceof Carbon) {
+                $timeStr = $t->format('H:i');
+            } else {
+                $timeStr = is_string($t) ? substr($t, 0, 5) : substr((string) $t, 0, 5);
+            }
+            try {
+                $slot = Carbon::parse($dateStr.' '.$timeStr, $timezone);
+            } catch (\Exception $e) {
+                continue;
+            }
+            if ($dateStr === $today && $slot->lt($now)) {
+                continue;
+            }
+            $occ = $occupiedByPlatformUserId[$did] ?? [];
+            $slotKey = $slot->copy()->timezone($timezone)->format('Y-m-d H:i');
+            if (! empty($occ[$slotKey])) {
+                continue;
+            }
+            $result[$did] = $slot;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Remove da agenda horários já ocupados por teleconsulta (mesma regra de AppointmentController).
+     * Dias que ficarem sem horários são omitidos de availableDays.
+     *
+     * @param  array{availableDays: array<int, string>, daySchedules: array<string, array<int, mixed>>}  $filteredAvailability
+     * @return array{availableDays: array<int, string>, daySchedules: array<string, array<int, mixed>>}
+     */
+    private function excludeBookedTeleconsultSlots(int $platformDoctorUserId, array $filteredAvailability, string $timezone): array
+    {
+        $days = $filteredAvailability['availableDays'] ?? [];
+        $schedules = $filteredAvailability['daySchedules'] ?? [];
+        $newDays = [];
+        $newSchedules = [];
+
+        $occupied = Appointment::teleconsultationOccupiedSlotKeyMap($platformDoctorUserId, $timezone);
+
+        foreach ($days as $date) {
+            $times = $schedules[$date] ?? [];
+            $free = [];
+            foreach ($times as $timeRaw) {
+                $timeStr = is_string($timeRaw) ? $timeRaw : (string) $timeRaw;
+                $timeStr = strlen($timeStr) >= 5 ? substr($timeStr, 0, 5) : $timeStr;
+                try {
+                    $slot = Carbon::parse($date.' '.$timeStr, $timezone);
+                } catch (\Exception $e) {
+                    continue;
+                }
+                $slotKey = $slot->copy()->timezone($timezone)->format('Y-m-d H:i');
+                if (! empty($occupied[$slotKey])) {
+                    continue;
+                }
+                $free[] = $timeRaw;
+            }
+            if (count($free) > 0) {
+                $newDays[] = $date;
+                $newSchedules[$date] = array_values($free);
+            }
+        }
+
+        return [
+            'availableDays' => array_values($newDays),
+            'daySchedules' => $newSchedules,
+        ];
     }
 }

@@ -158,6 +158,50 @@ class AdminUserController extends Controller
     }
 
     /**
+     * Trocar senha do usuário (admin)
+     * PUT /api/admin/users/{id}/password
+     */
+    public function changePassword(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'password' => 'required|string|min:6|confirmed',
+            ], [
+                'password.required' => 'A senha é obrigatória.',
+                'password.min' => 'A senha deve ter no mínimo 6 caracteres.',
+                'password.confirmed' => 'A confirmação da senha não confere.',
+            ]);
+
+            $user = User::findOrFail($id);
+            $user->password = Hash::make($request->password);
+            $user->save();
+
+            return response()->json([
+                'message' => 'Senha alterada com sucesso',
+                'user' => [
+                    'id' => $user->id,
+                    'email' => $user->email,
+                ]
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Dados inválidos',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'error' => 'Usuário não encontrado',
+                'message' => 'O usuário com o ID informado não existe'
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Erro ao alterar senha',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Excluir usuário
      * DELETE /api/admin/users/{id}
      */

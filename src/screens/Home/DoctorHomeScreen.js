@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Modal,
-  TextInput,
-  KeyboardAvoidingView,
   Platform,
   Switch,
 } from 'react-native';
@@ -30,15 +27,20 @@ import {
   ChevronForwardIcon,
   SaveOutlineIcon,
   TrashOutlineIcon,
-  CloseIcon,
-  LockClosedIcon,
-  AddCircleOutlineIcon,
   VideoCamIcon,
   MedicalIcon,
   TimeOutlineIcon,
   LocationOutlineIcon,
 } from '../../components/CustomIcons';
 import appointmentService from '../../services/appointmentService';
+import { appointmentMatchesLoggedInDoctor } from '../../utils/appointmentDoctorMatch';
+import {
+  isTeleconsultAwaitingHonorariumConfirmation,
+  teleconsultationSlotStillOccupied,
+  getDoctorAgendaSlotBookingLabel,
+  isTeleconsultAppointment,
+  isTeleconsultPaidForVideoStart,
+} from '../../utils/teleconsultationHonorarium';
 import doctorService from '../../services/doctorService';
 import groupService from '../../services/groupService';
 import moment from 'moment';
@@ -46,13 +48,44 @@ import 'moment/locale/pt-br';
 
 moment.locale('pt-br');
 
-const DoctorHomeScreen = ({ navigation }) => {
+function isAppointmentCancelled(apt) {
+  const st = apt?.status;
+  return st === 'cancelled' || st === 'cancelada';
+}
+
+function getAppointmentTimeMs(apt) {
+  const dateStr = apt?.appointment_date || apt?.scheduled_at;
+  if (!dateStr) return null;
+  const t = new Date(dateStr).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+/** Consulta que o médico pode marcar como “Realizada” (concluída ou teleconsulta com pagamento liberado). */
+function isAppointmentCompletedForDoctor(apt, nowMs = Date.now()) {
+  if (!apt || isAppointmentCancelled(apt)) return false;
+  if (apt.status === 'completed') return true;
+  const ps = apt.payment_status || apt.paymentStatus;
+  if (isTeleconsultAppointment(apt) && ps === 'released') return true;
+  return false;
+}
+
+/** Passou o horário, não cancelada e ainda não contada como realizada para o médico. */
+function isAppointmentIncompletePast(apt, nowMs = Date.now()) {
+  if (!apt || isAppointmentCancelled(apt)) return false;
+  const t = getAppointmentTimeMs(apt);
+  if (t == null || t >= nowMs) return false;
+  if (isAppointmentCompletedForDoctor(apt, nowMs)) return false;
+  return true;
+}
+
+const DoctorHomeScreen = ({ navigation, route }) => {
   const { user, signed } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' ou 'agenda'
-  const [showCompleted, setShowCompleted] = useState(false); // Toggle para mostrar consultas realizadas
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [showPastIncomplete, setShowPastIncomplete] = useState(false);
   const [groupNamesCache, setGroupNamesCache] = useState({}); // Cache de nomes de grupos
   const [patientNamesCache, setPatientNamesCache] = useState({}); // Cache de nomes de pacientes por group_id
   
@@ -62,20 +95,30 @@ const DoctorHomeScreen = ({ navigation }) => {
   const [blockedDays, setBlockedDays] = useState(new Set()); // Dias bloqueados
   const [daySchedules, setDaySchedules] = useState({}); // { '2024-12-15': ['08:00', '09:00', '14:00'] }
   const [savingAvailability, setSavingAvailability] = useState(false);
-  const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
-  const [selectedDay, setSelectedDay] = useState(null); // { date: Date, dateKey: string }
-  const [selectedDayTimes, setSelectedDayTimes] = useState([]); // Horários selecionados para o dia
-  const [bookedTimes, setBookedTimes] = useState(new Set()); // Horários agendados (não podem ser removidos)
+  /** Só o primeiro carregamento de consultas usa tela cheia de loading; evita piscar ao voltar da edição de horários */
+  const isInitialAppointmentsLoadRef = useRef(true);
+  const routeRef = useRef(route);
+  routeRef.current = route;
 
   useFocusEffect(
     React.useCallback(() => {
-      if (signed && user) {
-        loadAppointments();
-        if (activeTab === 'agenda') {
-          loadAvailability();
-        }
+      if (!signed || !user) return;
+
+      const draft = routeRef.current.params?.dayScheduleDraft;
+      if (draft && Array.isArray(draft.availableDays)) {
+        setAvailableDays(new Set(draft.availableDays));
+        setBlockedDays(new Set(draft.blockedDays || []));
+        setDaySchedules(draft.daySchedules || {});
+        navigation.setParams({ dayScheduleDraft: undefined });
       }
-    }, [signed, user, activeTab])
+
+      loadAppointments();
+      // Só busca agenda no servidor quando não acabamos de aplicar rascunho (ref le params atuais sem reexecutar o foco ao limpar params)
+      const hadDraft = draft && Array.isArray(draft.availableDays);
+      if (activeTab === 'agenda' && !hadDraft) {
+        loadAvailability();
+      }
+    }, [signed, user, activeTab, navigation])
   );
 
   // Recarregar consultas quando mudar para a aba de agenda
@@ -87,7 +130,9 @@ const DoctorHomeScreen = ({ navigation }) => {
 
   const loadAppointments = async () => {
     try {
-      setLoading(true);
+      if (isInitialAppointmentsLoadRef.current) {
+        setLoading(true);
+      }
       console.log('📅 DoctorHomeScreen - Carregando consultas agendadas...');
       
       if (!user || !user.id) {
@@ -111,42 +156,38 @@ const DoctorHomeScreen = ({ navigation }) => {
       );
 
       if (result.success && result.data) {
+        const raw = result.data;
+        const rows = Array.isArray(raw)
+          ? raw
+          : raw && Array.isArray(raw.data)
+            ? raw.data
+            : raw && Array.isArray(raw.appointments)
+              ? raw.appointments
+              : [];
+
         // Filtrar apenas consultas deste médico
         // Converter IDs para números para comparação correta
         const currentDoctorId = Number(user.id);
         
-        const doctorAppointments = result.data.filter((appointment) => {
-          const appointmentDoctorId = appointment.doctor_id ? Number(appointment.doctor_id) : null;
-          const doctorUserId = appointment.doctorUser?.id ? Number(appointment.doctorUser.id) : null;
-          const doctorId = appointment.doctor?.id ? Number(appointment.doctor.id) : null;
-          
-          const isDoctorAppointment = 
-            appointmentDoctorId === currentDoctorId ||
-            doctorUserId === currentDoctorId ||
-            doctorId === currentDoctorId;
-          
-          // Se for teleconsulta, verificar se está paga
-          // Médicos só devem ver teleconsultas que já foram pagas
-          if (appointment.is_teleconsultation) {
-            const paymentStatus = appointment.payment_status;
-            const isPaid = paymentStatus === 'paid_held' || paymentStatus === 'paid' || paymentStatus === 'released';
-            if (!isPaid) {
-              // Teleconsulta não paga - não mostrar para o médico
-              return false;
-            }
-          }
-          
+        const doctorAppointments = rows.filter((appointment) => {
+          const isDoctorAppointment = appointmentMatchesLoggedInDoctor(
+            appointment,
+            currentDoctorId
+          );
+
           return isDoctorAppointment;
         });
 
         console.log(`✅ DoctorHomeScreen - ${doctorAppointments.length} consulta(s) do médico carregada(s)`, {
-          totalAppointments: result.data.length,
+          totalAppointments: rows.length,
           doctorAppointments: doctorAppointments.length,
           doctorId: user.id,
         });
 
-        // Log detalhado das consultas
-        doctorAppointments.forEach(apt => {
+        const cacheKey = (gid) => (gid != null && gid !== '' ? String(gid) : null);
+
+        const patientPatchFromApi = {};
+        doctorAppointments.forEach((apt) => {
           console.log('📋 Consulta do médico:', {
             id: apt.id,
             title: apt.title,
@@ -161,103 +202,115 @@ const DoctorHomeScreen = ({ navigation }) => {
             group_id: apt.group_id,
             is_teleconsultation: apt.is_teleconsultation,
           });
-          
-          // Se a API retornou patient_name, adicionar ao cache imediatamente
-          if (apt.patient_name && apt.group_id) {
-            setPatientNamesCache(prev => {
-              const newCache = { ...prev };
-              newCache[apt.group_id] = apt.patient_name;
-              console.log('✅ Cache atualizado com patient_name da API:', {
-                group_id: apt.group_id,
-                patient_name: apt.patient_name,
-                previous_value: prev[apt.group_id]
-              });
-              return newCache;
-            });
-          } else if (apt.group_id && !apt.patient_name) {
+          const k = cacheKey(apt.group_id);
+          if (k && apt.patient_name) {
+            patientPatchFromApi[k] = apt.patient_name;
+          } else if (k && !apt.patient_name) {
             console.warn('⚠️ Consulta sem patient_name da API:', {
               appointment_id: apt.id,
               group_id: apt.group_id,
-              scheduled_at: apt.scheduled_at
+              scheduled_at: apt.scheduled_at,
             });
           }
         });
 
-        // Buscar nomes dos grupos e pacientes que não estão no cache
-        const groupIdsToFetch = doctorAppointments
-          .map(apt => apt.group_id)
-          .filter(id => id && (!groupNamesCache[id] || !patientNamesCache[id]));
-        
+        const uniqueGroupIds = [
+          ...new Set(doctorAppointments.map((apt) => apt.group_id).filter((id) => id != null && id !== '')),
+        ];
+
+        const groupIdsToFetch = uniqueGroupIds.filter((id) => {
+          const k = cacheKey(id);
+          if (!k) return false;
+          const hasPatient =
+            patientPatchFromApi[k] || patientNamesCache[k] || patientNamesCache[id];
+          const hasGroup = groupNamesCache[k] || groupNamesCache[id];
+          return !hasPatient || !hasGroup;
+        });
+
+        let patientPatchFromFetch = {};
+        let groupPatchFromFetch = {};
+
         if (groupIdsToFetch.length > 0) {
           console.log('🔍 Buscando nomes de grupos e pacientes:', groupIdsToFetch);
-          // Buscar nomes dos grupos e pacientes em paralelo
           const groupPromises = groupIdsToFetch.map(async (groupId) => {
             try {
-              // Buscar informações do grupo
               const groupResult = await groupService.getGroup(groupId);
               let groupName = null;
+              let patientName = null;
               if (groupResult.success && groupResult.data) {
                 groupName = groupResult.data.name || groupResult.data.groupName || null;
-              }
-              
-              // Buscar nome do paciente do grupo
-              let patientName = null;
-              try {
-                // Primeiro tentar usar accompanied_name do grupo
-                const groupResult = await groupService.getGroup(groupId);
-                if (groupResult.success && groupResult.data) {
-                  if (groupResult.data.accompanied_name) {
-                    patientName = groupResult.data.accompanied_name;
-                  }
+                if (groupResult.data.accompanied_name) {
+                  patientName = groupResult.data.accompanied_name;
                 }
-                
-                // Se não encontrou accompanied_name, buscar membro com role='patient' ou 'priority_contact'
-                if (!patientName) {
+              }
+              if (!patientName) {
+                try {
                   const membersResult = await groupService.getGroupMembers(groupId);
                   if (membersResult.success && membersResult.data) {
-                    const patientMember = membersResult.data.find(m => 
-                      (m.role === 'patient' || m.role === 'priority_contact') && 
-                      (m.user?.name || m.name)
+                    const patientMember = membersResult.data.find(
+                      (m) =>
+                        ['patient', 'priority_contact', 'accompanied'].includes(m.role) &&
+                        (m.user?.name || m.name)
                     );
                     if (patientMember) {
                       patientName = patientMember.user?.name || patientMember.name;
                     }
                   }
+                } catch (error) {
+                  console.error(`Erro ao buscar paciente do grupo ${groupId}:`, error);
                 }
-              } catch (error) {
-                console.error(`Erro ao buscar paciente do grupo ${groupId}:`, error);
               }
-              
               return { groupId, groupName, patientName };
             } catch (error) {
               console.error(`Erro ao buscar grupo ${groupId}:`, error);
               return { groupId, groupName: null, patientName: null };
             }
           });
-          
+
           const groupData = await Promise.all(groupPromises);
-          const newGroupCache = { ...groupNamesCache };
-          const newPatientCache = { ...patientNamesCache };
           groupData.forEach(({ groupId, groupName, patientName }) => {
-            if (groupName) {
-              newGroupCache[groupId] = groupName;
-            }
-            if (patientName) {
-              newPatientCache[groupId] = patientName;
-            }
+            const k = cacheKey(groupId);
+            if (!k) return;
+            if (groupName) groupPatchFromFetch[k] = groupName;
+            if (patientName) patientPatchFromFetch[k] = patientName;
           });
-          setGroupNamesCache(newGroupCache);
-          setPatientNamesCache(newPatientCache);
+
+          setGroupNamesCache((prev) => ({ ...prev, ...groupPatchFromFetch }));
+          setPatientNamesCache((prev) => ({ ...prev, ...patientPatchFromApi, ...patientPatchFromFetch }));
+        } else if (Object.keys(patientPatchFromApi).length > 0) {
+          setPatientNamesCache((prev) => ({ ...prev, ...patientPatchFromApi }));
         }
 
+        const resolvePatientForAppointment = (apt) => {
+          const k = cacheKey(apt.group_id);
+          const fromApt = apt.patient_name && String(apt.patient_name).trim();
+          if (fromApt) return fromApt;
+          if (!k) return null;
+          return (
+            patientPatchFromApi[k] ||
+            patientPatchFromFetch[k] ||
+            patientNamesCache[k] ||
+            patientNamesCache[apt.group_id] ||
+            null
+          );
+        };
+
+        const withResolvedNames = doctorAppointments.map((apt) => {
+          const resolved = resolvePatientForAppointment(apt);
+          if (resolved && resolved !== apt.patient_name) {
+            return { ...apt, patient_name: resolved };
+          }
+          return apt;
+        });
+
         // Ordenar por data (mais próximas primeiro)
-        doctorAppointments.sort((a, b) => {
+        withResolvedNames.sort((a, b) => {
           const dateA = new Date(a.appointment_date || a.scheduled_at);
           const dateB = new Date(b.appointment_date || b.scheduled_at);
           return dateA - dateB;
         });
 
-        setAppointments(doctorAppointments);
+        setAppointments(withResolvedNames);
       } else {
         console.warn('⚠️ DoctorHomeScreen - Nenhuma consulta encontrada ou erro na API:', result);
         setAppointments([]);
@@ -269,6 +322,7 @@ const DoctorHomeScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      isInitialAppointmentsLoadRef.current = false;
     }
   };
 
@@ -376,7 +430,6 @@ const DoctorHomeScreen = ({ navigation }) => {
     const bookedTimesSet = new Set();
     
     if (!appointments || appointments.length === 0) {
-      console.log('📅 getBookedTimesForDay - Nenhuma consulta disponível');
       return bookedTimesSet;
     }
 
@@ -387,10 +440,14 @@ const DoctorHomeScreen = ({ navigation }) => {
 
     // Formatar a data para comparação (YYYY-MM-DD)
     const targetDate = dateKey;
-    console.log('🔍 getBookedTimesForDay - Buscando horários agendados para:', targetDate);
 
     appointments.forEach((appointment) => {
       if (!appointment.appointment_date && !appointment.scheduled_at) {
+        return;
+      }
+
+      const st = appointment.status;
+      if (st === 'cancelled' || st === 'cancelada') {
         return;
       }
 
@@ -402,325 +459,44 @@ const DoctorHomeScreen = ({ navigation }) => {
       if (appointmentDateKey === targetDate) {
         // Verificar se a consulta é deste médico (comparar como números)
         const currentDoctorId = Number(user.id);
-        const appointmentDoctorId = appointment.doctor_id ? Number(appointment.doctor_id) : null;
-        const doctorUserId = appointment.doctorUser?.id ? Number(appointment.doctorUser.id) : null;
-        const doctorId = appointment.doctor?.id ? Number(appointment.doctor.id) : null;
-        
-        const isDoctorAppointment = 
-          appointmentDoctorId === currentDoctorId ||
-          doctorUserId === currentDoctorId ||
-          doctorId === currentDoctorId;
+        const isDoctorAppointment = appointmentMatchesLoggedInDoctor(
+          appointment,
+          currentDoctorId
+        );
 
         if (isDoctorAppointment) {
-          // Extrair o horário (HH:MM) usando métodos locais para garantir timezone correto
-          const appointmentDateObj = new Date(appointmentDate);
+          if (
+            isTeleconsultAppointment(appointment) &&
+            !teleconsultationSlotStillOccupied(appointment, Date.now())
+          ) {
+            return;
+          }
           const hours = String(appointmentDateObj.getHours()).padStart(2, '0');
           const minutes = String(appointmentDateObj.getMinutes()).padStart(2, '0');
           const time = `${hours}:${minutes}`;
-          
+
           bookedTimesSet.add(time);
-          console.log('✅ getBookedTimesForDay - Horário agendado encontrado:', {
-            appointmentId: appointment.id,
-            title: appointment.title,
-            date: appointmentDateKey,
-            time: time,
-            appointmentDate: appointmentDate,
-            localDateString: appointmentDateObj.toLocaleString('pt-BR'),
-          });
-        } else {
-          console.log('⚠️ getBookedTimesForDay - Consulta não é deste médico:', {
-            appointmentId: appointment.id,
-            appointmentDoctorId: appointment.doctor_id,
-            currentDoctorId: user.id,
-          });
         }
       }
     });
 
-    console.log('📅 getBookedTimesForDay - Horários agendados encontrados:', Array.from(bookedTimesSet));
     return bookedTimesSet;
   };
 
   const openScheduleModal = (day, date, dateKey) => {
-    setSelectedDay({ day, date, dateKey });
-    
-    // Buscar horários agendados para este dia
-    const booked = getBookedTimesForDay(dateKey);
-    setBookedTimes(booked);
-    
-    // Combinar horários da agenda disponível com horários agendados
-    // Isso garante que horários agendados apareçam na modal mesmo que não estejam na agenda
-    const availableTimes = daySchedules[dateKey] || [];
-    const bookedTimesArray = Array.from(booked);
-    
-    // Criar um Set com todos os horários (disponíveis + agendados) para evitar duplicatas
-    const allTimesSet = new Set([...availableTimes, ...bookedTimesArray]);
-    const allTimes = Array.from(allTimesSet).sort();
-    
-    console.log('📅 openScheduleModal - Horários para exibir:', {
+    const dayAppointments = appointments.filter((apt) => {
+      const apptDate = apt.appointment_date || apt.scheduled_at;
+      if (!apptDate) return false;
+      return formatDateKey(new Date(apptDate)) === dateKey;
+    });
+    navigation.navigate('DoctorDaySchedule', {
       dateKey,
-      availableTimes,
-      bookedTimesArray,
-      allTimes,
+      dateMs: date.getTime(),
+      initialAvailableDays: Array.from(availableDays),
+      initialBlockedDays: Array.from(blockedDays),
+      initialDaySchedules: { ...daySchedules },
+      dayAppointments,
     });
-    
-    setSelectedDayTimes(allTimes);
-    
-    setScheduleModalVisible(true);
-  };
-
-  const closeScheduleModal = () => {
-    setScheduleModalVisible(false);
-    setSelectedDay(null);
-    setSelectedDayTimes([]);
-    setBookedTimes(new Set());
-  };
-
-  const getNextTimeSlot = () => {
-    // Normalizar horários para comparação (remover segundos se houver)
-    const normalizeTime = (t) => {
-      if (!t) return '';
-      const trimmed = t.trim();
-      if (/^\d{2}:\d{2}:\d{2}/.test(trimmed)) return trimmed.substring(0, 5);
-      return trimmed;
-    };
-
-    // Criar um Set com horários normalizados para busca rápida
-    const existingTimesSet = new Set(selectedDayTimes.map(t => normalizeTime(t)));
-
-    // Se não há horários, começar com 08:00
-    if (selectedDayTimes.length === 0) {
-      return '08:00';
-    }
-
-    // Ordenar horários para pegar o último horário válido
-    const sortedTimes = [...selectedDayTimes]
-      .map(t => normalizeTime(t))
-      .filter(t => /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(t))
-      .sort();
-    
-    // Se não há horários válidos, começar com 08:00
-    if (sortedTimes.length === 0) {
-      return '08:00';
-    }
-
-    const lastTime = sortedTimes[sortedTimes.length - 1];
-    
-    // Extrair horas e minutos do último horário
-    const [hours, minutes] = lastTime.split(':').map(Number);
-    
-    // Tentar encontrar próximo horário disponível (começar 1 hora depois do último)
-    let nextHours = hours + 1;
-    let nextMinutes = minutes;
-    let attempts = 0;
-    const maxAttempts = 24; // Evitar loop infinito (máximo 24 tentativas)
-
-    while (attempts < maxAttempts) {
-      // Se ultrapassar 23:59, voltar para 08:00
-      if (nextHours > 23) {
-        nextHours = 8;
-        nextMinutes = 0;
-      }
-
-      // Formatar com zero à esquerda
-      const formattedHours = String(nextHours).padStart(2, '0');
-      const formattedMinutes = String(nextMinutes).padStart(2, '0');
-      const candidateTime = `${formattedHours}:${formattedMinutes}`;
-      
-      // Verificar se este horário não está na lista
-      if (!existingTimesSet.has(candidateTime)) {
-        return candidateTime;
-      }
-
-      // Se já existe, tentar próximo horário
-      nextHours++;
-      attempts++;
-    }
-
-    // Se não encontrou nenhum horário disponível no dia, retornar null
-    // (será tratado na função addTimeSlot)
-    return null;
-  };
-
-  const addTimeSlot = () => {
-    const nextTime = getNextTimeSlot();
-    
-    // Se não há horário disponível (todos os horários do dia estão ocupados)
-    if (nextTime === null) {
-      Alert.alert(
-        'Aviso',
-        'Todos os horários do dia já estão cadastrados. Por favor, edite um horário existente ou remova um horário antes de adicionar outro.'
-      );
-      return;
-    }
-    
-    // Verificar se o horário já existe (verificação de segurança adicional)
-    const normalizeTime = (t) => {
-      if (!t) return '';
-      const trimmed = t.trim();
-      if (/^\d{2}:\d{2}:\d{2}/.test(trimmed)) return trimmed.substring(0, 5);
-      return trimmed;
-    };
-
-    const normalizedNextTime = normalizeTime(nextTime);
-    const exists = selectedDayTimes.some(t => normalizeTime(t) === normalizedNextTime);
-    
-    if (exists) {
-      Alert.alert(
-        'Aviso',
-        `O horário ${nextTime} já está cadastrado. Por favor, escolha outro horário ou edite um horário existente.`
-      );
-      return;
-    }
-
-    const newTimes = [...selectedDayTimes, nextTime];
-    setSelectedDayTimes(newTimes);
-  };
-
-  const removeTimeSlot = (index) => {
-    const timeToRemove = selectedDayTimes[index];
-    
-    // Verificar se o horário está agendado
-    if (bookedTimes.has(timeToRemove)) {
-      Alert.alert(
-        'Horário Agendado',
-        'Este horário não pode ser removido pois já possui uma consulta agendada.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    const newTimes = selectedDayTimes.filter((_, i) => i !== index);
-    setSelectedDayTimes(newTimes);
-  };
-
-  const updateTimeSlot = (index, time) => {
-    const currentTime = selectedDayTimes[index];
-    
-    // Verificar se o horário atual está agendado
-    if (bookedTimes.has(currentTime)) {
-      Alert.alert(
-        'Horário Agendado',
-        'Este horário não pode ser editado pois já possui uma consulta agendada.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    // Validar formato HH:MM
-    const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-    
-    if (time.length === 5 && timeRegex.test(time)) {
-      // Verificar se o horário já existe em outro índice
-      const existingIndex = selectedDayTimes.findIndex((t, i) => i !== index && t === time);
-      if (existingIndex !== -1) {
-        Alert.alert('Aviso', 'Este horário já está cadastrado. Por favor, escolha outro horário.');
-        return;
-      }
-
-      const newTimes = [...selectedDayTimes];
-      newTimes[index] = time;
-      setSelectedDayTimes(newTimes);
-    } else if (time.length <= 5) {
-      // Permitir digitação parcial
-      const newTimes = [...selectedDayTimes];
-      newTimes[index] = time;
-      setSelectedDayTimes(newTimes);
-    }
-  };
-
-  const formatTimeInput = (time) => {
-    // Formatar automaticamente para HH:MM
-    let formatted = time.replace(/\D/g, ''); // Remove tudo que não é dígito
-    if (formatted.length >= 2) {
-      formatted = formatted.substring(0, 2) + ':' + formatted.substring(2, 4);
-    }
-    return formatted.substring(0, 5);
-  };
-
-  const saveDaySchedule = () => {
-    if (!selectedDay) return;
-
-    const { dateKey } = selectedDay;
-    const newAvailableDays = new Set(availableDays);
-    const newBlockedDays = new Set(blockedDays);
-    const newSchedules = { ...daySchedules };
-
-    // Filtrar apenas horários que NÃO estão agendados para salvar na agenda disponível
-    // Horários agendados devem aparecer na modal mas não devem ser salvos na agenda disponível
-    const availableOnlyTimes = selectedDayTimes.filter(time => {
-      // Normalizar horário para comparação
-      const normalizeTime = (t) => {
-        if (!t) return '';
-        const trimmed = t.trim();
-        if (/^\d{2}:\d{2}:\d{2}/.test(trimmed)) return trimmed.substring(0, 5);
-        return trimmed;
-      };
-      
-      const normalizedTime = normalizeTime(time);
-      return !bookedTimes.has(normalizedTime) && !bookedTimes.has(time);
-    });
-
-    if (availableOnlyTimes.length === 0) {
-      // Se não há horários disponíveis (apenas agendados), remover da lista de disponíveis
-      newAvailableDays.delete(dateKey);
-      delete newSchedules[dateKey];
-    } else {
-      // Remover horários duplicados e inválidos apenas dos horários disponíveis
-      const validTimes = [];
-      const seenTimes = new Set();
-      const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-
-      for (const time of availableOnlyTimes) {
-        // Validar formato
-        if (!timeRegex.test(time)) {
-          continue;
-        }
-        
-        // Verificar duplicatas
-        if (!seenTimes.has(time)) {
-          validTimes.push(time);
-          seenTimes.add(time);
-        }
-      }
-
-      // Ordenar horários
-      validTimes.sort();
-
-      if (validTimes.length === 0) {
-        // Se não há horários válidos, remover da lista de disponíveis
-        newAvailableDays.delete(dateKey);
-        delete newSchedules[dateKey];
-      } else {
-        // Adicionar como disponível e salvar apenas horários disponíveis (não agendados)
-        newAvailableDays.add(dateKey);
-        newBlockedDays.delete(dateKey);
-        newSchedules[dateKey] = validTimes;
-      }
-    }
-
-    setAvailableDays(newAvailableDays);
-    setBlockedDays(newBlockedDays);
-    setDaySchedules(newSchedules);
-    closeScheduleModal();
-  };
-
-  const blockDay = () => {
-    if (!selectedDay) return;
-
-    const { dateKey } = selectedDay;
-    const newAvailableDays = new Set(availableDays);
-    const newBlockedDays = new Set(blockedDays);
-    const newSchedules = { ...daySchedules };
-
-    newAvailableDays.delete(dateKey);
-    newBlockedDays.add(dateKey);
-    delete newSchedules[dateKey];
-
-    setAvailableDays(newAvailableDays);
-    setBlockedDays(newBlockedDays);
-    setDaySchedules(newSchedules);
-    closeScheduleModal();
   };
 
   const clearAllDays = () => {
@@ -827,17 +603,7 @@ const DoctorHomeScreen = ({ navigation }) => {
       console.log('📥 result.message:', result?.message);
       console.log('📥 Chaves do objeto result:', result ? Object.keys(result) : 'result é null/undefined');
       
-      // Verificar sucesso de diferentes formas
-      const isSuccess = result && (
-        result.success === true || 
-        result.success === 'true' ||
-        result.status === 'success' ||
-        (result.message && (
-          result.message.toLowerCase().includes('sucesso') ||
-          result.message.toLowerCase().includes('salva') ||
-          result.message.toLowerCase().includes('atualizada')
-        ))
-      );
+      const isSuccess = result && result.success === true;
       
       if (isSuccess) {
         Alert.alert('Sucesso', result.message || 'Agenda atualizada com sucesso');
@@ -905,7 +671,7 @@ const DoctorHomeScreen = ({ navigation }) => {
       }
 
       console.log('📅 DoctorHomeScreen - Carregando agenda do médico...');
-      const result = await doctorService.getDoctorAvailability(user.id);
+      const result = await doctorService.getDoctorAvailability(user.id, { excludeBooked: false });
       
       if (result && result.success && result.data) {
         // Converter array de availableDays para Set
@@ -927,9 +693,7 @@ const DoctorHomeScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('❌ DoctorHomeScreen - Erro ao carregar agenda:', error);
-      // Em caso de erro, inicializar vazio
-      setAvailableDays(new Set());
-      setDaySchedules({});
+      // Não limpar estado local: GET quebrado (ex.: 500) não deve apagar o que já estava na tela ou acabou de ser salvo
     }
   };
 
@@ -962,6 +726,12 @@ const DoctorHomeScreen = ({ navigation }) => {
       // Verificar se há consultas agendadas neste dia
       const bookedTimes = getDayBookedTimes(day);
       const hasBookedAppointments = bookedTimes.size > 0;
+      const slotsTemplate = daySchedules[dateKey] || [];
+      const freeSlotsCount = slotsTemplate.filter((t) => {
+        const norm =
+          typeof t === 'string' && t.length >= 5 ? t.substring(0, 5) : String(t || '');
+        return norm && !bookedTimes.has(norm);
+      }).length;
       
       days.push(
         <TouchableOpacity
@@ -993,9 +763,9 @@ const DoctorHomeScreen = ({ navigation }) => {
               <View style={styles.calendarDayIndicator}>
                 <CheckmarkCircleIcon size={12} color={colors.success} />
               </View>
-              {daySchedules[dateKey] && daySchedules[dateKey].length > 0 && (
+              {freeSlotsCount > 0 && (
                 <Text style={styles.calendarDayTimesCount}>
-                  {daySchedules[dateKey].length}h
+                  {freeSlotsCount}h
                 </Text>
               )}
             </>
@@ -1149,41 +919,89 @@ const DoctorHomeScreen = ({ navigation }) => {
         >
         {activeTab === 'appointments' ? (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
+            <View style={styles.appointmentsSectionHeader}>
               <Text style={styles.sectionTitle}>Consultas Agendadas</Text>
-              <View style={styles.toggleContainer}>
-                <Text style={styles.toggleLabel}>Mostrar Realizadas</Text>
-                <Switch
-                  value={showCompleted}
-                  onValueChange={setShowCompleted}
-                  trackColor={{ false: colors.gray300, true: colors.primary + '80' }}
-                  thumbColor={showCompleted ? colors.primary : colors.gray400}
-                  ios_backgroundColor={colors.gray300}
-                />
+              <View style={styles.toggleColumn}>
+                <View style={styles.toggleRow}>
+                  <Text style={styles.toggleLabel}>Realizadas</Text>
+                  <Switch
+                    value={showCompleted}
+                    onValueChange={setShowCompleted}
+                    trackColor={{ false: colors.gray300, true: colors.primary + '80' }}
+                    thumbColor={showCompleted ? colors.primary : colors.gray400}
+                    ios_backgroundColor={colors.gray300}
+                  />
+                </View>
+                <View style={styles.toggleRow}>
+                  <Text style={styles.toggleLabel}>Não realizadas</Text>
+                  <Switch
+                    value={showPastIncomplete}
+                    onValueChange={setShowPastIncomplete}
+                    trackColor={{ false: colors.gray300, true: colors.warning + '80' }}
+                    thumbColor={showPastIncomplete ? colors.warning : colors.gray400}
+                    ios_backgroundColor={colors.gray300}
+                  />
+                </View>
               </View>
             </View>
             
             {(() => {
-              // Filtrar consultas baseado no toggle
-              const filteredAppointments = showCompleted 
-                ? appointments 
-                : appointments.filter(apt => {
-                    const aptDate = new Date(apt.appointment_date || apt.scheduled_at);
-                    return aptDate >= new Date();
-                  });
-              
+              const nowMs = Date.now();
+              const completedList = appointments.filter(
+                (apt) => !isAppointmentCancelled(apt) && isAppointmentCompletedForDoctor(apt, nowMs)
+              );
+              const incompletePastList = appointments.filter((apt) =>
+                isAppointmentIncompletePast(apt, nowMs)
+              );
+              const upcomingList = appointments.filter((apt) => {
+                if (isAppointmentCancelled(apt)) {
+                  return false;
+                }
+                const t = getAppointmentTimeMs(apt);
+                return t != null && t >= nowMs;
+              });
+
+              let filteredAppointments = [];
+              if (showCompleted && showPastIncomplete) {
+                const byId = new Map();
+                completedList.forEach((a) => byId.set(a.id, a));
+                incompletePastList.forEach((a) => byId.set(a.id, a));
+                filteredAppointments = Array.from(byId.values()).sort(
+                  (a, b) => (getAppointmentTimeMs(b) ?? 0) - (getAppointmentTimeMs(a) ?? 0)
+                );
+              } else if (showCompleted) {
+                filteredAppointments = [...completedList].sort(
+                  (a, b) => (getAppointmentTimeMs(b) ?? 0) - (getAppointmentTimeMs(a) ?? 0)
+                );
+              } else if (showPastIncomplete) {
+                filteredAppointments = [...incompletePastList].sort(
+                  (a, b) => (getAppointmentTimeMs(b) ?? 0) - (getAppointmentTimeMs(a) ?? 0)
+                );
+              } else {
+                filteredAppointments = [...upcomingList];
+              }
+
               if (filteredAppointments.length === 0) {
+                let emptyText = 'Nenhuma consulta agendada';
+                let emptySubtext = 'Suas consultas com pacientes aparecerão aqui';
+                if (showCompleted && showPastIncomplete) {
+                  emptyText = 'Nenhuma consulta encontrada';
+                  emptySubtext =
+                    'Não há consultas concluídas nem pendentes de conclusão neste período';
+                } else if (showCompleted) {
+                  emptyText = 'Nenhuma consulta realizada';
+                  emptySubtext =
+                    'Consultas com confirmação e pagamento liberado aparecem aqui';
+                } else if (showPastIncomplete) {
+                  emptyText = 'Nenhuma consulta não realizada';
+                  emptySubtext =
+                    'Consultas passadas que aguardam confirmação de realização ou fechamento aparecem aqui';
+                }
                 return (
                   <View style={styles.emptyContainer}>
                     <CalendarIcon size={64} color={colors.gray300} />
-                    <Text style={styles.emptyText}>
-                      {showCompleted ? 'Nenhuma consulta encontrada' : 'Nenhuma consulta agendada'}
-                    </Text>
-                    <Text style={styles.emptySubtext}>
-                      {showCompleted 
-                        ? 'Não há consultas para exibir'
-                        : 'Suas consultas com pacientes aparecerão aqui'}
-                    </Text>
+                    <Text style={styles.emptyText}>{emptyText}</Text>
+                    <Text style={styles.emptySubtext}>{emptySubtext}</Text>
                   </View>
                 );
               }
@@ -1191,6 +1009,12 @@ const DoctorHomeScreen = ({ navigation }) => {
               return filteredAppointments.map((appointment) => {
                 const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at);
                 const isPast = appointmentDate < new Date();
+                const isTele = isTeleconsultAppointment(appointment);
+                const doctorViewsCompleted = isAppointmentCompletedForDoctor(appointment, Date.now());
+                const awaitingPatientConfirm = isTeleconsultAwaitingHonorariumConfirmation(
+                  appointment,
+                  Date.now()
+                );
                 
                 // Buscar nome do paciente de várias fontes possíveis
                 // 1. patient_name direto (se vier da API) - PRIORIDADE MÁXIMA
@@ -1206,7 +1030,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                   'Não informado';
                 
                 // Log para debug de teleconsultas
-                if (appointment.is_teleconsultation) {
+                if (isTele) {
                   console.log('🔍 Teleconsulta - Nome do paciente:', {
                     appointment_id: appointment.id,
                     patient_name_from_api: appointment.patient_name,
@@ -1216,8 +1040,10 @@ const DoctorHomeScreen = ({ navigation }) => {
                   });
                 }
                 
-                const isCancelled = appointment.status === 'cancelled';
-                
+                const isCancelled = isAppointmentCancelled(appointment);
+                const teleconsultPago =
+                  isTele && isTeleconsultPaidForVideoStart(appointment);
+
                 return (
                 <TouchableOpacity
                   key={appointment.id}
@@ -1230,7 +1056,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                 >
                   <View style={styles.appointmentHeader}>
                     <View style={styles.appointmentIconContainer}>
-                      {appointment.is_teleconsultation ? (
+                      {isTele ? (
                         <VideoCamIcon size={24} color={isPast ? colors.textLight : colors.primary} />
                       ) : (
                         <CalendarIcon size={24} color={isPast ? colors.textLight : colors.primary} />
@@ -1242,19 +1068,31 @@ const DoctorHomeScreen = ({ navigation }) => {
                           Consulta
                         </Text>
                       </View>
-                      {appointment.is_teleconsultation && (
+                      {isTele && (
                         <View style={styles.teleconsultationBadge}>
                           <VideoCamIcon size={18} color={colors.textWhite} />
                           <Text style={styles.teleconsultationBadgeText}>Teleconsulta</Text>
                         </View>
                       )}
                       {/* Sempre mostrar nome do paciente nas teleconsultas */}
-                      {appointment.is_teleconsultation && (
+                      {isTele && (
                         <Text style={styles.appointmentPatient}>
                           Paciente: {patientName}
                         </Text>
                       )}
-                      {appointment.is_teleconsultation && (appointment.doctorUser || appointment.doctor) && (
+                      {isTele &&
+                        appointment.status !== 'cancelled' &&
+                        appointment.status !== 'cancelada' && (
+                          <Text
+                            style={[
+                              styles.teleconsultAgendaStatus,
+                              teleconsultPago && styles.teleconsultAgendaStatusPaid,
+                            ]}
+                          >
+                            {getDoctorAgendaSlotBookingLabel(appointment)}
+                          </Text>
+                        )}
+                      {isTele && (appointment.doctorUser || appointment.doctor) && (
                         <View style={styles.doctorInfoRow}>
                           <MedicalIcon size={14} color={colors.primary} />
                           <Text style={styles.doctorInfoText}>
@@ -1293,9 +1131,30 @@ const DoctorHomeScreen = ({ navigation }) => {
                       <Text style={styles.cancelledBadgeText}>Cancelada</Text>
                     </View>
                   )}
-                  {isPast && appointment.status !== 'cancelled' && (
-                    <View style={styles.pastBadge}>
-                      <Text style={styles.pastBadgeText}>Realizada</Text>
+                  {!isCancelled && doctorViewsCompleted && (
+                    <View style={styles.completedBadgeDoctor}>
+                      <Text style={styles.completedBadgeDoctorText}>Realizada</Text>
+                    </View>
+                  )}
+                  {!isCancelled && !doctorViewsCompleted && isPast && (
+                    <View
+                      style={
+                        awaitingPatientConfirm
+                          ? styles.awaitingConfirmBadge
+                          : styles.notCompletedBadge
+                      }
+                    >
+                      <Text
+                        style={
+                          awaitingPatientConfirm
+                            ? styles.awaitingConfirmBadgeText
+                            : styles.notCompletedBadgeText
+                        }
+                      >
+                        {awaitingPatientConfirm
+                          ? 'Aguardando confirmação'
+                          : 'Não realizada'}
+                      </Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -1318,6 +1177,7 @@ const DoctorHomeScreen = ({ navigation }) => {
                 style={[styles.agendaButton, styles.agendaButtonSave]}
                 onPress={saveAvailability}
                 disabled={savingAvailability}
+                activeOpacity={0.7}
               >
                 <SaveOutlineIcon size={20} color={colors.textWhite} />
                 <Text style={styles.agendaButtonText}>
@@ -1328,6 +1188,7 @@ const DoctorHomeScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={[styles.agendaButton, styles.agendaButtonClear]}
                 onPress={clearAllDays}
+                activeOpacity={0.7}
               >
                 <TrashOutlineIcon size={20} color={colors.error} />
                 <Text style={[styles.agendaButtonText, { color: colors.error }]}>
@@ -1338,161 +1199,6 @@ const DoctorHomeScreen = ({ navigation }) => {
           </View>
         )}
       </ScrollView>
-
-      {/* Modal de Horários */}
-      <Modal
-        visible={scheduleModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closeScheduleModal}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={closeScheduleModal}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-            style={styles.modalKeyboardView}
-          >
-            <TouchableOpacity
-              activeOpacity={1}
-              onPress={(e) => e.stopPropagation()}
-              style={styles.modalContent}
-            >
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  {selectedDay && selectedDay.date ? `Horários - ${moment(selectedDay.date).format('DD/MM/YYYY')}` : 'Horários'}
-                </Text>
-                <TouchableOpacity onPress={closeScheduleModal} style={styles.modalCloseButton}>
-                  <CloseIcon size={24} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                style={styles.modalBody}
-                contentContainerStyle={styles.modalBodyContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                <Text style={styles.modalSubtitle}>
-                  Defina os horários disponíveis para este dia
-                </Text>
-
-                {/* Lista de horários */}
-                <View style={styles.timeSlotsContainer}>
-                  {selectedDayTimes.map((time, index) => {
-                    // Normalizar horário para comparação (remover segundos se houver)
-                    const normalizeTimeForComparison = (t) => {
-                      if (!t) return '';
-                      const trimmed = t.trim();
-                      // Se está no formato HH:MM:SS, remover segundos
-                      if (/^\d{2}:\d{2}:\d{2}/.test(trimmed)) {
-                        return trimmed.substring(0, 5);
-                      }
-                      return trimmed;
-                    };
-                    
-                    const normalizedTime = normalizeTimeForComparison(time);
-                    const isBooked = bookedTimes.has(normalizedTime) || bookedTimes.has(time);
-                    
-                    console.log('🔍 Verificando horário na modal:', {
-                      time,
-                      normalizedTime,
-                      isBooked,
-                      bookedTimes: Array.from(bookedTimes),
-                    });
-                    
-                    return (
-                      <View key={index} style={[
-                        styles.timeSlotRow,
-                        isBooked && styles.timeSlotRowBooked
-                      ]}>
-                        <View style={styles.timeInputContainer}>
-                          <TextInput
-                            style={[
-                              styles.timeInput,
-                              isBooked && styles.timeInputBooked
-                            ]}
-                            value={time}
-                            onChangeText={(text) => {
-                              if (!isBooked) {
-                                const formatted = formatTimeInput(text);
-                                updateTimeSlot(index, formatted);
-                              }
-                            }}
-                            placeholder="HH:MM"
-                            placeholderTextColor={colors.gray400}
-                            keyboardType="numeric"
-                            maxLength={5}
-                            editable={!isBooked}
-                            selectTextOnFocus={!isBooked}
-                          />
-                          {isBooked && (
-                            <View style={styles.bookedBadge}>
-                              <LockClosedIcon size={12} color={colors.textWhite} />
-                              <Text style={styles.bookedBadgeText}>Agendado</Text>
-                            </View>
-                          )}
-                        </View>
-                        {/* Só mostrar botão de excluir se o horário NÃO estiver agendado */}
-                        {!isBooked && (
-                          <TouchableOpacity
-                            style={styles.removeTimeButton}
-                            onPress={() => removeTimeSlot(index)}
-                          >
-                            <TrashOutlineIcon 
-                              size={20} 
-                              color={colors.error} 
-                            />
-                          </TouchableOpacity>
-                        )}
-                        {isBooked && (
-                          <View style={styles.bookedLockIcon}>
-                            <LockClosedIcon 
-                              size={20} 
-                              color={colors.primary} 
-                            />
-                          </View>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
-
-                {/* Botão adicionar horário */}
-                <TouchableOpacity
-                  style={styles.addTimeButton}
-                  onPress={addTimeSlot}
-                >
-                  <AddCircleOutlineIcon size={24} color={colors.primary} />
-                  <Text style={styles.addTimeButtonText}>Adicionar Horário</Text>
-                </TouchableOpacity>
-
-                {/* Botões de ação */}
-                <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalButtonBlock]}
-                    onPress={blockDay}
-                  >
-                    <CloseCircleIcon size={20} color={colors.textWhite} />
-                    <Text style={styles.modalButtonText}>Bloquear Dia</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalButtonSave]}
-                    onPress={saveDaySchedule}
-                  >
-                    <CheckmarkCircleIcon size={20} color={colors.textWhite} />
-                    <Text style={styles.modalButtonText}>Salvar</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </TouchableOpacity>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -1579,11 +1285,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  appointmentsSectionHeader: {
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 24,
     fontWeight: '700',
     color: colors.text,
     flex: 1,
+  },
+  toggleColumn: {
+    marginTop: 12,
+    gap: 10,
+    alignSelf: 'stretch',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -1687,6 +1407,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 4,
   },
+  teleconsultAgendaStatus: {
+    fontSize: 13,
+    color: colors.warning,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  teleconsultAgendaStatusPaid: {
+    color: colors.success,
+  },
   appointmentDescription: {
     fontSize: 14,
     color: colors.textLight,
@@ -1767,12 +1496,61 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textTransform: 'uppercase',
   },
+  completedBadgeDoctor: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: colors.success + '28',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  completedBadgeDoctorText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.success,
+    textTransform: 'uppercase',
+  },
+  awaitingConfirmBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: colors.warning + '28',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  awaitingConfirmBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.warning,
+    textTransform: 'uppercase',
+  },
+  notCompletedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: colors.textLight + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  notCompletedBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textLight,
+    textTransform: 'uppercase',
+  },
   // Estilos do calendário
   calendarContainer: {
+    alignSelf: 'flex-start',
+    width: '100%',
+    flexGrow: 0,
+    flexShrink: 0,
     backgroundColor: colors.backgroundLight,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    padding: 12,
+    marginBottom: 4,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -1780,25 +1558,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 6,
   },
   calendarNavButton: {
     padding: 8,
   },
   calendarMonthText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.text,
     textTransform: 'capitalize',
   },
   calendarWeekDays: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   calendarWeekDay: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   calendarWeekDayText: {
     fontSize: 12,
@@ -1808,15 +1586,17 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 16,
+    alignItems: 'flex-start',
+    alignContent: 'flex-start',
+    marginBottom: 0,
   },
   calendarDay: {
     width: '14.28%',
-    aspectRatio: 1,
+    aspectRatio: 0.9,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
-    margin: 2,
+    borderRadius: 6,
+    margin: 1,
     backgroundColor: colors.backgroundLight,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1876,7 +1656,7 @@ const styles = StyleSheet.create({
   calendarLegend: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: 16,
+    paddingTop: 4,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
@@ -1897,17 +1677,21 @@ const styles = StyleSheet.create({
     color: colors.textLight,
   },
   agendaActions: {
-    gap: 12,
-    marginTop: 8,
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 2,
   },
   agendaButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    padding: 16,
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    minHeight: 44,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 2,
   },
   agendaButtonSave: {
     backgroundColor: colors.primary,
@@ -1918,14 +1702,14 @@ const styles = StyleSheet.create({
     borderColor: colors.error,
   },
   agendaButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.textWhite,
   },
   sectionSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textLight,
-    marginBottom: 16,
+    marginBottom: 6,
   },
   calendarDayTimesCount: {
     position: 'absolute',
@@ -1933,174 +1717,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: colors.success,
     fontWeight: '600',
-  },
-  // Estilos do modal de horários
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalKeyboardView: {
-    width: '100%',
-  },
-  modalContent: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '85%',
-    minHeight: 300,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modalBody: {
-    flexGrow: 1,
-  },
-  modalBodyContent: {
-    padding: 20,
-    paddingBottom: 100,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: colors.textLight,
-    marginBottom: 20,
-  },
-  timeSlotsContainer: {
-    marginBottom: 20,
-  },
-  timeSlotRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  timeSlotRowBooked: {
-    opacity: 0.9,
-  },
-  timeInputContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  timeInput: {
-    flex: 1,
-    backgroundColor: colors.backgroundLight,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
-    textAlign: 'center',
-  },
-  timeInputBooked: {
-    backgroundColor: colors.primary + '15',
-    borderColor: colors.primary,
-    borderWidth: 2,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  bookedBadge: {
-    position: 'absolute',
-    top: -8,
-    right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    gap: 4,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  bookedBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textWhite,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  bookedLockIcon: {
-    padding: 12,
-    backgroundColor: colors.primary + '20',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.primary + '40',
-  },
-  removeTimeButton: {
-    padding: 12,
-    backgroundColor: colors.error + '20',
-    borderRadius: 12,
-  },
-  removeTimeButtonDisabled: {
-    backgroundColor: colors.textLight + '20',
-    opacity: 0.5,
-  },
-  addTimeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    backgroundColor: colors.backgroundLight,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderStyle: 'dashed',
-    marginBottom: 20,
-  },
-  addTimeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-    marginBottom: 40,
-    paddingTop: 20,
-  },
-  modalButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    borderRadius: 12,
-  },
-  modalButtonSave: {
-    backgroundColor: colors.primary,
-  },
-  modalButtonBlock: {
-    backgroundColor: colors.error,
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textWhite,
   },
 });
 

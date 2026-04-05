@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -12,12 +12,14 @@ import {
   Platform,
   Switch,
   Linking,
+  Keyboard,
   Modal,
   FlatList,
   Image,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
@@ -59,8 +61,77 @@ import apiService from '../../services/apiService';
 import GOOGLE_MAPS_CONFIG from '../../config/maps';
 import { checkGoogleMapsConfig } from '../../utils/checkGoogleMapsConfig';
 import { formatCrmDisplay } from '../../utils/crm';
+import {
+  filterTeleconsultDoctors,
+  sortTeleconsultDoctors,
+  formatNextSlotLabel,
+  normalizeDoctorGender,
+} from '../../utils/teleconsultDoctorFilters';
+import {
+  labelForDoctorQualification,
+  DOCTOR_QUALIFICATION_LEVELS,
+} from '../../constants/doctorQualificationLevels';
+/** Unifica formatos da API (doctors vs users) para o modal de detalhes na teleconsulta */
+function getDoctorDetailsForModal(d) {
+  if (!d || typeof d !== 'object') return null;
+  const name = d.name || d.user?.name || d.full_name || '';
+  const photoUrl =
+    d.photo_url ||
+    d.photo ||
+    d.profile_photo ||
+    d.user?.photo_url ||
+    d.user?.photo ||
+    null;
+  const crm = d.crm ?? d.user?.crm ?? null;
+  const specialtyName =
+    (d.medical_specialty && typeof d.medical_specialty === 'object'
+      ? d.medical_specialty.name
+      : null) ||
+    (typeof d.medical_specialty === 'string' ? d.medical_specialty : null) ||
+    (d.medicalSpecialty && typeof d.medicalSpecialty === 'object'
+      ? d.medicalSpecialty.name
+      : null) ||
+    (typeof d.medicalSpecialty === 'string' ? d.medicalSpecialty : null) ||
+    d.specialty ||
+    null;
+  const rating = d.average_rating ?? d.avg_rating ?? null;
+  const totalReviews = d.total_reviews ?? d.reviews_count ?? 0;
+  const qualRaw =
+    d.professional_qualification_level ??
+    d.user?.professional_qualification_level ??
+    null;
+  const displayQualification = labelForDoctorQualification(qualRaw);
+  const courses = Array.isArray(d.courses)
+    ? d.courses
+    : Array.isArray(d.caregiver_courses)
+      ? d.caregiver_courses
+      : [];
+  const formationText =
+    (d.formation_details && String(d.formation_details).trim()) ||
+    (d.formation_description && String(d.formation_description).trim()) ||
+    (d.user?.formation_details && String(d.user.formation_details).trim()) ||
+    (d.user?.formation_description && String(d.user.formation_description).trim()) ||
+    null;
+  const g = normalizeDoctorGender(d.gender ?? d.user?.gender ?? null);
+  const displayGender =
+    g === 'masculino' ? 'Masculino' : g === 'feminino' ? 'Feminino' : g === 'outro' ? 'Outro' : null;
+  return {
+    ...d,
+    courses,
+    displayName: name.trim() || 'Médico',
+    displayPhotoUrl: photoUrl,
+    displayCrm: crm,
+    displaySpecialty: specialtyName,
+    displayQualification: displayQualification || null,
+    displayFormation: formationText,
+    displayGender,
+    displayRating: rating,
+    displayTotalReviews: totalReviews,
+  };
+}
 
 const AddAppointmentScreen = ({ route, navigation }) => {
+  const insets = useSafeAreaInsets();
   let { groupId, groupName, appointmentId, appointment, isTeleconsultation } = route.params || {};
   
   // TEMPORÁRIO: Se groupId é um timestamp (> 999999999999), usar o grupo de teste
@@ -69,9 +140,6 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     groupId = 1;
   }
   
-  // Se isTeleconsultation for true, forçar tipo medical e teleconsulta
-  const isTeleconsultationMode = isTeleconsultation === true;
-  
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -79,6 +147,10 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   const [showRecurrenceEndPicker, setShowRecurrenceEndPicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const googlePlacesRef = useRef(null);
+  const [addressListVisible, setAddressListVisible] = useState(false);
+  const selectingAddressRef = useRef(false);
+  const lastSelectedAddressRef = useRef('');
+  const lastSelectedAddressAtRef = useRef(0);
   
   // Estados para especialidades médicas
   const [specialties, setSpecialties] = useState([]);
@@ -90,6 +162,19 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   const [doctorModalVisible, setDoctorModalVisible] = useState(false);
   const [doctorDetailsModalVisible, setDoctorDetailsModalVisible] = useState(false);
   const [selectedDoctorDetails, setSelectedDoctorDetails] = useState(null);
+
+  /** Filtros do modal "Selecione o médico" (teleconsulta) */
+  const [tcNameSearch, setTcNameSearch] = useState('');
+  const [tcFilterSpecialtyId, setTcFilterSpecialtyId] = useState(null);
+  const [tcFilterCity, setTcFilterCity] = useState('');
+  const [tcFilterState, setTcFilterState] = useState('');
+  const [tcOnlyWithAvailability, setTcOnlyWithAvailability] = useState(false);
+  const [tcSortBy, setTcSortBy] = useState('next_slot');
+  const [tcSpecialtyFilterModalVisible, setTcSpecialtyFilterModalVisible] = useState(false);
+  /** @type {null | 'masculino' | 'feminino' | 'outro'} */
+  const [tcFilterGender, setTcFilterGender] = useState(null);
+  /** Valores `professional_qualification_level` (múltipla seleção; OR na lista) */
+  const [tcFilterQualifications, setTcFilterQualifications] = useState([]);
   
   // Estados para médicos do grupo (quando tipo é "medical")
   const [groupDoctors, setGroupDoctors] = useState([]);
@@ -106,27 +191,29 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   // Dados do compromisso
   const [formData, setFormData] = useState({
     title: '',
-    type: isTeleconsultationMode ? 'medical' : 'medical', // common, medical, fisioterapia, exames
+    type: 'medical', // common, medical, fisioterapia, exames
     date: new Date().toISOString(),
     duration: '60',
     address: '',
     notes: '',
     selectedDoctor: null,
     medicalSpecialtyId: null,
-    isTeleconsultation: isTeleconsultationMode, // Teleconsulta - apenas true no modo teleconsulta (sem toggle)
+    isTeleconsultation: isTeleconsultation === true,
     recurrenceType: 'none', // none, daily, weekdays, custom
     recurrenceDays: [], // [0,1,2,3,4,5,6]
     recurrenceStart: new Date().toISOString(),
     recurrenceEnd: '',
     reminderOption: '3', // Opções pré-definidas
   });
-  
-  // Garantir que isTeleconsultation seja sempre false quando não for modo teleconsulta
-  useEffect(() => {
-    if (!isTeleconsultationMode && formData.isTeleconsultation) {
-      updateField('isTeleconsultation', false);
-    }
-  }, [isTeleconsultationMode]);
+
+  /** Inclui edição de teleconsulta vinda da agenda (ex.: aba Passadas) sem param isTeleconsultation na rota */
+  const isTeleconsultationMode = useMemo(() => {
+    return (
+      isTeleconsultation === true ||
+      !!(appointment?.is_teleconsultation || appointment?.isTeleconsultation) ||
+      formData.isTeleconsultation === true
+    );
+  }, [isTeleconsultation, appointment, formData.isTeleconsultation]);
 
   // Carregar especialidades ao montar o componente
   useEffect(() => {
@@ -145,6 +232,12 @@ const AddAppointmentScreen = ({ route, navigation }) => {
       loadSpecialties();
     }
   }, [specialtyModalVisible]);
+
+  useEffect(() => {
+    if (tcSpecialtyFilterModalVisible && specialties.length === 0) {
+      loadSpecialties();
+    }
+  }, [tcSpecialtyFilterModalVisible]);
 
   const loadSpecialties = async (retryCount = 0) => {
     const MAX_RETRIES = 2;
@@ -271,14 +364,15 @@ const AddAppointmentScreen = ({ route, navigation }) => {
         const appointmentDate = new Date(appointmentData.appointment_date || appointmentData.scheduled_at);
         setSelectedDate(appointmentDate);
         
+        const loadedLocation = appointmentData.location || '';
         setFormData({
           title: appointmentData.title || '',
           type: appointmentData.type || 'medical',
           date: appointmentDate.toISOString(),
           duration: '60',
-          address: appointmentData.location || '',
+          address: loadedLocation,
           notes: appointmentData.notes || appointmentData.description || '',
-          selectedDoctor: appointmentData.doctor || null,
+          selectedDoctor: appointmentData.doctor || appointmentData.doctorUser || null,
           medicalSpecialtyId: appointmentData.medical_specialty_id || null,
           isTeleconsultation: appointmentData.is_teleconsultation || appointmentData.isTeleconsultation || false,
           recurrenceType: appointmentData.recurrence_type || 'none',
@@ -287,6 +381,11 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           recurrenceEnd: appointmentData.recurrence_end || '',
           reminderOption: '3',
         });
+        if (loadedLocation.trim()) {
+          setTimeout(() => {
+            googlePlacesRef.current?.setAddressText?.(loadedLocation);
+          }, 200);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados do compromisso:', error);
@@ -305,6 +404,21 @@ const AddAppointmentScreen = ({ route, navigation }) => {
       return newData;
     });
   };
+
+  const handlePlacesAddressChange = useCallback((text) => {
+    if (selectingAddressRef.current) return;
+    const recentlySelected = Date.now() - lastSelectedAddressAtRef.current < 1200;
+    if (
+      recentlySelected &&
+      lastSelectedAddressRef.current &&
+      text !== lastSelectedAddressRef.current &&
+      String(text || '').length < lastSelectedAddressRef.current.length
+    ) {
+      return;
+    }
+    updateField('address', text);
+    setAddressListVisible(true);
+  }, []);
 
   // Definir especialidade padrão quando o tipo mudar para "medical"
   useEffect(() => {
@@ -335,8 +449,8 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     }
   }, [isTeleconsultationMode, formData.isTeleconsultation, formData.medicalSpecialtyId, formData.type]);
 
-  // Função para carregar médicos da plataforma (elegíveis para teleconsultas)
-  // Usa getDoctors(groupId) que verifica acesso ao grupo e retorna médicos do grupo + plataforma
+  // getDoctors(groupId) retorna médicos do grupo (tabela doctors) + da plataforma (users).
+  // Para teleconsulta usamos apenas quem tem is_platform_doctor (cadastro na plataforma).
   const loadPlatformDoctors = async () => {
     if (!groupId) return;
     
@@ -354,11 +468,12 @@ const AddAppointmentScreen = ({ route, navigation }) => {
         doctorsList = response;
       }
       
-      // Filtrar apenas médicos disponíveis (se tiver essa informação)
-      const availableDoctors = doctorsList.filter(doctor => {
-        return doctor.is_available !== false;
-      });
-      
+      // Só médicos com cadastro na plataforma (users.profile = doctor) podem fazer teleconsulta.
+      // O backend também devolve médicos só do grupo (tabela doctors); esses não têm is_platform_doctor.
+      const platformDoctors = doctorsList.filter((doctor) => doctor.is_platform_doctor === true);
+
+      const availableDoctors = platformDoctors.filter((doctor) => doctor.is_available !== false);
+
       // Ordenar médicos alfabeticamente por nome
       const sortedDoctors = availableDoctors.sort((a, b) => {
         const nameA = (a.name || '').toLowerCase();
@@ -375,6 +490,99 @@ const AddAppointmentScreen = ({ route, navigation }) => {
       setLoadingDoctors(false);
     }
   };
+
+  const showTeleconsultDoctorFilters =
+    isTeleconsultationMode || formData.isTeleconsultation;
+
+  /**
+   * Especialidades inferidas dos médicos do grupo (fallback se /medical-specialties ainda não carregou).
+   * O seletor do filtro de teleconsulta usa a lista completa da API — não só as dos médicos do grupo.
+   */
+  const tcTeleconsultSpecialtyOptions = useMemo(() => {
+    const groupDocs = doctors.filter((d) => d.is_group_doctor === true);
+    const source = groupDocs.length > 0 ? groupDocs : doctors;
+    const byId = new Map();
+    for (const d of source) {
+      const sid = d.medical_specialty_id ?? d.medical_specialty?.id;
+      if (sid == null || sid === '' || Number.isNaN(Number(sid))) continue;
+      const idNum = Number(sid);
+      if (byId.has(idNum)) continue;
+      const name =
+        (d.medical_specialty && typeof d.medical_specialty === 'object' && d.medical_specialty.name) ||
+        (typeof d.medical_specialty === 'string' ? d.medical_specialty : null) ||
+        `Especialidade #${idNum}`;
+      byId.set(idNum, { id: idNum, name });
+    }
+    return Array.from(byId.values()).sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '', 'pt-BR')
+    );
+  }, [doctors]);
+
+  /** Lista simples para o seletor de teleconsulta: “Todas” + especialidades A–Z. */
+  const tcSpecialtyPickerRows = useMemo(() => {
+    const raw =
+      specialties.length > 0 ? specialties.map((s) => ({ id: s.id, name: s.name })) : tcTeleconsultSpecialtyOptions;
+    const sorted = [...raw].sort((a, b) =>
+      String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR', { sensitivity: 'base' })
+    );
+    return [{ id: '__all__', name: 'Todas as especialidades' }, ...sorted];
+  }, [tcTeleconsultSpecialtyOptions, specialties]);
+
+  const closeTeleconsultSpecialtyFilterModal = useCallback(() => {
+    Keyboard.dismiss();
+    setTcSpecialtyFilterModalVisible(false);
+  }, []);
+
+  const teleconsultFilteredDoctors = useMemo(() => {
+    if (!showTeleconsultDoctorFilters) {
+      return doctors;
+    }
+    const filtered = filterTeleconsultDoctors(
+      doctors,
+      {
+        specialtyId: tcFilterSpecialtyId,
+        cityQuery: tcFilterCity,
+        stateQuery: tcFilterState,
+        onlyWithAvailability: tcOnlyWithAvailability,
+        maxDistanceKm: null,
+        nameQuery: tcNameSearch,
+        gender: tcFilterGender,
+        qualificationLevels: tcFilterQualifications,
+      },
+      null
+    );
+    const sortKey = tcSortBy === 'distance' ? 'name' : tcSortBy;
+    return sortTeleconsultDoctors(filtered, sortKey, null);
+  }, [
+    showTeleconsultDoctorFilters,
+    doctors,
+    tcFilterSpecialtyId,
+    tcFilterCity,
+    tcFilterState,
+    tcOnlyWithAvailability,
+    tcNameSearch,
+    tcSortBy,
+    tcFilterGender,
+    tcFilterQualifications,
+  ]);
+
+  const resetTeleconsultDoctorFilters = useCallback(() => {
+    setTcNameSearch('');
+    setTcFilterSpecialtyId(null);
+    setTcFilterCity('');
+    setTcFilterState('');
+    setTcOnlyWithAvailability(false);
+    setTcSortBy('next_slot');
+    setTcFilterGender(null);
+    setTcFilterQualifications([]);
+  }, []);
+
+  const tcSpecialtyFilterLabel =
+    tcFilterSpecialtyId == null
+      ? 'Todas as especialidades'
+      : specialties.find((s) => Number(s.id) === Number(tcFilterSpecialtyId))?.name ||
+        tcTeleconsultSpecialtyOptions.find((s) => Number(s.id) === Number(tcFilterSpecialtyId))?.name ||
+        'Especialidade';
 
   // Carregar médicos do grupo quando tipo for "medical"
   useEffect(() => {
@@ -518,351 +726,43 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     }
   };
 
+  /**
+   * Agenda do médico para TELECONSULTA (tela Agendar Teleconsulta → modal "Selecionar Data e Horário").
+   * Backend: GET /doctors/{id}/availability?exclude_booked=1 — omite horários já comprometidos.
+   */
   const loadDoctorAvailability = async (doctorId) => {
     try {
       setLoadingAvailability(true);
       console.log('📞 loadDoctorAvailability - Buscando agenda para médico ID:', doctorId);
-      const response = await doctorService.getDoctorAvailability(doctorId);
-      
+      const response = await doctorService.getDoctorAvailability(doctorId, { excludeBooked: true });
+
       console.log('📥 loadDoctorAvailability - Resposta completa do backend:', JSON.stringify(response, null, 2));
-      
-      // Formato esperado: { availableDays: [], daySchedules: {} }
-      if (response && response.success) {
-        console.log('✅ loadDoctorAvailability - Resposta válida recebida:', {
-          availableDaysCount: response.data?.availableDays?.length || 0,
-          availableDays: response.data?.availableDays || [],
-          daySchedulesKeys: response.data?.daySchedules ? Object.keys(response.data.daySchedules) : [],
-          daySchedules: response.data?.daySchedules || {},
+
+      const payload = response?.data;
+      const hasAgendaShape =
+        payload &&
+        typeof payload === 'object' &&
+        (Array.isArray(payload.availableDays) ||
+          (payload.daySchedules != null && typeof payload.daySchedules === 'object'));
+
+      if (response && (response.success === true || hasAgendaShape) && hasAgendaShape) {
+        console.log('✅ loadDoctorAvailability - Agenda recebida (horários já ocupados omitidos pelo backend):', {
+          availableDaysCount: payload.availableDays?.length || 0,
+          availableDays: payload.availableDays || [],
+          daySchedulesKeys: payload.daySchedules ? Object.keys(payload.daySchedules) : [],
+          daySchedules: payload.daySchedules || {},
         });
-        // Buscar consultas agendadas para este médico para filtrar horários ocupados
-        const today = new Date();
-        const startDate = new Date(today);
-        startDate.setDate(today.getDate() - 1); // Incluir consultas de ontem também
-        const endDate = new Date(today);
-        endDate.setDate(today.getDate() + 90); // Próximos 90 dias
-        
-        try {
-          const appointmentsResult = await appointmentService.getAppointments(
-            null, // groupId = null para buscar todas
-            startDate.toISOString().split('T')[0],
-            endDate.toISOString().split('T')[0]
-          );
-          
-          // Criar mapa de horários agendados por data
-          const bookedTimesByDate = {};
-          const currentDoctorId = Number(doctorId); // ID do médico cuja agenda estamos carregando
-          
-          console.log('🔍 loadDoctorAvailability - Buscando consultas para médico:', {
-            doctorId,
-            currentDoctorId,
-            totalAppointments: appointmentsResult.data?.length || 0,
-          });
-          
-          if (appointmentsResult.success && appointmentsResult.data) {
-            appointmentsResult.data.forEach((appointment) => {
-              const appointmentDoctorId = appointment.doctor_id ? Number(appointment.doctor_id) : null;
-              const doctorUserId = appointment.doctorUser?.id ? Number(appointment.doctorUser.id) : null;
-              const appointmentDoctorIdFromRelation = appointment.doctor?.id ? Number(appointment.doctor.id) : null;
-              
-              // Verificar se a consulta é deste médico
-              const isDoctorAppointment = 
-                appointmentDoctorId === currentDoctorId || 
-                doctorUserId === currentDoctorId || 
-                appointmentDoctorIdFromRelation === currentDoctorId;
-              
-              if (isDoctorAppointment) {
-                const appointmentDate = appointment.appointment_date || appointment.scheduled_at;
-                if (appointmentDate) {
-                  // Verificar se a consulta está reservada (reserved_until > now)
-                  const reservedUntil = appointment.reserved_until;
-                  const isReserved = reservedUntil && new Date(reservedUntil) > new Date();
-                  
-                  // Se não está reservada ou a reserva expirou, considerar como agendada
-                  // Se está reservada, também bloquear o horário
-                  if (!isReserved || appointment.payment_status === 'paid_held' || appointment.payment_status === 'paid' || appointment.payment_status === 'released') {
-                    // Criar data a partir da string ISO
-                    const dateObj = new Date(appointmentDate);
-                    
-                    // Usar métodos LOCAIS (não UTC) para extrair data e hora
-                    // Isso garante que pegamos a data/hora no timezone local do dispositivo
-                    const year = dateObj.getFullYear();
-                    const month = dateObj.getMonth() + 1; // getMonth() retorna 0-11
-                    const day = dateObj.getDate();
-                    const hours = dateObj.getHours(); // getHours() retorna no timezone local
-                    const minutes = dateObj.getMinutes(); // getMinutes() retorna no timezone local
-                    
-                    const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-                    
-                    if (!bookedTimesByDate[dateKey]) {
-                      bookedTimesByDate[dateKey] = new Set();
-                    }
-                    bookedTimesByDate[dateKey].add(time);
-                  } else {
-                    // Consulta está reservada, bloquear o horário também
-                    const dateObj = new Date(appointmentDate);
-                    const year = dateObj.getFullYear();
-                    const month = dateObj.getMonth() + 1;
-                    const day = dateObj.getDate();
-                    const hours = dateObj.getHours();
-                    const minutes = dateObj.getMinutes();
-                    
-                    const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-                    
-                    if (!bookedTimesByDate[dateKey]) {
-                      bookedTimesByDate[dateKey] = new Set();
-                    }
-                    bookedTimesByDate[dateKey].add(time);
-                    
-                    console.log('🔒 loadDoctorAvailability - Horário reservado bloqueado:', {
-                      dateKey,
-                      time,
-                      reservedUntil,
-                      payment_status: appointment.payment_status,
-                    });
-                  }
-                  
-                  console.log('📅 loadDoctorAvailability - Horário agendado encontrado:', {
-                    dateKey,
-                    time,
-                    appointmentId: appointment.id,
-                    appointmentDate: appointmentDate,
-                    extracted: { year, month, day, hours, minutes },
-                    localDateString: dateObj.toLocaleString('pt-BR'),
-                    appointmentDoctorId,
-                    doctorUserId,
-                    appointmentDoctorIdFromRelation,
-                    currentDoctorId,
-                  });
-                }
-              } else {
-                // Log para debug - verificar por que consultas não estão sendo consideradas
-                if (appointment.doctor_id || appointment.doctorUser || appointment.doctor) {
-                  console.log('⚠️ loadDoctorAvailability - Consulta não é deste médico:', {
-                    appointmentId: appointment.id,
-                    appointmentDoctorId,
-                    doctorUserId,
-                    appointmentDoctorIdFromRelation,
-                    currentDoctorId,
-                    match: {
-                      byDoctorId: appointmentDoctorId === currentDoctorId,
-                      byDoctorUserId: doctorUserId === currentDoctorId,
-                      byDoctorRelation: appointmentDoctorIdFromRelation === currentDoctorId,
-                    },
-                  });
-                }
-              }
-            });
-          }
-          
-          console.log('📊 loadDoctorAvailability - Horários agendados encontrados:', {
-            bookedTimesByDate: Object.keys(bookedTimesByDate).reduce((acc, key) => {
-              acc[key] = Array.from(bookedTimesByDate[key]);
-              return acc;
-            }, {}),
-          });
-          
-          // Filtrar datas passadas e horários agendados da disponibilidade
-          const today = new Date();
-          today.setHours(0, 0, 0, 0); // Zerar horas para comparar apenas datas
-          
-          const filteredDaySchedules = {};
-          const filteredAvailableDays = [];
-          
-          (response.data.availableDays || []).forEach((dateKey) => {
-            // Filtrar datas passadas
-            const dateParts = dateKey.split('-');
-            if (dateParts.length === 3) {
-              const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-              dateObj.setHours(0, 0, 0, 0);
-              
-              // Pular datas passadas
-              if (dateObj < today) {
-                console.log('🚫 loadDoctorAvailability - Pulando data passada:', dateKey);
-                return;
-              }
-            }
-            
-            const availableTimes = response.data.daySchedules?.[dateKey] || [];
-            const bookedTimes = bookedTimesByDate[dateKey] || new Set();
-            
-            // Função para normalizar horário para formato HH:MM
-            const normalizeTime = (timeStr) => {
-              if (!timeStr) return '';
-              const trimmed = timeStr.trim();
-              
-              // Se está no formato HH:MM:SS ou HH:MM:SS.SSS, remover os segundos
-              if (/^\d{2}:\d{2}:\d{2}/.test(trimmed)) {
-                return trimmed.substring(0, 5); // "08:00:00" -> "08:00"
-              }
-              
-              // Se já está no formato HH:MM, retornar
-              if (/^\d{2}:\d{2}$/.test(trimmed)) {
-                return trimmed;
-              }
-              
-              // Se está no formato H:MM, adicionar zero à esquerda
-              if (/^\d{1}:\d{2}$/.test(trimmed)) {
-                return `0${trimmed}`;
-              }
-              
-              // Se está no formato HHMM, adicionar dois pontos
-              if (/^\d{4}$/.test(trimmed)) {
-                return `${trimmed.substring(0, 2)}:${trimmed.substring(2, 4)}`;
-              }
-              
-              // Se está no formato HMM, adicionar zero e dois pontos
-              if (/^\d{3}$/.test(trimmed)) {
-                return `0${trimmed.substring(0, 1)}:${trimmed.substring(1, 3)}`;
-              }
-              
-              return trimmed;
-            };
-            
-            // Verificar se é hoje para filtrar horários passados
-            const isToday = dateObj.getTime() === today.getTime();
-            const now = new Date();
-            const currentHour = now.getHours();
-            const currentMinute = now.getMinutes();
-            
-            // Filtrar apenas horários não agendados e não passados (se for hoje)
-            const freeTimes = availableTimes.filter(time => {
-              if (!time || time.trim() === '') return false;
-              
-              const normalizedAvailableTime = normalizeTime(time);
-              
-              // Se for hoje, verificar se o horário já passou
-              if (isToday) {
-                const [timeHour, timeMinute] = normalizedAvailableTime.split(':').map(Number);
-                if (isNaN(timeHour) || isNaN(timeMinute)) {
-                  return false; // Horário inválido
-                }
-                
-                // Comparar horário disponível com horário atual
-                if (timeHour < currentHour || (timeHour === currentHour && timeMinute <= currentMinute)) {
-                  console.log('🚫 loadDoctorAvailability - Pulando horário passado:', {
-                    dateKey,
-                    time: normalizedAvailableTime,
-                    currentTime: `${currentHour}:${currentMinute}`,
-                  });
-                  return false; // Horário já passou
-                }
-              }
-              
-              // Verificar se o horário está agendado (comparar com todas as variações possíveis)
-              let isBooked = false;
-              
-              if (bookedTimes.size > 0) {
-                bookedTimes.forEach(bookedTime => {
-                  if (!bookedTime) return;
-                  
-                  const normalizedBookedTime = normalizeTime(bookedTime);
-                  
-                  // Comparar horários normalizados (principal comparação)
-                  if (normalizedAvailableTime === normalizedBookedTime && normalizedAvailableTime !== '') {
-                    isBooked = true;
-                    return;
-                  }
-                  
-                  // Comparar também formatos originais
-                  if (time === bookedTime) {
-                    isBooked = true;
-                    return;
-                  }
-                  
-                  // Comparar normalizado com original
-                  if (normalizedAvailableTime === bookedTime || time === normalizedBookedTime) {
-                    isBooked = true;
-                    return;
-                  }
-                  
-                  // Comparar removendo zeros à esquerda (ex: "08:00" vs "8:00")
-                  const removeLeadingZero = (t) => t.replace(/^0(\d:)/, '$1');
-                  if (removeLeadingZero(normalizedAvailableTime) === removeLeadingZero(normalizedBookedTime)) {
-                    isBooked = true;
-                    return;
-                  }
-                });
-              }
-              
-              if (isBooked) {
-                console.log('🚫 Horário filtrado (agendado):', { 
-                  dateKey, 
-                  availableTime: time, 
-                  normalizedAvailableTime,
-                  bookedTimes: Array.from(bookedTimes),
-                  bookedTimesNormalized: Array.from(bookedTimes).map(t => normalizeTime(t)),
-                });
-              }
-              
-              return !isBooked;
-            });
-            
-            // Log detalhado para debug
-            if (availableTimes.length > 0) {
-              console.log('🔍 Comparação de horários para', dateKey, ':', {
-                availableTimes,
-                bookedTimes: Array.from(bookedTimes),
-                bookedTimesNormalized: Array.from(bookedTimes).map(t => normalizeTime(t)),
-                freeTimes,
-                filteredCount: availableTimes.length - freeTimes.length,
-                allNormalized: availableTimes.map(t => normalizeTime(t)),
-              });
-            }
-            
-            if (freeTimes.length > 0) {
-              filteredAvailableDays.push(dateKey);
-              filteredDaySchedules[dateKey] = freeTimes;
-            } else {
-              console.log('📅 Dia removido (sem horários disponíveis):', dateKey);
-            }
-          });
-          
-          console.log('📅 loadDoctorAvailability - Horários filtrados:', {
-            originalDays: response.data.availableDays?.length || 0,
-            filteredDays: filteredAvailableDays.length,
-            bookedTimesByDate: Object.keys(bookedTimesByDate).reduce((acc, key) => {
-              acc[key] = Array.from(bookedTimesByDate[key]);
-              return acc;
-            }, {}),
-            filteredDaySchedules: Object.keys(filteredDaySchedules).reduce((acc, key) => {
-              acc[key] = filteredDaySchedules[key];
-              return acc;
-            }, {}),
-          });
-          
-          setDoctorAvailability({
-            availableDays: filteredAvailableDays,
-            daySchedules: filteredDaySchedules,
-          });
-        } catch (appointmentsError) {
-          console.warn('⚠️ Erro ao buscar consultas agendadas, usando agenda completa:', appointmentsError);
-          // Se houver erro ao buscar consultas, usar agenda completa
-          console.log('📋 Usando agenda completa (sem filtrar consultas agendadas):', {
-            availableDays: response.data?.availableDays || [],
-            daySchedules: response.data?.daySchedules || {},
-          });
-          setDoctorAvailability(response.data);
-        }
+        setDoctorAvailability({
+          availableDays: payload.availableDays || [],
+          daySchedules: payload.daySchedules || {},
+        });
       } else {
-        // Response não tem success: true ou estrutura diferente
-        console.error('❌ loadDoctorAvailability - Resposta inválida ou sem success:', {
-          response: response,
+        console.error('❌ loadDoctorAvailability - Resposta sem agenda utilizável:', {
+          response,
           hasSuccess: response?.success,
           hasData: !!response?.data,
         });
-        
-        // Mock data para desenvolvimento
-        console.warn('⚠️ Endpoint de agenda não implementado ou retornou erro, usando dados mock');
-        setDoctorAvailability({
-          availableDays: ['2025-12-15', '2025-12-16', '2025-12-17'],
-          daySchedules: {
-            '2025-12-15': ['08:00', '09:00', '10:00', '14:00', '15:00'],
-            '2025-12-16': ['08:00', '09:00', '14:00', '15:00', '16:00'],
-            '2025-12-17': ['08:00', '10:00', '11:00', '14:00'],
-          },
-        });
+        setDoctorAvailability({ availableDays: [], daySchedules: {} });
       }
     } catch (error) {
       console.error('❌ Erro ao carregar agenda do médico:', error);
@@ -871,16 +771,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
         stack: error.stack,
         response: error.response,
       });
-      // Em caso de erro, usar dados mock
-      console.warn('⚠️ Usando dados mock devido ao erro');
-      setDoctorAvailability({
-        availableDays: ['2025-12-15', '2025-12-16', '2025-12-17'],
-        daySchedules: {
-          '2025-12-15': ['08:00', '09:00', '10:00', '14:00', '15:00'],
-          '2025-12-16': ['08:00', '09:00', '14:00', '15:00', '16:00'],
-          '2025-12-17': ['08:00', '10:00', '11:00', '14:00'],
-        },
-      });
+      setDoctorAvailability({ availableDays: [], daySchedules: {} });
     } finally {
       setLoadingAvailability(false);
     }
@@ -1168,9 +1059,15 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     setLoading(true);
 
     try {
-      // Preparar dados para API
-      const doctorId = formData.selectedDoctor?.id || null;
-      
+      // Preparar dados para API — preferir users.id quando o cadastro doctors estiver ligado à plataforma
+      const sel = formData.selectedDoctor;
+      const doctorId =
+        sel?.user_id != null && sel.user_id !== ''
+          ? Number(sel.user_id)
+          : sel?.id != null
+            ? Number(sel.id)
+            : null;
+
       console.log('📤 Preparando dados do compromisso:', {
         selectedDoctor: formData.selectedDoctor,
         doctorId: doctorId,
@@ -1215,7 +1112,13 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           description: formData.notes.trim() || null,
           scheduledAt: formData.date,
           appointmentDate: formData.date,
-          doctorId: formData.selectedDoctor?.id || null,
+          doctorId:
+            formData.selectedDoctor?.user_id != null &&
+            formData.selectedDoctor.user_id !== ''
+              ? Number(formData.selectedDoctor.user_id)
+              : formData.selectedDoctor?.id != null
+                ? Number(formData.selectedDoctor.id)
+                : null,
           medicalSpecialtyId: formData.medicalSpecialtyId || null,
           isTeleconsultation: formData.isTeleconsultation || false,
           location: formData.address.trim() || null,
@@ -1332,6 +1235,9 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     { value: '4', label: '15min antes' },
   ];
 
+  /** Layout mais compacto na teleconsulta (cuidador/amigo): menos rolagem até o botão agendar */
+  const compactTeleconsultLayout = isTeleconsultationMode;
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
@@ -1354,21 +1260,49 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           <View style={styles.placeholder} />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-          <View style={styles.content}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.scrollView}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+        >
+          <View
+            style={[
+              styles.content,
+              compactTeleconsultLayout && styles.contentCompactTeleconsult,
+            ]}
+          >
             {/* Ícone */}
-            <View style={styles.iconContainer}>
-              <AppointmentIcon size={48} color={colors.primary} />
+            <View
+              style={[
+                styles.iconContainer,
+                compactTeleconsultLayout && styles.iconContainerCompactTeleconsult,
+              ]}
+            >
+              <AppointmentIcon
+                size={compactTeleconsultLayout ? 40 : 48}
+                color={colors.primary}
+              />
             </View>
 
-            <Text style={styles.title}>
+            <Text
+              style={[
+                styles.title,
+                compactTeleconsultLayout && styles.titleCompactTeleconsult,
+              ]}
+            >
               {isEditing 
                 ? 'Editar Compromisso' 
                 : isTeleconsultationMode 
                   ? 'Agendar Teleconsulta' 
                   : 'Agendar Compromisso'}
             </Text>
-            <Text style={styles.subtitle}>
+            <Text
+              style={[
+                styles.subtitle,
+                compactTeleconsultLayout && styles.subtitleCompactTeleconsult,
+              ]}
+            >
               {isEditing 
                 ? 'Edite as informações do compromisso'
                 : isTeleconsultationMode
@@ -1493,6 +1427,9 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             {formData.type === 'medical' && !isTeleconsultationMode && (
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Médico *</Text>
+                <Text style={styles.helperTextBelowLabel}>
+                  O médico não precisa ser membro do grupo: basta escolher um profissional da lista (inclui médicos da plataforma vinculados ao grupo).
+                </Text>
                 {loadingGroupDoctors ? (
                   <View style={styles.loadingDoctorsContainer}>
                     <ActivityIndicator size="small" color={colors.primary} />
@@ -1592,8 +1529,20 @@ const AddAppointmentScreen = ({ route, navigation }) => {
 
             {/* Seleção de Médico da Plataforma - para modo teleconsulta */}
             {isTeleconsultationMode && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Médico *</Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  compactTeleconsultLayout && styles.inputContainerCompactTeleconsult,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.label,
+                    compactTeleconsultLayout && styles.labelCompactTeleconsult,
+                  ]}
+                >
+                  Médico *
+                </Text>
                 {loadingDoctors ? (
                   <View style={styles.loadingDoctorsContainer}>
                     <ActivityIndicator size="small" color={colors.primary} />
@@ -1930,6 +1879,12 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     ref={googlePlacesRef}
                     placeholder="Buscar endereço no Google..."
                     fetchDetails={true}
+                    listViewDisplayed={addressListVisible}
+                    keepResultsAfterBlur={false}
+                    listViewProps={{
+                      keyboardShouldPersistTaps: 'handled',
+                      nestedScrollEnabled: true,
+                    }}
                     onPress={(data, details = null) => {
                       try {
                         let addressToSave = '';
@@ -1945,7 +1900,20 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                         }
                         
                         if (addressToSave) {
+                          selectingAddressRef.current = true;
+                          lastSelectedAddressRef.current = addressToSave;
+                          lastSelectedAddressAtRef.current = Date.now();
+                          setTimeout(() => {
+                            selectingAddressRef.current = false;
+                          }, 450);
                           updateField('address', addressToSave);
+                          setAddressListVisible(false);
+                          try {
+                            googlePlacesRef.current?.setAddressText?.(addressToSave);
+                            googlePlacesRef.current?.blur?.();
+                          } catch (e) {
+                            // noop
+                          }
                           Toast.show({
                             type: 'success',
                             text1: 'Endereço selecionado',
@@ -1989,8 +1957,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     }}
                     enablePoweredByContainer={false}
                     debounce={400}
-                    minLength={3}
-                    nearbyPlacesAPI="GooglePlacesSearch"
+                    minLength={1}
                     filterReverseGeocodingByTypes={['locality', 'administrative_area_level_3']}
                     styles={{
                       container: {
@@ -2028,7 +1995,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                         marginTop: 8,
                         borderWidth: 1,
                         borderColor: colors.border,
-                        maxHeight: 200,
+                        maxHeight: Math.min(280, Math.round(Dimensions.get('window').height * 0.36)),
                         shadowColor: '#000',
                         shadowOffset: { width: 0, height: 4 },
                         shadowOpacity: 0.15,
@@ -2059,9 +2026,12 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     }}
                     textInputProps={{
                       placeholderTextColor: colors.placeholder,
-                      value: formData.address,
-                      onChangeText: (text) => updateField('address', text),
+                      onChangeText: handlePlacesAddressChange,
                       returnKeyType: 'search',
+                      onFocus: () => setAddressListVisible(true),
+                      onBlur: () => {
+                        setTimeout(() => setAddressListVisible(false), 350);
+                      },
                     }}
                     renderLeftButton={() => (
                       <View style={styles.autocompleteLeftButton}>
@@ -2073,6 +2043,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                         style={styles.autocompleteClearButton}
                         onPress={() => {
                           updateField('address', '');
+                          setAddressListVisible(false);
                           if (googlePlacesRef.current) {
                             googlePlacesRef.current.setAddressText('');
                           }
@@ -2127,47 +2098,106 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             )}
 
             {/* Lembretes */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Lembretes</Text>
+            <View
+              style={[
+                styles.inputContainer,
+                compactTeleconsultLayout && styles.inputContainerCompactTeleconsult,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.label,
+                  compactTeleconsultLayout && styles.labelCompactTeleconsult,
+                ]}
+              >
+                Lembretes
+              </Text>
               {reminderOptions.map((option) => (
                 <TouchableOpacity
                   key={option.value}
-                  style={styles.radioOption}
+                  style={[
+                    styles.radioOption,
+                    compactTeleconsultLayout && styles.radioOptionCompactTeleconsult,
+                  ]}
                   onPress={() => updateField('reminderOption', option.value)}
                 >
                   <View style={[
                     styles.radio,
+                    compactTeleconsultLayout && styles.radioCompactTeleconsult,
                     formData.reminderOption === option.value && styles.radioActive,
                   ]}>
                     {formData.reminderOption === option.value && (
-                      <View style={styles.radioDot} />
+                      <View
+                        style={[
+                          styles.radioDot,
+                          compactTeleconsultLayout && styles.radioDotCompactTeleconsult,
+                        ]}
+                      />
                     )}
                   </View>
-                  <Text style={styles.radioLabel}>{option.label}</Text>
+                  <Text
+                    style={[
+                      styles.radioLabel,
+                      compactTeleconsultLayout && styles.radioLabelCompactTeleconsult,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             {/* Observações */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Observações</Text>
-              <View style={[styles.inputWrapper, styles.textAreaWrapper]}>
+            <View
+              style={[
+                styles.inputContainer,
+                compactTeleconsultLayout && styles.inputContainerCompactTeleconsult,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.label,
+                  compactTeleconsultLayout && styles.labelCompactTeleconsult,
+                ]}
+              >
+                Observações
+              </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  styles.textAreaWrapper,
+                  compactTeleconsultLayout && styles.textAreaWrapperCompactTeleconsult,
+                ]}
+              >
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   placeholder="Adicione observações..."
                   value={formData.notes}
                   onChangeText={(value) => updateField('notes', value)}
                   multiline
-                  numberOfLines={3}
+                  numberOfLines={compactTeleconsultLayout ? 2 : 3}
                 />
               </View>
             </View>
 
             {/* Info Card */}
-            <View style={styles.infoCard}>
-              <InformationCircleIcon size={24} color={colors.info} />
+            <View
+              style={[
+                styles.infoCard,
+                compactTeleconsultLayout && styles.infoCardCompactTeleconsult,
+              ]}
+            >
+              <InformationCircleIcon
+                size={compactTeleconsultLayout ? 20 : 24}
+                color={colors.info}
+              />
               <View style={styles.infoContent}>
-                <Text style={styles.infoText}>
+                <Text
+                  style={[
+                    styles.infoText,
+                    compactTeleconsultLayout && styles.infoTextCompactTeleconsult,
+                  ]}
+                >
                   Os lembretes serão enviados mesmo se o app estiver fechado. 
                   Compromissos médicos habilitam a gravação de áudio durante a consulta.
                 </Text>
@@ -2192,7 +2222,11 @@ const AddAppointmentScreen = ({ route, navigation }) => {
               )}
             </TouchableOpacity>
 
-            <View style={{ height: 40 }} />
+            <View
+              style={{
+                height: compactTeleconsultLayout ? 12 : 40,
+              }}
+            />
           </View>
         </ScrollView>
 
@@ -2211,7 +2245,13 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           }}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+            <View
+              style={[
+                styles.specialtiesModalSheet,
+                { paddingBottom: Math.max(insets.bottom, 12) },
+              ]}
+            >
+              <View style={styles.modalSheetHandle} />
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Selecione a Especialidade</Text>
                 <TouchableOpacity
@@ -2226,7 +2266,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
               </View>
               {specialties.length === 0 ? (
-                <View style={styles.modalEmptyContainer}>
+                <View style={styles.specialtiesModalEmptyBody}>
                   <Text style={styles.modalEmptyText}>Carregando especialidades...</Text>
                   <TouchableOpacity
                     onPress={() => {
@@ -2242,8 +2282,12 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                 <FlatList
                   data={specialties}
                   keyExtractor={(item) => item.id.toString()}
-                  style={styles.flatList}
+                  style={[styles.flatList, styles.specialtiesModalListFlex]}
                   contentContainerStyle={styles.flatListContent}
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
+                  scrollEnabled
+                  removeClippedSubviews={false}
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       style={[
@@ -2280,12 +2324,40 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           visible={doctorModalVisible}
           animationType="slide"
           transparent={true}
-          onRequestClose={() => setDoctorModalVisible(false)}
+          onRequestClose={() => {
+            if (tcSpecialtyFilterModalVisible) {
+              closeTeleconsultSpecialtyFilterModal();
+            } else {
+              setDoctorModalVisible(false);
+            }
+          }}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Selecione o Médico</Text>
+            <View
+              style={
+                showTeleconsultDoctorFilters
+                  ? [
+                      styles.doctorSelectSheet,
+                      { paddingBottom: Math.max(insets.bottom, 10) },
+                    ]
+                  : styles.modalContent
+              }
+            >
+              {showTeleconsultDoctorFilters ? <View style={styles.modalSheetHandle} /> : null}
+              <View
+                style={[
+                  styles.modalHeader,
+                  showTeleconsultDoctorFilters && styles.modalHeaderTeleconsult,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    showTeleconsultDoctorFilters && styles.modalTitleTeleconsult,
+                  ]}
+                >
+                  Selecione o Médico
+                </Text>
                 <TouchableOpacity
                   onPress={() => setDoctorModalVisible(false)}
                   style={styles.modalCloseButton}
@@ -2293,11 +2365,203 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   <CloseIcon size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
+              {showTeleconsultDoctorFilters ? (
+                <ScrollView
+                  style={styles.tcFilterPanel}
+                  nestedScrollEnabled
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Text style={styles.tcFilterPanelTitle}>Filtros</Text>
+                  <Text style={styles.tcFilterHint}>
+                    Ajuste para refinar a lista. Toque em um médico para agendar.
+                  </Text>
+                  <TextInput
+                    style={styles.tcFilterInput}
+                    placeholder="Buscar por nome"
+                    placeholderTextColor={colors.gray400}
+                    value={tcNameSearch}
+                    onChangeText={setTcNameSearch}
+                    autoCorrect={false}
+                  />
+                  <View style={styles.tcFilterRow}>
+                    <TouchableOpacity
+                      style={styles.tcFilterChipWide}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setTcSpecialtyFilterModalVisible(true);
+                      }}
+                    >
+                      <Text style={styles.tcFilterChipText} numberOfLines={1}>
+                        {tcSpecialtyFilterLabel}
+                      </Text>
+                      <ChevronDownIcon size={18} color={colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.tcFilterClearBtn}
+                      onPress={resetTeleconsultDoctorFilters}
+                    >
+                      <Text style={styles.tcFilterClearText}>Limpar</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.tcFilterRow}>
+                    <TextInput
+                      style={[styles.tcFilterInput, styles.tcFilterInputFlex]}
+                      placeholder="Cidade"
+                      placeholderTextColor={colors.gray400}
+                      value={tcFilterCity}
+                      onChangeText={setTcFilterCity}
+                      autoCorrect={false}
+                    />
+                    <TextInput
+                      style={styles.tcFilterStateInput}
+                      placeholder="UF"
+                      placeholderTextColor={colors.gray400}
+                      value={tcFilterState}
+                      onChangeText={(t) => setTcFilterState(t.toUpperCase().slice(0, 2))}
+                      autoCapitalize="characters"
+                      maxLength={2}
+                    />
+                  </View>
+                  <Text style={styles.tcFilterSectionLabel}>Sexo do profissional</Text>
+                  <View style={styles.tcChipRow}>
+                    {[
+                      { id: null, label: 'Qualquer' },
+                      { id: 'feminino', label: 'Feminino' },
+                      { id: 'masculino', label: 'Masculino' },
+                      { id: 'outro', label: 'Outro' },
+                    ].map(({ id, label }) => {
+                      const active = tcFilterGender === id;
+                      return (
+                        <TouchableOpacity
+                          key={label}
+                          style={[styles.tcSortChip, active && styles.tcSortChipActive]}
+                          onPress={() => setTcFilterGender(id)}
+                        >
+                          <Text
+                            style={[
+                              styles.tcSortChipText,
+                              active && styles.tcSortChipTextActive,
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.tcFilterSectionLabel}>Nível de qualificação</Text>
+                  <Text style={styles.tcFilterQualificationHint}>
+                    Marque uma ou mais opções. Aparecem médicos que tenham pelo menos uma delas.
+                  </Text>
+                  <View style={styles.tcChipRow}>
+                    <TouchableOpacity
+                      key="tc-qual-any"
+                      style={[
+                        styles.tcSortChip,
+                        tcFilterQualifications.length === 0 && styles.tcSortChipActive,
+                      ]}
+                      onPress={() => setTcFilterQualifications([])}
+                    >
+                      <Text
+                        style={[
+                          styles.tcSortChipText,
+                          tcFilterQualifications.length === 0 && styles.tcSortChipTextActive,
+                        ]}
+                      >
+                        Qualquer
+                      </Text>
+                    </TouchableOpacity>
+                    {DOCTOR_QUALIFICATION_LEVELS.map((opt) => {
+                      const active = tcFilterQualifications.includes(opt.value);
+                      return (
+                        <TouchableOpacity
+                          key={opt.value}
+                          style={[styles.tcSortChip, active && styles.tcSortChipActive]}
+                          onPress={() => {
+                            setTcFilterQualifications((prev) => {
+                              if (prev.includes(opt.value)) {
+                                return prev.filter((v) => v !== opt.value);
+                              }
+                              return [...prev, opt.value];
+                            });
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.tcSortChipText,
+                              active && styles.tcSortChipTextActive,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <View style={styles.tcSwitchRow}>
+                    <Text style={styles.tcSwitchLabel}>Só com horário disponível na agenda</Text>
+                    <Switch
+                      value={tcOnlyWithAvailability}
+                      onValueChange={setTcOnlyWithAvailability}
+                      trackColor={{ false: colors.gray300, true: colors.primary + '80' }}
+                      thumbColor={tcOnlyWithAvailability ? colors.primary : colors.gray400}
+                    />
+                  </View>
+                  <Text style={styles.tcFilterSectionLabel}>Ordenar por</Text>
+                  <View style={styles.tcChipRow}>
+                    {[
+                      { id: 'next_slot', label: 'Horário mais próximo' },
+                      { id: 'name', label: 'Nome' },
+                    ].map(({ id, label }) => {
+                      const active = tcSortBy === id;
+                      return (
+                        <TouchableOpacity
+                          key={id}
+                          style={[
+                            styles.tcSortChip,
+                            active && styles.tcSortChipActive,
+                          ]}
+                          onPress={() => setTcSortBy(id)}
+                        >
+                          <Text
+                            style={[
+                              styles.tcSortChipText,
+                              active && styles.tcSortChipTextActive,
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              ) : null}
               <FlatList
-                data={doctors}
-                keyExtractor={(item) => item.id.toString()}
-                style={styles.flatList}
-                contentContainerStyle={styles.flatListContent}
+                data={showTeleconsultDoctorFilters ? teleconsultFilteredDoctors : doctors}
+                keyExtractor={(item, index) =>
+                  `${item.id ?? 'd'}-${item.is_platform_doctor ? 'p' : 'g'}-${index}`
+                }
+                style={[
+                  styles.flatList,
+                  showTeleconsultDoctorFilters && styles.tcDoctorListFlex,
+                ]}
+                contentContainerStyle={[
+                  styles.flatListContent,
+                  showTeleconsultDoctorFilters && styles.flatListContentTeleconsult,
+                ]}
+                keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={
+                  showTeleconsultDoctorFilters ? (
+                    <View style={styles.tcEmptyList}>
+                      <Text style={styles.tcEmptyListText}>
+                        Nenhum médico com esses filtros. Tente outro nível de qualificação, especialidade ou sexo, ampliar
+                        cidade/UF ou desmarcar &quot;só com horário&quot;.
+                      </Text>
+                    </View>
+                  ) : null
+                }
                 renderItem={({ item }) => {
                   const renderStars = (rating) => {
                     if (!rating || rating === 0) return null;
@@ -2371,6 +2635,23 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                             {item.crm && (
                               <Text style={styles.doctorItemCrm}>CRM: {formatCrmDisplay(item.crm)}</Text>
                             )}
+                            {showTeleconsultDoctorFilters &&
+                              (item.city || item.state) && (
+                              <Text style={styles.doctorItemLocation} numberOfLines={1}>
+                                {[item.city, item.state].filter(Boolean).join(' · ')}
+                              </Text>
+                            )}
+                            {showTeleconsultDoctorFilters && item.next_slot_at ? (
+                              <Text style={styles.doctorItemNextSlot} numberOfLines={1}>
+                                Próximo horário: {formatNextSlotLabel(item.next_slot_at) || '—'}
+                              </Text>
+                            ) : showTeleconsultDoctorFilters &&
+                              item.is_platform_doctor &&
+                              !item.has_future_availability ? (
+                              <Text style={styles.doctorItemNoSlot} numberOfLines={1}>
+                                Sem horário cadastrado nas próximas datas
+                              </Text>
+                            ) : null}
                             {item.average_rating && (
                               <View style={styles.ratingContainer}>
                                 {renderStars(item.average_rating)}
@@ -2388,6 +2669,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                       <TouchableOpacity
                         style={styles.doctorDetailsButton}
                         onPress={() => {
+                          setDoctorModalVisible(false);
                           setSelectedDoctorDetails(item);
                           setDoctorDetailsModalVisible(true);
                         }}
@@ -2401,6 +2683,85 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                 ItemSeparatorComponent={() => <View style={styles.separator} />}
               />
             </View>
+            {tcSpecialtyFilterModalVisible ? (
+              <View style={styles.tcSpecialtyNestedOverlay} pointerEvents="box-none">
+                <TouchableOpacity
+                  style={styles.tcSpecialtyNestedBackdrop}
+                  activeOpacity={1}
+                  onPress={closeTeleconsultSpecialtyFilterModal}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fechar seleção de especialidade"
+                />
+                <View
+                  style={[
+                    styles.tcSpecialtySimpleSheet,
+                    { paddingBottom: Math.max(insets.bottom, 12) },
+                  ]}
+                >
+                  <View style={styles.modalSheetHandle} />
+                  <View style={[styles.modalHeader, styles.modalHeaderTeleconsult]}>
+                    <Text style={[styles.modalTitle, styles.modalTitleTeleconsult]}>
+                      Filtrar por especialidade
+                    </Text>
+                    <TouchableOpacity
+                      onPress={closeTeleconsultSpecialtyFilterModal}
+                      style={styles.modalCloseButton}
+                    >
+                      <CloseIcon size={24} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.tcSpecialtyScrollHint} numberOfLines={2}>
+                    Lista em ordem alfabética. Role para ver todas.
+                  </Text>
+                  <ScrollView
+                    style={styles.tcSpecialtyScroll}
+                    contentContainerStyle={styles.tcSpecialtyScrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                    bounces
+                  >
+                    {tcSpecialtyPickerRows.length <= 1 ? (
+                      <View style={styles.modalEmptyContainer}>
+                        <Text style={styles.modalEmptyText}>Carregando especialidades…</Text>
+                      </View>
+                    ) : (
+                      tcSpecialtyPickerRows.map((item, index) => {
+                        const selected =
+                          item.id === '__all__'
+                            ? tcFilterSpecialtyId == null
+                            : Number(tcFilterSpecialtyId) === Number(item.id);
+                        return (
+                          <TouchableOpacity
+                            key={`${item.id}-${index}`}
+                            style={[styles.specialtyItem, selected && styles.specialtyItemSelected]}
+                            onPress={() => {
+                              if (item.id === '__all__') {
+                                setTcFilterSpecialtyId(null);
+                              } else {
+                                setTcFilterSpecialtyId(item.id);
+                              }
+                              closeTeleconsultSpecialtyFilterModal();
+                            }}
+                            activeOpacity={0.65}
+                          >
+                            <Text
+                              style={[
+                                styles.specialtyItemText,
+                                selected && styles.specialtyItemTextSelected,
+                              ]}
+                            >
+                              {item.name}
+                            </Text>
+                            {selected ? <CheckmarkIcon size={22} color={colors.primary} /> : null}
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </ScrollView>
+                </View>
+              </View>
+            ) : null}
           </View>
         </Modal>
 
@@ -2412,7 +2773,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           onRequestClose={() => setDoctorDetailsModalVisible(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+            <View style={[styles.modalContent, styles.doctorDetailsModalSheet]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Dados Profissionais</Text>
                 <TouchableOpacity
@@ -2422,17 +2783,23 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                   <CloseIcon size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
-              <ScrollView 
-                style={styles.doctorDetailsScroll}
+              <ScrollView
+                style={[
+                  styles.doctorDetailsScroll,
+                  { maxHeight: Math.round(Dimensions.get('window').height * 0.62) },
+                ]}
+                contentContainerStyle={styles.doctorDetailsScrollContent}
                 showsVerticalScrollIndicator={false}
               >
-                {selectedDoctorDetails && (
+                {selectedDoctorDetails && (() => {
+                  const doc = getDoctorDetailsForModal(selectedDoctorDetails);
+                  if (!doc) return null;
+                  return (
                   <View style={styles.doctorDetailsContent}>
-                    {/* Foto e Nome */}
                     <View style={styles.doctorDetailsHeader}>
-                      {selectedDoctorDetails.photo || selectedDoctorDetails.photo_url ? (
+                      {doc.displayPhotoUrl ? (
                         <Image
-                          source={{ uri: selectedDoctorDetails.photo_url || selectedDoctorDetails.photo }}
+                          source={{ uri: doc.displayPhotoUrl }}
                           style={styles.doctorDetailsPhoto}
                         />
                       ) : (
@@ -2440,16 +2807,18 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                           <PersonIcon size={48} color={colors.gray400} />
                         </View>
                       )}
-                      <Text style={styles.doctorDetailsName}>{selectedDoctorDetails.name}</Text>
-                      {selectedDoctorDetails.crm && (
-                        <Text style={styles.doctorDetailsCrm}>CRM: {formatCrmDisplay(selectedDoctorDetails.crm)}</Text>
-                      )}
-                      {selectedDoctorDetails.average_rating && (
+                      <Text style={styles.doctorDetailsName}>{doc.displayName}</Text>
+                      {doc.displayCrm ? (
+                        <Text style={styles.doctorDetailsCrm}>
+                          CRM: {formatCrmDisplay(doc.displayCrm)}
+                        </Text>
+                      ) : null}
+                      {doc.displayRating != null && doc.displayRating > 0 ? (
                         <View style={styles.doctorDetailsRating}>
                           {(() => {
                             const stars = [];
-                            const fullStars = Math.floor(selectedDoctorDetails.average_rating);
-                            const hasHalfStar = selectedDoctorDetails.average_rating % 1 >= 0.5;
+                            const fullStars = Math.floor(doc.displayRating);
+                            const hasHalfStar = doc.displayRating % 1 >= 0.5;
 
                             for (let i = 0; i < fullStars; i++) {
                               stars.push(
@@ -2463,7 +2832,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                               );
                             }
 
-                            const emptyStars = 5 - Math.ceil(selectedDoctorDetails.average_rating);
+                            const emptyStars = 5 - Math.ceil(doc.displayRating);
                             for (let i = 0; i < emptyStars; i++) {
                               stars.push(
                                 <StarOutlineIcon key={`empty-${i}`} size={20} color={colors.gray400} />
@@ -2473,62 +2842,105 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                             return <View style={styles.starsContainer}>{stars}</View>;
                           })()}
                           <Text style={styles.doctorDetailsRatingText}>
-                            {selectedDoctorDetails.average_rating.toFixed(1)} ({selectedDoctorDetails.total_reviews || 0} avaliações)
+                            {Number(doc.displayRating).toFixed(1)} ({doc.displayTotalReviews || 0} avaliações)
                           </Text>
                         </View>
-                      )}
+                      ) : null}
                     </View>
 
-                    {/* Especialidade */}
-                    {selectedDoctorDetails.medical_specialty && (
+                    {doc.displaySpecialty ? (
                       <View style={styles.doctorDetailsSection}>
                         <Text style={styles.doctorDetailsLabel}>Especialidade</Text>
-                        <Text style={styles.doctorDetailsValue}>
-                          {selectedDoctorDetails.medical_specialty.name || selectedDoctorDetails.medical_specialty}
-                        </Text>
+                        <Text style={styles.doctorDetailsValue}>{doc.displaySpecialty}</Text>
                       </View>
-                    )}
+                    ) : null}
 
-                    {/* Localização */}
-                    {(selectedDoctorDetails.city || selectedDoctorDetails.neighborhood) && (
+                    <View style={styles.doctorDetailsSection}>
+                      <Text style={styles.doctorDetailsLabel}>Nível de qualificação</Text>
+                      <Text style={styles.doctorDetailsValue}>
+                        {doc.displayQualification || 'Não informado'}
+                      </Text>
+                    </View>
+
+                    {doc.displayGender ? (
+                      <View style={styles.doctorDetailsSection}>
+                        <Text style={styles.doctorDetailsLabel}>Sexo</Text>
+                        <Text style={styles.doctorDetailsValue}>{doc.displayGender}</Text>
+                      </View>
+                    ) : null}
+
+                    {doc.city || doc.state || doc.neighborhood ? (
                       <View style={styles.doctorDetailsSection}>
                         <Text style={styles.doctorDetailsLabel}>Localização</Text>
                         <Text style={styles.doctorDetailsValue}>
-                          {[selectedDoctorDetails.city, selectedDoctorDetails.neighborhood]
-                            .filter(Boolean)
-                            .join(', ')}
+                          {[doc.city, doc.state, doc.neighborhood].filter(Boolean).join(', ')}
                         </Text>
                       </View>
-                    )}
+                    ) : null}
 
-                    {/* Formação */}
-                    {selectedDoctorDetails.formation_details && (
+                    {doc.phone ? (
+                      <View style={styles.doctorDetailsSection}>
+                        <Text style={styles.doctorDetailsLabel}>Telefone</Text>
+                        <Text style={styles.doctorDetailsValue}>{doc.phone}</Text>
+                      </View>
+                    ) : null}
+
+                    {doc.notes ? (
+                      <View style={styles.doctorDetailsSection}>
+                        <Text style={styles.doctorDetailsLabel}>Observações</Text>
+                        <Text style={styles.doctorDetailsValue}>{doc.notes}</Text>
+                      </View>
+                    ) : null}
+
+                    {doc.address ? (
+                      <View style={styles.doctorDetailsSection}>
+                        <Text style={styles.doctorDetailsLabel}>Endereço</Text>
+                        <Text style={styles.doctorDetailsValue}>{doc.address}</Text>
+                      </View>
+                    ) : null}
+
+                    {doc.displayFormation ? (
                       <View style={styles.doctorDetailsSection}>
                         <Text style={styles.doctorDetailsLabel}>Formação</Text>
-                        <Text style={styles.doctorDetailsValue}>
-                          {selectedDoctorDetails.formation_details}
-                        </Text>
+                        <Text style={styles.doctorDetailsValue}>{doc.displayFormation}</Text>
                       </View>
-                    )}
+                    ) : null}
 
-                    {/* Cursos e Certificações */}
-                    {selectedDoctorDetails.courses && selectedDoctorDetails.courses.length > 0 && (
-                      <View style={styles.doctorDetailsSection}>
-                        <Text style={styles.doctorDetailsLabel}>Cursos e Certificações</Text>
-                        {selectedDoctorDetails.courses.map((course, index) => (
-                          <View key={index} style={styles.courseItem}>
+                    <View style={styles.doctorDetailsSection}>
+                      <Text style={styles.doctorDetailsLabel}>Cursos e certificações</Text>
+                      {doc.courses && doc.courses.length > 0 ? (
+                        doc.courses.map((course, index) => (
+                          <View key={course.id || index} style={styles.courseItem}>
                             <SchoolIcon size={16} color={colors.primary} />
                             <Text style={styles.courseText}>
-                              {course.name || course.course_name} 
-                              {course.institution && ` - ${course.institution}`}
-                              {course.year && ` (${course.year})`}
+                              {course.name || course.course_name}
+                              {course.institution ? ` — ${course.institution}` : ''}
+                              {course.year != null && course.year !== '' ? ` (${course.year})` : ''}
                             </Text>
                           </View>
-                        ))}
-                      </View>
-                    )}
+                        ))
+                      ) : (
+                        <Text style={[styles.doctorDetailsValue, styles.doctorDetailsMuted]}>
+                          Nenhum curso ou certificação cadastrado.
+                        </Text>
+                      )}
+                    </View>
+
+                    {!doc.displaySpecialty &&
+                    !doc.displayCrm &&
+                    !doc.phone &&
+                    !doc.notes &&
+                    !doc.address &&
+                    !doc.displayFormation &&
+                    (!doc.courses || doc.courses.length === 0) &&
+                    !doc.displayQualification ? (
+                      <Text style={styles.doctorDetailsEmptyHint}>
+                        Nenhum dado adicional cadastrado. Nome e CRM (quando houver) aparecem acima.
+                      </Text>
+                    ) : null}
                   </View>
-                )}
+                  );
+                })()}
               </ScrollView>
             </View>
           </View>
@@ -2797,9 +3209,18 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
   },
+  /** Teleconsulta (cuidador/amigo): menos espaço vertical até o botão agendar */
+  contentCompactTeleconsult: {
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
   iconContainer: {
     alignItems: 'center',
     marginBottom: 16,
+  },
+  iconContainerCompactTeleconsult: {
+    marginBottom: 6,
   },
   title: {
     fontSize: 24,
@@ -2808,6 +3229,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
+  titleCompactTeleconsult: {
+    fontSize: 21,
+    marginBottom: 4,
+  },
   subtitle: {
     fontSize: 15,
     color: colors.textLight,
@@ -2815,14 +3240,33 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     lineHeight: 22,
   },
+  subtitleCompactTeleconsult: {
+    fontSize: 13,
+    marginBottom: 14,
+    lineHeight: 18,
+  },
   inputContainer: {
     marginBottom: 20,
+  },
+  inputContainerCompactTeleconsult: {
+    marginBottom: 10,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 8,
+  },
+  labelCompactTeleconsult: {
+    marginBottom: 4,
+    fontSize: 13,
+  },
+  helperTextBelowLabel: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginTop: -4,
+    marginBottom: 10,
+    lineHeight: 18,
   },
   labelWithHelp: {
     flexDirection: 'row',
@@ -2834,10 +3278,39 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   autocompleteContainer: {
-    flex: 1,
-    zIndex: 1,
+    flexGrow: 0,
+    zIndex: 20,
+    elevation: 20,
     minHeight: 52,
     marginBottom: 8,
+  },
+  /** Altura fixa no sheet + lista flex:1 + minHeight:0 = rolagem confiável (maxHeight no pai não basta). */
+  specialtiesModalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    width: '100%',
+    height: Math.round(Dimensions.get('window').height * 0.78),
+    maxHeight: '88%',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  specialtiesModalListFlex: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
+  },
+  specialtiesModalEmptyBody: {
+    flex: 1,
+    minHeight: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
   dateTimeRow: {
     flexDirection: 'row',
@@ -2896,6 +3369,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingVertical: 12,
   },
+  textAreaWrapperCompactTeleconsult: {
+    minHeight: 64,
+    paddingVertical: 8,
+  },
   textArea: {
     textAlignVertical: 'top',
   },
@@ -2945,6 +3422,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 12,
   },
+  radioOptionCompactTeleconsult: {
+    paddingVertical: 5,
+    gap: 8,
+    alignItems: 'flex-start',
+  },
   radio: {
     width: 24,
     height: 24,
@@ -2953,6 +3435,12 @@ const styles = StyleSheet.create({
     borderColor: colors.gray400,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  radioCompactTeleconsult: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginTop: 1,
   },
   radioActive: {
     borderColor: colors.primary,
@@ -2963,9 +3451,19 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: colors.primary,
   },
+  radioDotCompactTeleconsult: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
   radioLabel: {
     fontSize: 15,
     color: colors.text,
+  },
+  radioLabelCompactTeleconsult: {
+    fontSize: 13,
+    lineHeight: 18,
+    flex: 1,
   },
   mapButtons: {
     flexDirection: 'row',
@@ -3030,6 +3528,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     gap: 12,
   },
+  infoCardCompactTeleconsult: {
+    padding: 10,
+    marginBottom: 12,
+    gap: 8,
+    borderRadius: 10,
+  },
   infoContent: {
     flex: 1,
   },
@@ -3037,6 +3541,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text,
     lineHeight: 18,
+  },
+  infoTextCompactTeleconsult: {
+    fontSize: 11,
+    lineHeight: 15,
   },
   saveButton: {
     flexDirection: 'row',
@@ -3066,7 +3574,7 @@ const styles = StyleSheet.create({
   // Estilos para Modal de Especialidades
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -3079,6 +3587,219 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  /** Altura mínima evita ScrollView com flex colapsar a zero (modal de detalhes do médico) */
+  doctorDetailsModalSheet: {
+    minHeight: '48%',
+    width: '100%',
+  },
+  /** Sheet fixo em coluna: evita flex:1 esticando o modal na tela inteira. */
+  doctorSelectSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    width: '100%',
+    height: Math.round(Dimensions.get('window').height * 0.86),
+    maxHeight: '92%',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalSheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.gray300,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  modalHeaderTeleconsult: {
+    paddingTop: 8,
+    paddingBottom: 14,
+    paddingHorizontal: 18,
+  },
+  modalTitleTeleconsult: {
+    fontSize: 18,
+    flex: 1,
+    flexShrink: 1,
+    marginRight: 8,
+  },
+  tcFilterPanel: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray200,
+    backgroundColor: colors.gray50,
+    flexGrow: 0,
+    flexShrink: 1,
+    maxHeight: Math.min(340, Math.round(Dimensions.get('window').height * 0.44)),
+  },
+  tcFilterPanelTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+    letterSpacing: 0.2,
+  },
+  tcFilterHint: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginBottom: 12,
+    lineHeight: 17,
+  },
+  tcFilterQualificationHint: {
+    fontSize: 11,
+    color: colors.textLight,
+    marginTop: -2,
+    marginBottom: 8,
+    lineHeight: 15,
+  },
+  tcFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  tcFilterInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
+    fontSize: 15,
+    color: colors.text,
+    backgroundColor: colors.backgroundLight,
+    marginBottom: 8,
+  },
+  tcFilterInputFlex: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  tcFilterStateInput: {
+    width: 56,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
+    fontSize: 15,
+    color: colors.text,
+    backgroundColor: colors.backgroundLight,
+    textAlign: 'center',
+  },
+  tcFilterChipWide: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: colors.primary + '12',
+  },
+  tcFilterChipText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    marginRight: 6,
+  },
+  tcFilterClearBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  tcFilterClearText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textLight,
+  },
+  tcSwitchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    gap: 12,
+  },
+  tcSwitchLabel: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+  },
+  tcFilterSectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textLight,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  tcChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  tcSortChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundLight,
+  },
+  tcSortChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '18',
+  },
+  tcSortChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  tcSortChipTextActive: {
+    color: colors.primary,
+  },
+  flatListContentTeleconsult: {
+    paddingBottom: 24,
+  },
+  tcEmptyList: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  tcEmptyListText: {
+    fontSize: 14,
+    color: colors.textLight,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  tcDoctorListFlex: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: '#FFFFFF',
+  },
+  doctorItemLocation: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginTop: 2,
+  },
+  doctorItemNextSlot: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
+    marginTop: 2,
+  },
+  doctorItemNoSlot: {
+    fontSize: 11,
+    color: colors.gray400,
+    marginTop: 2,
+    fontStyle: 'italic',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -3096,6 +3817,48 @@ const styles = StyleSheet.create({
   },
   modalCloseButton: {
     padding: 4,
+  },
+  /** Overlay dentro do modal do médico: evita segundo Modal (que no Android quebra toques/abertura). */
+  tcSpecialtyNestedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    zIndex: 1000,
+    elevation: 24,
+  },
+  tcSpecialtyNestedBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  tcSpecialtySimpleSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    width: '100%',
+    zIndex: 2,
+    height: Math.round(Dimensions.get('window').height * 0.78),
+    maxHeight: '88%',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+  },
+  tcSpecialtyScrollHint: {
+    fontSize: 12,
+    color: colors.textLight,
+    paddingHorizontal: 18,
+    paddingBottom: 8,
+    lineHeight: 16,
+  },
+  tcSpecialtyScroll: {
+    flex: 1,
+    minHeight: 120,
+    backgroundColor: '#FFFFFF',
+  },
+  tcSpecialtyScrollContent: {
+    paddingBottom: 8,
   },
   flatList: {
     backgroundColor: '#FFFFFF',
@@ -3461,10 +4224,20 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   doctorDetailsScroll: {
-    flex: 1,
+    width: '100%',
+  },
+  doctorDetailsScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 24,
   },
   doctorDetailsContent: {
     padding: 20,
+  },
+  doctorDetailsEmptyHint: {
+    fontSize: 14,
+    color: colors.textLight,
+    lineHeight: 20,
+    marginTop: 8,
   },
   doctorDetailsHeader: {
     alignItems: 'center',
@@ -3520,6 +4293,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
     lineHeight: 24,
+  },
+  doctorDetailsMuted: {
+    color: colors.textLight,
+    fontStyle: 'italic',
   },
   courseItem: {
     flexDirection: 'row',

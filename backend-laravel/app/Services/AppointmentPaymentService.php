@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\Appointment;
+use App\Models\Group;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
@@ -42,6 +44,21 @@ class AppointmentPaymentService
                 return [
                     'success' => false,
                     'message' => 'Apenas teleconsultas requerem pagamento.',
+                ];
+            }
+
+            // Não permitir pagamento após o horário agendado (evita cobrança de slot não pago semanas depois)
+            $scheduledFor = $appointment->scheduled_at ?? $appointment->appointment_date;
+            if (!$scheduledFor) {
+                return [
+                    'success' => false,
+                    'message' => 'Esta consulta não possui data/hora agendada válida para pagamento.',
+                ];
+            }
+            if (Carbon::parse($scheduledFor)->lt(Carbon::now())) {
+                return [
+                    'success' => false,
+                    'message' => 'O prazo para pagamento desta teleconsulta expirou (o horário agendado já passou).',
                 ];
             }
 
@@ -103,6 +120,15 @@ class AppointmentPaymentService
                 'hold_id' => $paymentResult['hold_id'],
                 'amount' => $amount,
             ]);
+
+            try {
+                $this->emitTeleconsultationPaymentNotifications($appointment->fresh());
+            } catch (\Throwable $e) {
+                Log::warning('AppointmentPaymentService - Falha ao enviar notificações (teleconsulta paga)', [
+                    'appointment_id' => $appointment->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return [
                 'success' => true,
@@ -409,6 +435,159 @@ class AppointmentPaymentService
     protected function getPlatformAccountId(): string
     {
         return 'platform_account_lacos';
+    }
+
+    /**
+     * Dispara notificações no app após pagamento confirmado (médico + membros do grupo).
+     * Usado pelo fluxo interno de pagamento e pelo Stripe (PaymentController).
+     */
+    public function emitTeleconsultationPaymentNotifications(?Appointment $appointment): void
+    {
+        if (! $appointment || ! $appointment->is_teleconsultation) {
+            return;
+        }
+        $ps = $appointment->payment_status;
+        if (! in_array($ps, ['paid_held', 'paid', 'released'], true)) {
+            return;
+        }
+
+        try {
+            $this->notifyDoctorTeleconsultationPaid($appointment);
+        } catch (\Throwable $e) {
+            Log::warning('emitTeleconsultationPaymentNotifications: médico', [
+                'appointment_id' => $appointment->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->notifyGroupMembersTeleconsultationPaid($appointment);
+        } catch (\Throwable $e) {
+            Log::warning('emitTeleconsultationPaymentNotifications: grupo', [
+                'appointment_id' => $appointment->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Notificar o médico na plataforma que a teleconsulta foi paga e confirmada.
+     */
+    protected function notifyDoctorTeleconsultationPaid(Appointment $appointment): void
+    {
+        if (!$appointment->is_teleconsultation) {
+            return;
+        }
+
+        $doctorUser = Appointment::resolveDoctorUserForNotification($appointment->doctor_id);
+        if (!$doctorUser) {
+            Log::info('notifyDoctorTeleconsultationPaid: médico não resolvido para user', [
+                'appointment_id' => $appointment->id,
+                'doctor_id' => $appointment->doctor_id,
+            ]);
+
+            return;
+        }
+
+        $notificationService = app(NotificationService::class);
+        if (!$notificationService->hasNotificationPreference($doctorUser, 'appointment_patient_notification')) {
+            return;
+        }
+
+        $patientLabel = trim((string) $appointment->title);
+        if ($appointment->group_id) {
+            $group = DB::table('groups')->where('id', $appointment->group_id)->first();
+            if ($group && ! empty($group->accompanied_name)) {
+                $patientLabel = $group->accompanied_name;
+            }
+        }
+        if ($patientLabel === '') {
+            $patientLabel = 'Paciente';
+        }
+
+        $tz = 'America/Sao_Paulo';
+        $when = Carbon::parse($appointment->scheduled_at ?? $appointment->appointment_date)->timezone($tz);
+        $title = 'Nova teleconsulta confirmada';
+        $message = 'A teleconsulta com '.$patientLabel.' foi confirmada (pagamento recebido) para '.$when->format('d/m/Y \à\s H:i').'.';
+
+        $notificationService->sendNotification(
+            $doctorUser,
+            'appointment',
+            $title,
+            $message,
+            [
+                'appointment_id' => $appointment->id,
+                'group_id' => $appointment->group_id,
+                'action_type' => 'teleconsultation_paid',
+                'appointment_date' => $when->toIso8601String(),
+            ],
+            false,
+            $appointment->group_id
+        );
+    }
+
+    /**
+     * Avisar cuidadores/amigos do grupo que o pagamento da teleconsulta foi confirmado.
+     * (Quem agendou não recebia push na criação por ser o autor; aqui todos com preferência recebem.)
+     */
+    protected function notifyGroupMembersTeleconsultationPaid(Appointment $appointment): void
+    {
+        if (! $appointment->is_teleconsultation || ! $appointment->group_id) {
+            return;
+        }
+
+        $group = Group::find($appointment->group_id);
+        if (! $group) {
+            return;
+        }
+
+        $notificationService = app(NotificationService::class);
+
+        $members = $group->members()
+            ->where(function ($q) {
+                $q->where('is_active', true)->orWhereNull('is_active');
+            })
+            ->get();
+
+        $patientLabel = trim((string) $appointment->title);
+        $g = DB::table('groups')->where('id', $appointment->group_id)->first();
+        if ($g && ! empty($g->accompanied_name)) {
+            $patientLabel = $g->accompanied_name;
+        }
+        if ($patientLabel === '') {
+            $patientLabel = 'Paciente';
+        }
+
+        $tz = 'America/Sao_Paulo';
+        $when = Carbon::parse($appointment->scheduled_at ?? $appointment->appointment_date)->timezone($tz);
+
+        foreach ($members as $member) {
+            $memberUser = User::find($member->user_id);
+            if (! $memberUser) {
+                continue;
+            }
+            if (! $notificationService->shouldNotifyNewGroupAppointment($memberUser)) {
+                continue;
+            }
+
+            $title = 'Teleconsulta confirmada';
+            $message = 'O pagamento da teleconsulta com '.$patientLabel.' para '.$when->format('d/m/Y \à\s H:i').' foi confirmado.';
+
+            $notificationService->sendNotification(
+                $memberUser,
+                'appointment',
+                $title,
+                $message,
+                [
+                    'appointment_id' => $appointment->id,
+                    'group_id' => $appointment->group_id,
+                    'action_type' => 'teleconsultation_payment_confirmed',
+                    'appointment_date' => $when->toIso8601String(),
+                ],
+                false,
+                $appointment->group_id
+            );
+        }
     }
 }
 

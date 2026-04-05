@@ -403,68 +403,103 @@ class CaregiverController extends Controller
                 ], 401);
             }
 
-            // Verificar se o usuário é médico (doctor_id nos appointments é o user_id)
+            // Médico: doctor_id pode ser users.id ou doctors.id (ligado por doctors.user_id)
             $isDoctor = $user->profile === 'doctor';
             if ($isDoctor) {
-                // LÓGICA PARA MÉDICOS: Buscar pacientes que agendaram consultas
+                // Uma linha por grupo com consulta: nome do acompanhado (accompanied_name) ou membro patient/priority_contact/accompanied
                 $appointments = DB::table('appointments')
-                    ->where('doctor_id', $user->id)
                     ->whereNotNull('group_id')
-                    ->select('group_id', DB::raw('MAX(scheduled_at) as last_appointment'))
+                    ->where(function ($q) use ($user) {
+                        $q->where('doctor_id', $user->id);
+                        if (Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'user_id')) {
+                            $q->orWhereIn('doctor_id', function ($sub) use ($user) {
+                                $sub->select('id')->from('doctors')->where('user_id', $user->id);
+                            });
+                        }
+                    })
+                    ->select('group_id', DB::raw('MAX(COALESCE(scheduled_at, appointment_date)) as last_appointment'))
                     ->groupBy('group_id')
                     ->get();
 
                 if ($appointments->isEmpty()) {
                     return response()->json([
                         'success' => true,
-                        'data' => []
+                        'data' => [],
                     ]);
                 }
 
-                $groupIds = $appointments->pluck('group_id')->toArray();
                 $groupLastAppointment = $appointments->pluck('last_appointment', 'group_id')->toArray();
+                $patientRoles = ['patient', 'priority_contact', 'accompanied'];
 
-                // Buscar pacientes (membros com role 'patient' ou 'priority_contact') desses grupos
-                $patients = DB::table('group_members')
-                    ->join('users', 'group_members.user_id', '=', 'users.id')
-                    ->whereIn('group_members.group_id', $groupIds)
-                    ->whereIn('group_members.role', ['patient', 'priority_contact'])
-                    ->select(
-                        'users.id',
-                        'users.name',
-                        'users.birth_date',
-                        'users.gender',
-                        'group_members.group_id'
-                    )
-                    ->distinct()
-                    ->get()
-                    ->map(function ($patient) use ($groupLastAppointment) {
-                        // Calcular idade
-                        $age = null;
-                        if ($patient->birth_date) {
-                            $birthDate = new \DateTime($patient->birth_date);
-                            $today = new \DateTime();
-                            $age = $today->diff($birthDate)->y;
-                        }
+                $rows = [];
+                foreach ($appointments as $apptRow) {
+                    $gid = (int) $apptRow->group_id;
+                    $group = DB::table('groups')->where('id', $gid)->first();
+                    if (! $group) {
+                        continue;
+                    }
 
-                        // Data da última consulta do grupo
-                        $lastAppointment = $groupLastAppointment[$patient->group_id] ?? null;
+                    $member = DB::table('group_members')
+                        ->join('users', 'group_members.user_id', '=', 'users.id')
+                        ->where('group_members.group_id', $gid)
+                        ->whereIn('group_members.role', $patientRoles)
+                        ->orderByRaw("CASE group_members.role WHEN 'patient' THEN 1 WHEN 'priority_contact' THEN 2 WHEN 'accompanied' THEN 3 ELSE 4 END")
+                        ->select('users.id', 'users.name', 'users.birth_date', 'users.gender')
+                        ->first();
 
-                        return [
-                            'id' => $patient->id,
-                            'name' => $patient->name,
-                            'age' => $age,
-                            'gender' => $patient->gender === 'male' ? 'Masculino' : ($patient->gender === 'female' ? 'Feminino' : ($patient->gender ?? 'Não informado')),
-                            'last_appointment_date' => $lastAppointment,
-                            'group_id' => $patient->group_id,
-                        ];
-                    })
-                    ->sortByDesc('last_appointment_date')
-                    ->values();
+                    // Prioridade: nome do acompanhado no grupo > nome do grupo familiar > usuário paciente.
+                    // Evita listar duas vezes o mesmo nome civil quando há dois grupos (ex.: Vovó Rosa / Tia Maria)
+                    // com a mesma pessoa cadastrada como membro "patient" ou contato.
+                    $accompanied = isset($group->accompanied_name) ? trim((string) $group->accompanied_name) : '';
+                    $groupName = isset($group->name) ? trim((string) $group->name) : '';
+                    if ($accompanied !== '') {
+                        $displayName = $accompanied;
+                    } elseif ($groupName !== '') {
+                        $displayName = $groupName;
+                    } elseif ($member) {
+                        $displayName = $member->name;
+                    } else {
+                        $displayName = 'Paciente';
+                    }
+
+                    $userId = $member->id ?? null;
+                    $listId = $userId ?? -$gid;
+
+                    $age = null;
+                    if ($member && $member->birth_date) {
+                        $birthDate = new \DateTime($member->birth_date);
+                        $today = new \DateTime();
+                        $age = $today->diff($birthDate)->y;
+                    }
+
+                    $genderLabel = 'Não informado';
+                    if ($member && $member->gender) {
+                        $genderLabel = $member->gender === 'male' ? 'Masculino' : ($member->gender === 'female' ? 'Feminino' : ($member->gender ?? 'Não informado'));
+                    }
+
+                    $lastAppointment = $groupLastAppointment[$gid] ?? $groupLastAppointment[(string) $gid] ?? null;
+
+                    $rows[] = [
+                        'id' => $listId,
+                        'name' => $displayName,
+                        'age' => $age,
+                        'gender' => $genderLabel,
+                        'last_appointment_date' => $lastAppointment,
+                        'group_id' => $gid,
+                        'patient_user_id' => $userId,
+                    ];
+                }
+
+                usort($rows, function ($a, $b) {
+                    $ta = $a['last_appointment_date'] ?? '';
+                    $tb = $b['last_appointment_date'] ?? '';
+
+                    return strcmp((string) $tb, (string) $ta);
+                });
 
                 return response()->json([
                     'success' => true,
-                    'data' => $patients
+                    'data' => array_values($rows),
                 ]);
             }
 
@@ -748,7 +783,118 @@ class CaregiverController extends Controller
             $isDoctor = $user->profile === 'doctor';
 
             if ($isDoctor) {
-                // Para médicos: buscar paciente que agendou consultas
+                $patientRoles = ['patient', 'priority_contact', 'accompanied'];
+
+                $doctorAppointmentScope = function ($q) use ($user) {
+                    $q->whereNotNull('group_id')
+                        ->where(function ($q2) use ($user) {
+                            $q2->where('doctor_id', $user->id);
+                            if (Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'user_id')) {
+                                $q2->orWhereIn('doctor_id', function ($sub) use ($user) {
+                                    $sub->select('id')->from('doctors')->where('user_id', $user->id);
+                                });
+                            }
+                        });
+                };
+
+                // ID negativo = paciente apenas do grupo (accompanied_name / sem user paciente)
+                if (is_numeric($id) && (int) $id < 0) {
+                    $groupId = abs((int) $id);
+
+                    $hasAppointment = DB::table('appointments')
+                        ->where('group_id', $groupId)
+                        ->where($doctorAppointmentScope)
+                        ->exists();
+
+                    if (! $hasAppointment) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Paciente não encontrado ou sem consultas com este médico',
+                        ], 404);
+                    }
+
+                    $group = DB::table('groups')->where('id', $groupId)->first();
+                    if (! $group) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Paciente não encontrado',
+                        ], 404);
+                    }
+
+                    $member = DB::table('group_members')
+                        ->join('users', 'group_members.user_id', '=', 'users.id')
+                        ->where('group_members.group_id', $groupId)
+                        ->whereIn('group_members.role', $patientRoles)
+                        ->orderByRaw("CASE group_members.role WHEN 'patient' THEN 1 WHEN 'priority_contact' THEN 2 WHEN 'accompanied' THEN 3 ELSE 4 END")
+                        ->select(
+                            'users.id',
+                            'users.name',
+                            'users.email',
+                            'users.phone',
+                            'users.birth_date',
+                            'users.gender',
+                            'users.city',
+                            'users.neighborhood',
+                            'users.photo'
+                        )
+                        ->first();
+
+                    $accompanied = isset($group->accompanied_name) ? trim((string) $group->accompanied_name) : '';
+                    $groupNameDetail = isset($group->name) ? trim((string) $group->name) : '';
+                    if ($accompanied !== '') {
+                        $displayName = $accompanied;
+                    } elseif ($groupNameDetail !== '') {
+                        $displayName = $groupNameDetail;
+                    } elseif ($member) {
+                        $displayName = $member->name;
+                    } else {
+                        $displayName = 'Paciente';
+                    }
+
+                    $lastAppointment = DB::table('appointments')
+                        ->where('group_id', $groupId)
+                        ->where($doctorAppointmentScope)
+                        ->orderByRaw('COALESCE(scheduled_at, appointment_date) DESC')
+                        ->select('scheduled_at', 'appointment_date', 'title', 'type')
+                        ->first();
+
+                    $age = null;
+                    if ($member && $member->birth_date) {
+                        $birthDate = new \DateTime($member->birth_date);
+                        $today = new \DateTime();
+                        $age = $today->diff($birthDate)->y;
+                    }
+
+                    $genderLabel = 'Não informado';
+                    if ($member && $member->gender) {
+                        $genderLabel = $member->gender === 'male' ? 'Masculino' : ($member->gender === 'female' ? 'Feminino' : ($member->gender ?? 'Não informado'));
+                    }
+
+                    $patientData = [
+                        'id' => -$groupId,
+                        'name' => $displayName,
+                        'email' => $member->email ?? null,
+                        'phone' => $member->phone ?? null,
+                        'age' => $age,
+                        'gender' => $genderLabel,
+                        'city' => $member->city ?? null,
+                        'neighborhood' => $member->neighborhood ?? null,
+                        'photo_url' => ($member && $member->photo) ? asset('storage/'.$member->photo) : null,
+                        'photo' => ($member && $member->photo) ? asset('storage/'.$member->photo) : null,
+                        'last_appointment_date' => $lastAppointment ? ($lastAppointment->scheduled_at ?? $lastAppointment->appointment_date ?? null) : null,
+                        'last_appointment_title' => $lastAppointment ? ($lastAppointment->title ?? null) : null,
+                        'group_id' => $groupId,
+                        'patient_user_id' => $member->id ?? null,
+                        'reviews' => [],
+                    ];
+
+                    return response()->json([
+                        'success' => true,
+                        'data' => $patientData,
+                    ]);
+                }
+
+                // Paciente com usuário na plataforma
                 $patient = DB::table('users')
                     ->where('id', $id)
                     ->select(
@@ -764,47 +910,53 @@ class CaregiverController extends Controller
                     )
                     ->first();
 
-                if (!$patient) {
+                if (! $patient) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Paciente não encontrado'
+                        'message' => 'Paciente não encontrado',
                     ], 404);
                 }
 
-                // Verificar se o paciente tem consultas com este médico
                 $hasAppointments = DB::table('appointments')
-                    ->where('doctor_id', $user->id)
-                    ->whereNotNull('group_id')
-                    ->whereIn('group_id', function($query) use ($id) {
+                    ->where($doctorAppointmentScope)
+                    ->whereIn('group_id', function ($query) use ($id, $patientRoles) {
                         $query->select('group_id')
                             ->from('group_members')
                             ->where('user_id', $id)
-                            ->where('role', 'patient');
+                            ->whereIn('role', $patientRoles);
                     })
                     ->exists();
 
-                if (!$hasAppointments) {
+                if (! $hasAppointments) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Paciente não encontrado ou sem consultas com este médico'
+                        'message' => 'Paciente não encontrado ou sem consultas com este médico',
                     ], 404);
                 }
 
-                // Buscar última consulta
+                $groupId = DB::table('group_members')
+                    ->where('user_id', $id)
+                    ->whereIn('role', $patientRoles)
+                    ->whereIn('group_id', function ($query) use ($doctorAppointmentScope) {
+                        $query->select('group_id')
+                            ->from('appointments')
+                            ->where($doctorAppointmentScope);
+                    })
+                    ->orderBy('group_id')
+                    ->value('group_id');
+
                 $lastAppointment = DB::table('appointments')
-                    ->where('doctor_id', $user->id)
-                    ->whereNotNull('group_id')
-                    ->whereIn('group_id', function($query) use ($id) {
+                    ->where($doctorAppointmentScope)
+                    ->whereIn('group_id', function ($query) use ($id, $patientRoles) {
                         $query->select('group_id')
                             ->from('group_members')
                             ->where('user_id', $id)
-                            ->where('role', 'patient');
+                            ->whereIn('role', $patientRoles);
                     })
-                    ->orderBy('scheduled_at', 'desc')
-                    ->select('scheduled_at', 'title', 'type')
+                    ->orderByRaw('COALESCE(scheduled_at, appointment_date) DESC')
+                    ->select('scheduled_at', 'appointment_date', 'title', 'type')
                     ->first();
 
-                // Calcular idade
                 $age = null;
                 if ($patient->birth_date) {
                     $birthDate = new \DateTime($patient->birth_date);
@@ -821,16 +973,18 @@ class CaregiverController extends Controller
                     'gender' => $patient->gender === 'male' ? 'Masculino' : ($patient->gender === 'female' ? 'Feminino' : ($patient->gender ?? 'Não informado')),
                     'city' => $patient->city,
                     'neighborhood' => $patient->neighborhood,
-                    'photo_url' => $patient->photo ? asset('storage/' . $patient->photo) : null,
-                    'photo' => $patient->photo ? asset('storage/' . $patient->photo) : null,
-                    'last_appointment_date' => $lastAppointment->scheduled_at ?? $lastAppointment->appointment_date ?? null,
-                    'last_appointment_title' => $lastAppointment->title ?? null,
+                    'photo_url' => $patient->photo ? asset('storage/'.$patient->photo) : null,
+                    'photo' => $patient->photo ? asset('storage/'.$patient->photo) : null,
+                    'last_appointment_date' => $lastAppointment ? ($lastAppointment->scheduled_at ?? $lastAppointment->appointment_date ?? null) : null,
+                    'last_appointment_title' => $lastAppointment ? ($lastAppointment->title ?? null) : null,
+                    'group_id' => $groupId ? (int) $groupId : null,
+                    'patient_user_id' => (int) $patient->id,
                     'reviews' => [],
                 ];
 
                 return response()->json([
                     'success' => true,
-                    'data' => $patientData
+                    'data' => $patientData,
                 ]);
             }
 

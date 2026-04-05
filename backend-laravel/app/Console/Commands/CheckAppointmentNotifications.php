@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\Appointment;
 use App\Models\User;
-use App\Models\UserNotificationPreference;
 use App\Services\NotificationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -46,17 +45,14 @@ class CheckAppointmentNotifications extends Command
             $now = Carbon::now();
             $tenMinutesFromNow = $now->copy()->addMinutes(10);
             
-            // Buscar consultas entre agora e 10 minutos no futuro
-            $appointments = Appointment::where('status', 'scheduled')
-                ->whereBetween('appointment_date', [
-                    $now->format('Y-m-d H:i:s'),
-                    $tenMinutesFromNow->format('Y-m-d H:i:s')
-                ])
-                ->whereDoesntHave('notifications', function($query) {
-                    $query->where('type', 'appointment')
-                          ->where('created_at', '>=', Carbon::now()->subMinutes(15));
-                })
-                ->with(['group', 'doctor'])
+            // Consultas no intervalo (usa scheduled_at quando existir — teleconsultas)
+            $appointments = Appointment::query()
+                ->where('status', 'scheduled')
+                ->whereRaw(
+                    'COALESCE(scheduled_at, appointment_date) BETWEEN ? AND ?',
+                    [$now->format('Y-m-d H:i:s'), $tenMinutesFromNow->format('Y-m-d H:i:s')]
+                )
+                ->with(['group.members.user'])
                 ->get();
 
             $sentCount = 0;
@@ -76,21 +72,29 @@ class CheckAppointmentNotifications extends Command
                     continue;
                 }
 
-                // Verificar se o médico tem preferência de notificação habilitada
+                // Alinhado ao NotificationService: sem registro de preferências = permitir
                 $preferences = $doctor->notificationPreferences;
-                if (!$preferences || !$preferences->appointment_patient_notification) {
+                if ($preferences && ! $preferences->appointment_patient_notification) {
                     continue;
                 }
 
-                // Buscar paciente do grupo
-                $patient = $appointment->group->members()
-                    ->wherePivot('role', 'patient')
-                    ->orWherePivot('role', 'priority_contact')
-                    ->first();
-
-                if (!$patient) {
+                $group = $appointment->group;
+                if (!$group) {
                     continue;
                 }
+
+                $patientMember = $group->members->first(function ($member) {
+                    $role = strtolower((string) $member->role);
+
+                    return in_array($role, ['patient', 'priority_contact', 'accompanied'], true);
+                });
+
+                if (!$patientMember || !$patientMember->user) {
+                    continue;
+                }
+
+                $patientName = $patientMember->user->name ?? 'Paciente';
+                $patientUserId = $patientMember->user_id;
 
                 // Verificar se já foi enviada notificação para esta consulta nos últimos 15 minutos
                 $existingNotification = \App\Models\Notification::where('user_id', $doctor->id)
@@ -106,11 +110,11 @@ class CheckAppointmentNotifications extends Command
                 // Enviar notificação ao médico
                 // Usar timezone do Brasil (GMT-3) para formatar a data
                 $timezone = 'America/Sao_Paulo';
-                $appointmentTime = Carbon::parse($appointment->appointment_date)
+                $appointmentTime = Carbon::parse($appointment->scheduled_at ?? $appointment->appointment_date)
                     ->setTimezone($timezone);
                 $title = 'Consulta em 10 minutos';
-                $message = "Você tem uma consulta agendada em 10 minutos com {$patient->name}.\n";
-                $message .= "Horário: " . $appointmentTime->format('d/m/Y H:i') . "\n";
+                $message = "Você tem uma consulta agendada em 10 minutos com {$patientName}.\n";
+                $message .= 'Horário: '.$appointmentTime->format('d/m/Y H:i')."\n";
                 if ($appointment->title) {
                     $message .= "Título: {$appointment->title}";
                 }
@@ -122,9 +126,9 @@ class CheckAppointmentNotifications extends Command
                     $message,
                     [
                         'appointment_id' => $appointment->id,
-                        'patient_id' => $patient->id,
-                        'patient_name' => $patient->name,
-                        'appointment_date' => $appointment->appointment_date,
+                        'patient_id' => $patientUserId,
+                        'patient_name' => $patientName,
+                        'appointment_date' => $appointmentTime->toIso8601String(),
                         'group_id' => $appointment->group_id,
                     ],
                     false, // Não enviar WhatsApp por padrão
@@ -132,7 +136,7 @@ class CheckAppointmentNotifications extends Command
                 );
 
                 $sentCount++;
-                $this->info("Notificação enviada para médico {$doctor->name} sobre consulta com {$patient->name}");
+                $this->info("Notificação enviada para médico {$doctor->name} sobre consulta com {$patientName}");
             }
 
             $this->info("Total de notificações enviadas: {$sentCount}");

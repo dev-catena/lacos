@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   Modal,
+  ScrollView,
 } from 'react-native';
 import * as Location from 'expo-location';
 import Toast from 'react-native-toast-message';
@@ -255,6 +256,9 @@ const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
   // Removido buttonSize interpolado - agora usa apenas scale transform
 
   if (isCallActive) {
+    const getContactName = (c) => c.user?.name || c.emergency_contact?.name || 'Contato';
+    const getContactPhone = (c) => c.user?.phone || c.emergency_contact?.phone;
+
     return (
       <Modal
         visible={true}
@@ -274,12 +278,37 @@ const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
             <View style={styles.sosIconContainer}>
               <Text style={styles.sosText}>SOS</Text>
             </View>
-            <Text style={styles.callActiveTitle}>Chamada de Emergência Ativa</Text>
+            <Text style={styles.callActiveTitle}>🚨 PÂNICO ACIONADO</Text>
             <Text style={styles.callActiveSubtitle}>
-              {emergencyContacts.length > 0
-                ? `Conectado: ${emergencyContacts[0].user?.name || emergencyContacts[0].emergency_contact?.name || 'Contato de emergência'}`
-                : 'Conectando...'}
+              Todos os contatos de emergência foram notificados
             </Text>
+
+            {/* Lista de todos os contatos de emergência notificados */}
+            {emergencyContacts.length > 0 && (
+              <View style={styles.contactsListContainer}>
+                <Text style={styles.contactsListTitle}>Contatos notificados:</Text>
+                <ScrollView
+                  style={styles.contactsScrollView}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                >
+                  {emergencyContacts.map((contact, index) => (
+                    <View key={index} style={styles.contactItem}>
+                      <Text style={styles.contactItemName}>
+                        • {getContactName(contact)}
+                        {index === 0 && (
+                          <Text style={styles.contactItemCalling}> (ligando...)</Text>
+                        )}
+                      </Text>
+                      {getContactPhone(contact) && (
+                        <Text style={styles.contactItemPhone}>{getContactPhone(contact)}</Text>
+                      )}
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             <TouchableOpacity
               style={styles.endCallButton}
               onPress={endCall}
@@ -539,6 +568,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     maxWidth: SCREEN_WIDTH - 80,
     flexWrap: 'wrap',
+  },
+  contactsListContainer: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    maxWidth: SCREEN_WIDTH - 80,
+    maxHeight: 200,
+    alignSelf: 'center',
+  },
+  contactsScrollView: {
+    maxHeight: 160,
+  },
+  contactsListTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.white,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  contactItem: {
+    marginBottom: 8,
+  },
+  contactItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  contactItemCalling: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontStyle: 'italic',
+  },
+  contactItemPhone: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginLeft: 16,
+    marginTop: 2,
   },
   endCallButton: {
     flexDirection: 'row',

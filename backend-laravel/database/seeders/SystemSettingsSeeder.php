@@ -15,8 +15,7 @@ class SystemSettingsSeeder extends Seeder
     public function run()
     {
         $records = array (
-  0 => 
-  array (
+  0 => array (
     'id' => 1,
     'key' => 'recording_start_before_minutes',
     'value' => '15',
@@ -26,8 +25,7 @@ class SystemSettingsSeeder extends Seeder
     'created_at' => '2026-01-25 15:28:49',
     'updated_at' => '2026-01-25 15:28:49',
   ),
-  1 => 
-  array (
+  1 => array (
     'id' => 2,
     'key' => 'recording_stop_after_end_minutes',
     'value' => '15',
@@ -37,8 +35,7 @@ class SystemSettingsSeeder extends Seeder
     'created_at' => '2026-01-25 15:28:49',
     'updated_at' => '2026-01-25 15:28:49',
   ),
-  2 => 
-  array (
+  2 => array (
     'id' => 3,
     'key' => 'recording_max_duration_after_end_minutes',
     'value' => '30',

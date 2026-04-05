@@ -8,6 +8,7 @@ use App\Models\AppointmentException;
 use App\Models\DoctorReview;
 use App\Models\GroupActivity;
 use App\Services\AppointmentPaymentService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,30 @@ use Illuminate\Support\Facades\Schema;
 
 class AppointmentController extends Controller
 {
+    /**
+     * Médico designado: doctor_id pode ser users.id ou doctors.id (resolvido via doctorUser.platform_user_id).
+     */
+    private function actingUserIsAssignedDoctor(Appointment $appointment, $user): bool
+    {
+        if (!$appointment->doctor_id) {
+            return false;
+        }
+        if ((int) $appointment->doctor_id === (int) $user->id) {
+            return true;
+        }
+        try {
+            $doc = $appointment->doctorUser;
+            if ($doc && isset($doc->platform_user_id) && $doc->platform_user_id !== null
+                && (int) $doc->platform_user_id === (int) $user->id) {
+                return true;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('actingUserIsAssignedDoctor: '.$e->getMessage());
+        }
+
+        return false;
+    }
+
     public function index(Request $request)
     {
         $groupId = $request->query('group_id');
@@ -42,36 +67,40 @@ class AppointmentController extends Controller
         // Não mostrar consultas canceladas
         $query->where('status', '!=', 'cancelled');
 
-        // Se o usuário for médico, filtrar teleconsultas não pagas
-        // Médicos só devem ver teleconsultas que já foram pagas
+        // Teleconsultas agendadas aparecem para o médico assim que marcadas (ex.: pending); o app indica
+        // pagamento pendente e bloqueia a videochamada até paid_held/paid/released. Ocultar só reembolsadas.
         if ($user && $user->profile === 'doctor') {
             $query->where(function($q) {
-                $q->where('is_teleconsultation', false) // Mostrar consultas normais
+                $q->where('is_teleconsultation', false)
                   ->orWhere(function($q2) {
-                      // Para teleconsultas, apenas mostrar se estiverem pagas
                       $q2->where('is_teleconsultation', true)
-                         ->whereIn('payment_status', ['paid_held', 'paid', 'released']);
+                         ->where(function($q3) {
+                             $q3->whereNull('payment_status')
+                                ->orWhere('payment_status', '<>', 'refunded');
+                         });
                   });
             });
         }
 
-        // Usar scheduled_at com fallback para appointment_date quando scheduled_at for null
+        // Intervalo: início/fim do dia para não cortar consultas no último dia do range (comparação com date-only).
         if ($startDate) {
-            $query->where(function($q) use ($startDate) {
-                $q->where('scheduled_at', '>=', $startDate)
-                  ->orWhere(function($q2) use ($startDate) {
+            $startDateTime = Carbon::parse($startDate)->startOfDay()->toDateTimeString();
+            $query->where(function($q) use ($startDateTime) {
+                $q->where('scheduled_at', '>=', $startDateTime)
+                  ->orWhere(function($q2) use ($startDateTime) {
                       $q2->whereNull('scheduled_at')
-                         ->where('appointment_date', '>=', $startDate);
+                         ->where('appointment_date', '>=', $startDateTime);
                   });
             });
         }
 
         if ($endDate) {
-            $query->where(function($q) use ($endDate) {
-                $q->where('scheduled_at', '<=', $endDate)
-                  ->orWhere(function($q2) use ($endDate) {
+            $endDateTime = Carbon::parse($endDate)->endOfDay()->toDateTimeString();
+            $query->where(function($q) use ($endDateTime) {
+                $q->where('scheduled_at', '<=', $endDateTime)
+                  ->orWhere(function($q2) use ($endDateTime) {
                       $q2->whereNull('scheduled_at')
-                         ->where('appointment_date', '<=', $endDate);
+                         ->where('appointment_date', '<=', $endDateTime);
                   });
             });
         }
@@ -90,6 +119,12 @@ class AppointmentController extends Controller
             
             // Buscar dados do médico usando o accessor (mais eficiente)
             if ($appointment->doctor_id) {
+                try {
+                    $platformUser = Appointment::resolveDoctorUserForNotification((int) $appointment->doctor_id);
+                    $appointmentData['assigned_platform_user_id'] = $platformUser ? (int) $platformUser->id : null;
+                } catch (\Throwable $e) {
+                    $appointmentData['assigned_platform_user_id'] = null;
+                }
                 try {
                     $doctorUser = $appointment->doctorUser;
                     if ($doctorUser) {
@@ -114,10 +149,10 @@ class AppointmentController extends Controller
                             // Se não tiver accompanied_name, buscar membro com role='patient' ou 'priority_contact'
                             $patientMember = DB::table('group_members')
                                 ->where('group_id', $appointment->group_id)
-                                ->whereIn('role', ['patient', 'priority_contact'])
+                                ->whereIn('role', ['patient', 'priority_contact', 'accompanied'])
                                 ->join('users', 'group_members.user_id', '=', 'users.id')
-                                ->select('users.name')
-                                ->orderByRaw("CASE WHEN role = 'patient' THEN 1 ELSE 2 END") // Priorizar 'patient' sobre 'priority_contact'
+                                ->select('users.name', 'group_members.role')
+                                ->orderByRaw("CASE WHEN group_members.role = 'patient' THEN 1 WHEN group_members.role = 'priority_contact' THEN 2 ELSE 3 END")
                                 ->first();
                             
                             if ($patientMember && isset($patientMember->name) && $patientMember->name) {
@@ -203,6 +238,8 @@ class AppointmentController extends Controller
             $validated['created_by_user_id'] = $user->id;
         }
 
+        // O médico designado (doctor_id) não precisa ser membro do grupo; o compromisso pertence ao grupo do paciente.
+
         // Se for teleconsulta, definir payment_status como 'pending' e reservar horário por 10 minutos
         if (isset($validated['is_teleconsultation']) && $validated['is_teleconsultation']) {
             $validated['payment_status'] = 'pending';
@@ -237,6 +274,22 @@ class AppointmentController extends Controller
                 // Calcular valor total: consultation_price + 20% (taxa da plataforma)
                 // O valor total é o que o paciente paga
                 $validated['amount'] = round($consultationPrice * 1.20, 2);
+            }
+        }
+
+        if (!empty($validated['is_teleconsultation']) && !empty($validated['doctor_id'])) {
+            $slot = Carbon::parse($validated['scheduled_at'] ?? $validated['appointment_date']);
+            $conflict = Appointment::findConflictingTeleconsultationAppointment(
+                (int) $validated['doctor_id'],
+                $slot
+            );
+            if ($conflict) {
+                return response()->json([
+                    'message' => 'Este horário já está reservado para este médico. Escolha outro horário.',
+                    'errors' => [
+                        'scheduled_at' => ['Este horário já está reservado para este médico.'],
+                    ],
+                ], 422);
             }
         }
 
@@ -282,11 +335,13 @@ class AppointmentController extends Controller
             $notificationService = app(\App\Services\NotificationService::class);
             $group = $appointment->group;
             
-            if ($group) {
-                // Buscar membros ativos do grupo (exceto quem criou)
+            if ($group && $user) {
+                // Membros ativos (is_active null = legado, tratar como ativo)
                 $members = $group->members()
                     ->where('user_id', '!=', $user->id)
-                    ->where('is_active', true)
+                    ->where(function ($q) {
+                        $q->where('is_active', true)->orWhereNull('is_active');
+                    })
                     ->get();
                 
                 \Log::info('AppointmentController.store - Enviando notificações', [
@@ -316,16 +371,14 @@ class AppointmentController extends Controller
                         continue;
                     }
                     
-                    // Verificar preferências de notificação
-                    $shouldNotify = $notificationService->hasNotificationPreference($memberUser, 'appointment_reminders');
-                    
+                    // Preferência: lembretes de horário OU atualizações do grupo (não só appointment_reminders)
+                    $shouldNotify = $notificationService->shouldNotifyNewGroupAppointment($memberUser);
                     \Log::info('AppointmentController.store - Verificando preferência de notificação', [
                         'user_id' => $memberUser->id,
                         'shouldNotify' => $shouldNotify,
                     ]);
-                    
                     if (!$shouldNotify) {
-                        \Log::info('AppointmentController.store - Usuário desabilitou notificações de consultas', [
+                        \Log::info('AppointmentController.store - Usuário desabilitou avisos de novo agendamento (lembretes e atualizações do grupo)', [
                             'user_id' => $memberUser->id,
                         ]);
                         continue;
@@ -399,6 +452,14 @@ class AppointmentController extends Controller
         }
         $appointment = $query->findOrFail($id);
         $data = $appointment->toArray();
+        if ($appointment->doctor_id) {
+            try {
+                $platformUser = Appointment::resolveDoctorUserForNotification((int) $appointment->doctor_id);
+                $data['assigned_platform_user_id'] = $platformUser ? (int) $platformUser->id : null;
+            } catch (\Throwable $e) {
+                $data['assigned_platform_user_id'] = null;
+            }
+        }
 
         // Para teleconsultas realizadas: indicar se o usuário já avaliou o médico
         if (Schema::hasTable('doctor_reviews') && Auth::check()) {
@@ -461,6 +522,30 @@ class AppointmentController extends Controller
         }
         if (!isset($validated['recurrence_end']) || empty($validated['recurrence_end'])) {
             unset($validated['recurrence_end']);
+        }
+
+        $mergedDoctorId = isset($validated['doctor_id']) ? (int) $validated['doctor_id'] : (int) $appointment->doctor_id;
+        $mergedScheduled = isset($validated['scheduled_at'])
+            ? Carbon::parse($validated['scheduled_at'])
+            : ($appointment->scheduled_at ?? $appointment->appointment_date);
+        $mergedIsTele = array_key_exists('is_teleconsultation', $validated)
+            ? (bool) $validated['is_teleconsultation']
+            : (bool) $appointment->is_teleconsultation;
+
+        if ($mergedIsTele && $mergedDoctorId && $mergedScheduled) {
+            $conflict = Appointment::findConflictingTeleconsultationAppointment(
+                $mergedDoctorId,
+                $mergedScheduled,
+                (int) $appointment->id
+            );
+            if ($conflict) {
+                return response()->json([
+                    'message' => 'Este horário já está reservado para este médico. Escolha outro horário.',
+                    'errors' => [
+                        'scheduled_at' => ['Este horário já está reservado para este médico.'],
+                    ],
+                ], 422);
+            }
         }
 
         $appointment->update($validated);
@@ -638,11 +723,11 @@ class AppointmentController extends Controller
                 ], 400);
             }
 
-            $isCompleted = $appointment->status === 'completed' || $appointment->payment_status === 'released';
-            if (!$isCompleted) {
+            // Exigir pagamento liberado: não basta status "completed" com pagamento ainda pendente
+            if ($appointment->payment_status !== 'released') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'A consulta precisa ter sido realizada para avaliar o médico'
+                    'message' => 'Só é possível avaliar o médico após a consulta ser concluída e o pagamento liberado.',
                 ], 400);
             }
 
@@ -750,10 +835,17 @@ class AppointmentController extends Controller
             $updated = false;
 
             if ($validated['role'] === 'doctor') {
-                if ((int) $appointment->doctor_id !== (int) $user->id) {
+                if (!$this->actingUserIsAssignedDoctor($appointment, $user)) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Apenas o médico da consulta pode registrar entrada como médico',
+                    ], 403);
+                }
+                $ps = $appointment->payment_status;
+                if (!in_array($ps, ['paid_held', 'paid', 'released'], true)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Pagamento pendente. A videoconferência só pode ser iniciada após a confirmação do pagamento.',
                     ], 403);
                 }
                 if (!$appointment->doctor_joined_at) {
@@ -827,8 +919,7 @@ class AppointmentController extends Controller
             $hasPermission = false;
             
             if ($validated['cancelled_by'] === 'doctor') {
-                // Médico: verificar se é o médico da consulta
-                if ($appointment->doctor_id && $appointment->doctor_id == $user->id) {
+                if ($this->actingUserIsAssignedDoctor($appointment, $user)) {
                     $hasPermission = true;
                 }
             } else {

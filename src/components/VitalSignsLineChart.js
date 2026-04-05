@@ -54,8 +54,12 @@ const VitalSignsLineChart = ({
     return parseFloat(rawValue) || 0;
   });
 
-  const minValue = Math.min(...values, basalValue || 0) * 0.9;
-  const maxValue = Math.max(...values, basalValue || 0) * 1.1;
+  // Para basal de pressão arterial (objeto), usar média para escala
+  const basalForScale = typeof basalValue === 'object' && basalValue?.systolic != null && basalValue?.diastolic != null
+    ? (basalValue.systolic + basalValue.diastolic) / 2
+    : basalValue;
+  const minValue = Math.min(...values, basalForScale || 0) * 0.9;
+  const maxValue = Math.max(...values, basalForScale || 0) * 1.1;
   const valueRange = maxValue - minValue || 1;
 
   // Calcular posições dos pontos
@@ -118,7 +122,7 @@ const VitalSignsLineChart = ({
       <View style={styles.chartWrapper}>
         <Svg width={CHART_WIDTH} height={CHART_HEIGHT + 40} style={styles.svg}>
         {/* Linha de basal */}
-        {basalValue !== null && (
+        {(basalValue !== null && basalValue !== undefined) && (
           <G>
             <Line
               x1={PADDING}
@@ -189,7 +193,11 @@ const VitalSignsLineChart = ({
         <View style={[styles.valueCard, { borderLeftColor: colors.warning }]}>
           <Text style={styles.valueCardLabel}>Basal</Text>
           <Text style={[styles.valueCardValue, { color: colors.warning }]}>
-            {typeof calculatedBasal === 'number' ? calculatedBasal.toFixed(1) : calculatedBasal}
+            {typeof calculatedBasal === 'object' && calculatedBasal?.systolic != null && calculatedBasal?.diastolic != null
+              ? `${calculatedBasal.systolic}/${calculatedBasal.diastolic}`
+              : typeof calculatedBasal === 'number'
+                ? calculatedBasal.toFixed(1)
+                : calculatedBasal}
           </Text>
           <Text style={styles.valueCardUnit}>{unit}</Text>
         </View>

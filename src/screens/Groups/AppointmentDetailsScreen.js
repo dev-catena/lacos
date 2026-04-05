@@ -137,6 +137,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
       groupId,
       appointmentId: appointmentIdToEdit,
       appointment: appointment,
+      isTeleconsultation: !!(appointment.is_teleconsultation || appointment.isTeleconsultation),
     });
   };
 
@@ -500,6 +501,19 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
   const isMedical = appointment.type === 'medical';
   const hasRecurrence = appointment.recurrence_type && appointment.recurrence_type !== 'none';
 
+  const isCancelledAppt =
+    appointment.status === 'cancelled' || appointment.status === 'cancelada';
+  const isTeleconsultAppt = !!(
+    appointment.is_teleconsultation ||
+    appointment.isTeleconsultation
+  );
+  const apptWhen = new Date(
+    appointment.appointment_date || appointment.scheduled_at
+  );
+  const isPastTeleconsult =
+    isTeleconsultAppt && apptWhen.getTime() < Date.now();
+  const showHeaderEdit = !isCancelledAppt && !isPastTeleconsult;
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar style="dark" />
@@ -515,14 +529,18 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
           </View>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detalhes do Compromisso</Text>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={handleEdit}
-        >
-          <View style={styles.iconWrapper}>
-            <Ionicons name="create-outline" size={24} color={colors.primary} />
-          </View>
-        </TouchableOpacity>
+        {showHeaderEdit ? (
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={handleEdit}
+          >
+            <View style={styles.iconWrapper}>
+              <Ionicons name="create-outline" size={24} color={colors.primary} />
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerButton} />
+        )}
       </View>
 
       <ScrollView 
@@ -640,43 +658,72 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
               </View>
               <Text style={[styles.sectionTitle, { marginLeft: 8 }]}>Teleconsulta</Text>
             </View>
-            {(appointment.payment_status === 'paid_held' || appointment.paymentStatus === 'paid_held') ? (
-              <>
-                <Text style={styles.teleconsultText}>
-                  A consulta foi realizada? Ao confirmar, o pagamento será liberado para o médico.
-                </Text>
-                <TouchableOpacity
-                  style={[styles.confirmButton, confirming && styles.confirmButtonDisabled]}
-                  onPress={handleOpenConfirmModal}
-                  disabled={confirming}
-                >
-                  {confirming ? (
-                    <ActivityIndicator color={colors.white} />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle-outline" size={22} color={colors.white} />
-                      <Text style={styles.confirmButtonText}>Confirmar que a consulta foi realizada</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </>
-            ) : (appointment.status === 'completed' || appointment.payment_status === 'released' || appointment.paymentStatus === 'released') ? (
-              <>
-                <View style={styles.completedBadge}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                  <Text style={styles.completedBadgeText}>Consulta realizada</Text>
-                </View>
-                {!appointment.has_user_review && (appointment.doctorUser || appointment.doctor) && (
-                  <TouchableOpacity
-                    style={styles.reviewButton}
-                    onPress={handleOpenReviewModal}
-                  >
-                    <Ionicons name="star-outline" size={20} color={colors.primary} />
-                    <Text style={styles.reviewButtonText}>Avaliar o médico</Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            ) : null}
+            {(() => {
+              const ps = appointment.payment_status || appointment.paymentStatus;
+              const teleconsultPago =
+                ps === 'paid_held' || ps === 'paid' || ps === 'released';
+              const mostrarRealizadoEAvaliar =
+                ps === 'released' ||
+                appointment.paymentStatus === 'released' ||
+                (appointment.status === 'completed' && teleconsultPago);
+
+              if (ps === 'paid_held' || appointment.paymentStatus === 'paid_held') {
+                return (
+                  <>
+                    <Text style={styles.teleconsultText}>
+                      A consulta foi realizada? Ao confirmar, o pagamento será liberado para o médico.
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.confirmButton, confirming && styles.confirmButtonDisabled]}
+                      onPress={handleOpenConfirmModal}
+                      disabled={confirming}
+                    >
+                      {confirming ? (
+                        <ActivityIndicator color={colors.textWhite} />
+                      ) : (
+                        <>
+                          <Ionicons name="checkmark-circle-outline" size={22} color={colors.textWhite} />
+                          <Text style={styles.confirmButtonText}>Confirmar que a consulta foi realizada</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                );
+              }
+
+              if (mostrarRealizadoEAvaliar) {
+                return (
+                  <>
+                    <View style={styles.completedBadge}>
+                      <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                      <Text style={styles.completedBadgeText}>Consulta realizada</Text>
+                    </View>
+                    {!appointment.has_user_review && (appointment.doctorUser || appointment.doctor) && (
+                      <TouchableOpacity style={styles.reviewButton} onPress={handleOpenReviewModal}>
+                        <Ionicons name="star-outline" size={20} color={colors.primary} />
+                        <Text style={styles.reviewButtonText}>Avaliar o médico</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                );
+              }
+
+              if (
+                (!ps || ps === 'pending') &&
+                apptWhen.getTime() < Date.now() &&
+                appointment.status !== 'cancelled' &&
+                appointment.status !== 'cancelada'
+              ) {
+                return (
+                  <Text style={styles.teleconsultText}>
+                    Esta teleconsulta já passou e o pagamento não foi concluído no prazo. Não é possível
+                    pagar nem avaliar neste fluxo — agende uma nova consulta ou fale com o suporte.
+                  </Text>
+                );
+              }
+
+              return null;
+            })()}
           </View>
         )}
 
@@ -740,7 +787,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
                 disabled={confirming}
               >
                 {confirming ? (
-                  <ActivityIndicator color={colors.white} size="small" />
+                  <ActivityIndicator color={colors.textWhite} size="small" />
                 ) : (
                   <Text style={styles.modalButtonConfirmText}>Confirmar</Text>
                 )}
@@ -790,7 +837,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
                 disabled={submittingReview}
               >
                 {submittingReview ? (
-                  <ActivityIndicator color={colors.white} size="small" />
+                  <ActivityIndicator color={colors.textWhite} size="small" />
                 ) : (
                   <Text style={styles.modalButtonConfirmText}>Enviar</Text>
                 )}
@@ -1008,7 +1055,7 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.white,
+    color: colors.textWhite,
   },
   completedBadge: {
     flexDirection: 'row',
@@ -1037,17 +1084,25 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    zIndex: 1,
   },
   modalContent: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.backgroundLight,
     borderRadius: 16,
     padding: 24,
     width: '100%',
     maxWidth: 400,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 12,
+    zIndex: 2,
   },
   modalTitle: {
     fontSize: 18,
@@ -1114,7 +1169,7 @@ const styles = StyleSheet.create({
   modalButtonConfirmText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.white,
+    color: colors.textWhite,
   },
 });
 

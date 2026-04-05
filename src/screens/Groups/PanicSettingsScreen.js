@@ -8,6 +8,7 @@ import {
   Switch,
   Alert,
   FlatList,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -17,6 +18,8 @@ import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import panicService from '../../services/panicService';
 import apiService from '../../services/apiService';
+import groupService from '../../services/groupService';
+import { isAccompaniedPersonGroupRole } from '../../utils/groupRoles';
 
 const PanicSettingsScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params;
@@ -41,15 +44,32 @@ const PanicSettingsScreen = ({ route, navigation }) => {
       // Buscar configuração do pânico
       const configResponse = await panicService.checkConfig(groupId);
       if (configResponse.success) {
-        setPanicEnabled(configResponse.data.enabled);
+        setPanicEnabled(configResponse.data.enabled ?? configResponse.data.panic_enabled ?? true);
         setEmergencyContacts(configResponse.data.emergency_contacts || []);
       }
 
-      // Buscar membros do grupo
-      const membersResponse = await apiService.get(`/groups/${groupId}/members`);
-      if (membersResponse.success) {
-        setMembers(membersResponse.data || []);
+      // Buscar membros: 1) endpoint /members, 2) fallback do detalhe do grupo
+      let membersList = [];
+      const membersResponse = await groupService.getGroupMembers(groupId);
+      if (membersResponse.success && Array.isArray(membersResponse.data) && membersResponse.data.length > 0) {
+        membersList = membersResponse.data;
       }
+      if (membersList.length === 0) {
+        const groupResponse = await groupService.getGroup(groupId);
+        const gm = groupResponse?.data?.group_members;
+        if (Array.isArray(gm) && gm.length > 0) {
+          membersList = gm.map(m => ({
+            id: m.user_id,
+            user_id: m.user_id,
+            name: m.name,
+            email: m.email,
+            role: m.role,
+            joined_at: m.joined_at ?? null,
+            user: { id: m.user_id, name: m.name, email: m.email },
+          }));
+        }
+      }
+      setMembers(membersList);
     } catch (error) {
       console.error('Erro ao carregar configuração:', error);
       Toast.show({
@@ -94,26 +114,36 @@ const PanicSettingsScreen = ({ route, navigation }) => {
     }
   };
 
-  const toggleEmergencyContact = async (memberId, currentValue) => {
-    try {
-      await apiService.put(`/group-members/${memberId}`, {
-        is_emergency_contact: !currentValue,
-      });
+  const setEmergencyContact = async (memberId, newValue) => {
+    const member = members.find(m => (m.user_id || m.id) === memberId);
+    const memberName = member?.user?.name || member?.name || 'Membro';
+    const previousContacts = [...emergencyContacts];
 
-      // Recarregar configuração
-      loadPanicConfig();
+    // Atualização otimista: atualizar UI imediatamente
+    if (newValue) {
+      setEmergencyContacts(prev => [...prev, { user_id: memberId, name: memberName }]);
+    } else {
+      setEmergencyContacts(prev => prev.filter(ec => Number(ec.user_id) !== Number(memberId)));
+    }
+
+    try {
+      await apiService.put(`/groups/${groupId}/members/${memberId}/emergency-contact`, {
+        is_emergency_contact: newValue,
+      });
 
       Toast.show({
         type: 'success',
-        text1: !currentValue 
+        text1: newValue 
           ? 'Contato de emergência adicionado' 
           : 'Contato de emergência removido',
       });
     } catch (error) {
+      // Reverter em caso de erro
+      setEmergencyContacts(previousContacts);
       Toast.show({
         type: 'error',
         text1: 'Erro ao atualizar contato',
-        text2: error.message,
+        text2: error?.message || 'Tente novamente',
       });
     }
   };
@@ -136,7 +166,24 @@ const PanicSettingsScreen = ({ route, navigation }) => {
   };
 
   const isEmergencyContact = (memberId) => {
-    return emergencyContacts.some(ec => ec.user_id === memberId);
+    return emergencyContacts.some(ec => Number(ec.user_id) === Number(memberId));
+  };
+
+  /** Contatos de emergência válidos (exclui paciente/acompanhado marcado por engano) */
+  const validEmergencyContactsCount = emergencyContacts.filter((ec) => {
+    const m = members.find(
+      (x) => Number(x.user_id || x.id) === Number(ec.user_id)
+    );
+    if (!m) return true;
+    return !isAccompaniedPersonGroupRole(m.role);
+  }).length;
+
+  const memberRoleLabel = (role) => {
+    if (role === 'admin') return 'Administrador';
+    if (role === 'caregiver') return 'Cuidador / Amigo';
+    if (role === 'professional_caregiver') return 'Cuidador profissional';
+    if (isAccompaniedPersonGroupRole(role)) return 'Paciente acompanhado';
+    return 'Membro';
   };
 
   const renderMemberItem = ({ item }) => (
@@ -148,13 +195,13 @@ const PanicSettingsScreen = ({ route, navigation }) => {
         <View style={styles.memberDetails}>
           <Text style={styles.memberName}>{item.user?.name || item.name}</Text>
           <Text style={styles.memberRole}>
-            {item.role === 'admin' ? 'Administrador' : 'Membro'}
+            {memberRoleLabel(item.role)}
           </Text>
         </View>
       </View>
       <Switch
         value={isEmergencyContact(item.user_id || item.id)}
-        onValueChange={() => toggleEmergencyContact(item.id, isEmergencyContact(item.user_id || item.id))}
+        onValueChange={(newValue) => setEmergencyContact(item.user_id || item.id, newValue)}
         trackColor={{ false: colors.gray300, true: colors.error + '50' }}
         thumbColor={isEmergencyContact(item.user_id || item.id) ? colors.error : colors.gray400}
       />
@@ -304,15 +351,18 @@ const PanicSettingsScreen = ({ route, navigation }) => {
             </View>
           ) : (
             <View>
-              {members.map((item) => (
-                <View key={item.id.toString()}>
+              {members
+                .filter((m) => !isAccompaniedPersonGroupRole(m.role))
+                .map((item, idx) => (
+                <View key={String(item.user_id || item.id || idx)}>
                   {renderMemberItem({ item })}
                 </View>
               ))}
             </View>
           )}
 
-          {emergencyContacts.length === 0 && members.length > 0 && (
+          {validEmergencyContactsCount === 0 &&
+            members.filter((m) => !isAccompaniedPersonGroupRole(m.role)).length > 0 && (
             <View style={styles.warningBox}>
               <SafeIcon name="alert-circle" size={20} color={colors.error} />
               <Text style={styles.warningText}>
@@ -335,8 +385,8 @@ const PanicSettingsScreen = ({ route, navigation }) => {
             </View>
           ) : (
             <View>
-              {panicEvents.map((item) => (
-                <View key={item.id.toString()}>
+              {panicEvents.map((item, idx) => (
+                <View key={String(item.id || idx)}>
                   {renderEventItem({ item })}
                 </View>
               ))}
@@ -412,11 +462,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...(Platform.OS === 'ios' && {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+    }),
+    ...(Platform.OS === 'android' && {
+      elevation: 0,
+      borderWidth: 1,
+      borderColor: colors.gray200,
+    }),
   },
   settingRow: {
     flexDirection: 'row',
@@ -473,11 +529,17 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    ...(Platform.OS === 'ios' && {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+    }),
+    ...(Platform.OS === 'android' && {
+      elevation: 0,
+      borderWidth: 1,
+      borderColor: colors.gray200,
+    }),
   },
   memberInfo: {
     flexDirection: 'row',
@@ -511,11 +573,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...(Platform.OS === 'ios' && {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+    }),
+    ...(Platform.OS === 'android' && {
+      elevation: 0,
+      borderWidth: 1,
+      borderColor: colors.gray200,
+    }),
   },
   eventHeader: {
     flexDirection: 'row',
@@ -579,6 +647,11 @@ const styles = StyleSheet.create({
     padding: 40,
     borderRadius: 12,
     alignItems: 'center',
+    ...(Platform.OS === 'android' && {
+      elevation: 0,
+      borderWidth: 1,
+      borderColor: colors.gray200,
+    }),
   },
   emptyStateText: {
     fontSize: 16,

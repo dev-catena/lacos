@@ -1,4 +1,3 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform, Alert } from 'react-native';
@@ -10,21 +9,33 @@ const MEDICATIONS_STORAGE_KEY = '@lacos_medications';
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
 const isAndroid = Platform.OS === 'android';
 
-// Configurar como as notificações devem ser tratadas quando o app está em primeiro plano
-// Apenas se não estiver no Expo Go no Android
-if (!(isExpoGo && isAndroid)) {
+/** Expo Go no Android não suporta notificações (SDK 53+). Não carregar o módulo evita o erro. */
+const shouldSkipNotifications = isExpoGo && isAndroid;
+
+/** Carrega expo-notifications apenas quando necessário (nunca no Expo Go Android). */
+const getNotifications = async () => {
+  if (shouldSkipNotifications) return null;
+  return import('expo-notifications');
+};
+
+/** Configura o handler de notificações. Chamar após o app carregar (ex: App.js). */
+export const initNotificationHandler = async () => {
+  if (shouldSkipNotifications) return;
   try {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-      }),
-    });
+    const Notifications = await getNotifications();
+    if (Notifications) {
+      await Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+        }),
+      });
+    }
   } catch (error) {
     console.warn('⚠️ NotificationService - Erro ao configurar handler:', error);
   }
-}
+};
 
 /**
  * Solicita permissão para enviar notificações
@@ -46,6 +57,9 @@ export const requestNotificationPermission = async () => {
       console.log('⚠️ NotificationService - Notificações não funcionam em simulador');
       return false;
     }
+
+    const Notifications = await getNotifications();
+    if (!Notifications) return false;
 
     let finalStatus;
     try {
@@ -70,7 +84,7 @@ export const requestNotificationPermission = async () => {
     }
 
     // Configurar canal de notificação (Android)
-    if (Platform.OS === 'android' && !isExpoGo) {
+    if (Platform.OS === 'android') {
       try {
         await Notifications.setNotificationChannelAsync('medication-reminders', {
           name: 'Lembretes de Medicamentos',
@@ -106,6 +120,9 @@ export const scheduleMedicationNotifications = async (medication) => {
     if (!hasPermission) {
       return [];
     }
+
+    const Notifications = await getNotifications();
+    if (!Notifications) return [];
 
     // Cancelar notificações anteriores deste medicamento
     await cancelMedicationNotifications(medication.id);
@@ -159,8 +176,11 @@ export const scheduleMedicationNotifications = async (medication) => {
  */
 export const cancelMedicationNotifications = async (medicationId) => {
   try {
+    const Notifications = await getNotifications();
+    if (!Notifications) return;
+
     const notificationIds = await getMedicationNotificationIds(medicationId);
-    
+
     if (notificationIds && notificationIds.length > 0) {
       for (const notifId of notificationIds) {
         await Notifications.cancelScheduledNotificationAsync(notifId);
@@ -232,6 +252,9 @@ const getMedicationNotificationIds = async (medicationId) => {
  */
 export const getAllScheduledNotifications = async () => {
   try {
+    const Notifications = await getNotifications();
+    if (!Notifications) return [];
+
     const notifications = await Notifications.getAllScheduledNotificationsAsync();
     console.log('📋 Notificações agendadas:', notifications.length);
     notifications.forEach((notif, index) => {
@@ -249,6 +272,9 @@ export const getAllScheduledNotifications = async () => {
  */
 export const cancelAllNotifications = async () => {
   try {
+    const Notifications = await getNotifications();
+    if (!Notifications) return;
+
     await Notifications.cancelAllScheduledNotificationsAsync();
     console.log('🗑️  Todas as notificações foram canceladas');
   } catch (error) {
@@ -259,18 +285,17 @@ export const cancelAllNotifications = async () => {
 /**
  * Configura listeners para notificações
  */
-export const setupNotificationListeners = () => {
-  // Listener para quando uma notificação é recebida enquanto o app está aberto
+export const setupNotificationListeners = async () => {
+  const Notifications = await getNotifications();
+  if (!Notifications) return () => {};
+
   const receivedListener = Notifications.addNotificationReceivedListener(notification => {
     console.log('📬 Notificação recebida:', notification);
   });
 
-  // Listener para quando o usuário interage com a notificação
   const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
     console.log('👆 Usuário interagiu com notificação:', response);
     const data = response.notification.request.content.data;
-    
-    // Aqui você pode navegar para a tela de detalhes do medicamento
     if (data.medicationId) {
       // navigation.navigate('MedicationDetails', { medicationId: data.medicationId });
     }
@@ -283,6 +308,7 @@ export const setupNotificationListeners = () => {
 };
 
 export default {
+  initNotificationHandler,
   requestNotificationPermission,
   scheduleMedicationNotifications,
   cancelMedicationNotifications,

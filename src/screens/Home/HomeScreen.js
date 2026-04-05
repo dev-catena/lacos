@@ -16,18 +16,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { ProfileIcon } from '../../components/CustomIcons';
-import { useFocusEffect } from '@react-navigation/native';
-import colors from '../../constants/colors';
-import { useAuth } from '../../contexts/AuthContext';
-import { LacosIcon, LacosLogoFull } from '../../components/LacosLogo';
-import groupService from '../../services/groupService';
-import activityService from '../../services/activityService';
-import planService from '../../services/planService';
-import API_CONFIG from '../../config/api';
-import moment from 'moment';
-import Toast from 'react-native-toast-message';
 import {
+  ProfileIcon,
   MedicationIcon,
   VitalSignsIcon,
   AppointmentIcon,
@@ -43,6 +33,42 @@ import {
   ErrorIcon,
   TrashIcon,
 } from '../../components/CustomIcons';
+import { useFocusEffect } from '@react-navigation/native';
+import colors from '../../constants/colors';
+import { useAuth } from '../../contexts/AuthContext';
+import { LacosIcon, LacosLogoFull } from '../../components/LacosLogo';
+import groupService from '../../services/groupService';
+import activityService from '../../services/activityService';
+import planService from '../../services/planService';
+import API_CONFIG from '../../config/api';
+import moment from 'moment';
+import Toast from 'react-native-toast-message';
+
+/** Data/hora do compromisso a partir de metadata (API); não confundir com created_at da atividade. */
+function formatActivitySlotLabel(metadata, actionType) {
+  if (!metadata) return null;
+  let raw = null;
+  if (actionType === 'appointment_created' || actionType === 'appointment_cancelled') {
+    raw = metadata.appointment_date || metadata.scheduled_at;
+  } else if (actionType === 'consultation_created') {
+    raw = metadata.consultation_date || metadata.scheduled_at;
+  }
+  if (!raw) return null;
+  const rawStr = typeof raw === 'string' ? raw.trim() : '';
+  const m = moment(raw);
+  if (!m.isValid()) return null;
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(rawStr);
+  const formatted = dateOnly
+    ? m.format('DD/MM/YYYY')
+    : m.format('DD/MM/YYYY [às] HH:mm');
+  if (actionType === 'consultation_created') {
+    return `Consulta: ${formatted}`;
+  }
+  if (actionType === 'appointment_created' || actionType === 'appointment_cancelled') {
+    return `Compromisso: ${formatted}`;
+  }
+  return null;
+}
 
 /** Foto do grupo com fallback para ícone quando falha (timeout, 404, etc.) */
 const GroupPhoto = ({ group, photoUrl, style, iconColor }) => {
@@ -258,6 +284,8 @@ const HomeScreen = ({ navigation }) => {
             has_group_object: !!activity.group,
           });
           
+          const meta =
+            activity.metadata && typeof activity.metadata === 'object' ? activity.metadata : null;
           return {
             id: activity.id,
             title: activityService.getActivityTypeLabel(activity.action_type),
@@ -269,7 +297,8 @@ const HomeScreen = ({ navigation }) => {
             time: moment(activity.created_at).fromNow(),
             dateTime: moment(activity.created_at).format('DD/MM/YYYY [às] HH:mm'),
             timestamp: activity.created_at,
-            action_type: activity.action_type, // Armazenar o tipo original para filtrar notificações
+            action_type: activity.action_type,
+            slotLabel: formatActivitySlotLabel(meta, activity.action_type),
           };
         });
         
@@ -814,6 +843,9 @@ const HomeScreen = ({ navigation }) => {
                         <View style={styles.activityContent}>
                           <Text style={styles.activityTitle}>{activity.title}</Text>
                           <Text style={styles.activityDescription}>{activity.description}</Text>
+                          {activity.slotLabel ? (
+                            <Text style={styles.activitySlotLabel}>{activity.slotLabel}</Text>
+                          ) : null}
                           <View style={styles.activityMeta}>
                             <View style={styles.activityMetaLeft}>
                               <Text style={styles.activityGroup}>{activity.groupName}</Text>
@@ -1307,6 +1339,12 @@ const styles = StyleSheet.create({
   activityDescription: {
     fontSize: 14,
     color: colors.textLight,
+    marginBottom: 6,
+  },
+  activitySlotLabel: {
+    fontSize: 13,
+    color: colors.text,
+    fontWeight: '500',
     marginBottom: 6,
   },
   activityMeta: {

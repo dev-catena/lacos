@@ -8,6 +8,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  Platform,
   ActivityIndicator,
   Image,
   Switch,
@@ -303,10 +304,10 @@ const GroupContactsScreen = ({ route, navigation }) => {
     });
   };
 
-  // Função para toggle SOS
-  const toggleSOS = (index) => {
+  // Atualizar SOS usando o valor do Switch (evita duplo disparo que causava marcar/desmarcar)
+  const setSOS = (index, value) => {
     setContacts(prev => prev.map((contact, idx) => 
-      idx === index ? { ...contact, isSOS: !contact.isSOS } : contact
+      idx === index ? { ...contact, isSOS: !!value } : contact
     ));
   };
 
@@ -643,7 +644,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
 
             {contacts.map((contact, index) => (
               <View 
-                key={`contact-${contact.id || index}-${contact.name || 'empty'}`} 
+                key={`contact-${contact.id ?? `slot-${index}`}`} 
                 style={[
                   styles.contactCard,
                   contact.isSOS && styles.sosContactCard
@@ -664,14 +665,15 @@ const GroupContactsScreen = ({ route, navigation }) => {
                     Contato {index + 1}
                   </Text>
                   {/* Toggle SOS */}
-                  <View style={styles.sosToggleContainer}>
+                  <View style={styles.sosToggleContainer} collapsable={false}>
                     <Text style={styles.sosToggleLabel}>SOS</Text>
                     <Switch
-                      value={contact.isSOS}
-                      onValueChange={() => toggleSOS(index)}
+                      value={!!contact.isSOS}
+                      onValueChange={(newValue) => setSOS(index, newValue)}
                       trackColor={{ false: colors.gray300, true: colors.error + '80' }}
-                      thumbColor={contact.isSOS ? colors.error : colors.white}
+                      thumbColor={!!contact.isSOS ? colors.error : colors.white}
                       ios_backgroundColor={colors.gray300}
+                      disabled={false}
                     />
                   </View>
                 </View>
@@ -684,6 +686,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
                     placeholderTextColor={colors.placeholder}
                     value={contact.name}
                     onChangeText={(text) => updateContact(index, 'name', text)}
+                    underlineColorAndroid="transparent"
                   />
                 </View>
 
@@ -704,6 +707,7 @@ const GroupContactsScreen = ({ route, navigation }) => {
                     }}
                     keyboardType="phone-pad"
                     editable={!saving}
+                    underlineColorAndroid="transparent"
                   />
                   <Text style={styles.hint}>
                     Formato: +55(DDD)XXXXX-XXXX (11 dígitos)
@@ -860,11 +864,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+    ...(Platform.OS === 'android' && { borderWidth: 0, elevation: 0 }),
   },
   sosContactCard: {
-    borderColor: colors.error + '40',
     backgroundColor: colors.error + '05',
   },
   contactHeader: {
@@ -917,13 +919,12 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
     color: colors.text,
+    ...(Platform.OS === 'android' && { borderWidth: 0 }),
   },
   hint: {
     fontSize: 12,
@@ -936,9 +937,7 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 12,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
+    ...(Platform.OS === 'android' && { borderWidth: 0, elevation: 0 }),
   },
   photoPreview: {
     width: '100%',

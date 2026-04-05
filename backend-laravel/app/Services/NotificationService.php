@@ -86,5 +86,24 @@ class NotificationService
 
         return $preferences->$preferenceKey ?? true;
     }
+
+    /**
+     * Aviso de novo agendamento criado no grupo (por outro membro).
+     * Não usar só appointment_reminders: no app é "Lembretes de consultas" (antes do horário).
+     * Considera também group_changes e group_member_added (atividade no grupo).
+     */
+    public function shouldNotifyNewGroupAppointment(User $user): bool
+    {
+        $preferences = $user->notificationPreferences;
+        if (!$preferences) {
+            return true;
+        }
+
+        $memberAdded = $preferences->group_member_added ?? true;
+        $groupUpdates = $preferences->group_changes ?? false;
+        $reminders = $preferences->appointment_reminders ?? true;
+
+        return $memberAdded || $groupUpdates || $reminders;
+    }
 }
 

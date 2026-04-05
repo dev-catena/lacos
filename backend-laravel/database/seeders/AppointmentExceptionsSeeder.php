@@ -14,6 +14,13 @@ class AppointmentExceptionsSeeder extends Seeder
      */
     public function run()
     {
-        // Tabela vazia - nenhum dado para inserir
+        $records = array ();
+
+        foreach ($records as $record) {
+            DB::table('appointment_exceptions')->updateOrInsert(
+                ['id' => $record['id']],
+                $record
+            );
+        }
     }
 }

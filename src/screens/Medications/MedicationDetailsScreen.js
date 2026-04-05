@@ -24,6 +24,7 @@ import colors from '../../constants/colors';
 import medicationService from '../../services/medicationService';
 import medicationSearchService from '../../services/medicationSearchService';
 import medicationPriceService from '../../services/medicationPriceService';
+import { buildScheduleFromMedicationApi } from '../../utils/medicationSchedule';
 import NearbyPharmacies from '../../components/NearbyPharmacies';
 import PopularPharmacies from '../../components/PopularPharmacies';
 
@@ -77,10 +78,11 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
             form: med.pharmaceutical_form || med.form,
             route: med.administration_route || med.route || '',
             frequency: frequencyType === 'advanced' ? 'advanced' : (frequencyDetails.interval || '24'),
-            schedule: med.times || frequencyDetails.schedule || [],
+            schedule: buildScheduleFromMedicationApi(med, frequencyDetails),
             advancedFrequency: frequencyType === 'advanced' ? frequencyDetails : null,
             durationType: duration.type || 'continuo',
             durationDays: duration.value || null,
+            instructions: med.instructions ?? med.notes ?? '',
           };
           
           setMedication(transformedMed);
@@ -101,8 +103,26 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
         if (medsJson) {
           const meds = JSON.parse(medsJson);
           const med = meds.find(m => m.id === medicationId);
-          setMedication(med);
-          
+          if (med) {
+            try {
+              const frequency = typeof med.frequency === 'string'
+                ? JSON.parse(med.frequency)
+                : (med.frequency || {});
+              const frequencyDetails = frequency.details || {};
+              setMedication({
+                ...med,
+                schedule: buildScheduleFromMedicationApi(med, frequencyDetails),
+              });
+            } catch {
+              setMedication({
+                ...med,
+                schedule: Array.isArray(med.schedule) ? med.schedule : [],
+              });
+            }
+          } else {
+            setMedication(null);
+          }
+
           if (med && med.name) {
             const isPopular = medicationSearchService.isFarmaciaPopular(med.name);
             setIsFarmaciaPopular(isPopular);
@@ -318,7 +338,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
               } else {
                 frequencyDetailsToSend = {
                   interval: frequencyDetails.interval || '24',
-                  schedule: med.times || frequencyDetails.schedule || [],
+                  schedule: buildScheduleFromMedicationApi(med, frequencyDetails),
                 };
               }
               
@@ -428,7 +448,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
               } else {
                 frequencyDetailsToSend = {
                   interval: frequencyDetails.interval || '24',
-                  schedule: med.times || frequencyDetails.schedule || [],
+                  schedule: buildScheduleFromMedicationApi(med, frequencyDetails),
                 };
               }
               
@@ -634,7 +654,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
               Pressione e segure para mais opções
             </Text>
           </View>
-          {medication.schedule && medication.schedule.map((time, index) => {
+          {(Array.isArray(medication.schedule) ? medication.schedule : []).map((time, index) => {
             const status = getDoseStatus(time);
             return (
               <TouchableOpacity

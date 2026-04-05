@@ -38,6 +38,7 @@ class User extends Authenticatable
         'formation_description',
         'crm',
         'medical_specialty_id',
+        'professional_qualification_level',
         'hourly_rate',
         'consultation_price',
         'availability',
@@ -62,6 +63,7 @@ class User extends Authenticatable
         'consultation_price' => 'decimal:2',
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
+        'professional_qualification_level' => 'array',
     ];
 
     public function createdGroups()

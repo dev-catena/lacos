@@ -14,6 +14,13 @@ class StoreTrackingEventsSeeder extends Seeder
      */
     public function run()
     {
-        // Tabela vazia - nenhum dado para inserir
+        $records = array ();
+
+        foreach ($records as $record) {
+            DB::table('store_tracking_events')->updateOrInsert(
+                ['id' => $record['id']],
+                $record
+            );
+        }
     }
 }

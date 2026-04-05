@@ -26,6 +26,16 @@ class UserController extends Controller
             return response()->json(['message' => 'Usuário não encontrado'], 404);
         }
 
+        if ($request->has('professional_qualification_level')) {
+            $pql = $request->input('professional_qualification_level');
+            if (is_string($pql)) {
+                $trim = trim($pql);
+                $request->merge([
+                    'professional_qualification_level' => $trim === '' ? [] : [$trim],
+                ]);
+            }
+        }
+
         $rules = [
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $id,
@@ -56,6 +66,8 @@ class UserController extends Controller
             // Campos específicos de médico
             'crm' => 'sometimes|nullable|string|max:20',
             'medical_specialty_id' => 'sometimes|nullable|exists:medical_specialties,id',
+            'professional_qualification_level' => 'sometimes|nullable|array',
+            'professional_qualification_level.*' => 'in:especialista,residencia,mestrado,doutorado,pos_doutorado',
             'consultation_price' => 'sometimes|nullable|numeric|min:0',
         ];
 
@@ -141,6 +153,7 @@ class UserController extends Controller
         $doctorFields = [
             'crm',
             'medical_specialty_id',
+            'professional_qualification_level',
             'consultation_price',
         ];
         
@@ -150,6 +163,15 @@ class UserController extends Controller
                 // Para consultation_price, garantir que seja numérico ou null
                 if ($field === 'consultation_price') {
                     $data[$field] = $value !== null && $value !== '' ? (float) $value : null;
+                } elseif ($field === 'professional_qualification_level') {
+                    if (! is_array($value)) {
+                        $data[$field] = null;
+                    } else {
+                        $allowed = ['especialista', 'residencia', 'mestrado', 'doutorado', 'pos_doutorado'];
+                        $clean = array_values(array_unique(array_filter(array_map('strval', $value))));
+                        $clean = array_values(array_intersect($clean, $allowed));
+                        $data[$field] = $clean === [] ? null : $clean;
+                    }
                 } else {
                     $data[$field] = $value;
                 }

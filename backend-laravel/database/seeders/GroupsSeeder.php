@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class GroupsSeeder extends Seeder
 {
@@ -15,8 +16,7 @@ class GroupsSeeder extends Seeder
     public function run()
     {
         $records = array (
-  0 => 
-  array (
+  0 => array (
     'id' => 1,
     'name' => 'Vovó 71',
     'description' => 'Cuidar da vovó',
@@ -38,12 +38,11 @@ class GroupsSeeder extends Seeder
     'type' => 'care',
     'is_active' => 1,
     'created_by' => 1,
-    'created_at' => NULL,
+    'created_at' => null,
     'updated_at' => '2026-01-24 01:45:07',
-    'deleted_at' => NULL,
+    'deleted_at' => null,
   ),
-  1 => 
-  array (
+  1 => array (
     'id' => 2,
     'name' => 'Vovó Nervosa',
     'description' => 'Vovó',
@@ -65,17 +64,16 @@ class GroupsSeeder extends Seeder
     'type' => 'care',
     'is_active' => 1,
     'created_by' => 1,
-    'created_at' => NULL,
+    'created_at' => null,
     'updated_at' => '2026-01-25 14:17:58',
-    'deleted_at' => NULL,
+    'deleted_at' => null,
   ),
-  2 => 
-  array (
+  2 => array (
     'id' => 3,
     'name' => 'Dalva Ruback',
     'description' => 'Vovó Dalva',
     'code' => '65028053',
-    'photo' => NULL,
+    'photo' => null,
     'monitor_blood_pressure' => 0,
     'monitor_heart_rate' => 0,
     'monitor_oxygen_saturation' => 0,
@@ -92,17 +90,16 @@ class GroupsSeeder extends Seeder
     'type' => 'care',
     'is_active' => 1,
     'created_by' => 16,
-    'created_at' => NULL,
+    'created_at' => null,
     'updated_at' => '2026-01-28 19:41:23',
-    'deleted_at' => NULL,
+    'deleted_at' => null,
   ),
-  3 => 
-  array (
+  3 => array (
     'id' => 4,
     'name' => 'Dalva Ruback',
-    'description' => NULL,
+    'description' => null,
     'code' => 'D842B3D9',
-    'photo' => NULL,
+    'photo' => 'groups/group_4_698394621b9aa9.54795816.jpg',
     'monitor_blood_pressure' => 0,
     'monitor_heart_rate' => 0,
     'monitor_oxygen_saturation' => 0,
@@ -119,17 +116,96 @@ class GroupsSeeder extends Seeder
     'type' => 'care',
     'is_active' => 1,
     'created_by' => 16,
-    'created_at' => NULL,
-    'updated_at' => NULL,
-    'deleted_at' => NULL,
+    'created_at' => null,
+    'updated_at' => '2026-02-04 18:48:02',
+    'deleted_at' => null,
+  ),
+  4 => array (
+    'id' => 8,
+    'name' => 'Vovó Rosa',
+    'description' => 'Cuidados com a mãe',
+    'code' => 'B7DADEBE',
+    'photo' => null,
+    'monitor_blood_pressure' => 0,
+    'monitor_heart_rate' => 0,
+    'monitor_oxygen_saturation' => 0,
+    'monitor_blood_glucose' => 0,
+    'monitor_temperature' => 0,
+    'monitor_respiratory_rate' => 0,
+    'accompanied_notify_medication' => 1,
+    'accompanied_notify_appointment' => 1,
+    'accompanied_access_history' => 1,
+    'accompanied_access_medication' => 1,
+    'accompanied_access_schedule' => 1,
+    'accompanied_access_chat' => 0,
+    'admin_user_id' => 16,
+    'type' => 'care',
+    'is_active' => 1,
+    'created_by' => 16,
+    'created_at' => null,
+    'updated_at' => null,
+    'deleted_at' => null,
+  ),
+  5 => array (
+    'id' => 9,
+    'name' => 'Vovo Rosa',
+    'description' => null,
+    'code' => 'F974D5CB',
+    'photo' => null,
+    'monitor_blood_pressure' => 0,
+    'monitor_heart_rate' => 0,
+    'monitor_oxygen_saturation' => 0,
+    'monitor_blood_glucose' => 0,
+    'monitor_temperature' => 0,
+    'monitor_respiratory_rate' => 0,
+    'accompanied_notify_medication' => 1,
+    'accompanied_notify_appointment' => 1,
+    'accompanied_access_history' => 1,
+    'accompanied_access_medication' => 1,
+    'accompanied_access_schedule' => 1,
+    'accompanied_access_chat' => 0,
+    'admin_user_id' => 64,
+    'type' => 'care',
+    'is_active' => 1,
+    'created_by' => 64,
+    'created_at' => null,
+    'updated_at' => null,
+    'deleted_at' => null,
+  ),
+  6 => array (
+    'id' => 10,
+    'name' => 'Vovó Lena',
+    'description' => null,
+    'code' => '59BB3057',
+    'photo' => 'groups/group_10_69a48937346a06.98838604.jpg',
+    'monitor_blood_pressure' => 0,
+    'monitor_heart_rate' => 0,
+    'monitor_oxygen_saturation' => 0,
+    'monitor_blood_glucose' => 0,
+    'monitor_temperature' => 0,
+    'monitor_respiratory_rate' => 0,
+    'accompanied_notify_medication' => 1,
+    'accompanied_notify_appointment' => 1,
+    'accompanied_access_history' => 1,
+    'accompanied_access_medication' => 1,
+    'accompanied_access_schedule' => 1,
+    'accompanied_access_chat' => 0,
+    'admin_user_id' => 70,
+    'type' => 'care',
+    'is_active' => 1,
+    'created_by' => 70,
+    'created_at' => null,
+    'updated_at' => '2026-03-01 18:45:11',
+    'deleted_at' => null,
   ),
 );
 
+        $existingColumns = array_flip(Schema::getColumnListing('groups'));
         foreach ($records as $record) {
-            DB::table('groups')->updateOrInsert(
-                ['id' => $record['id']],
-                $record
-            );
+            $filtered = array_intersect_key($record, $existingColumns);
+            $filtered['created_at'] = $filtered['created_at'] ?? now();
+            $filtered['accompanied_name'] = $filtered['accompanied_name'] ?? $filtered['name'] ?? 'Acompanhado';
+            DB::table('groups')->updateOrInsert(['id' => $record['id']], $filtered);
         }
     }
 }

@@ -175,6 +175,7 @@ const AddPrescriptionScreen = ({ route, navigation }) => {
   ]);
   
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
   const [currentMedicationIndex, setCurrentMedicationIndex] = useState(0);
   
@@ -1037,6 +1038,43 @@ const AddPrescriptionScreen = ({ route, navigation }) => {
 
   const filteredDoctors = filterDoctors(doctors, searchQuery);
 
+  const handleDeletePrescription = () => {
+    if (!prescriptionId || deleting || saving) return;
+
+    Alert.alert(
+      'Excluir receita',
+      'Esta ação remove a receita e os medicamentos vinculados a ela. Deseja continuar?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeleting(true);
+              const result = await prescriptionService.deletePrescription(prescriptionId);
+              if (result.success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Receita excluída',
+                  text2: 'A receita foi removida com sucesso',
+                  position: 'bottom',
+                });
+                navigation.navigate('Prescriptions', { groupId, groupName });
+              } else {
+                Alert.alert('Não foi possível excluir', result.error || 'Tente novamente');
+              }
+            } catch (e) {
+              Alert.alert('Erro', e.message || 'Tente novamente');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loadingPrescription) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -1062,10 +1100,26 @@ const AddPrescriptionScreen = ({ route, navigation }) => {
           <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
-          <Text style={styles.title}>{isEditing ? 'Editar Receita' : 'Nova Receita'}</Text>
+          <Text style={styles.title}>{isEditing || prescriptionId ? 'Editar Receita' : 'Nova Receita'}</Text>
           <Text style={styles.subtitle}>{groupName}</Text>
         </View>
-        <View style={styles.placeholder} />
+        {prescriptionId ? (
+          <TouchableOpacity
+            onPress={handleDeletePrescription}
+            style={styles.backButton}
+            disabled={deleting || saving}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Excluir receita"
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <SafeIcon name="trash-outline" size={22} color={colors.error} />
+            )}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholder} />
+        )}
       </View>
 
       <ScrollView 
@@ -1205,9 +1259,9 @@ const AddPrescriptionScreen = ({ route, navigation }) => {
             <TouchableOpacity
               style={styles.addButton}
               onPress={handleAddMedication}
+              activeOpacity={0.7}
             >
-              <SafeIcon name="add" size={20} color={PASTEL_BLUE} />
-              <Text style={styles.addButtonText}>Adicionar</Text>
+              <Text style={styles.addButtonText}>+ Adicionar Medicamentos</Text>
             </TouchableOpacity>
           </View>
 
@@ -1993,16 +2047,27 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: PASTEL_BLUE + '20',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    justifyContent: 'center',
+    backgroundColor: PASTEL_BLUE,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: PASTEL_BLUE,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: { elevation: 4 },
+    }),
   },
   addButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: PASTEL_BLUE,
-    marginLeft: 6,
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.white,
   },
   medicationCard: {
     backgroundColor: colors.white,

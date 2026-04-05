@@ -444,7 +444,8 @@ class MedicationController extends Controller
         unset($medicationData['first_dose_at']);
         unset($medicationData['doctor_id']); // Remover doctor_id - coluna não existe na tabela medications
         // pharmaceutical_form, unit, administration_route, dose_quantity e dose_quantity_unit EXISTEM na tabela - NÃO remover
-        unset($medicationData['times']); // Remover - usar 'time' ao invés
+        // Coluna JSON `times` é NOT NULL no banco — gravar a grade de horários (mesma origem do campo `time`)
+        $medicationData['times'] = json_encode(array_values(is_array($times) ? $times : []));
         // Não mapear duration - coluna não existe na tabela
         unset($medicationData['duration_type']);
         unset($medicationData['duration_value']);

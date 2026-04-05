@@ -9,12 +9,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->boolean('two_factor_enabled')->default(false)->after('is_blocked');
-            $table->string('two_factor_method')->nullable()->after('two_factor_enabled');
-            $table->string('two_factor_phone')->nullable()->after('two_factor_method');
-            $table->string('two_factor_code')->nullable()->after('two_factor_phone');
-            $table->timestamp('two_factor_expires_at')->nullable()->after('two_factor_code');
-            $table->string('two_factor_secret')->nullable()->after('two_factor_expires_at');
+            $table->boolean('two_factor_enabled')->default(false);
+            $table->string('two_factor_method')->nullable();
+            $table->string('two_factor_phone')->nullable();
+            $table->string('two_factor_code')->nullable();
+            $table->timestamp('two_factor_expires_at')->nullable();
+            $table->string('two_factor_secret')->nullable();
         });
     }
 

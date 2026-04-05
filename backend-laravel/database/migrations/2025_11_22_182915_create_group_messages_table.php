@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('group_messages')) {
+            return;
+        }
+
         Schema::create('group_messages', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('group_id');
@@ -39,4 +43,3 @@ return new class extends Migration
         Schema::dropIfExists('group_messages');
     }
 };
-

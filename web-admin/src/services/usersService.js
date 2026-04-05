@@ -266,6 +266,30 @@ class UsersService {
     }
   }
 
+  async changePassword(userId, password, passwordConfirmation) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/password`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          password,
+          password_confirmation: passwordConfirmation,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await cleanJsonResponse(response);
+        const msg = error.errors?.password?.[0] || error.message || 'Erro ao alterar senha';
+        throw new Error(msg);
+      }
+
+      return await cleanJsonResponse(response);
+    } catch (error) {
+      console.error('Erro ao alterar senha:', error);
+      throw error;
+    }
+  }
+
   async deleteUser(userId) {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Group;
+use App\Models\GroupMember;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -28,6 +29,67 @@ class GroupController extends Controller
         $photoPath = ltrim($photoPath, '/');
         return $baseUrl . '/storage/' . $photoPath;
     }
+
+    /**
+     * Compromissos ligam médico ao grupo mesmo sem group_members.
+     * doctor_id pode ser users.id ou doctors.id; doctors.user_id associa ao login do médico.
+     */
+    private function doctorOrCreatorHasAppointmentInGroup(int $groupId, $user): bool
+    {
+        if (!Schema::hasTable('appointments')) {
+            return false;
+        }
+
+        return DB::table('appointments')
+            ->where('group_id', $groupId)
+            ->where(function ($query) use ($user) {
+                $query->where('doctor_id', $user->id);
+                if (Schema::hasColumn('appointments', 'created_by_user_id')) {
+                    $query->orWhere('created_by_user_id', $user->id);
+                }
+                if (Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'user_id')) {
+                    $query->orWhereIn('doctor_id', function ($sub) use ($user) {
+                        $sub->select('id')->from('doctors')->where('user_id', $user->id);
+                    });
+                }
+            })
+            ->exists();
+    }
+
+    /**
+     * IDs de grupos onde o usuário aparece como médico ou criador do compromisso.
+     */
+    private function groupIdsFromUserAppointments($user): array
+    {
+        if (!Schema::hasTable('appointments')) {
+            return [];
+        }
+        try {
+            return DB::table('appointments')
+                ->where(function ($query) use ($user) {
+                    $query->where('doctor_id', $user->id);
+                    if (Schema::hasColumn('appointments', 'created_by_user_id')) {
+                        $query->orWhere('created_by_user_id', $user->id);
+                    }
+                    if (Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'user_id')) {
+                        $query->orWhereIn('doctor_id', function ($sub) use ($user) {
+                            $sub->select('id')->from('doctors')->where('user_id', $user->id);
+                        });
+                    }
+                })
+                ->whereNotNull('group_id')
+                ->distinct()
+                ->pluck('group_id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->toArray();
+        } catch (\Exception $e) {
+            Log::warning('GroupController::groupIdsFromUserAppointments - '.$e->getMessage());
+
+            return [];
+        }
+    }
+
     /**
      * Listar grupos do usuário autenticado
      * GET /api/groups
@@ -50,15 +112,15 @@ class GroupController extends Controller
             Log::info("Buscando grupos para usuário ID: {$user->id} ({$user->email})");
 
             // Buscar grupos de múltiplas formas:
-            // 1. Grupos onde o usuário é admin (admin_user_id)
+            // 1. Grupos onde o usuário é admin/criador (created_by)
             // 2. Grupos onde o usuário é membro (via tabela group_members)
             // 3. Grupos onde o usuário tem atividades (group_activities)
             // 4. Grupos onde o usuário tem documentos (documents)
             // 5. Grupos onde o usuário tem medicamentos (medications)
             
-            // Buscar grupos onde o usuário é admin
+            // Buscar grupos onde o usuário é admin/criador
             $adminGroups = DB::table('groups')
-                ->where('admin_user_id', $user->id)
+                ->where('created_by', $user->id)
                 ->pluck('id')
                 ->toArray();
             
@@ -125,13 +187,18 @@ class GroupController extends Controller
                 Log::warning("Erro ao buscar grupos via medicamentos: " . $e->getMessage());
             }
 
+            // Grupos via consultas (médico designado ou quem criou — sem exigir membro do grupo)
+            $appointmentGroups = $this->groupIdsFromUserAppointments($user);
+            Log::info("Grupos via appointments para usuário {$user->id}: ".count($appointmentGroups));
+
             // Combinar todos os IDs únicos
             $allGroupIds = array_unique(array_merge(
                 $adminGroups,
                 $memberGroups,
                 $activityGroups,
                 $documentGroups,
-                $medicationGroups
+                $medicationGroups,
+                $appointmentGroups
             ));
 
             Log::info("Total de grupos únicos encontrados para usuário {$user->id}: " . count($allGroupIds) . " - IDs: " . implode(', ', $allGroupIds));
@@ -353,6 +420,7 @@ class GroupController extends Controller
             $validationRules = [
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
+                'accompanied_name' => 'nullable|string|max:255',
             ];
 
             // Adicionar validação de foto se coluna existir
@@ -371,14 +439,14 @@ class GroupController extends Controller
             $data = [
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
-                'admin_user_id' => $user->id,
-                'type' => 'care', // Padrão
+                'accompanied_name' => $validated['accompanied_name'] ?? $validated['name'] ?? 'Não informado',
+                'created_by' => $user->id,
                 'is_active' => true,
             ];
             
-            // Definir created_by se a coluna existir
-            if (Schema::hasColumn('groups', 'created_by')) {
-                $data['created_by'] = $user->id;
+            // Adicionar type se a coluna existir
+            if (Schema::hasColumn('groups', 'type')) {
+                $data['type'] = 'care';
             }
 
             // Gerar código de acesso se coluna existir
@@ -573,19 +641,7 @@ class GroupController extends Controller
                     }
                 }
                 
-                $hasAppointments = false;
-                if (Schema::hasTable('appointments')) {
-                    // A tabela appointments não tem user_id, mas tem doctor_id e created_by_user_id
-                    $hasAppointments = DB::table('appointments')
-                        ->where('group_id', $id)
-                        ->where(function($query) use ($user) {
-                            $query->where('doctor_id', $user->id);
-                            if (Schema::hasColumn('appointments', 'created_by_user_id')) {
-                                $query->orWhere('created_by_user_id', $user->id);
-                            }
-                        })
-                        ->exists();
-                }
+                $hasAppointments = $this->doctorOrCreatorHasAppointmentInGroup((int) $id, $user);
                 
                 $hasAccess = $hasActivities || $hasDocuments || $hasMedications || $hasAppointments;
             }
@@ -607,7 +663,7 @@ class GroupController extends Controller
                     ->first();
 
                 // Construir select dinamicamente baseado nas colunas disponíveis
-                $userColumns = ['users.id as user_id', 'users.name', 'users.email', 'group_members.role'];
+                $userColumns = ['users.id as user_id', 'users.name', 'users.email', 'group_members.role', 'group_members.joined_at'];
                 if (Schema::hasColumn('users', 'profile')) {
                     $userColumns[] = 'users.profile';
                 }
@@ -626,7 +682,8 @@ class GroupController extends Controller
                             'email' => $m->email,
                             'profile' => $m->profile ?? null,
                             'role' => $role, // Retornar 'patient' se for 'priority_contact'
-                            'is_admin' => ($m->role === 'admin')
+                            'is_admin' => ($m->role === 'admin'),
+                            'joined_at' => $m->joined_at ?? null,
                         ];
                     })
                     ->toArray();
@@ -1181,19 +1238,7 @@ class GroupController extends Controller
                     }
                 }
                 
-                $hasAppointments = false;
-                if (Schema::hasTable('appointments')) {
-                    // A tabela appointments não tem user_id, mas tem doctor_id e created_by_user_id
-                    $hasAppointments = DB::table('appointments')
-                        ->where('group_id', $id)
-                        ->where(function($query) use ($user) {
-                            $query->where('doctor_id', $user->id);
-                            if (Schema::hasColumn('appointments', 'created_by_user_id')) {
-                                $query->orWhere('created_by_user_id', $user->id);
-                            }
-                        })
-                        ->exists();
-                }
+                $hasAppointments = $this->doctorOrCreatorHasAppointmentInGroup((int) $id, $user);
                 
                 $hasAccess = $hasActivities || $hasDocuments || $hasMedications || $hasAppointments;
             }
@@ -1208,7 +1253,10 @@ class GroupController extends Controller
             }
             $members = [];
             if (Schema::hasTable("group_members")) {
-                $memberColumns = ["users.id", "users.name", "users.email", "users.phone", "group_members.role", "group_members.joined_at"];
+                $memberColumns = ["group_members.id as group_member_id", "users.id as user_id", "users.name", "users.email", "users.phone", "group_members.role", "group_members.joined_at"];
+                if (Schema::hasColumn('group_members', 'is_emergency_contact')) {
+                    $memberColumns[] = "group_members.is_emergency_contact";
+                }
                 if (Schema::hasColumn('users', 'photo')) {
                     $memberColumns[] = "users.photo";
                 }
@@ -1226,10 +1274,8 @@ class GroupController extends Controller
                     ->join("users", "group_members.user_id", "=", "users.id")
                     ->where("group_members.group_id", $id);
                 
-                // Adicionar filtro is_active apenas se a coluna existir
-                if (Schema::hasColumn('users', 'is_active')) {
-                    $query->where("users.is_active", 1);
-                }
+                // Não filtrar por is_active para garantir que todos os membros apareçam
+                // (usuários inativos ainda podem ser contatos de emergência)
                 
                 $members = $query->select($memberColumns)
                     ->get()
@@ -1241,8 +1287,9 @@ class GroupController extends Controller
                         $role = $m->role === 'priority_contact' ? 'patient' : $m->role;
                         
                         return [
-                            "id" => $m->id, 
-                            "user_id" => $m->id, 
+                            "id" => $m->user_id,
+                            "user_id" => $m->user_id,
+                            "group_member_id" => $m->group_member_id,
                             "name" => $m->name, 
                             "email" => $m->email, 
                             "phone" => $m->phone ?? null, 
@@ -1250,10 +1297,11 @@ class GroupController extends Controller
                             "photo_url" => $photoUrl ?: $this->buildPhotoUrl($photo), 
                             "role" => $role, // Retornar 'patient' se for 'priority_contact'
                             "is_admin" => ($m->role === "admin"), 
+                            "is_emergency_contact" => isset($m->is_emergency_contact) ? (bool) $m->is_emergency_contact : false,
                             "profile" => $m->profile ?? null, 
                             "joined_at" => $m->joined_at,
                             "user" => [
-                                "id" => $m->id,
+                                "id" => $m->user_id,
                                 "name" => $m->name,
                                 "email" => $m->email,
                                 "phone" => $m->phone ?? null,
@@ -1306,6 +1354,7 @@ class GroupController extends Controller
                             "photo_url" => $photoUrl ?: $this->buildPhotoUrl($photo), 
                             "role" => "admin", 
                             "is_admin" => true, 
+                            "is_emergency_contact" => false,
                             "profile" => $creator->profile ?? null, 
                             "joined_at" => $group->created_at,
                             "user" => [
@@ -1847,6 +1896,74 @@ class GroupController extends Controller
                 'message' => 'Erro ao atualizar role',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Atualizar contato de emergência de um membro
+     * PUT /api/groups/{groupId}/members/{memberId}/emergency-contact
+     */
+    public function updateMemberEmergencyContact(Request $request, $groupId, $memberId)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['success' => false, 'message' => 'Usuário não autenticado'], 401);
+            }
+
+            $group = DB::table('groups')->where('id', $groupId)->first();
+            if (!$group) {
+                return response()->json(['success' => false, 'message' => 'Grupo não encontrado'], 404);
+            }
+
+            $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+            $isCreator = $createdBy && (int)$createdBy == (int)$user->id;
+            $isAdmin = $isCreator;
+            if (!$isAdmin && Schema::hasTable('group_members')) {
+                $adminMember = DB::table('group_members')
+                    ->where('group_id', $groupId)
+                    ->where('user_id', $user->id)
+                    ->where('role', 'admin')
+                    ->first();
+                $isAdmin = $isAdmin || ($adminMember !== null);
+            }
+            if (!$isAdmin) {
+                return response()->json(['success' => false, 'message' => 'Sem permissão'], 403);
+            }
+
+            if (!Schema::hasTable('group_members') || !Schema::hasColumn('group_members', 'is_emergency_contact')) {
+                return response()->json(['success' => false, 'message' => 'Recurso não disponível'], 500);
+            }
+
+            $member = DB::table('group_members')
+                ->where('group_id', $groupId)
+                ->where('user_id', $memberId)
+                ->first();
+            if (!$member) {
+                return response()->json(['success' => false, 'message' => 'Membro não encontrado'], 404);
+            }
+
+            $isEmergencyContact = $request->boolean('is_emergency_contact');
+
+            if ($isEmergencyContact && GroupMember::isAccompaniedPersonRole($member->role ?? null)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A pessoa acompanhada não pode ser contato de emergência do grupo.',
+                ], 422);
+            }
+
+            DB::table('group_members')
+                ->where('group_id', $groupId)
+                ->where('user_id', $memberId)
+                ->update(['is_emergency_contact' => $isEmergencyContact, 'updated_at' => now()]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $isEmergencyContact ? 'Contato de emergência ativado' : 'Contato de emergência desativado',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao atualizar contato de emergência: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao atualizar'], 500);
         }
     }
 

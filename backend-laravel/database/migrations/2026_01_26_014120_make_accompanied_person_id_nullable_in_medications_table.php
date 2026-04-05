@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasColumn('medications', 'accompanied_person_id')) {
+            return;
+        }
+
         Schema::table('medications', function (Blueprint $table) {
             // Tornar accompanied_person_id nullable para permitir medicamentos de receitas sem paciente específico
             $table->unsignedBigInteger('accompanied_person_id')->nullable()->change();
@@ -22,6 +26,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasColumn('medications', 'accompanied_person_id')) {
+            return;
+        }
+
         Schema::table('medications', function (Blueprint $table) {
             // Reverter para NOT NULL (pode causar erro se houver registros com NULL)
             $table->unsignedBigInteger('accompanied_person_id')->nullable(false)->change();

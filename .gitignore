@@ -35,3 +35,4 @@ web-build/
 
 backend-laravel/.env.backup.*
 backups/**/*.bak
+node_modules

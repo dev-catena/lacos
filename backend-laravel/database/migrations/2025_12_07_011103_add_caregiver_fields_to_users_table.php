@@ -14,30 +14,30 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             // Campos de localização (adicionar apenas se não existirem)
             if (!Schema::hasColumn('users', 'latitude')) {
-                $table->decimal('latitude', 10, 8)->nullable()->after('profile');
+                $table->decimal('latitude', 10, 8)->nullable();
             }
             if (!Schema::hasColumn('users', 'longitude')) {
-                $table->decimal('longitude', 11, 8)->nullable()->after('latitude');
+                $table->decimal('longitude', 11, 8)->nullable();
             }
             if (!Schema::hasColumn('users', 'city')) {
-                $table->string('city', 100)->nullable()->after('longitude');
+                $table->string('city', 100)->nullable();
             }
             if (!Schema::hasColumn('users', 'neighborhood')) {
-                $table->string('neighborhood', 100)->nullable()->after('city');
+                $table->string('neighborhood', 100)->nullable();
             }
             
             // Campos específicos de cuidador profissional (adicionar apenas se não existirem)
             if (!Schema::hasColumn('users', 'formation_details')) {
-                $table->text('formation_details')->nullable()->after('neighborhood');
+                $table->text('formation_details')->nullable();
             }
             if (!Schema::hasColumn('users', 'hourly_rate')) {
-                $table->decimal('hourly_rate', 8, 2)->nullable()->after('formation_details');
+                $table->decimal('hourly_rate', 8, 2)->nullable();
             }
             if (!Schema::hasColumn('users', 'availability')) {
-                $table->text('availability')->nullable()->after('hourly_rate');
+                $table->text('availability')->nullable();
             }
             if (!Schema::hasColumn('users', 'is_available')) {
-                $table->boolean('is_available')->default(true)->after('availability');
+                $table->boolean('is_available')->default(true);
             }
             // gender já existe, não adicionar novamente
         });

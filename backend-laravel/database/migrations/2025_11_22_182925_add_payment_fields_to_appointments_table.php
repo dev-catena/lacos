@@ -66,9 +66,9 @@ return new class extends Migration
                 $table->decimal('platform_amount', 10, 2)->nullable()->after('doctor_amount');
             }
             
-            // Índices
+            // Índices (appointment_date existe na tabela appointments)
             $table->index('payment_status', 'idx_payment_status');
-            $table->index('scheduled_at', 'idx_scheduled_at');
+            $table->index('appointment_date', 'idx_appointment_date');
         });
     }
 
@@ -79,7 +79,7 @@ return new class extends Migration
     {
         Schema::table('appointments', function (Blueprint $table) {
             $table->dropIndex('idx_payment_status');
-            $table->dropIndex('idx_scheduled_at');
+            $table->dropIndex('idx_appointment_date');
             
             $columns = [
                 'payment_status', 'amount', 'payment_id', 'payment_hold_id', 'refund_id',
@@ -95,4 +95,3 @@ return new class extends Migration
         });
     }
 };
-

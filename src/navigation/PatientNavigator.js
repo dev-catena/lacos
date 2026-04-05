@@ -13,6 +13,8 @@ import AppointmentDetailsScreen from '../screens/Patient/AppointmentDetailsScree
 import AppointmentDetailsFullScreen from '../screens/Groups/AppointmentDetailsScreen';
 import RecordingScreen from '../screens/Patient/RecordingScreen';
 import PatientProfileScreen from '../screens/Patient/PatientProfileScreen';
+import PatientHowToUseScreen from '../screens/Patient/PatientHowToUseScreen';
+import PatientEmergencyContactsScreen from '../screens/Patient/PatientEmergencyContactsScreen';
 import PatientMessagesScreen from '../screens/Patient/PatientMessagesScreen';
 import PatientJoinGroupScreen from '../screens/Patient/PatientJoinGroupScreen';
 import PatientVideoCallScreen from '../screens/Patient/PatientVideoCallScreen';
@@ -338,6 +340,16 @@ const PatientNavigator = () => {
         options={{ 
           headerShown: false 
         }}
+      />
+      <Stack.Screen 
+        name="PatientHowToUse" 
+        component={PatientHowToUseScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="PatientEmergencyContacts" 
+        component={PatientEmergencyContactsScreen}
+        options={{ headerShown: false }}
       />
       </Stack.Navigator>
       {/* Componente de controle de navegação - renderizado fora do Stack mas com acesso via useNavigation */}

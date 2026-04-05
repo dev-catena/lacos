@@ -10,6 +10,7 @@ import CustomTabBar from '../components/CustomTabBar';
 // Importa as telas principais
 import HomeScreen from '../screens/Home/HomeScreen';
 import DoctorHomeScreen from '../screens/Home/DoctorHomeScreen';
+import DoctorDayScheduleScreen from '../screens/Home/DoctorDayScheduleScreen';
 import NoGroupsScreen from '../screens/Groups/NoGroupsScreen';
 import GroupsScreen from '../screens/Groups/GroupsScreen';
 import CreateGroupScreen from '../screens/Groups/CreateGroupScreen';
@@ -74,6 +75,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="HomeMain" 
         component={DoctorHomeScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="DoctorDaySchedule" 
+        component={DoctorDayScheduleScreen}
         options={{ 
           headerShown: false 
         }}

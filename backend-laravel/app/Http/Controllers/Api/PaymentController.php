@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
+use App\Services\AppointmentPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -238,6 +239,19 @@ class PaymentController extends Controller
                         'error' => $e->getMessage(),
                     ]);
                     // Não re-lançar: pagamento já foi processado no Stripe
+                }
+
+                // Mesmo fluxo que AppointmentPaymentService::processPayment (Stripe não chamava notificações antes)
+                try {
+                    $appt = $appointment->fresh();
+                    if ($appt && $appt->is_teleconsultation) {
+                        app(AppointmentPaymentService::class)->emitTeleconsultationPaymentNotifications($appt);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('PaymentController.confirm - Falha ao enviar notificações pós-pagamento', [
+                        'appointment_id' => $appointment->id,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
 
                 Log::info('Pagamento confirmado com sucesso', [

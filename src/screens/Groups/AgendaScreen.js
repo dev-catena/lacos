@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,6 +31,7 @@ import {
 } from '../../components/CustomIcons';
 import appointmentService from '../../services/appointmentService';
 import { useAuth } from '../../contexts/AuthContext';
+import { isTeleconsultAwaitingHonorariumConfirmation } from '../../utils/teleconsultationHonorarium';
 
 const AgendaScreen = ({ route, navigation }) => {
   let { groupId, groupName, isTeleconsultation } = route.params || {};
@@ -42,7 +44,26 @@ const AgendaScreen = ({ route, navigation }) => {
 
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('upcoming'); // 'upcoming', 'past', 'medical'
+  const [activeFilter, setActiveFilter] = useState('upcoming'); // 'upcoming', 'await_confirm', 'past'
+
+  useEffect(() => {
+    if (!isTeleconsultation && activeFilter === 'await_confirm') {
+      setActiveFilter('upcoming');
+    }
+  }, [isTeleconsultation, activeFilter]);
+
+  const awaitingHonorariumCount = useMemo(() => {
+    if (!isTeleconsultation) {
+      return 0;
+    }
+    const nowMs = Date.now();
+    return appointments.filter((a) => {
+      if (!a.is_teleconsultation) {
+        return false;
+      }
+      return isTeleconsultAwaitingHonorariumConfirmation(a, nowMs);
+    }).length;
+  }, [appointments, isTeleconsultation]);
 
   // Expandir compromissos recorrentes em múltiplos registros
   const expandRecurringAppointments = (appointmentsList) => {
@@ -213,6 +234,20 @@ const AgendaScreen = ({ route, navigation }) => {
         });
         
         setAppointments(filteredAppointments);
+
+        // Teleconsultas: priorizar aba "Confirmar realização" quando houver itens pendentes
+        if (isTeleconsultation) {
+          const awaitingCount = filteredAppointments.filter(
+            (a) =>
+              a.is_teleconsultation &&
+              isTeleconsultAwaitingHonorariumConfirmation(a, Date.now())
+          ).length;
+          if (awaitingCount > 0) {
+            setActiveFilter('await_confirm');
+          } else {
+            setActiveFilter((prev) => (prev === 'await_confirm' ? 'upcoming' : prev));
+          }
+        }
       } else {
         console.error('Erro ao carregar compromissos:', result.error);
       }
@@ -304,11 +339,17 @@ const AgendaScreen = ({ route, navigation }) => {
         // Próximos: data/hora > agora (ainda não aconteceu)
         // Usar > ao invés de >= para garantir que consultas que já passaram não apareçam
         const isUpcoming = appointmentTime > nowTime;
-        
+
+        // Teleconsulta: quem já passou e ainda está em paid_held vai para a aba "Confirmar realização", não para Próximos
+        if (isTeleconsultation && isTeleconsultAwaitingHonorariumConfirmation(item, nowTime)) {
+          return false;
+        }
+
         // Log para debug se necessário
         if (!isUpcoming && appointmentTime <= nowTime) {
           const diffMinutes = Math.floor((nowTime - appointmentTime) / (1000 * 60));
-          if (diffMinutes < 60) { // Log apenas se passou menos de 1 hora
+          if (diffMinutes < 60) {
+            // Log apenas se passou menos de 1 hora
             console.log('🔍 AgendaScreen - Consulta passada filtrada:', {
               title: item.title,
               appointmentTime: appointmentDate.toISOString(),
@@ -319,11 +360,26 @@ const AgendaScreen = ({ route, navigation }) => {
             });
           }
         }
-        
+
         return isUpcoming;
-      } else if (activeFilter === 'past') {
-        // Passados: data/hora <= agora (já aconteceu)
-        return appointmentTime <= nowTime;
+      }
+
+      if (activeFilter === 'await_confirm') {
+        if (!isTeleconsultation) {
+          return false;
+        }
+        return isTeleconsultAwaitingHonorariumConfirmation(item, nowTime);
+      }
+
+      if (activeFilter === 'past') {
+        // Passados: já ocorreu e não está mais aguardando confirmação para honorários
+        if (appointmentTime > nowTime) {
+          return false;
+        }
+        if (isTeleconsultation && isTeleconsultAwaitingHonorariumConfirmation(item, nowTime)) {
+          return false;
+        }
+        return true;
       }
       return true;
     });
@@ -460,6 +516,13 @@ const AgendaScreen = ({ route, navigation }) => {
     const now = new Date();
     const oneHourBefore = new Date(appointmentDate.getTime() - 60 * 60 * 1000);
     const canCancel = !isCancelled && now <= oneHourBefore;
+    const isTeleconsultItem = !!(item.is_teleconsultation || item.isTeleconsultation);
+    const isPastAppointment = appointmentDate.getTime() < now.getTime();
+    const canEditAppointment = !isCancelled && !(isTeleconsultItem && isPastAppointment);
+    const showHonorariumAwaitHint =
+      isTeleconsultItem &&
+      activeFilter === 'await_confirm' &&
+      isTeleconsultAwaitingHonorariumConfirmation(item, now.getTime());
     
     // Log detalhado para teleconsultas
     if (item.is_teleconsultation) {
@@ -479,7 +542,10 @@ const AgendaScreen = ({ route, navigation }) => {
 
     return (
       <TouchableOpacity 
-        style={styles.appointmentCard}
+        style={[
+          styles.appointmentCard,
+          showHonorariumAwaitHint && styles.appointmentCardAwaitingConfirm,
+        ]}
         onPress={() => {
           // Teleconsultas: usar tela completa com opção de confirmar realização
           const targetScreen = item.is_teleconsultation ? 'AppointmentDetailsFull' : 'AppointmentDetails';
@@ -508,6 +574,12 @@ const AgendaScreen = ({ route, navigation }) => {
             )}
             <Text style={styles.appointmentTitle} numberOfLines={2}>{item.title}</Text>
           </View>
+
+          {showHonorariumAwaitHint && (
+            <Text style={styles.honorariumAwaitHint}>
+              Toque para confirmar a realização e liberar os honorários ao médico assistente.
+            </Text>
+          )}
 
           {/* Badges */}
           <View style={styles.badgesContainer}>
@@ -545,8 +617,16 @@ const AgendaScreen = ({ route, navigation }) => {
             
             const paymentPending = !item.payment_status || item.payment_status === 'pending' || item.payment_status === null;
             
-            // Mostrar banner se: é teleconsulta, usuário não é paciente, pagamento está pendente E não está cancelada
-            const shouldShowBanner = isTeleconsultation && isNotPatient && paymentPending && !isCancelled;
+            // Não permitir pagar teleconsulta já no passado (evita pagar semanas depois por slot não pago)
+            const telePastUnpaidBlocked = isTeleconsultItem && isPastAppointment && paymentPending;
+
+            // Mostrar banner se: é teleconsulta, não paciente, pagamento pendente, não cancelada e consulta ainda não passou
+            const shouldShowBanner =
+              isTeleconsultation &&
+              isNotPatient &&
+              paymentPending &&
+              !isCancelled &&
+              !telePastUnpaidBlocked;
             
             // Debug log
             if (isTeleconsultation) {
@@ -677,7 +757,7 @@ const AgendaScreen = ({ route, navigation }) => {
               <NavigateIcon size={16} color={colors.info} />
             </TouchableOpacity>
           )}
-          {!isCancelled && (
+          {canEditAppointment && (
             <TouchableOpacity 
               style={styles.actionIconButton}
               onPress={(e) => {
@@ -688,6 +768,7 @@ const AgendaScreen = ({ route, navigation }) => {
                   groupName,
                   appointmentId: item.isRecurringInstance ? item.originalAppointmentId : item.id,
                   appointment: item,
+                  isTeleconsultation: !!(item.is_teleconsultation || item.isTeleconsultation),
                 });
               }}
             >
@@ -713,84 +794,144 @@ const AgendaScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <ArrowBackIcon size={24} color={colors.text} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>
-            {isTeleconsultation ? 'Teleconsultas' : 'Agenda'}
-          </Text>
-          <Text style={styles.headerSubtitle}>{groupName || 'Grupo'}</Text>
-        </View>
-        <View style={styles.placeholder} />
-      </View>
 
-      {/* Filtros */}
-      <View style={styles.filtersContainer}>
-        <TouchableOpacity 
-          style={[styles.filterChip, activeFilter === 'upcoming' && styles.filterChipActive]}
-          onPress={() => setActiveFilter('upcoming')}
-        >
-          <Text style={[styles.filterChipText, activeFilter === 'upcoming' && styles.filterChipTextActive]}>
-            Próximos
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.filterChip, activeFilter === 'past' && styles.filterChipActive]}
-          onPress={() => setActiveFilter('past')}
-        >
-          <Text style={[styles.filterChipText, activeFilter === 'past' && styles.filterChipTextActive]}>
-            Passados
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Lista de Compromissos */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Carregando compromissos...</Text>
-        </View>
-      ) : (() => {
-        const filteredAppointments = getFilteredAppointments();
-        return filteredAppointments.length > 0 ? (
-          <FlatList
-            data={filteredAppointments}
-            renderItem={renderAppointmentCard}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
-          <View style={styles.emptyState}>
-            <AppointmentIcon size={64} color={colors.gray300} />
-            <Text style={styles.emptyTitle}>
-              {isTeleconsultation ? 'Nenhuma teleconsulta' : 'Nenhum compromisso'}
+      {/* Topo fixo: título + abas (não participa do flex vertical da lista) */}
+      <View style={styles.topSection}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <ArrowBackIcon size={24} color={colors.text} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>
+              {isTeleconsultation ? 'Teleconsultas' : 'Agenda'}
             </Text>
-            <Text style={styles.emptyText}>
-              {isTeleconsultation ? (
-                activeFilter === 'upcoming' || !activeFilter 
-                  ? 'Nenhuma teleconsulta futura com nosso time agendada'
-                  : activeFilter === 'past'
-                    ? 'Nenhuma teleconsulta passada encontrada'
-                    : 'Toque no botão + para agendar uma teleconsulta'
-              ) : (
-                <>
-                  {activeFilter === 'upcoming' && 'Nenhum compromisso futuro encontrado'}
-                  {activeFilter === 'past' && 'Nenhum compromisso passado encontrado'}
-                  {!activeFilter && 'Toque no botão + para agendar um compromisso ou consulta'}
-                </>
-              )}
-            </Text>
+            <Text style={styles.headerSubtitle}>{groupName || 'Grupo'}</Text>
           </View>
-        );
-      })()}
+          <View style={styles.placeholder} />
+        </View>
+
+        {isTeleconsultation ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filtersScrollView}
+            contentContainerStyle={styles.filtersScroll}
+          >
+            <TouchableOpacity
+              style={[styles.filterChip, activeFilter === 'upcoming' && styles.filterChipActive]}
+              onPress={() => setActiveFilter('upcoming')}
+            >
+              <Text style={[styles.filterChipText, activeFilter === 'upcoming' && styles.filterChipTextActive]}>
+                Próximos
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                activeFilter === 'await_confirm' && styles.filterChipAwaitConfirm,
+              ]}
+              onPress={() => setActiveFilter('await_confirm')}
+            >
+              <View style={styles.filterChipRow}>
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    activeFilter === 'await_confirm' && styles.filterChipTextActive,
+                  ]}
+                >
+                  Confirmar realização
+                </Text>
+                {awaitingHonorariumCount > 0 && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>{awaitingHonorariumCount}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, activeFilter === 'past' && styles.filterChipActive]}
+              onPress={() => setActiveFilter('past')}
+            >
+              <Text style={[styles.filterChipText, activeFilter === 'past' && styles.filterChipTextActive]}>
+                Passados
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        ) : (
+          <View style={styles.filtersContainer}>
+            <TouchableOpacity
+              style={[styles.filterChip, activeFilter === 'upcoming' && styles.filterChipActive]}
+              onPress={() => setActiveFilter('upcoming')}
+            >
+              <Text style={[styles.filterChipText, activeFilter === 'upcoming' && styles.filterChipTextActive]}>
+                Próximos
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, activeFilter === 'past' && styles.filterChipActive]}
+              onPress={() => setActiveFilter('past')}
+            >
+              <Text style={[styles.filterChipText, activeFilter === 'past' && styles.filterChipTextActive]}>
+                Passados
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {isTeleconsultation && (
+          <Text style={styles.filtersHelper}>
+            Em &quot;Confirmar realização&quot; aparecem consultas já realizadas nas quais você precisa confirmar para liberar os honorários ao médico. Depois da confirmação, elas passam para &quot;Passados&quot;.
+          </Text>
+        )}
+      </View>
+
+      {/* Área da lista: único bloco com flex: 1 */}
+      <View style={styles.listSection}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Carregando compromissos...</Text>
+          </View>
+        ) : (() => {
+          const filteredAppointments = getFilteredAppointments();
+          return filteredAppointments.length > 0 ? (
+            <FlatList
+              data={filteredAppointments}
+              renderItem={renderAppointmentCard}
+              keyExtractor={(item) => item.id.toString()}
+              style={styles.flatList}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <AppointmentIcon size={64} color={colors.gray300} />
+              <Text style={styles.emptyTitle}>
+                {isTeleconsultation ? 'Nenhuma teleconsulta' : 'Nenhum compromisso'}
+              </Text>
+              <Text style={styles.emptyText}>
+                {isTeleconsultation ? (
+                  activeFilter === 'upcoming' || !activeFilter
+                    ? 'Nenhuma teleconsulta futura com nosso time agendada'
+                    : activeFilter === 'await_confirm'
+                      ? 'Nenhuma consulta aguardando confirmação. Quando uma teleconsulta paga já tiver ocorrido e faltar liberar honorários ao médico, ela aparecerá aqui.'
+                    : activeFilter === 'past'
+                      ? 'Nenhuma teleconsulta concluída nesta lista (após confirmar a realização, a consulta aparece em Passados).'
+                      : 'Toque no botão + para agendar uma teleconsulta'
+                ) : (
+                  <>
+                    {activeFilter === 'upcoming' && 'Nenhum compromisso futuro encontrado'}
+                    {activeFilter === 'past' && 'Nenhum compromisso passado encontrado'}
+                    {!activeFilter && 'Toque no botão + para agendar um compromisso ou consulta'}
+                  </>
+                )}
+              </Text>
+            </View>
+          );
+        })()}
+      </View>
 
       {/* Botão Flutuante */}
       <TouchableOpacity
@@ -811,6 +952,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  topSection: {
+    flexShrink: 0,
+    backgroundColor: colors.background,
+  },
+  listSection: {
+    flex: 1,
+    minHeight: 0,
+  },
+  flatList: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -852,6 +1004,49 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 8,
   },
+  filtersScrollView: {
+    flexGrow: 0,
+    flexShrink: 0,
+    alignSelf: 'stretch',
+  },
+  filtersScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    flexGrow: 0,
+  },
+  filtersHelper: {
+    fontSize: 12,
+    color: colors.textLight,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    lineHeight: 17,
+  },
+  filterChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  filterBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.error,
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterBadgeText: {
+    color: colors.textWhite,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  filterChipAwaitConfirm: {
+    backgroundColor: colors.warning,
+    borderColor: colors.warning,
+  },
   filterChip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -876,19 +1071,48 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 100,
   },
+  appointmentCardAwaitingConfirm: {
+    borderColor: colors.warning,
+    borderWidth: 2,
+    backgroundColor: colors.warning + '12',
+  },
+  honorariumAwaitHint: {
+    fontSize: 13,
+    color: colors.warning,
+    fontWeight: '600',
+    marginTop: 6,
+    marginBottom: 4,
+    lineHeight: 18,
+  },
   appointmentCard: {
     flexDirection: 'row',
     backgroundColor: colors.backgroundLight,
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 0,
+        borderWidth: 1,
+        borderColor: colors.gray200,
+      },
+      default: {
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+    }),
   },
   dateContainer: {
     width: 50,
@@ -947,11 +1171,23 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
     gap: 4,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 0,
+      },
+      default: {
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+      },
+    }),
   },
   teleconsultationBadgeText: {
     fontSize: 9,
@@ -1034,9 +1270,10 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     paddingHorizontal: 40,
+    paddingTop: 32,
   },
   emptyTitle: {
     fontSize: 18,

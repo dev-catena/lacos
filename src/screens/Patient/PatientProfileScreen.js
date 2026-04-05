@@ -96,11 +96,12 @@ const PatientProfileScreen = ({ navigation }) => {
         if (membersResult.success && membersResult.data) {
           const members = membersResult.data;
           
-          // Buscar data de entrada do paciente
-          const currentMember = members.find(m => m.user_id === user?.id);
-          if (currentMember && currentMember.created_at) {
-            setMemberSince(currentMember.created_at);
-          }
+          // Buscar data de entrada do paciente (joined_at ou created_at)
+          const currentMember = members.find(m => 
+            Number(m.user_id) === Number(user?.id) || Number(m.id) === Number(user?.id)
+          );
+          const memberDate = currentMember?.joined_at || currentMember?.created_at;
+          setMemberSince(memberDate || null);
 
           // Buscar quem é o admin
           const admin = members.find(m => m.role === 'admin');
@@ -430,7 +431,10 @@ const PatientProfileScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ajuda</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('PatientHowToUse')}
+          >
             <View style={styles.menuIcon}>
               <HelpCircleOutlineIcon size={24} color={colors.info} />
             </View>
@@ -441,7 +445,10 @@ const PatientProfileScreen = ({ navigation }) => {
             <ChevronForwardIcon size={20} color={colors.gray400} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('PatientEmergencyContacts')}
+          >
             <View style={styles.menuIcon}>
               <CallOutlineIcon size={24} color={colors.success} />
             </View>

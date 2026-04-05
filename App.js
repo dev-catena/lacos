@@ -15,6 +15,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import colors from './src/constants/colors';
 import { navigationRef } from './src/navigation/navigationRef';
+import { initNotificationHandler } from './src/services/notificationService';
 
 // Manter splash screen visível enquanto carrega fontes
 SplashScreen.preventAutoHideAsync();
@@ -262,6 +263,10 @@ export default function App() {
     }
 
     loadFonts();
+  }, []);
+
+  useEffect(() => {
+    initNotificationHandler();
   }, []);
 
   // Mostrar loading enquanto fontes não carregam

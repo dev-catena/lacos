@@ -54,14 +54,15 @@ const DoctorsScreen = ({ route, navigation }) => {
       // Processar médicos do grupo
       let groupDoctors = [];
       if (groupDoctorsResponse.success && groupDoctorsResponse.data) {
-        groupDoctors = groupDoctorsResponse.data.map(doctor => ({
+        // Não forçar false: a API já marca quem veio só da plataforma (ex.: por consultas no grupo).
+        groupDoctors = groupDoctorsResponse.data.map((doctor) => ({
           ...doctor,
-          is_platform_doctor: false, // Marcar como médico do grupo
+          is_platform_doctor: doctor.is_platform_doctor === true,
         }));
       }
       
       // Combinar as duas listas
-      // Remover duplicatas baseado no ID (se um médico da plataforma já estiver no grupo, priorizar o do grupo)
+      // Remover duplicatas por ID (priorizar entrada já no mapa; roster do grupo costuma vir antes)
       const doctorsMap = new Map();
       
       // Primeiro adicionar médicos do grupo (têm prioridade)
@@ -151,12 +152,12 @@ const DoctorsScreen = ({ route, navigation }) => {
   const renderDoctorItem = ({ item }) => (
     <TouchableWithoutFeedback
       onPress={() => {
-        // Médicos da plataforma não são editáveis através desta tela
-        if (!item.is_platform_doctor) {
+        // Só editar cadastro da tabela doctors do grupo; médicos só da plataforma não têm is_group_doctor
+        if (item.is_group_doctor === true) {
           handleEditDoctor(item);
         }
       }}
-      disabled={item.is_platform_doctor}
+      disabled={item.is_group_doctor !== true}
     >
       <View
         style={[
@@ -246,8 +247,8 @@ const DoctorsScreen = ({ route, navigation }) => {
         </View>
       )}
 
-      {/* Botões de Ação - Apenas para médicos do grupo (não da plataforma) */}
-      {!item.is_platform_doctor && (
+      {/* Botões só para linha em `doctors` do grupo (API: is_group_doctor); plataforma pura não tem is_group_doctor */}
+      {item.is_group_doctor === true && (
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.actionButton}

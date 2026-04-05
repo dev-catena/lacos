@@ -131,15 +131,39 @@ const AddDocumentScreen = ({ route, navigation }) => {
         copyToCacheDirectory: true,
       });
 
-      if (result.type === 'success') {
+      if (result.canceled) {
+        return;
+      }
+
+      // expo-document-picker v13+: assets[0] com uri, name, mimeType
+      const asset = result.assets?.[0];
+      if (asset?.uri) {
+        const mime = (asset.mimeType || '').toLowerCase();
+        const isPdf =
+          mime.includes('pdf') || (asset.name && asset.name.toLowerCase().endsWith('.pdf'));
+        updateField('file', {
+          uri: asset.uri,
+          type: isPdf ? 'pdf' : 'image',
+          name: asset.name || `documento_${Date.now()}${isPdf ? '.pdf' : ''}`,
+        });
+        return;
+      }
+
+      // Legado (expo-document-picker antigo): type === 'success'
+      if (result.type === 'success' && result.uri) {
         updateField('file', {
           uri: result.uri,
           type: result.mimeType?.includes('pdf') ? 'pdf' : 'image',
-          name: result.name,
+          name: result.name || 'documento',
         });
       }
     } catch (error) {
       console.error('Erro ao selecionar documento:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro ao selecionar',
+        text2: error.message || 'Não foi possível abrir o seletor de arquivos',
+      });
     }
   };
 

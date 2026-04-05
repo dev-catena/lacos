@@ -350,6 +350,27 @@ class PrescriptionService {
       };
     }
   }
+
+  /**
+   * Excluir receita existente (e medicamentos vinculados no servidor).
+   */
+  async deletePrescription(prescriptionId) {
+    try {
+      const endpoint = apiService.replaceParams('/prescriptions/:id', { id: prescriptionId });
+      await apiService.delete(endpoint);
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao excluir receita:', error);
+      const msg =
+        error.response?.data?.message ||
+        error.message ||
+        'Erro ao excluir receita';
+      return {
+        success: false,
+        error: typeof msg === 'string' ? msg : 'Erro ao excluir receita',
+      };
+    }
+  }
 }
 
 export default new PrescriptionService();

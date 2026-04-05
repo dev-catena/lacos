@@ -45,6 +45,7 @@ import mediaService from '../../services/mediaService';
 import alertService from '../../services/alertService';
 import websocketService from '../../services/websocketService';
 import API_CONFIG from '../../config/api';
+import { isAccompaniedPersonGroupRole } from '../../utils/groupRoles';
 
 const PATIENT_SESSION_KEY = '@lacos_patient_session';
 const GROUPS_STORAGE_KEY = '@lacos_groups';
@@ -478,10 +479,14 @@ const PatientHomeScreen = ({ navigation }) => {
         });
       }
       
-      // Adicionar membros que são contatos de emergência (group_members com is_emergency_contact=true)
+      // Adicionar membros que são contatos de emergência (exceto o próprio paciente acompanhado)
       if (membersResult.success && membersResult.data) {
         const members = Array.isArray(membersResult.data) ? membersResult.data : [];
-        const emergencyMembers = members.filter(m => m.is_emergency_contact);
+        const emergencyMembers = members.filter(
+          m =>
+            m.is_emergency_contact &&
+            !isAccompaniedPersonGroupRole(m.role)
+        );
         
         emergencyMembers.forEach((member, index) => {
           allContacts.push({

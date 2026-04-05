@@ -596,17 +596,13 @@ class PrescriptionController extends Controller
                 return response()->json(['success' => false, 'message' => 'group_id é obrigatório'], 422);
             }
 
-            // Verificar acesso ao grupo
-            $hasAccess = DB::table('group_members')
-                ->where('user_id', $user->id)
-                ->where('group_id', $groupId)
-                ->exists();
-
-            if (!$hasAccess) {
+            if (! $this->userCanAccessPrescriptionGroup($user, (int) $groupId)) {
                 return response()->json(['success' => false, 'message' => 'Você não tem acesso a este grupo'], 403);
             }
 
+            // Não listar receitas órfãs (criadas antes de transação ou falha ao gravar medicamentos)
             $prescriptions = \App\Models\Prescription::where('group_id', $groupId)
+                ->whereHas('medications')
                 ->with(['medications' => function($query) {
                     $query->where('is_active', true);
                 }])
@@ -802,13 +798,7 @@ class PrescriptionController extends Controller
                 'medications.*.notes' => 'nullable|string',
             ]);
 
-            // Verificar acesso ao grupo
-            $hasAccess = DB::table('group_members')
-                ->where('user_id', $user->id)
-                ->where('group_id', $validated['group_id'])
-                ->exists();
-
-            if (!$hasAccess) {
+            if (! $this->userCanAccessPrescriptionGroup($user, (int) $validated['group_id'])) {
                 return response()->json(['success' => false, 'message' => 'Você não tem acesso a este grupo'], 403);
             }
 
@@ -856,54 +846,70 @@ class PrescriptionController extends Controller
                 Log::info('PrescriptionController.store - Nenhum image_url fornecido ou está vazio');
             }
             
-            // Criar receita
-            Log::info('PrescriptionController.store - Criando receita com image_url:', [
-                'image_url' => $imageUrl,
-                'image_url_is_null' => is_null($imageUrl),
-            ]);
-            
-            $prescription = \App\Models\Prescription::create([
-                'group_id' => $validated['group_id'],
-                'doctor_id' => $validated['doctor_id'] ?? null,
-                'doctor_name' => $validated['doctor_name'] ?? null,
-                'doctor_specialty' => $validated['doctor_specialty'] ?? null,
-                'doctor_crm' => $validated['doctor_crm'] ?? null,
-                'prescription_date' => $validated['prescription_date'],
-                'notes' => $validated['notes'] ?? null,
-                'image_url' => $imageUrl,
-                'created_by' => $user->id,
-            ]);
-            
-            Log::info('PrescriptionController.store - Receita criada:', [
-                'prescription_id' => $prescription->id,
-                'image_url_salvo' => $prescription->image_url,
-            ]);
+            // Transação: receita + medicamentos são tudo-ou-nada (evita receitas órfãs sem medicamentos)
+            $response = DB::transaction(function () use ($user, $validated, $imageUrl) {
+                Log::info('PrescriptionController.store - Criando receita com image_url:', [
+                    'image_url' => $imageUrl,
+                    'image_url_is_null' => is_null($imageUrl),
+                ]);
 
-            // Registrar atividade de criação de receita
-            if (class_exists('App\Models\GroupActivity')) {
-                try {
-                    \App\Models\GroupActivity::logPrescriptionCreated(
-                        $validated['group_id'],
-                        $user->id,
-                        $user->name,
-                        $prescription->id
-                    );
-                } catch (\Exception $e) {
-                    Log::warning("Erro ao registrar atividade de receita: " . $e->getMessage());
+                $prescription = \App\Models\Prescription::create([
+                    'group_id' => $validated['group_id'],
+                    'doctor_id' => $validated['doctor_id'] ?? null,
+                    'doctor_name' => $validated['doctor_name'] ?? null,
+                    'doctor_specialty' => $validated['doctor_specialty'] ?? null,
+                    'doctor_crm' => $validated['doctor_crm'] ?? null,
+                    'prescription_date' => $validated['prescription_date'],
+                    'notes' => $validated['notes'] ?? null,
+                    'image_url' => $imageUrl,
+                    'created_by' => $user->id,
+                ]);
+
+                Log::info('PrescriptionController.store - Receita criada:', [
+                    'prescription_id' => $prescription->id,
+                    'image_url_salvo' => $prescription->image_url,
+                ]);
+
+                if (class_exists('App\Models\GroupActivity')) {
+                    try {
+                        \App\Models\GroupActivity::logPrescriptionCreated(
+                            $validated['group_id'],
+                            $user->id,
+                            $user->name,
+                            $prescription->id
+                        );
+                    } catch (\Exception $e) {
+                        Log::warning('Erro ao registrar atividade de receita: '.$e->getMessage());
+                    }
                 }
-            }
 
-            // Criar medicamentos
-            Log::info('PrescriptionController.store - Iniciando criação de medicamentos:', [
-                'prescription_id' => $prescription->id,
-                'medications_count' => count($validated['medications']),
-            ]);
-            
-            foreach ($validated['medications'] as $index => $medData) {
+                Log::info('PrescriptionController.store - Iniciando criação de medicamentos:', [
+                    'prescription_id' => $prescription->id,
+                    'medications_count' => count($validated['medications']),
+                ]);
+
+                foreach ($validated['medications'] as $index => $medData) {
                 Log::info("PrescriptionController.store - Processando medicamento {$index}:", [
                     'name' => $medData['name'] ?? 'sem nome',
                     'has_all_fields' => isset($medData['name']) && isset($medData['frequency']),
                 ]);
+
+                $schedule = [];
+                if (isset($medData['frequency']['details']['schedule']) && is_array($medData['frequency']['details']['schedule'])) {
+                    $schedule = $medData['frequency']['details']['schedule'];
+                }
+                $timesJson = json_encode(array_values($schedule));
+
+                $normalizedTime = $medData['time'] ?? null;
+                if ($normalizedTime) {
+                    try {
+                        $normalizedTime = \Carbon\Carbon::parse($normalizedTime)->format('H:i:s');
+                    } catch (\Throwable $e) {
+                        $normalizedTime = is_string($normalizedTime) && strlen($normalizedTime) > 20
+                            ? substr($normalizedTime, 0, 8)
+                            : $normalizedTime;
+                    }
+                }
                 
                 // Determinar accompanied_person_id (mesma lógica do MedicationController)
                 $accompaniedPersonId = null;
@@ -966,7 +972,8 @@ class PrescriptionController extends Controller
                     'dose_quantity' => $medData['dose_quantity'] ?? null,
                     'dose_quantity_unit' => $medData['dose_quantity_unit'] ?? null,
                     'frequency' => json_encode($medData['frequency']),
-                    'time' => $medData['time'] ?? null,
+                    'times' => $timesJson,
+                    'time' => $normalizedTime,
                     'start_date' => $medData['start_date'] ?? now(),
                     'end_date' => $medData['end_date'] ?? null,
                     'instructions' => $medData['instructions'] ?? null,
@@ -975,31 +982,32 @@ class PrescriptionController extends Controller
                     'registered_by_user_id' => $user->id,
                 ]);
                 
-                Log::info("PrescriptionController.store - Medicamento {$index} criado com sucesso:", [
-                    'medication_id' => $medication->id,
-                    'name' => $medication->name,
+                    Log::info("PrescriptionController.store - Medicamento {$index} criado com sucesso:", [
+                        'medication_id' => $medication->id,
+                        'name' => $medication->name,
+                    ]);
+                }
+
+                $createdCount = DB::table('medications')
+                    ->where('prescription_id', $prescription->id)
+                    ->count();
+
+                Log::info('PrescriptionController.store - Resumo da criação:', [
+                    'prescription_id' => $prescription->id,
+                    'medications_requested' => count($validated['medications']),
+                    'medications_created' => $createdCount,
                 ]);
-            }
 
-            // Verificar quantos medicamentos foram realmente criados
-            $createdCount = DB::table('medications')
-                ->where('prescription_id', $prescription->id)
-                ->count();
-            
-            Log::info('PrescriptionController.store - Resumo da criação:', [
-                'prescription_id' => $prescription->id,
-                'medications_requested' => count($validated['medications']),
-                'medications_created' => $createdCount,
-            ]);
+                $prescription->load('medications');
 
-            // Carregar receita com medicamentos
-            $prescription->load('medications');
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Receita criada com sucesso',
+                    'data' => $prescription,
+                ], 201);
+            });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Receita criada com sucesso',
-                'data' => $prescription,
-            ], 201);
+            return $response;
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json(['success' => false, 'message' => 'Dados inválidos', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
@@ -1022,13 +1030,7 @@ class PrescriptionController extends Controller
 
             $prescription = \App\Models\Prescription::findOrFail($id);
 
-            // Verificar acesso ao grupo
-            $hasAccess = DB::table('group_members')
-                ->where('user_id', $user->id)
-                ->where('group_id', $prescription->group_id)
-                ->exists();
-
-            if (!$hasAccess) {
+            if (! $this->userCanAccessPrescriptionGroup($user, (int) $prescription->group_id)) {
                 return response()->json(['success' => false, 'message' => 'Você não tem acesso a esta receita'], 403);
             }
 
@@ -1086,23 +1088,38 @@ class PrescriptionController extends Controller
                     $imageUrl = null; // Remover imagem se enviado vazio
                 }
             }
-            
-            // Atualizar receita
-            $prescription->update([
-                'doctor_id' => $validated['doctor_id'] ?? $prescription->doctor_id,
-                'doctor_name' => $validated['doctor_name'] ?? $prescription->doctor_name,
-                'doctor_specialty' => $validated['doctor_specialty'] ?? $prescription->doctor_specialty,
-                'doctor_crm' => $validated['doctor_crm'] ?? $prescription->doctor_crm,
-                'prescription_date' => $validated['prescription_date'],
-                'notes' => $validated['notes'] ?? null,
-                'image_url' => $imageUrl,
-            ]);
 
-            // Deletar medicamentos antigos
-            \App\Models\Medication::where('prescription_id', $prescription->id)->delete();
+            $response = DB::transaction(function () use ($user, $prescription, $validated, $imageUrl) {
+                $prescription->update([
+                    'doctor_id' => $validated['doctor_id'] ?? $prescription->doctor_id,
+                    'doctor_name' => $validated['doctor_name'] ?? $prescription->doctor_name,
+                    'doctor_specialty' => $validated['doctor_specialty'] ?? $prescription->doctor_specialty,
+                    'doctor_crm' => $validated['doctor_crm'] ?? $prescription->doctor_crm,
+                    'prescription_date' => $validated['prescription_date'],
+                    'notes' => $validated['notes'] ?? null,
+                    'image_url' => $imageUrl,
+                ]);
 
-            // Criar novos medicamentos
-            foreach ($validated['medications'] as $medData) {
+                \App\Models\Medication::where('prescription_id', $prescription->id)->delete();
+
+                foreach ($validated['medications'] as $medData) {
+                $schedule = [];
+                if (isset($medData['frequency']['details']['schedule']) && is_array($medData['frequency']['details']['schedule'])) {
+                    $schedule = $medData['frequency']['details']['schedule'];
+                }
+                $timesJson = json_encode(array_values($schedule));
+
+                $normalizedTime = $medData['time'] ?? null;
+                if ($normalizedTime) {
+                    try {
+                        $normalizedTime = \Carbon\Carbon::parse($normalizedTime)->format('H:i:s');
+                    } catch (\Throwable $e) {
+                        $normalizedTime = is_string($normalizedTime) && strlen($normalizedTime) > 20
+                            ? substr($normalizedTime, 0, 8)
+                            : $normalizedTime;
+                    }
+                }
+
                 // Determinar accompanied_person_id
                 $accompaniedPersonId = null;
                 $patientMember = DB::table('group_members')
@@ -1143,41 +1160,109 @@ class PrescriptionController extends Controller
                     // Não pular o medicamento - salvar mesmo sem accompanied_person_id
                 }
 
-                \App\Models\Medication::create([
-                    'group_id' => $prescription->group_id,
-                    'prescription_id' => $prescription->id,
-                    'accompanied_person_id' => $accompaniedPersonId,
-                    'name' => $medData['name'],
-                    'pharmaceutical_form' => $medData['pharmaceutical_form'] ?? null,
-                    'dosage' => $medData['dosage'] ?? null,
-                    'unit' => $medData['unit'] ?? null,
-                    'administration_route' => $medData['administration_route'] ?? null,
-                    'dose_quantity' => $medData['dose_quantity'] ?? null,
-                    'dose_quantity_unit' => $medData['dose_quantity_unit'] ?? null,
-                    'frequency' => json_encode($medData['frequency']),
-                    'time' => $medData['time'] ?? null,
-                    'start_date' => $medData['start_date'] ?? now(),
-                    'end_date' => $medData['end_date'] ?? null,
-                    'instructions' => $medData['instructions'] ?? null,
-                    'notes' => $medData['notes'] ?? null,
-                    'is_active' => true,
-                    'registered_by_user_id' => $user->id,
-                ]);
-            }
+                    \App\Models\Medication::create([
+                        'group_id' => $prescription->group_id,
+                        'prescription_id' => $prescription->id,
+                        'accompanied_person_id' => $accompaniedPersonId,
+                        'name' => $medData['name'],
+                        'pharmaceutical_form' => $medData['pharmaceutical_form'] ?? null,
+                        'dosage' => $medData['dosage'] ?? null,
+                        'unit' => $medData['unit'] ?? null,
+                        'administration_route' => $medData['administration_route'] ?? null,
+                        'dose_quantity' => $medData['dose_quantity'] ?? null,
+                        'dose_quantity_unit' => $medData['dose_quantity_unit'] ?? null,
+                        'frequency' => json_encode($medData['frequency']),
+                        'times' => $timesJson,
+                        'time' => $normalizedTime,
+                        'start_date' => $medData['start_date'] ?? now(),
+                        'end_date' => $medData['end_date'] ?? null,
+                        'instructions' => $medData['instructions'] ?? null,
+                        'notes' => $medData['notes'] ?? null,
+                        'is_active' => true,
+                        'registered_by_user_id' => $user->id,
+                    ]);
+                }
 
-            // Carregar receita com medicamentos atualizados
-            $prescription->load('medications');
+                $prescription->load('medications');
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Receita atualizada com sucesso',
-                'data' => $prescription,
-            ], 200);
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Receita atualizada com sucesso',
+                    'data' => $prescription,
+                ], 200);
+            });
+
+            return $response;
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json(['success' => false, 'message' => 'Dados inválidos', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             Log::error('Erro ao atualizar receita: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erro ao atualizar receita: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Excluir receita (soft delete) e medicamentos vinculados.
+     * DELETE /api/prescriptions/{id}
+     */
+    public function destroy(Request $request, $id)
+    {
+        try {
+            $user = Auth::user();
+            if (! $user) {
+                return response()->json(['success' => false, 'message' => 'Usuário não autenticado'], 401);
+            }
+
+            $prescription = \App\Models\Prescription::findOrFail($id);
+
+            if (! $this->userCanAccessPrescriptionGroup($user, (int) $prescription->group_id)) {
+                return response()->json(['success' => false, 'message' => 'Você não tem acesso a esta receita'], 403);
+            }
+
+            DB::transaction(function () use ($prescription) {
+                \App\Models\Medication::where('prescription_id', $prescription->id)->delete();
+                $prescription->delete();
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Receita excluída com sucesso',
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'message' => 'Receita não encontrada'], 404);
+        } catch (\Exception $e) {
+            Log::error('Erro ao excluir receita: ' . $e->getMessage());
+
+            return response()->json(['success' => false, 'message' => 'Erro ao excluir receita: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Membro do grupo ou médico com pelo menos um agendamento neste grupo (doctor_id em users ou doctors).
+     */
+    private function userCanAccessPrescriptionGroup($user, int $groupId): bool
+    {
+        if (DB::table('group_members')
+            ->where('user_id', $user->id)
+            ->where('group_id', $groupId)
+            ->exists()) {
+            return true;
+        }
+
+        if (($user->profile ?? '') !== 'doctor') {
+            return false;
+        }
+
+        return DB::table('appointments')
+            ->where('group_id', $groupId)
+            ->where(function ($q) use ($user) {
+                $q->where('doctor_id', $user->id);
+                if (Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'user_id')) {
+                    $q->orWhereIn('doctor_id', function ($sub) use ($user) {
+                        $sub->select('id')->from('doctors')->where('user_id', $user->id);
+                    });
+                }
+            })
+            ->exists();
     }
 }

@@ -143,12 +143,6 @@ const GroupDetailScreen = ({ route, navigation }) => {
       if (result.success && result.data) {
         const group = result.data;
         
-        // Obter o código do grupo
-        const code = group.code || group.access_code || group.patient_code;
-        if (code && code !== 'NULL' && code !== 'null') {
-          setGroupCode(code);
-        }
-        
         console.log('🔐 GroupDetail - Dados do grupo recebidos:', {
           groupId: group.id,
           groupName: group.name,
@@ -157,7 +151,6 @@ const GroupDetailScreen = ({ route, navigation }) => {
           is_admin: group.is_admin,
           user_id: user?.id,
           group_members: group.group_members?.length || 0,
-          code: code
         });
         
         // Verificar manualmente primeiro (mais confiável)
@@ -174,20 +167,20 @@ const GroupDetailScreen = ({ route, navigation }) => {
         const manualIsAdmin = isCreatorManual || hasAdminRole;
         
         // Usar is_admin do backend se disponível, mas sempre verificar manualmente também
+        let finalIsAdmin = false;
         if (group.is_admin !== undefined) {
           const backendIsAdmin = Boolean(group.is_admin);
           console.log('🔐 GroupDetail - is_admin do backend:', backendIsAdmin, '(tipo:', typeof group.is_admin, ')');
           console.log('🔐 GroupDetail - Verificação manual:', manualIsAdmin, '(criador:', isCreatorManual, ', role admin:', hasAdminRole, ')');
           
-          // Usar o valor mais permissivo (se qualquer um for true, usar true)
-          const finalIsAdmin = backendIsAdmin || manualIsAdmin;
+          finalIsAdmin = backendIsAdmin || manualIsAdmin;
           setIsAdmin(finalIsAdmin);
           
           if (backendIsAdmin !== manualIsAdmin) {
             console.warn('⚠️ GroupDetail - Diferença entre backend e verificação manual! Usando:', finalIsAdmin);
           }
         } else {
-          // Fallback: usar verificação manual
+          finalIsAdmin = manualIsAdmin;
           setIsAdmin(manualIsAdmin);
           
           console.log('🔐 GroupDetail - Verificação manual (fallback):', {
@@ -198,6 +191,16 @@ const GroupDetailScreen = ({ route, navigation }) => {
             memberData: memberData ? { role: memberData.role, is_admin: memberData.is_admin } : null,
             finalIsAdmin: manualIsAdmin
           });
+        }
+        
+        // Código do grupo: só carregar/exibir para administradores
+        if (finalIsAdmin) {
+          const code = group.code || group.access_code || group.patient_code;
+          if (code && code !== 'NULL' && code !== 'null') {
+            setGroupCode(code);
+          }
+        } else {
+          setGroupCode(null);
         }
       } else {
         console.warn('⚠️ GroupDetail - Não foi possível carregar dados do grupo');

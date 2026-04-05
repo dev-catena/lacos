@@ -41,6 +41,11 @@ import colors from '../../constants/colors';
 import videoCallService from '../../services/videoCallService';
 import appointmentService from '../../services/appointmentService';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  isTeleconsultPaidForVideoStart,
+  isTeleconsultAppointment,
+  isWithinTeleconsultVideoJoinWindow,
+} from '../../utils/teleconsultationHonorarium';
 // Importar RTCView do Agora.io (será disponível após build)
 // import { RtcSurfaceView, RtcSurfaceViewMode } from 'react-native-agora';
 
@@ -66,10 +71,29 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
   const chatFlatListRef = useRef(null);
 
   useEffect(() => {
+    if (isTeleconsultAppointment(appointment) && !isTeleconsultPaidForVideoStart(appointment)) {
+      Alert.alert(
+        'Pagamento pendente',
+        'A videochamada só pode ser iniciada após o paciente concluir o pagamento.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+      setIsInitializing(false);
+      return undefined;
+    }
+
+    if (isTeleconsultAppointment(appointment) && !isWithinTeleconsultVideoJoinWindow(appointment, Date.now())) {
+      Alert.alert(
+        'Fora do horário da videochamada',
+        'A entrada só é permitida entre 15 minutos antes e 40 minutos após o horário agendado.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+      setIsInitializing(false);
+      return undefined;
+    }
+
     initializeCall();
-    
+
     return () => {
-      // Cleanup ao sair da tela
       endCall();
     };
   }, []);

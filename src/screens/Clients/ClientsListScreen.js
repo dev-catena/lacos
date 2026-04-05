@@ -143,7 +143,7 @@ const ClientsListScreen = ({ navigation }) => {
 
   const renderClientCard = (client) => (
     <TouchableOpacity
-      key={client.id}
+      key={client.group_id != null ? `g-${client.group_id}-${client.id}` : `c-${client.id}`}
       style={[styles.clientCard, { borderWidth: 0, borderColor: 'transparent' }]}
       onPress={() => navigation.navigate('ClientDetails', { client })}
       activeOpacity={0.7}
@@ -277,7 +277,9 @@ const ClientsListScreen = ({ navigation }) => {
           {user?.profile === 'doctor' ? 'Meus Pacientes' : 'Meus Clientes'}
         </Text>
         <Text style={styles.headerSubtitle}>
-          Admins dos grupos em que você participa
+          {user?.profile === 'doctor'
+            ? 'Pacientes dos grupos em que você tem agendamentos'
+            : 'Admins dos grupos em que você participa'}
         </Text>
       </View>
 

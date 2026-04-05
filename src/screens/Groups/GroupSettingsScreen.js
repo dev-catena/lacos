@@ -1615,8 +1615,8 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           )}
         </View>
 
-        {/* Código do Grupo para Compartilhar */}
-        {(() => {
+        {/* Código do Grupo para Compartilhar - apenas para administradores */}
+        {isAdmin && (() => {
           const code = groupData?.code || groupData?.access_code;
           const hasCode = code && code !== 'NULL' && code !== 'null' && String(code).trim() !== '';
           if (!hasCode) return null;

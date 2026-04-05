@@ -20,6 +20,14 @@ const UsersManagement = ({ currentUser, onLogout }) => {
   const [sortColumn, setSortColumn] = useState('name'); // Coluna para ordenar
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' ou 'desc'
 
+  // Modal trocar senha
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [userForPassword, setUserForPassword] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
   // Salvar filtro no localStorage sempre que mudar
   useEffect(() => {
     localStorage.setItem('@lacos:usersFilter', filter);
@@ -84,6 +92,46 @@ const UsersManagement = ({ currentUser, onLogout }) => {
       await loadUsers();
     } catch (err) {
       setError(err.message || 'Erro ao desbloquear usuário');
+    }
+  };
+
+  const openPasswordModal = (user) => {
+    setUserForPassword(user);
+    setNewPassword('');
+    setNewPasswordConfirm('');
+    setPasswordError('');
+    setShowPasswordModal(true);
+  };
+
+  const closePasswordModal = () => {
+    setShowPasswordModal(false);
+    setUserForPassword(null);
+    setNewPassword('');
+    setNewPasswordConfirm('');
+    setPasswordError('');
+  };
+
+  const handleChangePassword = async () => {
+    if (!userForPassword) return;
+    if (newPassword.length < 6) {
+      setPasswordError('A senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+    if (newPassword !== newPasswordConfirm) {
+      setPasswordError('As senhas não conferem.');
+      return;
+    }
+
+    try {
+      setPasswordLoading(true);
+      setPasswordError('');
+      await usersService.changePassword(userForPassword.id, newPassword, newPasswordConfirm);
+      alert('Senha alterada com sucesso!');
+      closePasswordModal();
+    } catch (err) {
+      setPasswordError(err.message || 'Erro ao alterar senha');
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -414,6 +462,13 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                   </td>
                   <td>
                     <div className="action-buttons">
+                      <button
+                        className="action-btn password-btn-change"
+                        onClick={() => openPasswordModal(user)}
+                        title="Trocar senha do usuário"
+                      >
+                        🔑 Trocar senha
+                      </button>
                       {user.is_blocked ? (
                         <button
                           className="action-btn unblock-btn"
@@ -447,6 +502,57 @@ const UsersManagement = ({ currentUser, onLogout }) => {
           </tbody>
         </table>
       </div>
+
+      {/* Modal Trocar Senha */}
+      {showPasswordModal && userForPassword && (
+        <div className="password-modal-overlay" onClick={closePasswordModal}>
+          <div className="password-modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Trocar senha de {userForPassword.name}</h3>
+            <p style={{ margin: '0 0 1rem 0', color: '#6b7280', fontSize: '0.9375rem' }}>
+              Defina uma nova senha para {userForPassword.email}
+            </p>
+            <div className="form-group">
+              <label htmlFor="new-password">Nova senha (mín. 6 caracteres)</label>
+              <input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); }}
+                placeholder="Digite a nova senha"
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="new-password-confirm">Confirmar nova senha</label>
+              <input
+                id="new-password-confirm"
+                type="password"
+                value={newPasswordConfirm}
+                onChange={(e) => { setNewPasswordConfirm(e.target.value); setPasswordError(''); }}
+                placeholder="Repita a nova senha"
+                autoComplete="new-password"
+              />
+            </div>
+            {passwordError && (
+              <div style={{ color: '#dc2626', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                {passwordError}
+              </div>
+            )}
+            <div className="password-modal-actions">
+              <button className="password-btn password-btn-cancel" onClick={closePasswordModal}>
+                Cancelar
+              </button>
+              <button
+                className="password-btn password-btn-submit"
+                onClick={handleChangePassword}
+                disabled={passwordLoading || !newPassword || !newPasswordConfirm}
+              >
+                {passwordLoading ? 'Salvando...' : 'Salvar nova senha'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

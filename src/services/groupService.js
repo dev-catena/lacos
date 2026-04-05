@@ -375,20 +375,15 @@ class GroupService {
       const response = await apiService.get(`/groups/${groupId}/members`);
       
       // O backend retorna { success: true, data: [...] }
-      // Precisamos extrair o array de membros corretamente
+      // Extrair o array de membros de diferentes formatos de resposta
       let membersArray = [];
       
       if (response && typeof response === 'object') {
-        // Se response tem a propriedade data e é um array
-        if (response.data && Array.isArray(response.data)) {
-          membersArray = response.data;
-        }
-        // Se response é diretamente um array
-        else if (Array.isArray(response)) {
+        if (Array.isArray(response)) {
           membersArray = response;
-        }
-        // Se response.success existe e response.data é um array
-        else if (response.success && response.data && Array.isArray(response.data)) {
+        } else if (response.data && Array.isArray(response.data)) {
+          membersArray = response.data;
+        } else if (response.success && response.data && Array.isArray(response.data)) {
           membersArray = response.data;
         }
       }

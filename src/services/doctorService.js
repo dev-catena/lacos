@@ -68,10 +68,19 @@ const doctorService = {
 
   /**
    * Busca a agenda disponível de um médico
+   * @param {number|string} doctorId
+   * @param {{ excludeBooked?: boolean }} [options] - true: omitir ocupados; false: grade completa (médico); omitido: backend omite ocupados por padrão
    */
-  async getDoctorAvailability(doctorId) {
+  async getDoctorAvailability(doctorId, options = {}) {
     try {
-      const response = await apiService.get(`/doctors/${doctorId}/availability`);
+      const params = new URLSearchParams();
+      if (options.excludeBooked === true) {
+        params.set('exclude_booked', '1');
+      } else if (options.excludeBooked === false) {
+        params.set('exclude_booked', '0');
+      }
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const response = await apiService.get(`/doctors/${doctorId}/availability${qs}`);
       return response;
     } catch (error) {
       console.error('Erro ao buscar agenda do médico:', error);
