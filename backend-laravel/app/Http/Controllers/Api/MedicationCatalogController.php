@@ -36,22 +36,29 @@ class MedicationCatalogController extends Controller
 
             foreach ($medications as $med) {
                 $nameOnly = MedicationCatalog::extractNameOnly($med->nome_produto);
-                $nameKey = strtolower(trim($nameOnly));
+                if ($med->obm_entity && $med->obm_code) {
+                    $dedupeKey = strtolower($med->obm_entity).'|'.$med->obm_code;
+                } else {
+                    $dedupeKey = strtolower(trim($nameOnly));
+                }
 
-                // Se já vimos este nome, pular
-                if (isset($seenNames[$nameKey])) {
+                if (isset($seenNames[$dedupeKey])) {
                     continue;
                 }
 
-                $seenNames[$nameKey] = true;
+                $seenNames[$dedupeKey] = true;
 
                 $uniqueMedications[] = [
                     'id' => $med->id,
-                    'name' => $med->nome_produto, // Nome completo para referência
-                    'displayName' => $nameOnly, // Apenas nome para exibição
+                    'name' => $med->nome_produto,
+                    'displayName' => $nameOnly,
                     'principio_ativo' => $med->principio_ativo,
                     'classe_terapeutica' => $med->classe_terapeutica,
                     'situacao_registro' => $med->situacao_registro,
+                    'obm_entity' => $med->obm_entity,
+                    'obm_code' => $med->obm_code,
+                    'tipo_produto' => $med->tipo_produto,
+                    'empresa_detentora_registro' => $med->empresa_detentora_registro,
                     'source' => 'database',
                 ];
             }
@@ -118,6 +125,9 @@ class MedicationCatalogController extends Controller
                     'numero_registro_produto' => $medication->numero_registro_produto,
                     'situacao_registro' => $medication->situacao_registro,
                     'empresa_detentora_registro' => $medication->empresa_detentora_registro,
+                    'obm_entity' => $medication->obm_entity,
+                    'obm_code' => $medication->obm_code,
+                    'tipo_produto' => $medication->tipo_produto,
                 ],
             ]);
 
@@ -144,12 +154,20 @@ class MedicationCatalogController extends Controller
                 ->where('situacao_registro', 'VÁLIDO')
                 ->count();
 
+            $byObm = MedicationCatalog::query()
+                ->selectRaw('obm_entity, COUNT(*) as c')
+                ->whereNotNull('obm_entity')
+                ->groupBy('obm_entity')
+                ->pluck('c', 'obm_entity')
+                ->all();
+
             return response()->json([
                 'success' => true,
                 'data' => [
                     'total' => $total,
                     'active' => $active,
                     'inactive' => $total - $active,
+                    'obm_by_entity' => $byObm,
                 ],
             ]);
 

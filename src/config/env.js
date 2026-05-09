@@ -2,7 +2,7 @@
 //
 // Backend deste app: /home/darley/lacos/backend-laravel (Laravel).
 // Para subir o servidor: cd /home/darley/lacos/backend-laravel && php artisan serve --host=0.0.0.0 --port=8000
-// Use BACKEND_HOST com o IP que o celular/emulador usa para acessar a máquina (ex.: 192.168.0.20).
+// Use BACKEND_HOST com o IP que o celular/emulador usa para acessar a máquina (ex.: 10.102.0.178).
 //
 // Para alterar o IP/porta, edite:
 // - BACKEND_HOST: IP ou hostname onde o backend está acessível
@@ -17,7 +17,7 @@
 const NGROK_URL = null; // ou 'https://abc123.ngrok-free.app'
 
 // IP do servidor onde o backend Lacos (backend-laravel) está rodando
-const BACKEND_HOST = '192.168.0.20';
+const BACKEND_HOST = '10.102.0.178';
 const BACKEND_PORT = '8000';
 
 // Construir URL base da API (usa ngrok se definido, senão IP local)

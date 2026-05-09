@@ -217,6 +217,7 @@ class GroupService {
       if (groupData.accompanied_access_medication !== undefined) data.accompanied_access_medication = groupData.accompanied_access_medication;
       if (groupData.accompanied_access_schedule !== undefined) data.accompanied_access_schedule = groupData.accompanied_access_schedule;
       if (groupData.accompanied_access_chat !== undefined) data.accompanied_access_chat = groupData.accompanied_access_chat;
+      if (groupData.module_watch_audios !== undefined) data.module_watch_audios = groupData.module_watch_audios;
 
       console.log('📤 GroupService.updateGroup - Enviando dados JSON:', data);
       console.log('📤 GroupService.updateGroup - Endpoint:', endpoint);

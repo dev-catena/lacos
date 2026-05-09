@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Group;
+use App\Models\GroupMember;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -199,6 +202,118 @@ class AdminUserController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Grupos que cuidam de um usuário Acompanhado/Paciente e membros de cada grupo (web-admin).
+     * GET /api/admin/users/{id}/accompanied-care
+     */
+    public function accompaniedCareContext($id)
+    {
+        try {
+            $subject = User::findOrFail($id);
+            $profile = strtolower((string) ($subject->profile ?? ''));
+            if (! in_array($profile, ['accompanied', 'patient'], true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Este perfil não é Acompanhado/Paciente.',
+                ], 422);
+            }
+
+            $accompaniedRoles = GroupMember::accompaniedPersonRoles();
+            $groupIds = GroupMember::query()
+                ->where('user_id', $subject->id)
+                ->where('is_active', true)
+                ->whereIn('role', $accompaniedRoles)
+                ->pluck('group_id')
+                ->unique()
+                ->filter()
+                ->values();
+
+            if ($groupIds->isEmpty()) {
+                $groupIds = GroupMember::query()
+                    ->where('user_id', $subject->id)
+                    ->where('is_active', true)
+                    ->pluck('group_id')
+                    ->unique()
+                    ->filter()
+                    ->values();
+            }
+
+            $groups = [];
+            foreach ($groupIds as $gid) {
+                $group = Group::with('creator')->find($gid);
+                if (! $group) {
+                    continue;
+                }
+
+                $membersRows = GroupMember::query()
+                    ->where('group_id', $gid)
+                    ->where('is_active', true)
+                    ->with(['user:id,name,email,profile'])
+                    ->orderBy('role')
+                    ->orderBy('id')
+                    ->get();
+
+                $members = $membersRows->map(function (GroupMember $m) {
+                    return [
+                        'member_id' => $m->id,
+                        'user_id' => $m->user_id,
+                        'name' => $m->user ? $m->user->name : null,
+                        'email' => $m->user ? $m->user->email : null,
+                        'profile' => $m->user ? $m->user->profile : null,
+                        'role' => $m->role,
+                        'role_label' => $this->mapGroupMemberRoleLabel($m->role),
+                    ];
+                })->values()->all();
+
+                $groups[] = [
+                    'id' => $group->id,
+                    'name' => $group->name,
+                    'code' => $group->code ?? null,
+                    'accompanied_name' => $group->accompanied_name ?? null,
+                    'admin_name' => $group->creator ? $group->creator->name : null,
+                    'admin_email' => $group->creator ? $group->creator->email : null,
+                    'members' => $members,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'user' => [
+                    'id' => $subject->id,
+                    'name' => $subject->name,
+                    'email' => $subject->email,
+                    'profile' => $subject->profile,
+                ],
+                'groups' => $groups,
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Usuário não encontrado',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao buscar grupos do acompanhado',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    private function mapGroupMemberRoleLabel(?string $role): string
+    {
+        return match (strtolower((string) $role)) {
+            'admin' => 'Administrador',
+            'caregiver' => 'Cuidador/Amigo',
+            'patient' => 'Paciente',
+            'accompanied' => 'Acompanhado',
+            'priority_contact' => 'Contato prioritário',
+            'doctor' => 'Médico',
+            'professional_caregiver' => 'Cuidador profissional',
+            default => $role ? (string) $role : 'Membro',
+        };
     }
 
     /**

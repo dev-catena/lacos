@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,15 +10,56 @@ import {
   Modal,
   Alert,
   Pressable,
+  RefreshControl,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import colors from '../../constants/colors';
 import { ArrowBackIcon, AddIcon, PulseIcon } from '../../components/CustomIcons';
 import SafeIcon from '../../components/SafeIcon';
 import vitalSignService from '../../services/vitalSignService';
+import deviceService from '../../services/deviceService';
 import VitalSignsLineChart from '../../components/VitalSignsLineChart';
 import moment from 'moment';
 import AddVitalSignModal from './AddVitalSignModal';
+import { buildWatchVitalData } from '../../utils/thalamusHealthAdapter';
+
+const WATCH_EXTRA_TEXT_KEYS = new Set([
+  '__fall_alerts__',
+  '__ecg__',
+  '__sleep_sessions__',
+  '__sleep_entries__',
+]);
+
+function watchHealthApiPath(imei, suffix) {
+  const id = imei || '{imei}';
+  return `/api/health/${id}${suffix}`;
+}
+
+function watchModalTitleForKey(key) {
+  switch (key) {
+    case '__fall_alerts__':
+      return 'Queda';
+    case '__ecg__':
+      return 'ECG';
+    case '__sleep_sessions__':
+      return 'Sono — sessões';
+    case '__sleep_entries__':
+      return 'Sono — registros';
+    default:
+      return null;
+  }
+}
+
+/** `last_battery_percentage` na resposta de smartwatch-health (Thalamus authorized-devices). */
+function parseWatchBatteryFromSmartwatchPayload(data) {
+  if (!data || typeof data !== 'object') return null;
+  const pct = data.last_battery_percentage;
+  if (pct == null || pct === '') return null;
+  const n = Number(pct);
+  if (Number.isNaN(n)) return null;
+  return Math.min(100, Math.max(0, Math.round(n)));
+}
 
 const VitalSignsDetailScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params || {};
@@ -30,6 +71,15 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedIndicatorData, setSelectedIndicatorData] = useState([]);
+  const [activeTab, setActiveTab] = useState('manual');
+  const [hasSmartwatch, setHasSmartwatch] = useState(false);
+  const [watchImei, setWatchImei] = useState(null);
+  const [watchNickname, setWatchNickname] = useState(null);
+  const [watchBatteryPercent, setWatchBatteryPercent] = useState(null);
+  const [watchVitalData, setWatchVitalData] = useState(null);
+  const [watchError, setWatchError] = useState(null);
+  const [refreshingManual, setRefreshingManual] = useState(false);
+  const [refreshingWatch, setRefreshingWatch] = useState(false);
 
   // Configuração dos indicadores
   const indicatorsConfig = [
@@ -83,100 +133,169 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
     },
   ];
 
+  const applyVitalSignsResult = useCallback((result) => {
+    if (!result.success || !result.data) {
+      return;
+    }
+    const organized = {};
+    const basals = {};
+
+    indicatorsConfig.forEach((indicator) => {
+      const typeData = result.data.filter((item) => item.type === indicator.key);
+
+      const sortedData = [...typeData].sort(
+        (a, b) => new Date(a.measured_at) - new Date(b.measured_at)
+      );
+
+      organized[indicator.key] = sortedData.slice(-20);
+
+      if (typeData.length > 0) {
+        if (indicator.key === 'blood_pressure') {
+          const systolicValues = [];
+          const diastolicValues = [];
+          typeData.forEach((item) => {
+            let value = item.value;
+            if (Array.isArray(value) && value.length > 0) value = value[0];
+            if (
+              typeof value === 'object' &&
+              value !== null &&
+              value.systolic != null &&
+              value.diastolic != null
+            ) {
+              systolicValues.push(parseFloat(value.systolic));
+              diastolicValues.push(parseFloat(value.diastolic));
+            }
+          });
+          if (systolicValues.length > 0 && diastolicValues.length > 0) {
+            const avgSystolic = systolicValues.reduce((a, b) => a + b, 0) / systolicValues.length;
+            const avgDiastolic = diastolicValues.reduce((a, b) => a + b, 0) / diastolicValues.length;
+            basals[indicator.key] = {
+              systolic: Math.round(avgSystolic),
+              diastolic: Math.round(avgDiastolic),
+            };
+          }
+        } else {
+          const values = typeData.map((item) => {
+            let value = item.value;
+            if (Array.isArray(value) && value.length > 0) value = value[0];
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+              if (value.systolic && value.diastolic) return (value.systolic + value.diastolic) / 2;
+              if (Array.isArray(value) && value.length > 0) return parseFloat(value[0]) || 0;
+            }
+            return parseFloat(value) || 0;
+          });
+          const sum = values.reduce((a, b) => a + b, 0);
+          basals[indicator.key] = sum / values.length;
+        }
+      }
+    });
+
+    setVitalSignsData(organized);
+    setBasalValues(basals);
+  }, []);
+
   useEffect(() => {
-    loadVitalSigns();
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      try {
+        setLoading(true);
+        setWatchError(null);
+
+        const [vitRes, watchRes] = await Promise.all([
+          vitalSignService.getVitalSigns(groupId),
+          deviceService.getGroupSmartwatchHealth(groupId),
+        ]);
+
+        if (cancelled) return;
+
+        applyVitalSignsResult(vitRes);
+
+        if (watchRes.success && watchRes.data) {
+          const d = watchRes.data;
+          if (d.has_smartwatch) {
+            setHasSmartwatch(true);
+            setWatchImei(d.imei || null);
+            setWatchNickname(d.device_nickname || null);
+            setWatchBatteryPercent(parseWatchBatteryFromSmartwatchPayload(d));
+            setWatchVitalData(buildWatchVitalData(d.health));
+            setActiveTab('watch');
+          } else {
+            setHasSmartwatch(false);
+            setWatchImei(null);
+            setWatchNickname(null);
+            setWatchBatteryPercent(null);
+            setWatchVitalData(null);
+            setActiveTab('manual');
+          }
+        } else {
+          setHasSmartwatch(false);
+          setWatchImei(null);
+          setWatchNickname(null);
+          setWatchBatteryPercent(null);
+          setWatchVitalData(null);
+          setActiveTab('manual');
+          if (watchRes.error) setWatchError(watchRes.error);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao carregar sinais vitais:', error);
+        if (!cancelled) Alert.alert('Erro', 'Não foi possível carregar os sinais vitais');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, applyVitalSignsResult]);
+
+  const onRefreshManual = useCallback(async () => {
+    setRefreshingManual(true);
+    try {
+      const result = await vitalSignService.getVitalSigns(groupId);
+      applyVitalSignsResult(result);
+    } finally {
+      setRefreshingManual(false);
+    }
+  }, [groupId, applyVitalSignsResult]);
+
+  const onRefreshWatch = useCallback(async () => {
+    setRefreshingWatch(true);
+    setWatchError(null);
+    try {
+      const watchRes = await deviceService.getGroupSmartwatchHealth(groupId);
+      if (watchRes.success && watchRes.data?.has_smartwatch) {
+        setWatchVitalData(buildWatchVitalData(watchRes.data.health));
+        setWatchImei(watchRes.data.imei || null);
+        setWatchNickname(watchRes.data.device_nickname || null);
+        setWatchBatteryPercent(parseWatchBatteryFromSmartwatchPayload(watchRes.data));
+        setHasSmartwatch(true);
+      } else if (watchRes.error) {
+        setWatchError(watchRes.error);
+      }
+    } finally {
+      setRefreshingWatch(false);
+    }
   }, [groupId]);
 
-  const loadVitalSigns = async () => {
-    try {
-      setLoading(true);
-      const result = await vitalSignService.getVitalSigns(groupId);
-      
-      if (result.success && result.data) {
-        // Organizar dados por tipo de indicador
-        const organized = {};
-        const basals = {};
-
-        indicatorsConfig.forEach(indicator => {
-          const typeData = result.data.filter(item => item.type === indicator.key);
-          
-          // Ordenar por data (mais antigo primeiro) para pegar as últimas 20
-          const sortedData = [...typeData].sort((a, b) => 
-            new Date(a.measured_at) - new Date(b.measured_at)
-          );
-          
-          // Pegar as últimas 20 medidas (mais recentes) e manter ordenadas do mais antigo para o mais recente
-          // Isso permite que o gráfico mostre a evolução temporal da esquerda para a direita
-          organized[indicator.key] = sortedData.slice(-20);
-
-          // Calcular basal (média de TODAS as medidas, não só as 20 mostradas)
-          if (typeData.length > 0) {
-            if (indicator.key === 'blood_pressure') {
-              // Pressão arterial: calcular média de sistólica e diastólica separadamente
-              const systolicValues = [];
-              const diastolicValues = [];
-              typeData.forEach(item => {
-                let value = item.value;
-                if (Array.isArray(value) && value.length > 0) value = value[0];
-                if (typeof value === 'object' && value !== null && value.systolic != null && value.diastolic != null) {
-                  systolicValues.push(parseFloat(value.systolic));
-                  diastolicValues.push(parseFloat(value.diastolic));
-                }
-              });
-              if (systolicValues.length > 0 && diastolicValues.length > 0) {
-                const avgSystolic = systolicValues.reduce((a, b) => a + b, 0) / systolicValues.length;
-                const avgDiastolic = diastolicValues.reduce((a, b) => a + b, 0) / diastolicValues.length;
-                basals[indicator.key] = { systolic: Math.round(avgSystolic), diastolic: Math.round(avgDiastolic) };
-              }
-            } else {
-              const values = typeData.map(item => {
-                let value = item.value;
-                if (Array.isArray(value) && value.length > 0) value = value[0];
-                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                  if (value.systolic && value.diastolic) return (value.systolic + value.diastolic) / 2;
-                  if (Array.isArray(value) && value.length > 0) return parseFloat(value[0]) || 0;
-                }
-                return parseFloat(value) || 0;
-              });
-              const sum = values.reduce((a, b) => a + b, 0);
-              basals[indicator.key] = sum / values.length;
-            }
-          }
-        });
-
-        setVitalSignsData(organized);
-        setBasalValues(basals);
-        
-        // Log para depuração
-        console.log('📊 VitalSignsDetailScreen - Dados organizados:', Object.keys(organized));
-        console.log('📊 VitalSignsDetailScreen - Total de dados:', result.data.length);
-        indicatorsConfig.forEach(indicator => {
-          const count = organized[indicator.key]?.length || 0;
-          if (count > 0) {
-            const basalStr = typeof basals[indicator.key] === 'object'
-              ? (basals[indicator.key]?.systolic != null ? `${basals[indicator.key].systolic}/${basals[indicator.key].diastolic}` : 'N/A')
-              : (basals[indicator.key]?.toFixed?.(2) || 'N/A');
-            console.log(`📊 ${indicator.label}: ${count} medidas, basal: ${basalStr}`);
-          }
-        });
-      } else {
-        console.log('⚠️ VitalSignsDetailScreen - Nenhum dado retornado da API');
-      }
-    } catch (error) {
-      console.error('❌ Erro ao carregar sinais vitais:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os sinais vitais');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleChartPress = async (indicatorKey) => {
-    // Buscar TODAS as medidas deste indicador (não só as 20 do gráfico)
+    if (activeTab === 'watch' && watchVitalData) {
+      const data = watchVitalData[indicatorKey] || [];
+      const allData = [...data].sort(
+        (a, b) => new Date(b.measured_at) - new Date(a.measured_at)
+      );
+      setSelectedIndicatorData(allData);
+      setSelectedIndicator(indicatorKey);
+      setShowDetailsModal(true);
+      return;
+    }
+
     try {
       const result = await vitalSignService.getVitalSigns(groupId, indicatorKey);
       if (result.success && result.data) {
-        // Ordenar por data (mais recente primeiro)
-        const allData = [...result.data].sort((a, b) => 
+        const allData = [...result.data].sort((a, b) =>
           new Date(b.measured_at) - new Date(a.measured_at)
         );
         setSelectedIndicatorData(allData);
@@ -185,9 +304,8 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
       }
     } catch (error) {
       console.error('Erro ao carregar detalhes:', error);
-      // Fallback: usar dados já carregados
       const result = vitalSignsData[indicatorKey] || [];
-      const allData = [...result].sort((a, b) => 
+      const allData = [...result].sort((a, b) =>
         new Date(b.measured_at) - new Date(a.measured_at)
       );
       setSelectedIndicatorData(allData);
@@ -196,13 +314,34 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const openWatchTextListModal = (modalKey, list) => {
+    if (!list?.length) return;
+    setSelectedIndicatorData(list);
+    setSelectedIndicator(modalKey);
+    setShowDetailsModal(true);
+  };
+
+  const watchEndpointFailed = (endpointKey) =>
+    watchVitalData?.endpointErrors?.find((e) => e.key === endpointKey);
+
+  const handleFallAlertsPress = () => {
+    if (!watchVitalData?.fallAlerts?.length) return;
+    const items = watchVitalData.fallAlerts.map((row) => ({
+      measured_at: row.measured_at,
+      value: row.value,
+      measured_by_name: row.measured_by_name || 'Relógio',
+      wearable_name: row.wearable_name || 'Thalamus',
+    }));
+    openWatchTextListModal('__fall_alerts__', items);
+  };
+
   const handleAddMeasure = () => {
     setShowAddModal(true);
   };
 
   const handleAddSuccess = () => {
     setShowAddModal(false);
-    loadVitalSigns();
+    vitalSignService.getVitalSigns(groupId).then(applyVitalSignsResult);
   };
 
   if (loading) {
@@ -240,56 +379,273 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {enabledIndicators.length === 0 ? (
-          <View style={styles.emptyState}>
-            <PulseIcon size={64} color={colors.gray300} />
-            <Text style={styles.emptyTitle}>Nenhum indicador habilitado</Text>
-            <Text style={styles.emptyText}>
-              Configure os indicadores nas configurações do grupo
+      {hasSmartwatch && watchImei ? (
+        <View style={styles.imeiBanner}>
+          <View style={styles.watchBatteryRow}>
+            <SafeIcon name="battery-half-outline" size={22} color={colors.primary} />
+            <Text style={styles.watchBatteryLabel}>Carga da bateria</Text>
+            <Text style={styles.watchBatteryValue}>
+              {watchBatteryPercent != null ? `${watchBatteryPercent}%` : '—'}
             </Text>
           </View>
-        ) : (
-          enabledIndicators.map((indicator) => {
-            const data = vitalSignsData[indicator.key] || [];
-            const basal = basalValues[indicator.key];
+          <Text style={[styles.imeiBannerLabel, styles.imeiBannerLabelAfterBattery]}>Dispositivo</Text>
+          <Text style={styles.imeiBannerValue} numberOfLines={1}>
+            {watchNickname ? `${watchNickname} · ` : ''}IMEI {watchImei}
+          </Text>
+        </View>
+      ) : null}
 
-            return (
-              <TouchableOpacity
-                key={indicator.key}
-                style={styles.indicatorCard}
-                onPress={() => handleChartPress(indicator.key)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.indicatorHeader}>
-                  <View style={[styles.indicatorIcon, { backgroundColor: indicator.color + '20' }]}>
-                    <SafeIcon name={indicator.icon} size={24} color={indicator.color} />
-                  </View>
-                  <Text style={styles.indicatorLabel}>{indicator.label}</Text>
+      <View style={styles.tabsRow}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'watch' && styles.tabActive]}
+          onPress={() => setActiveTab('watch')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === 'watch' && styles.tabTextActive]}>Relógio</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'manual' && styles.tabActive]}
+          onPress={() => setActiveTab('manual')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === 'manual' && styles.tabTextActive]}>Manual</Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === 'watch' ? (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshingWatch} onRefresh={onRefreshWatch} colors={[colors.primary]} />
+          }
+        >
+          {!hasSmartwatch ? (
+            <View style={styles.emptyState}>
+              <PulseIcon size={64} color={colors.gray300} />
+              <Text style={styles.emptyTitle}>Nenhum relógio associado</Text>
+              <Text style={styles.emptyText}>
+                Cadastre um smartwatch neste grupo para ver os dados da API Thalamus na aba Relógio.
+              </Text>
+            </View>
+          ) : (
+            <>
+              {watchError ? (
+                <View style={styles.watchErrorBanner}>
+                  <Text style={styles.watchErrorText}>{watchError}</Text>
                 </View>
+              ) : null}
+              {watchVitalData?.endpointErrors?.length ? (
+                <Text style={styles.watchPartialHint}>
+                  Alguns dados do relógio não puderam ser carregados ({watchVitalData.endpointErrors.length}{' '}
+                  endpoint(s)).
+                </Text>
+              ) : null}
 
-                {data.length > 0 ? (
-                  <VitalSignsLineChart
-                    data={data}
-                    basalValue={basal}
-                    unit={indicator.unit}
-                    color={indicator.color}
-                    label={indicator.label}
-                  />
+              {watchVitalData?.comprehensiveText ? (
+                <View style={styles.comprehensiveCard}>
+                  <Text style={styles.comprehensiveTitle}>Visão geral (relógio)</Text>
+                  <Text style={styles.comprehensiveBody}>{watchVitalData.comprehensiveText}</Text>
+                </View>
+              ) : null}
+
+              {enabledIndicators.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <PulseIcon size={64} color={colors.gray300} />
+                  <Text style={styles.emptyTitle}>Nenhum indicador habilitado</Text>
+                </View>
+              ) : (
+                enabledIndicators.map((indicator) => {
+                  const data = watchVitalData ? watchVitalData[indicator.key] || [] : [];
+                  const basal = watchVitalData?.basalValues?.[indicator.key];
+
+                  return (
+                    <TouchableOpacity
+                      key={indicator.key}
+                      style={styles.indicatorCard}
+                      onPress={() => handleChartPress(indicator.key)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.indicatorHeader}>
+                        <View style={[styles.indicatorIcon, { backgroundColor: indicator.color + '20' }]}>
+                          <SafeIcon name={indicator.icon} size={24} color={indicator.color} />
+                        </View>
+                        <Text style={styles.indicatorLabel}>{indicator.label}</Text>
+                      </View>
+
+                      {data.length > 0 ? (
+                        <VitalSignsLineChart
+                          data={data}
+                          basalValue={basal}
+                          unit={indicator.unit}
+                          color={indicator.color}
+                          label={indicator.label}
+                        />
+                      ) : (
+                        <View style={styles.noDataContainer}>
+                          <Text style={styles.noDataText}>Nenhum dado do relógio para este indicador</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+
+              <View style={styles.watchExtraSection}>
+                <Text style={styles.watchExtraTitle}>Queda</Text>
+                <Text style={styles.watchExtraEndpoint}>{watchHealthApiPath(watchImei, '/fall-down-alerts')}</Text>
+                {watchEndpointFailed('fall_down_alerts') ? (
+                  <Text style={styles.watchExtraEndpointError}>
+                    Falha ao carregar (HTTP {watchEndpointFailed('fall_down_alerts').status || '—'}).
+                  </Text>
+                ) : null}
+                {watchVitalData?.fallAlerts?.length > 0 ? (
+                  <TouchableOpacity onPress={handleFallAlertsPress} activeOpacity={0.7}>
+                    <View style={styles.indicatorHeader}>
+                      <View style={[styles.indicatorIcon, { backgroundColor: colors.warning + '20' }]}>
+                        <SafeIcon name="warning" size={24} color={colors.warning} />
+                      </View>
+                      <Text style={styles.indicatorLabel}>Alertas de queda</Text>
+                    </View>
+                    <Text style={styles.watchExtraHint}>
+                      {watchVitalData.fallAlerts.length} registro(s) — toque para ver a lista
+                    </Text>
+                  </TouchableOpacity>
                 ) : (
-                  <View style={styles.noDataContainer}>
-                    <Text style={styles.noDataText}>Nenhuma medida registrada</Text>
-                  </View>
+                  <Text style={styles.watchExtraHint}>Nenhum alerta ou lista vazia.</Text>
                 )}
-              </TouchableOpacity>
-            );
-          })
-        )}
-      </ScrollView>
+              </View>
+
+              <View style={styles.watchExtraSection}>
+                <Text style={styles.watchExtraTitle}>ECG</Text>
+                <Text style={styles.watchExtraEndpoint}>{watchHealthApiPath(watchImei, '/ecg-data')}</Text>
+                {watchEndpointFailed('ecg_data') ? (
+                  <Text style={styles.watchExtraEndpointError}>
+                    Falha ao carregar (HTTP {watchEndpointFailed('ecg_data').status || '—'}).
+                  </Text>
+                ) : null}
+                {watchVitalData?.ecgList?.length > 0 ? (
+                  <TouchableOpacity
+                    onPress={() => openWatchTextListModal('__ecg__', watchVitalData.ecgList)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.watchExtraHint}>
+                      {watchVitalData.ecgList.length} registro(s) — toque para ver a lista
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.watchExtraHint}>Sem dados ECG ou lista vazia.</Text>
+                )}
+              </View>
+
+              <View style={styles.watchExtraSection}>
+                <Text style={styles.watchExtraTitle}>Sono — sessões</Text>
+                <Text style={styles.watchExtraEndpoint}>{watchHealthApiPath(watchImei, '/sleep-sessions')}</Text>
+                {watchEndpointFailed('sleep_sessions') ? (
+                  <Text style={styles.watchExtraEndpointError}>
+                    Falha ao carregar (HTTP {watchEndpointFailed('sleep_sessions').status || '—'}).
+                  </Text>
+                ) : null}
+                {watchVitalData?.sleepSessionsList?.length > 0 ? (
+                  <TouchableOpacity
+                    onPress={() =>
+                      openWatchTextListModal('__sleep_sessions__', watchVitalData.sleepSessionsList)
+                    }
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.watchExtraHint}>
+                      {watchVitalData.sleepSessionsList.length} sessão(ões) — toque para ver a lista
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.watchExtraHint}>Sem sessões de sono ou lista vazia.</Text>
+                )}
+              </View>
+
+              <View style={styles.watchExtraSection}>
+                <Text style={styles.watchExtraTitle}>Sono — registros</Text>
+                <Text style={styles.watchExtraEndpoint}>{watchHealthApiPath(watchImei, '/sleep-entries')}</Text>
+                {watchEndpointFailed('sleep_entries') ? (
+                  <Text style={styles.watchExtraEndpointError}>
+                    Falha ao carregar (HTTP {watchEndpointFailed('sleep_entries').status || '—'}).
+                  </Text>
+                ) : null}
+                {watchVitalData?.sleepEntriesList?.length > 0 ? (
+                  <TouchableOpacity
+                    onPress={() =>
+                      openWatchTextListModal('__sleep_entries__', watchVitalData.sleepEntriesList)
+                    }
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.watchExtraHint}>
+                      {watchVitalData.sleepEntriesList.length} registro(s) — toque para ver a lista
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.watchExtraHint}>Sem registros de sono ou lista vazia.</Text>
+                )}
+              </View>
+            </>
+          )}
+        </ScrollView>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshingManual}
+              onRefresh={onRefreshManual}
+              colors={[colors.primary]}
+            />
+          }
+        >
+          {enabledIndicators.length === 0 ? (
+            <View style={styles.emptyState}>
+              <PulseIcon size={64} color={colors.gray300} />
+              <Text style={styles.emptyTitle}>Nenhum indicador habilitado</Text>
+              <Text style={styles.emptyText}>Configure os indicadores nas configurações do grupo</Text>
+            </View>
+          ) : (
+            enabledIndicators.map((indicator) => {
+              const data = vitalSignsData[indicator.key] || [];
+              const basal = basalValues[indicator.key];
+
+              return (
+                <TouchableOpacity
+                  key={indicator.key}
+                  style={styles.indicatorCard}
+                  onPress={() => handleChartPress(indicator.key)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.indicatorHeader}>
+                    <View style={[styles.indicatorIcon, { backgroundColor: indicator.color + '20' }]}>
+                      <SafeIcon name={indicator.icon} size={24} color={indicator.color} />
+                    </View>
+                    <Text style={styles.indicatorLabel}>{indicator.label}</Text>
+                  </View>
+
+                  {data.length > 0 ? (
+                    <VitalSignsLineChart
+                      data={data}
+                      basalValue={basal}
+                      unit={indicator.unit}
+                      color={indicator.color}
+                      label={indicator.label}
+                    />
+                  ) : (
+                    <View style={styles.noDataContainer}>
+                      <Text style={styles.noDataText}>Nenhuma medida registrada</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
 
       {/* Modal de Detalhes */}
       <Modal
@@ -309,7 +665,9 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
           >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {indicatorsConfig.find(i => i.key === selectedIndicator)?.label || 'Detalhes'}
+                {watchModalTitleForKey(selectedIndicator) ||
+                  indicatorsConfig.find((i) => i.key === selectedIndicator)?.label ||
+                  'Detalhes'}
               </Text>
               <TouchableOpacity
                 onPress={() => setShowDetailsModal(false)}
@@ -344,8 +702,12 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
                   value = value[0];
                 }
                 
+                const isWatchTextModal = WATCH_EXTRA_TEXT_KEYS.has(selectedIndicator);
+
                 // Formatar baseado no tipo
-                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                if (isWatchTextModal) {
+                  displayValue = typeof value === 'string' ? value : JSON.stringify(value || '');
+                } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
                   // Objeto com systolic/diastolic (pressão arterial)
                   if (value.systolic !== undefined && value.diastolic !== undefined) {
                     displayValue = `${value.systolic}/${value.diastolic}`;
@@ -368,7 +730,9 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
                   }
                 }
                 
-                const unit = indicatorsConfig.find(i => i.key === selectedIndicator)?.unit || '';
+                const unit = isWatchTextModal
+                  ? ''
+                  : indicatorsConfig.find((i) => i.key === selectedIndicator)?.unit || '';
                 
                 return (
                   <View key={index} style={styles.detailItem}>
@@ -381,7 +745,9 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
                       </Text>
                     </View>
                     <View style={styles.detailItemCenter}>
-                      <Text style={styles.detailValue}>
+                      <Text
+                        style={isWatchTextModal ? styles.detailValueWatchExtra : styles.detailValue}
+                      >
                         {displayValue} {unit}
                       </Text>
                       <Text style={styles.detailSource}>
@@ -405,14 +771,16 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
         groupName={groupName}
       />
 
-      {/* Botão Flutuante */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleAddMeasure}
-        activeOpacity={0.8}
-      >
-        <AddIcon size={28} color={colors.white} />
-      </TouchableOpacity>
+      {/* Botão Flutuante — apenas medições manuais */}
+      {activeTab === 'manual' ? (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={handleAddMeasure}
+          activeOpacity={0.8}
+        >
+          <AddIcon size={28} color={colors.white} />
+        </TouchableOpacity>
+      ) : null}
     </SafeAreaView>
   );
 };
@@ -460,6 +828,138 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+  },
+  imeiBanner: {
+    backgroundColor: colors.white,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  watchBatteryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  watchBatteryLabel: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  watchBatteryValue: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  imeiBannerLabelAfterBattery: {
+    marginTop: 10,
+  },
+  imeiBannerLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  imeiBannerValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 8,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: colors.backgroundLight,
+    alignItems: 'center',
+  },
+  tabActive: {
+    backgroundColor: colors.primary,
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textLight,
+  },
+  tabTextActive: {
+    color: colors.textWhite,
+  },
+  watchErrorBanner: {
+    backgroundColor: '#fee2e2',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  watchErrorText: {
+    color: '#991b1b',
+    fontSize: 14,
+  },
+  watchPartialHint: {
+    fontSize: 13,
+    color: colors.warning,
+    marginBottom: 12,
+  },
+  comprehensiveCard: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  comprehensiveTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  comprehensiveBody: {
+    fontSize: 13,
+    color: colors.textLight,
+    lineHeight: 20,
+    fontFamily: 'System',
+  },
+  watchExtraSection: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  watchExtraTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 6,
+  },
+  watchExtraEndpoint: {
+    fontSize: 11,
+    color: colors.textLight,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    marginBottom: 10,
+  },
+  watchExtraHint: {
+    fontSize: 14,
+    color: colors.textLight,
+  },
+  watchExtraEndpointError: {
+    fontSize: 13,
+    color: colors.error,
+    marginBottom: 8,
   },
   fab: {
     position: 'absolute',
@@ -608,6 +1108,12 @@ const styles = StyleSheet.create({
   detailValue: {
     fontSize: 18,
     fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  detailValueWatchExtra: {
+    fontSize: 14,
+    fontWeight: '500',
     color: colors.text,
     marginBottom: 4,
   },

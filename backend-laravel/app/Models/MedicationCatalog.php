@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 
 class MedicationCatalog extends Model
 {
@@ -27,13 +26,44 @@ class MedicationCatalog extends Model
         'numero_processo',
         'is_active',
         'search_keywords',
+        'obm_entity',
+        'obm_code',
+        'obm_imported_at',
     ];
 
     protected $casts = [
         'data_vencimento_registro' => 'date',
         'data_finalizacao_processo' => 'date',
         'is_active' => 'boolean',
+        'obm_imported_at' => 'datetime',
     ];
+
+    /**
+     * Extrai texto do último "(FABRICANTE)" no nome AMP da API OBM.
+     */
+    public static function extractManufacturerFromAmpDescription(?string $name): ?string
+    {
+        if (empty($name)) {
+            return null;
+        }
+        if (preg_match('/\(([^)]+)\)\s*$/u', trim($name), $m)) {
+            return trim($m[1]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Remove o sufixo " (FABRICANTE)" do nome AMP.
+     */
+    public static function stripManufacturerSuffix(?string $name): string
+    {
+        if (empty($name)) {
+            return '';
+        }
+
+        return trim(preg_replace('/\s*\([^)]+\)\s*$/u', '', trim($name)));
+    }
 
     /**
      * Normalizar nome do medicamento para busca
@@ -169,6 +199,7 @@ class MedicationCatalog extends Model
         });
 
         return $queryBuilder
+            ->orderByRaw("(CASE obm_entity WHEN 'vtm' THEN 1 WHEN 'vmp' THEN 2 WHEN 'amp' THEN 3 ELSE 4 END)")
             ->orderByRaw("CASE 
                 WHEN nome_normalizado LIKE ? THEN 1 
                 WHEN nome_normalizado LIKE ? THEN 2 

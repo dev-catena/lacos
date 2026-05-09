@@ -482,13 +482,14 @@ const MediaScreen = ({ navigation, route }) => {
                 </Text>
               </View>
             ) : (
-              <View style={styles.videoContainer}>
+              <View style={styles.videoContainer} pointerEvents="box-none">
                 <Video
                   source={{ uri: mediaUrl }}
                   style={styles.mediaThumbnail}
                   resizeMode="cover"
                   shouldPlay={false}
                   useNativeControls={false}
+                  pointerEvents="none"
                   onError={(error) => {
                     // Verificar se é erro de codec não suportado
                     const errorMessage = error?.message || error?.toString() || '';
@@ -509,7 +510,7 @@ const MediaScreen = ({ navigation, route }) => {
                     }
                   }}
                 />
-                <View style={styles.playIconOverlay}>
+                <View style={styles.playIconOverlay} pointerEvents="none">
                   <SafeIcon name="play-circle" size={48} color="#FFFFFF" />
                 </View>
               </View>

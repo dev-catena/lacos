@@ -134,6 +134,8 @@ class PlansService {
           sensorQuedas: false,
           cameras: false,
           teleconsulta: false,
+          audiosRelogio: false,
+          localizacaoRelogio: false,
         },
         isDefault: true,
       },
@@ -158,6 +160,8 @@ class PlansService {
           sensorQuedas: false,
           cameras: false,
           teleconsulta: false,
+          audiosRelogio: false,
+          localizacaoRelogio: false,
         },
         isDefault: false,
       },
@@ -182,6 +186,8 @@ class PlansService {
           sensorQuedas: false,
           cameras: false,
           teleconsulta: false,
+          audiosRelogio: false,
+          localizacaoRelogio: false,
         },
         isDefault: false,
       },
@@ -206,6 +212,8 @@ class PlansService {
           sensorQuedas: false,
           cameras: false,
           teleconsulta: false,
+          audiosRelogio: false,
+          localizacaoRelogio: false,
         },
         isDefault: false,
       },
@@ -230,6 +238,16 @@ class PlansService {
       { key: 'sensorQuedas', label: 'Sensor de Quedas', description: 'Monitoramento de quedas (ainda não implementado na aplicação)' },
       { key: 'cameras', label: 'Câmeras', description: 'Acesso às câmeras (ainda não implementado na aplicação)' },
       { key: 'teleconsulta', label: 'Teleconsulta', description: 'Acesso ao módulo de teleconsultas' },
+      {
+        key: 'audiosRelogio',
+        label: 'Áudios do relógio',
+        description: 'Exibe o card de feed de áudios do smartwatch (Thalamus) na home do grupo',
+      },
+      {
+        key: 'localizacaoRelogio',
+        label: 'Localização',
+        description: 'Mapa com posição do relógio e últimos pontos (API Thalamus health/…/locations)',
+      },
     ];
   }
 }

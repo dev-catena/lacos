@@ -82,7 +82,7 @@ const MediaCarousel = ({ media = [], onMediaPress }) => {
         activeOpacity={0.8}
       >
         {loadingMedia[item.id] && (
-          <View style={styles.loadingOverlay}>
+          <View style={styles.loadingOverlay} pointerEvents="none">
             <ActivityIndicator size="large" color="#FFFFFF" />
           </View>
         )}
@@ -108,6 +108,7 @@ const MediaCarousel = ({ media = [], onMediaPress }) => {
                 shouldPlay={false}
                 isLooping={false}
                 useNativeControls={false}
+                pointerEvents="none"
                 onLoadStart={() => handleMediaLoadStart(item.id)}
                 onLoad={() => {
                   handleMediaLoad(item.id);
@@ -162,13 +163,13 @@ const MediaCarousel = ({ media = [], onMediaPress }) => {
         )}
 
         {isVideo && (
-          <View style={styles.playIcon}>
+          <View style={styles.playIcon} pointerEvents="none">
             <Ionicons name="play-circle" size={48} color="#FFFFFF" />
           </View>
         )}
 
         {/* Info overlay */}
-        <View style={styles.mediaInfo}>
+        <View style={styles.mediaInfo} pointerEvents="none">
           {item.description && (
             <Text style={styles.mediaDescription} numberOfLines={2}>
               {item.description}

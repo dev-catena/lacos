@@ -13,13 +13,17 @@ class Device extends Model
         'nickname',
         'type',
         'identifier',
+        'status',
+        'parser_model',
         'user_id',
         'group_id',
+        'thalamus_device_id',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'thalamus_device_id' => 'integer',
     ];
 
     /**

@@ -77,6 +77,7 @@ Route::get('/doctors/activate', [AdminDoctorController::class, 'activate']);
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     // Gestão de Usuários (apenas root/admin)
     Route::get('/users', [AdminUserController::class, 'index']);
+    Route::get('/users/{id}/accompanied-care', [AdminUserController::class, 'accompaniedCareContext']);
     Route::post('/users/{id}/block', [AdminUserController::class, 'block']);
     Route::post('/users/{id}/unblock', [AdminUserController::class, 'unblock']);
     Route::get('/users/{id}/plan', [AdminUserController::class, 'getUserPlan']);
@@ -100,6 +101,8 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/caregivers/{id}/patients', [AdminCaregiverController::class, 'getPatients']);
     
     // Gestão de Dispositivos/Smartwatch (apenas root/admin)
+    Route::get('/groups/device-assignment-options', [DeviceController::class, 'deviceAssignmentGroups']);
+    Route::get('/thalamus/authorized-devices', [DeviceController::class, 'thalamusAuthorizedDevices']);
     Route::get('/devices', [DeviceController::class, 'index']);
     Route::get('/devices/{id}', [DeviceController::class, 'show']);
     Route::post('/devices', [DeviceController::class, 'store']);
@@ -220,6 +223,11 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Dispositivos - Dispositivos dos Grupos (Smartwatch e Sensores)
     Route::get('/groups/{groupId}/devices', [DeviceController::class, 'getGroupDevices']);
+    Route::get('/groups/{groupId}/smartwatch-health', [DeviceController::class, 'getGroupSmartwatchHealth']);
+    Route::get('/groups/{groupId}/smartwatch-locations', [DeviceController::class, 'getGroupSmartwatchLocations']);
+    Route::get('/groups/{groupId}/smartwatch-audios', [DeviceController::class, 'getGroupSmartwatchAudios']);
+    Route::get('/groups/{groupId}/smartwatch-audios/stream', [DeviceController::class, 'streamGroupSmartwatchAudio']);
+    Route::post('/groups/{groupId}/smartwatch-audios/send', [DeviceController::class, 'postGroupSmartwatchAudiosSend']);
     Route::post('/groups/{groupId}/devices', [DeviceController::class, 'createGroupDevice']);
     Route::delete('/groups/{groupId}/devices/{deviceId}', [DeviceController::class, 'destroy']);
     

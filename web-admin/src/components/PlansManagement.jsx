@@ -124,6 +124,10 @@ const PlansManagement = () => {
               <strong>Funcionalidades:</strong> Marque as funcionalidades que deseja disponibilizar em cada plano.
             </li>
             <li>
+              <strong>Áudios do relógio:</strong> basta marcar em &quot;Áudios do relógio&quot; no plano; o card aparece na
+              home do grupo para quem tiver essa funcionalidade no plano.
+            </li>
+            <li>
               <strong>Smartwatch, Sensor de Quedas e Câmeras:</strong> Estas funcionalidades podem ser selecionadas, mas ainda não possuem cards implementados na aplicação mobile.
             </li>
             <li>

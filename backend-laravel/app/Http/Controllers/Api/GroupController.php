@@ -333,6 +333,7 @@ class GroupController extends Controller
                         'accompanied_access_medication' => (bool)($group->accompanied_access_medication ?? true),
                         'accompanied_access_schedule' => (bool)($group->accompanied_access_schedule ?? true),
                         'accompanied_access_chat' => (bool)($group->accompanied_access_chat ?? false),
+                        'module_watch_audios' => (bool)($group->module_watch_audios ?? false),
                     ];
 
                         return $groupData;
@@ -750,6 +751,7 @@ class GroupController extends Controller
                 'accompanied_access_medication' => (bool)($group->accompanied_access_medication ?? true),
                 'accompanied_access_schedule' => (bool)($group->accompanied_access_schedule ?? true),
                 'accompanied_access_chat' => (bool)($group->accompanied_access_chat ?? false),
+                'module_watch_audios' => (bool)($group->module_watch_audios ?? false),
             ];
 
             return response()->json($groupData);
@@ -857,6 +859,7 @@ class GroupController extends Controller
                 'accompanied_access_medication' => 'sometimes',
                 'accompanied_access_schedule' => 'sometimes',
                 'accompanied_access_chat' => 'sometimes',
+                'module_watch_audios' => 'sometimes',
             ];
 
             if ($hasPhotoColumn) {
@@ -937,6 +940,9 @@ class GroupController extends Controller
             }
             if (isset($validated['accompanied_access_chat'])) {
                 $data['accompanied_access_chat'] = $toBool($validated['accompanied_access_chat']);
+            }
+            if (isset($validated['module_watch_audios'])) {
+                $data['module_watch_audios'] = $toBool($validated['module_watch_audios']);
             }
 
             // Upload de foto se fornecida

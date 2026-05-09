@@ -19,6 +19,8 @@ import PatientMessagesScreen from '../screens/Patient/PatientMessagesScreen';
 import PatientJoinGroupScreen from '../screens/Patient/PatientJoinGroupScreen';
 import PatientVideoCallScreen from '../screens/Patient/PatientVideoCallScreen';
 import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
+import WatchAudiosScreen from '../screens/Groups/WatchAudiosScreen';
+import SmartwatchLocationScreen from '../screens/Groups/SmartwatchLocationScreen';
 import GroupChatScreen from '../screens/Groups/GroupChatScreen';
 import PrescriptionsScreen from '../screens/Prescriptions/PrescriptionsScreen';
 import PrescriptionDetailsScreen from '../screens/Prescriptions/PrescriptionDetailsScreen';
@@ -288,6 +290,20 @@ const PatientNavigator = () => {
       <Stack.Screen 
         name="GroupDetail" 
         component={GroupDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="WatchAudios" 
+        component={WatchAudiosScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="SmartwatchLocation" 
+        component={SmartwatchLocationScreen}
         options={{ 
           headerShown: false 
         }}

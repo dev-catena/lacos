@@ -17,7 +17,6 @@ import {
   Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import SafeIcon from '../../components/SafeIcon';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -1245,6 +1244,9 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         Object.keys(permissions).forEach(key => {
           formData.append(key, permissions[key] ? '1' : '0');
         });
+        Object.keys(vitalSigns).forEach(key => {
+          formData.append(key, vitalSigns[key] ? '1' : '0');
+        });
         
         // Adicionar foto - IMPORTANTE: usar o formato correto para React Native
         const filename = newGroupPhoto.split('/').pop();
@@ -1327,6 +1329,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       console.log('💾 GroupSettings.handleSave - typeof newGroupPhoto:', typeof newGroupPhoto);
       
       const updateData = {
+        ...vitalSigns,
         ...permissions,
       };
       

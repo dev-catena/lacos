@@ -45,10 +45,11 @@ const extractInviteCodeFromUrl = (url) => {
     const supportedHosts = [
       'lacos.com',
       'www.lacos.com',
+      '10.102.0.178',
       '192.168.1.105',
       '192.168.0.20',
       'localhost',
-      '127.0.0.1'
+      '127.0.0.1',
     ];
     
     const host = urlObj.hostname.toLowerCase();

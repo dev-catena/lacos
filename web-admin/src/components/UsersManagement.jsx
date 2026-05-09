@@ -28,6 +28,11 @@ const UsersManagement = ({ currentUser, onLogout }) => {
   const [passwordError, setPasswordError] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
 
+  const [accompaniedModalUser, setAccompaniedModalUser] = useState(null);
+  const [accompaniedModalData, setAccompaniedModalData] = useState(null);
+  const [accompaniedModalLoading, setAccompaniedModalLoading] = useState(false);
+  const [accompaniedModalError, setAccompaniedModalError] = useState('');
+
   // Salvar filtro no localStorage sempre que mudar
   useEffect(() => {
     localStorage.setItem('@lacos:usersFilter', filter);
@@ -188,6 +193,34 @@ const UsersManagement = ({ currentUser, onLogout }) => {
     return profile;
   }, []);
 
+  const isAccompaniedProfile = useCallback((user) => {
+    const p = String(user?.profile || '').toLowerCase();
+    return p === 'accompanied' || p === 'patient';
+  }, []);
+
+  const openAccompaniedModal = async (user) => {
+    if (!isAccompaniedProfile(user)) return;
+    setAccompaniedModalUser(user);
+    setAccompaniedModalData(null);
+    setAccompaniedModalError('');
+    setAccompaniedModalLoading(true);
+    try {
+      const data = await usersService.getAccompaniedCareContext(user.id);
+      setAccompaniedModalData(data);
+    } catch (err) {
+      setAccompaniedModalError(err.message || 'Erro ao carregar grupos e membros.');
+    } finally {
+      setAccompaniedModalLoading(false);
+    }
+  };
+
+  const closeAccompaniedModal = () => {
+    setAccompaniedModalUser(null);
+    setAccompaniedModalData(null);
+    setAccompaniedModalError('');
+    setAccompaniedModalLoading(false);
+  };
+
   // Função para ordenar
   const handleSort = (column) => {
     if (sortColumn === column) {
@@ -288,7 +321,8 @@ const UsersManagement = ({ currentUser, onLogout }) => {
         <div>
           <h1>Gestão de Usuários</h1>
           <p className="subtitle">
-            Gerencie os usuários da plataforma. Usuários bloqueados verão "Acesso negado" ao tentar fazer login.
+            Gerencie os usuários da plataforma. Usuários bloqueados verão &quot;Acesso negado&quot; ao tentar fazer login.
+            Para perfil <strong>Acompanhado</strong> ou <strong>Paciente</strong>, clique na célula do perfil para ver o grupo de cuidado e os membros.
           </p>
         </div>
         <button className="refresh-button" onClick={loadUsers}>
@@ -433,9 +467,20 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                   </td>
                   <td>{user.email}</td>
                   <td>
-                    <span className="profile-badge">
-                      {getProfileLabel(user.profile)}
-                    </span>
+                    {isAccompaniedProfile(user) ? (
+                      <button
+                        type="button"
+                        className="profile-badge profile-badge--clickable"
+                        onClick={() => openAccompaniedModal(user)}
+                        title="Ver grupo de cuidado e membros"
+                      >
+                        {getProfileLabel(user.profile)}
+                      </button>
+                    ) : (
+                      <span className="profile-badge">
+                        {getProfileLabel(user.profile)}
+                      </span>
+                    )}
                   </td>
                   <td>
                     <span className="plan-badge">
@@ -502,6 +547,90 @@ const UsersManagement = ({ currentUser, onLogout }) => {
           </tbody>
         </table>
       </div>
+
+      {accompaniedModalUser && (
+        <div className="accompanied-modal-overlay" onClick={closeAccompaniedModal}>
+          <div className="accompanied-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="accompanied-modal__header">
+              <h3>Grupo e membros</h3>
+              <button type="button" className="accompanied-modal__close" onClick={closeAccompaniedModal} aria-label="Fechar">
+                ×
+              </button>
+            </div>
+            <p className="accompanied-modal__user">
+              <strong>{accompaniedModalUser.name}</strong>
+              {' · '}
+              {accompaniedModalUser.email}
+            </p>
+            {accompaniedModalLoading && <p className="accompanied-modal__loading">Carregando…</p>}
+            {accompaniedModalError && (
+              <div className="accompanied-modal__error" role="alert">
+                {accompaniedModalError}
+              </div>
+            )}
+            {!accompaniedModalLoading && accompaniedModalData?.groups && (
+              <div className="accompanied-modal__body">
+                {accompaniedModalData.groups.length === 0 ? (
+                  <p className="accompanied-modal__empty">
+                    Nenhum vínculo ativo em grupo encontrado para este usuário.
+                  </p>
+                ) : (
+                  accompaniedModalData.groups.map((g) => (
+                    <section key={g.id} className="accompanied-modal__group">
+                      <h4>{g.name}</h4>
+                      <ul className="accompanied-modal__meta">
+                        {g.code && (
+                          <li>
+                            <span>Código do grupo:</span> {g.code}
+                          </li>
+                        )}
+                        {g.accompanied_name && (
+                          <li>
+                            <span>Nome do acompanhado (cadastro grupo):</span> {g.accompanied_name}
+                          </li>
+                        )}
+                        {(g.admin_name || g.admin_email) && (
+                          <li>
+                            <span>Administrador do grupo:</span>{' '}
+                            {[g.admin_name, g.admin_email].filter(Boolean).join(' · ')}
+                          </li>
+                        )}
+                      </ul>
+                      <p className="accompanied-modal__members-title">Membros ativos</p>
+                      <div className="accompanied-modal__table-wrap">
+                        <table className="accompanied-modal__table">
+                          <thead>
+                            <tr>
+                              <th>Nome</th>
+                              <th>E-mail</th>
+                              <th>Papel no grupo</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {g.members && g.members.length > 0 ? (
+                              g.members.map((m) => (
+                                <tr key={m.member_id}>
+                                  <td>{m.name || '—'}</td>
+                                  <td>{m.email || '—'}</td>
+                                  <td>{m.role_label || m.role || '—'}</td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={3}>Nenhum membro listado.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Modal Trocar Senha */}
       {showPasswordModal && userForPassword && (

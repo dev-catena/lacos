@@ -198,6 +198,36 @@ class UsersService {
     }
   }
 
+  async getAccompaniedCareContext(userId) {
+    try {
+      const token = localStorage.getItem('@lacos:token');
+      if (!token) {
+        throw new Error('Token de autenticação não encontrado. Faça login novamente.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/accompanied-care`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+        mode: 'cors',
+      });
+
+      const data = await cleanJsonResponse(response).catch(() => ({}));
+
+      if (response.status === 401) {
+        throw new Error('Não autenticado. Faça login novamente.');
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Erro ao carregar grupo e membros');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar contexto do acompanhado:', error);
+      throw error;
+    }
+  }
+
   async blockUser(userId) {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/block`, {

@@ -100,6 +100,8 @@ const GroupDetailScreen = ({ route, navigation }) => {
             'documents': () => navigation.navigate('Documents', { groupId, groupName }),
             'prescriptions': () => navigation.navigate('Prescriptions', { groupId, groupName }),
             'vitalsigns': () => navigation.navigate('VitalSignsDetail', { groupId, groupName }),
+            'watchAudios': () => navigation.navigate('WatchAudios', { groupId, groupName }),
+            'watchLocation': () => navigation.navigate('SmartwatchLocation', { groupId, groupName }),
           };
 
           const navigateToCard = cardNavigationMap[currentOpenCard];
@@ -369,6 +371,32 @@ const GroupDetailScreen = ({ route, navigation }) => {
       }),
     },
     {
+      id: 'watchAudios',
+      featureKey: 'audiosRelogio',
+      title: 'Áudios do relógio',
+      subtitle: 'Mensagens de áudio do smartwatch',
+      icon: 'mic',
+      IconComponent: ({ size = 32, color: c = colors.primary }) => (
+        <Ionicons name="mic-outline" size={size} color={c} />
+      ),
+      color: '#6366f1',
+      backgroundColor: '#6366f120',
+      onPress: () => navigation.navigate('WatchAudios', { groupId, groupName }),
+    },
+    {
+      id: 'watchLocation',
+      featureKey: 'localizacaoRelogio',
+      title: 'Localização',
+      subtitle: 'Mapa do relógio e últimos pontos',
+      icon: 'location',
+      IconComponent: ({ size = 32, color: c = '#0d9488' }) => (
+        <Ionicons name="location-outline" size={size} color={c} />
+      ),
+      color: '#0d9488',
+      backgroundColor: '#0d948820',
+      onPress: () => navigation.navigate('SmartwatchLocation', { groupId, groupName }),
+    },
+    {
       id: 'fallSensor',
       featureKey: 'sensorQuedas',
       title: 'Sensor de Queda',
@@ -440,7 +468,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     if (item.id === 'caregivers' && user?.profile === 'professional_caregiver' && !isAdmin) {
       return false;
     }
-    
+
     // Se o plano ainda não foi carregado, não mostrar outros itens
     if (!userPlan) {
       return false; // Não mostrar funcionalidades enquanto carrega o plano

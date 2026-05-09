@@ -36,3 +36,6 @@ web-build/
 backend-laravel/.env.backup.*
 backups/**/*.bak
 node_modules
+
+# Dumps OBM / SQL grandes (limite GitHub 100 MB)
+portal-obm-*.sql

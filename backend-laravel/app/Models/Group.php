@@ -21,6 +21,7 @@ class Group extends Model {
         'health_info',
         'created_by',
         'is_active',
+        'thalamus_group_external_id',
     ];
     
     protected $appends = ['photo_url'];
@@ -50,7 +51,7 @@ class Group extends Model {
     public function getPhotoUrlAttribute() {
         if ($this->photo) {
             // Construir URL diretamente em vez de usar asset() para garantir URL correta
-            $baseUrl = config('app.url', 'http://192.168.0.20:8000');
+            $baseUrl = config('app.url', 'http://10.102.0.178:8000');
             $baseUrl = rtrim($baseUrl, '/');
             $photoPath = ltrim($this->photo, '/');
             return $baseUrl . '/storage/' . $photoPath;
