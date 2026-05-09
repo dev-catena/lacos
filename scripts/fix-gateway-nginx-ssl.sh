@@ -4,7 +4,7 @@
 # - Cria server Nginx apontando para o Laravel (public/)
 # - Instala certificado Let's Encrypt (Certbot plugin nginx)
 #
-# Requisitos no servidor: nginx, certbot python3-certbot-nginx, php-fpm, Laravel em disco.
+# Instala nginx, certbot e php-fpm no servidor (Laravel já deve existir em disco).
 #
 # Uso:
 #   export CERTBOT_EMAIL='admin@lacosapp.com'
@@ -38,21 +38,51 @@ if [[ ! -f "${PUBLIC_DIR}/index.php" ]]; then
   exit 1
 fi
 
-PHP_SOCK="$(ls -1 /run/php/php*-fpm.sock 2>/dev/null | head -1 || true)"
-if [[ -z "${PHP_SOCK}" ]]; then
-  echo "Nenhum socket PHP-FPM em /run/php/php*-fpm.sock" >&2
-  echo "Instale: apt-get install -y php-fpm (ou php8.3-fpm)" >&2
-  exit 1
-fi
-
-if [[ ! -f /etc/nginx/snippets/fastcgi-php.conf ]]; then
-  echo "Falta /etc/nginx/snippets/fastcgi-php.conf (instale nginx completo no Ubuntu)." >&2
-  exit 1
-fi
-
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y nginx certbot python3-certbot-nginx
+apt-get install -y nginx certbot python3-certbot-nginx php-fpm
+
+if [[ ! -f /etc/nginx/snippets/fastcgi-php.conf ]]; then
+  echo "Falta /etc/nginx/snippets/fastcgi-php.conf (pacote nginx incompleto?)." >&2
+  exit 1
+fi
+
+# Subir PHP-FPM (nome do serviço varia: php8.3-fpm, php8.2-fpm…)
+_start_fpm() {
+  local u
+  for u in php8.3-fpm php8.2-fpm php8.1-fpm php-fpm; do
+    if systemctl start "${u}" 2>/dev/null && systemctl is-active --quiet "${u}"; then
+      systemctl enable "${u}" 2>/dev/null || true
+      return 0
+    fi
+  done
+  return 1
+}
+if ! _start_fpm; then
+  echo "Aviso: não arranquei php*fpm automaticamente; verifique: systemctl status php8.3-fpm" >&2
+fi
+sleep 1
+
+detect_php_sock() {
+  local d s
+  for d in /run/php /var/run/php; do
+    s="$(ls -1 "${d}"/php*-fpm.sock 2>/dev/null | head -1 || true)"
+    if [[ -n "${s}" && -S "${s}" ]]; then
+      echo "${s}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+PHP_SOCK="$(detect_php_sock || true)"
+if [[ -z "${PHP_SOCK}" ]]; then
+  echo "Nenhum socket PHP-FPM encontrado em /run/php ou /var/run/php." >&2
+  echo "Instale manualmente, por exemplo:" >&2
+  echo "  apt-get install -y php8.3-fpm && systemctl enable --now php8.3-fpm" >&2
+  echo "Depois: ls -la /run/php/" >&2
+  exit 1
+fi
 
 # Permissões básicas para o PHP ler o projeto
 if getent group www-data >/dev/null 2>&1; then
