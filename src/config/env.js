@@ -1,35 +1,54 @@
-// Configuração de ambiente - IP do servidor backend
+// Configuração de ambiente — URL do backend Laravel (API)
 //
-// Backend deste app: /home/darley/lacos/backend-laravel (Laravel).
-// Para subir o servidor: cd /home/darley/lacos/backend-laravel && php artisan serve --host=0.0.0.0 --port=8000
-// Use BACKEND_HOST com o IP que o celular/emulador usa para acessar a máquina (ex.: 10.102.0.178).
+// Em builds de release o app usa sempre a API de produção (gateway HTTPS).
+// Em desenvimento (__DEV__), o padrão é produção; para usar o Laravel na LAN,
+// defina USE_LOCAL_BACKEND = true.
 //
-// Para alterar o IP/porta, edite:
-// - BACKEND_HOST: IP ou hostname onde o backend está acessível
-// - BACKEND_PORT: Porta (padrão 8000)
-//
-// EXPO GO: Para fotos aparecerem no Expo Go, use ngrok (HTTPS). O Expo Go bloqueia HTTP.
-// 1. Instale: npm install -g ngrok
-// 2. Terminal 1: cd backend-laravel && php artisan serve --host=0.0.0.0 --port=8000
-// 3. Terminal 2: ngrok http 8000
-// 4. Copie a URL HTTPS (ex: https://abc123.ngrok-free.app) e cole em NGROK_URL abaixo
-// 5. Reinicie o Expo: npx expo start
-const NGROK_URL = null; // ou 'https://abc123.ngrok-free.app'
+// EXPO / HTTPS: para túnel (Expo Go), use NGROK_URL com USE_LOCAL_BACKEND = true.
 
-// IP do servidor onde o backend Lacos (backend-laravel) está rodando
-const BACKEND_HOST = '10.102.0.178';
-const BACKEND_PORT = '8000';
+/** true = API em LAN/ngrok quando __DEV__; false = sempre gateway de produção (inclui __DEV__) */
+const USE_LOCAL_BACKEND = false;
 
-// Construir URL base da API (usa ngrok se definido, senão IP local)
-const BASE_URL = NGROK_URL || `http://${BACKEND_HOST}:${BACKEND_PORT}`;
-export const BACKEND_BASE_URL = `${BASE_URL}/api`;
+/** API em produção */
+const PRODUCTION_API_BASE_URL = 'https://gateway.lacosapp.com/api';
 
-// Exportar host e port separadamente para uso em outros lugares
-export { BACKEND_HOST, BACKEND_PORT };
+// --- Só com USE_LOCAL_BACKEND && __DEV__ ---
+const NGROK_URL = null; // ex.: 'https://abc123.ngrok-free.app'
+const LOCAL_BACKEND_HOST = '10.102.0.178';
+const LOCAL_BACKEND_PORT = '8000';
+
+function resolveApiBaseUrl() {
+  const prod = PRODUCTION_API_BASE_URL.replace(/\/$/, '');
+
+  if (!__DEV__) {
+    return prod;
+  }
+
+  if (USE_LOCAL_BACKEND) {
+    if (NGROK_URL) {
+      return `${String(NGROK_URL).replace(/\/$/, '')}/api`;
+    }
+    return `http://${LOCAL_BACKEND_HOST}:${LOCAL_BACKEND_PORT}/api`;
+  }
+
+  return prod;
+}
+
+export const BACKEND_BASE_URL = resolveApiBaseUrl();
+
+/** Para mensagens de UI / dicas de rede */
+export const BACKEND_HOST =
+  USE_LOCAL_BACKEND && __DEV__
+    ? NGROK_URL
+      ? 'ngrok'
+      : LOCAL_BACKEND_HOST
+    : 'gateway.lacosapp.com';
+
+export const BACKEND_PORT =
+  USE_LOCAL_BACKEND && __DEV__ ? LOCAL_BACKEND_PORT : '443';
 
 console.log('🌐 Configuração do Backend:', {
-  host: NGROK_URL ? 'ngrok' : BACKEND_HOST,
-  port: BACKEND_PORT,
-  baseUrl: BACKEND_BASE_URL
+  mode: __DEV__ ? 'development' : 'release',
+  target: USE_LOCAL_BACKEND && __DEV__ ? 'local' : 'production',
+  baseUrl: BACKEND_BASE_URL,
 });
-
