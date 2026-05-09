@@ -1,75 +1,111 @@
-// Configuração da API - detecta automaticamente o host
-import { BACKEND_BASE_URL, BACKEND_HOST } from './env';
+// URL da API: backend local quando desenvolves / acedes por LAN; gateway em produção (HTTPS).
+import {
+  DEV_API_BASE_URL,
+  PRODUCTION_API_BASE_URL,
+  LOCAL_BACKEND_PORT,
+  BACKEND_BASE_URL,
+  BACKEND_HOST,
+} from './env';
+
+const PRODUCTION_HOSTNAMES = new Set([
+  'lacosapp.com',
+  'www.lacosapp.com',
+  'admin.lacosapp.com',
+]);
+
+function isPrivateLanHostname(hostname) {
+  if (/^10\./.test(hostname)) {
+    return true;
+  }
+  if (/^192\.168\./.test(hostname)) {
+    return true;
+  }
+  // RFC1918 172.16.0.0 – 172.31.255.255
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) {
+    return true;
+  }
+  return false;
+}
 
 const getApiBaseUrl = () => {
-  // Se estiver em desenvolvimento ou acessando via IP local
   const hostname = window.location.hostname;
   const protocol = window.location.protocol;
-  const port = window.location.port;
-  
-  console.log('🌐 Detectando ambiente:', { hostname, protocol, port });
-  
-  // Se for localhost ou IP local, usar backend local
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    const apiUrl = 'http://localhost:8000/api';
-    console.log('📍 Ambiente local detectado (localhost), usando backend local:', apiUrl);
-    return apiUrl;
+
+  if (import.meta.env.DEV) {
+    console.log('🌐 Detectando ambiente (dev):', { hostname, protocol });
   }
-  
-  // Se for IP local (10.x, 192.168.x), usar o mesmo IP para o backend
-  if (hostname.startsWith('10.') || hostname.startsWith('192.168.')) {
-    const apiUrl = `http://${hostname}:8000/api`;
-    console.log('📍 Ambiente local detectado (IP), usando backend no mesmo IP:', apiUrl);
-    return apiUrl;
-  }
-  
-  // Se for o domínio lacosapp.com, www.lacosapp.com ou admin.lacosapp.com, usar gateway HTTPS
-  if (hostname === 'lacosapp.com' || hostname === 'www.lacosapp.com' || hostname === 'admin.lacosapp.com') {
-    // Se estiver em HTTPS, usar gateway HTTPS para evitar mixed content
+
+  // Produção: painel servido em lacosapp.com (ou www / admin) com HTTPS → API no gateway
+  if (PRODUCTION_HOSTNAMES.has(hostname)) {
     if (protocol === 'https:') {
-      const apiUrl = 'https://gateway.lacosapp.com/api';
-      console.log('📍 Domínio de produção detectado (HTTPS), usando gateway HTTPS:', apiUrl);
-      return apiUrl;
-    } else {
-      // HTTP: usar IP configurado em env.js
-      console.log('📍 Domínio de produção detectado (HTTP), usando backend configurado:', BACKEND_BASE_URL);
-      return BACKEND_BASE_URL;
+      const url = PRODUCTION_API_BASE_URL.replace(/\/$/, '');
+      if (import.meta.env.DEV) {
+        console.log('📍 Produção HTTPS →', url);
+      }
+      return url;
     }
+    // HTTP no domínio de produção (raro): evitar misturar; usar mesmo gateway configurado
+    const url = PRODUCTION_API_BASE_URL.replace(/\/$/, '');
+    if (import.meta.env.DEV) {
+      console.log('📍 Produção (HTTP) →', url);
+    }
+    return url;
   }
-  
-  // Se for o IP configurado, usar o mesmo
+
+  // Local explícito
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    const url = DEV_API_BASE_URL.replace(/\/$/, '');
+    if (import.meta.env.DEV) {
+      console.log('📍 Localhost →', url);
+    }
+    return url;
+  }
+
+  // Vite na LAN: front em http://IP:8081 → Laravel costuma estar em http://IP:8000
+  if (isPrivateLanHostname(hostname)) {
+    const url = `http://${hostname}:${LOCAL_BACKEND_PORT}/api`;
+    if (import.meta.env.DEV) {
+      console.log('📍 Rede local (IP) →', url);
+    }
+    return url;
+  }
+
+  // Host igual ao configurado manualmente (VITE_BACKEND_HOST)
   if (hostname === BACKEND_HOST) {
-    const apiUrl = `${protocol}//${hostname}:8000/api`;
-    console.log('📍 IP configurado detectado:', apiUrl);
-    return apiUrl;
+    const url = `${protocol}//${hostname}:${LOCAL_BACKEND_PORT}/api`.replace(/\/$/, '');
+    if (import.meta.env.DEV) {
+      console.log('📍 Host = BACKEND_HOST →', url);
+    }
+    return url;
   }
-  
-  // Default: usar IP configurado em env.js
-  console.log('📍 Usando URL padrão do backend configurado:', BACKEND_BASE_URL);
-  return BACKEND_BASE_URL;
+
+  if (import.meta.env.DEV) {
+    console.log('📍 Fallback env.js →', BACKEND_BASE_URL);
+  }
+  return BACKEND_BASE_URL.replace(/\/$/, '');
 };
 
 export const API_BASE_URL = getApiBaseUrl();
 
-// Log para debug
-console.log('🌐 API Base URL configurada:', API_BASE_URL);
-console.log('📍 Current hostname:', window.location.hostname);
-console.log('📍 Current origin:', window.location.origin);
+if (import.meta.env.DEV) {
+  console.log('🌐 API Base URL:', API_BASE_URL);
+  console.log('📍 Origin:', window.location.origin);
+}
 
-// Testar conectividade (sempre, para debug)
-fetch(`${API_BASE_URL}/gateway/status`, { 
+// Verificação opcional do gateway (não falha o app se 404)
+fetch(`${API_BASE_URL}/gateway/status`, {
   method: 'GET',
-  headers: {
-    'Accept': 'application/json',
-  },
+  headers: { Accept: 'application/json' },
 })
   .then(async (res) => {
     const text = await res.text();
-    console.log('✅ Backend acessível:', res.status, text);
+    if (import.meta.env.DEV) {
+      console.log('✅ Backend (health):', res.status, text.slice(0, 200));
+    }
   })
   .catch((err) => {
-    console.error('⚠️  Não foi possível verificar conectividade com backend:', err);
-    console.error('   URL tentada:', `${API_BASE_URL}/gateway/status`);
-    console.error('   Origem atual:', window.location.origin);
-    console.error('   Erro completo:', err.message);
+    if (import.meta.env.DEV) {
+      console.warn('⚠️ Health check opcional falhou:', err.message);
+      console.warn('   URL:', API_BASE_URL);
+    }
   });
