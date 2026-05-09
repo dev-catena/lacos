@@ -5,10 +5,10 @@ node_modules/
 dist/
 build/
 
-# Environment variables
+# Environment variables (defaults comitados: .env.development / .env.production)
 .env
 .env.local
-.env.production
+.env.*.local
 
 # IDE
 .vscode/
