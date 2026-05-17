@@ -48,7 +48,82 @@
   box-shadow: 0 4px 12px rgba(83, 97, 115, 0.3);
 }
 
-/* Campo de busca */
+/* Linha: busca + dica sobre grupos por usuário */
+.search-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.search-container--toolbar {
+  flex: 1 1 280px;
+  max-width: 500px;
+  margin-bottom: 0;
+}
+
+.search-toolbar__hint {
+  flex: 1 1 260px;
+  margin: 0;
+  padding-top: 0.25rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--vt-c-text-light-2);
+}
+
+.user-groups-cell {
+  vertical-align: top;
+  min-width: 140px;
+  max-width: 320px;
+}
+
+.user-groups-empty {
+  color: #94a3b8;
+}
+
+.user-group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.group-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+
+.group-chip:hover {
+  background: #e0e7ff;
+  border-color: #818cf8;
+  transform: translateY(-1px);
+}
+
+.group-chip:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.group-chip__code {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6366f1;
+  opacity: 0.95;
+}
+
 .search-container {
   position: relative;
   margin-bottom: 1.5rem;
@@ -622,6 +697,6 @@
   }
 
   .users-table {
-    min-width: 800px;
+    min-width: 1080px;
   }
 }

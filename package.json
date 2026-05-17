@@ -16,14 +16,17 @@
     "start:ios": "node start-expo-ios-fixed.js --clear --lan",
     "start:ios:tunnel": "node start-expo-ios-fixed.js --clear --tunnel",
     "start:auto": "node start-expo-ip-auto.js",
-    "start:auto:tunnel": "node start-expo-ip-auto.js --tunnel",
+    "start:expo-tunnel": "expo start --tunnel",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
     "web:ip": "node scripts/start-web-ip-corrigido.js",
     "logs:android": "adb logcat | grep -i 'reactnative\\|expo' || echo 'Instale adb: sudo apt install android-tools-adb'",
     "logs:all": "adb logcat || echo 'Instale adb: sudo apt install android-tools-adb'",
-    "debugger": "echo 'Pressione j no terminal do Expo para abrir DevTools, ou acesse: http://localhost:19000/debugger-ui/'"
+    "debugger": "echo 'Pressione j no terminal do Expo para abrir DevTools, ou acesse: http://localhost:19000/debugger-ui/'",
+    "eas:build:ios": "npx eas-cli build --platform ios --profile production",
+    "eas:build:android-apk": "npx eas-cli build --platform android --profile preview",
+    "eas:submit:ios": "npx eas-cli submit --platform ios --profile production --latest"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -75,6 +78,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "@expo/ngrok": "^4.1.0",
     "babel-preset-expo": "^54.0.7",
     "baseline-browser-mapping": "^2.10.0",
     "qrcode-terminal": "^0.12.0"

@@ -129,10 +129,20 @@ const PatientProfileScreen = ({ navigation }) => {
         const activities = Array.isArray(result.data) ? result.data : [];
         
         const formattedActivities = activities.map(activity => {
+          const meta =
+            activity.metadata && typeof activity.metadata === 'object' ? activity.metadata : null;
+          const normalizedDesc = activityService.normalizeActivityDescription(activity.description);
+          const split = activityService.splitMedicalAppointmentHomeLines(
+            normalizedDesc,
+            activity.action_type,
+            meta
+          );
           return {
             id: activity.id,
             title: activityService.getActivityTypeLabel(activity.action_type),
-            description: activity.description,
+            description: split.mode === 'single' ? split.text : null,
+            appointmentHeadline: split.mode === 'split' ? split.headline : null,
+            appointmentDoctorLine: split.mode === 'split' ? split.doctorLine : null,
             icon: activityService.getActivityIcon(activity.action_type),
             color: activityService.getActivityColor(activity.action_type),
             time: moment(activity.created_at).fromNow(),
@@ -414,11 +424,20 @@ const PatientProfileScreen = ({ navigation }) => {
                   </View>
                   <View style={styles.activityContent}>
                     <Text style={styles.activityTitle}>{activity.title}</Text>
-                    {activity.description && (
+                    {activity.appointmentHeadline && activity.appointmentDoctorLine ? (
+                      <>
+                        <Text style={styles.activityDescription} numberOfLines={2}>
+                          {activity.appointmentHeadline}
+                        </Text>
+                        <Text style={styles.activityDoctorLine} numberOfLines={2}>
+                          {activity.appointmentDoctorLine}
+                        </Text>
+                      </>
+                    ) : activity.description ? (
                       <Text style={styles.activityDescription} numberOfLines={2}>
                         {activity.description}
                       </Text>
-                    )}
+                    ) : null}
                     <Text style={styles.activityTime}>{activity.time}</Text>
                   </View>
                 </View>
@@ -729,6 +748,12 @@ const styles = StyleSheet.create({
   activityDescription: {
     fontSize: 14,
     color: colors.textLight,
+    marginBottom: 4,
+  },
+  activityDoctorLine: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '600',
     marginBottom: 4,
   },
   activityTime: {

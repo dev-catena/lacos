@@ -2,6 +2,56 @@ import apiService from './apiService';
 
 class ActivityService {
   /**
+   * Ajustes de texto legado na UI quando a API ainda devolve frases antigas (ex.: produção sem deploy).
+   */
+  normalizeActivityDescription(description) {
+    if (description == null || typeof description !== 'string') {
+      return description;
+    }
+    // Sem \b: em motores JS antigos, limites de palavra com acentos podem falhar.
+    return description
+      .replace(/agendou\s+um\s+consulta\s+médica/giu, 'agendou uma consulta médica')
+      .replace(/agendou\s+um\s+sessão/giu, 'agendou uma sessão');
+  }
+
+  /**
+   * Para cartões "consulta médica" na Home: 1ª linha só o ato, 2ª linha Dra./Dr. — clínica/especialidade.
+   */
+  splitMedicalAppointmentHomeLines(description, actionType, metadata) {
+    if (!description || typeof description !== 'string') {
+      return { mode: 'single', text: description };
+    }
+    if (actionType !== 'appointment_created') {
+      return { mode: 'single', text: description };
+    }
+    const metaType = metadata && metadata.appointment_type;
+    const looksMedical =
+      metaType === 'medical' ||
+      /\bagendou\s+(?:um|uma)\s+consulta\s+médica\s*:/iu.test(description);
+    if (!looksMedical) {
+      return { mode: 'single', text: description };
+    }
+    const m = description.match(
+      /^(.+?)\s+agendou\s+(?:um|uma)\s+consulta\s+médica:\s*(.+?)\s+para\s+\d{2}\/\d{2}\/\d{4}\s*$/iu
+    );
+    if (!m) {
+      return { mode: 'single', text: description };
+    }
+    const actor = m[1].trim();
+    let doctorLine = m[2].trim();
+    const DEFAULT_CLINIC = 'Clínica Médica';
+    const hasClinicOrSpecialty = /\s[—–-]\s/.test(doctorLine);
+    if (!hasClinicOrSpecialty) {
+      doctorLine = `${doctorLine} — ${DEFAULT_CLINIC}`;
+    }
+    return {
+      mode: 'split',
+      headline: `${actor} agendou uma consulta`,
+      doctorLine,
+    };
+  }
+
+  /**
    * Buscar atividades recentes de todos os grupos do usuário
    */
   async getRecentActivities(limit = 10) {

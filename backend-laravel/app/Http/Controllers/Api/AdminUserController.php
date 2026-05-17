@@ -20,21 +20,70 @@ class AdminUserController extends Controller
     public function index()
     {
         try {
-            $users = User::leftJoin('user_plans', function($join) {
+            $rows = User::leftJoin('user_plans', function ($join) {
                 $join->on('users.id', '=', 'user_plans.user_id')
                      ->where('user_plans.is_active', '=', true);
             })
             ->leftJoin('plans', 'user_plans.plan_id', '=', 'plans.id')
             ->select(
-                'users.*',
+                'users.id',
+                'users.name',
+                'users.email',
+                'users.profile',
+                'users.is_blocked',
+                'users.created_at',
                 'plans.name as plan_name',
                 'plans.id as plan_id'
             )
             ->orderBy('users.created_at', 'desc')
-            ->get()
-            ->map(function($user) {
+            ->get();
+
+            $userIds = $rows->pluck('id')->unique()->filter()->values()->all();
+
+            $groupsByUserId = [];
+            if (count($userIds) > 0) {
+                $gRows = GroupMember::query()
+                    ->join('groups', 'group_members.group_id', '=', 'groups.id')
+                    ->whereIn('group_members.user_id', $userIds)
+                    ->where('group_members.is_active', true)
+                    ->select([
+                        'group_members.user_id',
+                        'groups.id as group_id',
+                        'groups.name as group_name',
+                        'groups.code as group_code',
+                    ])
+                    ->orderBy('groups.name')
+                    ->get();
+
+                foreach ($gRows as $r) {
+                    $uid = (int) $r->user_id;
+                    $gid = (int) $r->group_id;
+                    if (! isset($groupsByUserId[$uid])) {
+                        $groupsByUserId[$uid] = [];
+                    }
+                    $dup = false;
+                    foreach ($groupsByUserId[$uid] as $existing) {
+                        if ((int) $existing['id'] === $gid) {
+                            $dup = true;
+                            break;
+                        }
+                    }
+                    if ($dup) {
+                        continue;
+                    }
+                    $groupsByUserId[$uid][] = [
+                        'id' => $gid,
+                        'name' => $r->group_name,
+                        'code' => $r->group_code,
+                    ];
+                }
+            }
+
+            $users = $rows->map(function ($user) use ($groupsByUserId) {
+                $uid = (int) $user->id;
+
                 return [
-                    'id' => $user->id,
+                    'id' => $uid,
                     'name' => $user->name,
                     'email' => $user->email,
                     'profile' => $user->profile,
@@ -44,6 +93,7 @@ class AdminUserController extends Controller
                         'id' => $user->plan_id,
                         'name' => $user->plan_name,
                     ] : null,
+                    'groups' => $groupsByUserId[$uid] ?? [],
                 ];
             });
 
@@ -52,6 +102,34 @@ class AdminUserController extends Controller
             return response()->json([
                 'error' => 'Erro ao buscar usuários',
                 'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Detalhe de um grupo (membros ativos) para o web-admin.
+     * GET /api/admin/groups/{groupId}/detail
+     */
+    public function groupAdminDetail($groupId)
+    {
+        try {
+            $group = Group::with('creator')->findOrFail($groupId);
+            $payload = $this->buildGroupPayload($group);
+
+            return response()->json([
+                'success' => true,
+                'group' => $payload,
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Grupo não encontrado',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao buscar grupo',
+                'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
@@ -243,39 +321,10 @@ class AdminUserController extends Controller
             $groups = [];
             foreach ($groupIds as $gid) {
                 $group = Group::with('creator')->find($gid);
-                if (! $group) {
-                    continue;
+                $payload = $this->buildGroupPayload($group);
+                if ($payload !== null) {
+                    $groups[] = $payload;
                 }
-
-                $membersRows = GroupMember::query()
-                    ->where('group_id', $gid)
-                    ->where('is_active', true)
-                    ->with(['user:id,name,email,profile'])
-                    ->orderBy('role')
-                    ->orderBy('id')
-                    ->get();
-
-                $members = $membersRows->map(function (GroupMember $m) {
-                    return [
-                        'member_id' => $m->id,
-                        'user_id' => $m->user_id,
-                        'name' => $m->user ? $m->user->name : null,
-                        'email' => $m->user ? $m->user->email : null,
-                        'profile' => $m->user ? $m->user->profile : null,
-                        'role' => $m->role,
-                        'role_label' => $this->mapGroupMemberRoleLabel($m->role),
-                    ];
-                })->values()->all();
-
-                $groups[] = [
-                    'id' => $group->id,
-                    'name' => $group->name,
-                    'code' => $group->code ?? null,
-                    'accompanied_name' => $group->accompanied_name ?? null,
-                    'admin_name' => $group->creator ? $group->creator->name : null,
-                    'admin_email' => $group->creator ? $group->creator->email : null,
-                    'members' => $members,
-                ];
             }
 
             return response()->json([
@@ -300,6 +349,48 @@ class AdminUserController extends Controller
                 'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
+    }
+
+    /**
+     * Monta o payload JSON de um grupo com membros ativos (admin / acompanhado).
+     */
+    private function buildGroupPayload(?Group $group): ?array
+    {
+        if (! $group) {
+            return null;
+        }
+
+        $gid = $group->id;
+
+        $membersRows = GroupMember::query()
+            ->where('group_id', $gid)
+            ->where('is_active', true)
+            ->with(['user:id,name,email,profile'])
+            ->orderBy('role')
+            ->orderBy('id')
+            ->get();
+
+        $members = $membersRows->map(function (GroupMember $m) {
+            return [
+                'member_id' => $m->id,
+                'user_id' => $m->user_id,
+                'name' => $m->user ? $m->user->name : null,
+                'email' => $m->user ? $m->user->email : null,
+                'profile' => $m->user ? $m->user->profile : null,
+                'role' => $m->role,
+                'role_label' => $this->mapGroupMemberRoleLabel($m->role),
+            ];
+        })->values()->all();
+
+        return [
+            'id' => $group->id,
+            'name' => $group->name,
+            'code' => $group->code ?? null,
+            'accompanied_name' => $group->accompanied_name ?? null,
+            'admin_name' => $group->creator ? $group->creator->name : null,
+            'admin_email' => $group->creator ? $group->creator->email : null,
+            'members' => $members,
+        ];
     }
 
     private function mapGroupMemberRoleLabel(?string $role): string

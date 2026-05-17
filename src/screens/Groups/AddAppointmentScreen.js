@@ -1877,7 +1877,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                 <View style={styles.autocompleteContainer}>
                   <GooglePlacesAutocomplete
                     ref={googlePlacesRef}
-                    placeholder="Buscar endereço no Google..."
+                    placeholder="Buscar endereço — se faltar rua em outra cidade, inclua o nome da cidade"
                     fetchDetails={true}
                     listViewDisplayed={addressListVisible}
                     keepResultsAfterBlur={false}
@@ -1951,14 +1951,16 @@ const AddAppointmentScreen = ({ route, navigation }) => {
                     }}
                     query={{
                       key: GOOGLE_MAPS_CONFIG.API_KEY,
-                      language: 'pt-BR',
+                      language: GOOGLE_MAPS_CONFIG.language || 'pt-BR',
                       components: 'country:br',
-                      types: 'address', // Buscar apenas endereços
+                      // Viés de região (ccTLD), alinha com Maps no Brasil
+                      region: 'br',
+                      // Sem `types` e sem o antigo `types: 'address'`: o Maps mistura sugestões;
+                      // `address` limitava a ~5 resultados "precisos" e empurrava homônimos para fora.
                     }}
                     enablePoweredByContainer={false}
                     debounce={400}
-                    minLength={1}
-                    filterReverseGeocodingByTypes={['locality', 'administrative_area_level_3']}
+                    minLength={2}
                     styles={{
                       container: {
                         flex: 0,

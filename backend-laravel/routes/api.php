@@ -78,6 +78,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     // Gestão de Usuários (apenas root/admin)
     Route::get('/users', [AdminUserController::class, 'index']);
     Route::get('/users/{id}/accompanied-care', [AdminUserController::class, 'accompaniedCareContext']);
+    Route::get('/groups/{groupId}/detail', [AdminUserController::class, 'groupAdminDetail']);
     Route::post('/users/{id}/block', [AdminUserController::class, 'block']);
     Route::post('/users/{id}/unblock', [AdminUserController::class, 'unblock']);
     Route::get('/users/{id}/plan', [AdminUserController::class, 'getUserPlan']);

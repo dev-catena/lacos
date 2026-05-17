@@ -33,6 +33,12 @@ const UsersManagement = ({ currentUser, onLogout }) => {
   const [accompaniedModalLoading, setAccompaniedModalLoading] = useState(false);
   const [accompaniedModalError, setAccompaniedModalError] = useState('');
 
+  /** Modal: detalhe de um grupo (membros) ao clicar no chip na linha do usuário */
+  const [groupDetailState, setGroupDetailState] = useState(null);
+  const [groupDetailPayload, setGroupDetailPayload] = useState(null);
+  const [groupDetailLoading, setGroupDetailLoading] = useState(false);
+  const [groupDetailError, setGroupDetailError] = useState('');
+
   // Salvar filtro no localStorage sempre que mudar
   useEffect(() => {
     localStorage.setItem('@lacos:usersFilter', filter);
@@ -221,6 +227,29 @@ const UsersManagement = ({ currentUser, onLogout }) => {
     setAccompaniedModalLoading(false);
   };
 
+  const openGroupDetailModal = async (user, groupChip) => {
+    setGroupDetailState({ user, groupChip });
+    setGroupDetailPayload(null);
+    setGroupDetailError('');
+    setGroupDetailLoading(true);
+    try {
+      const data = await usersService.getGroupAdminDetail(groupChip.id);
+      setGroupDetailPayload(data.group || null);
+    } catch (err) {
+      setGroupDetailError(err.message || 'Erro ao carregar grupo.');
+      setGroupDetailPayload(null);
+    } finally {
+      setGroupDetailLoading(false);
+    }
+  };
+
+  const closeGroupDetailModal = () => {
+    setGroupDetailState(null);
+    setGroupDetailPayload(null);
+    setGroupDetailError('');
+    setGroupDetailLoading(false);
+  };
+
   // Função para ordenar
   const handleSort = (column) => {
     if (sortColumn === column) {
@@ -248,11 +277,18 @@ const UsersManagement = ({ currentUser, onLogout }) => {
       if (filter === 'blocked' && !user.is_blocked) return false;
       if (filter === 'active' && user.is_blocked) return false;
       
-      // Filtro por busca no nome
+      // Filtro por busca: nome do usuário ou nome/código dos grupos dele
       if (searchText.trim()) {
         const searchLower = searchText.toLowerCase().trim();
         const userName = (user.name || '').toLowerCase();
-        if (!userName.includes(searchLower)) return false;
+        const nameMatches = userName.includes(searchLower);
+        const groups = user.groups || [];
+        const groupMatches = groups.some((g) => {
+          const gName = (g.name || '').toLowerCase();
+          const gCode = (g.code || '').toLowerCase();
+          return gName.includes(searchLower) || gCode.includes(searchLower);
+        });
+        if (!nameMatches && !groupMatches) return false;
       }
       
       return true;
@@ -322,7 +358,8 @@ const UsersManagement = ({ currentUser, onLogout }) => {
           <h1>Gestão de Usuários</h1>
           <p className="subtitle">
             Gerencie os usuários da plataforma. Usuários bloqueados verão &quot;Acesso negado&quot; ao tentar fazer login.
-            Para perfil <strong>Acompanhado</strong> ou <strong>Paciente</strong>, clique na célula do perfil para ver o grupo de cuidado e os membros.
+            Em cada linha, use os <strong>grupos</strong> ao lado do nome para ver todos os membros do grupo. Para perfil{' '}
+            <strong>Acompanhado</strong> ou <strong>Paciente</strong>, você também pode clicar no perfil para ver o contexto de cuidado.
           </p>
         </div>
         <button className="refresh-button" onClick={loadUsers}>
@@ -338,24 +375,30 @@ const UsersManagement = ({ currentUser, onLogout }) => {
         </div>
       )}
 
-      {/* Campo de busca por nome */}
-      <div className="search-container">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Buscar por nome..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-        />
-        {searchText && (
-          <button
-            className="clear-search-btn"
-            onClick={() => setSearchText('')}
-            title="Limpar busca"
-          >
-            ✕
-          </button>
-        )}
+      {/* Busca + dica sobre grupos na linha */}
+      <div className="search-toolbar">
+        <div className="search-container search-container--toolbar">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Buscar por nome, grupo ou código..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+          {searchText && (
+            <button
+              className="clear-search-btn"
+              onClick={() => setSearchText('')}
+              title="Limpar busca"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <p className="search-toolbar__hint">
+          A busca inclui o <strong>nome do usuário</strong> e os <strong>nomes (e códigos) dos grupos</strong> em que ele participa.
+          Clique num grupo para ver admin e todos os membros ativos.
+        </p>
       </div>
 
       <div className="filters">
@@ -401,6 +444,7 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                   Nome {getSortIcon('name')}
                 </button>
               </th>
+              <th>Grupos</th>
               <th>
                 <button
                   className="sortable-header"
@@ -452,8 +496,8 @@ const UsersManagement = ({ currentUser, onLogout }) => {
           <tbody>
             {filteredAndSortedUsers.length === 0 ? (
               <tr>
-                <td colSpan="8" className="empty-state">
-                  {searchText ? `Nenhum usuário encontrado com "${searchText}"` : 'Nenhum usuário encontrado'}
+                <td colSpan="9" className="empty-state">
+                  {searchText ? `Nenhum usuário encontrado para "${searchText}" (nome ou grupo)` : 'Nenhum usuário encontrado'}
                 </td>
               </tr>
             ) : (
@@ -464,6 +508,26 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                     <div className="user-info">
                       <strong>{user.name || 'Sem nome'}</strong>
                     </div>
+                  </td>
+                  <td className="user-groups-cell">
+                    {user.groups && user.groups.length > 0 ? (
+                      <div className="user-group-chips" role="list">
+                        {user.groups.map((g) => (
+                          <button
+                            key={g.id}
+                            type="button"
+                            className="group-chip"
+                            title={`Ver membros de ${g.name}`}
+                            onClick={() => openGroupDetailModal(user, g)}
+                          >
+                            {g.name || `Grupo #${g.id}`}
+                            {g.code ? <span className="group-chip__code">{g.code}</span> : null}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="user-groups-empty">—</span>
+                    )}
                   </td>
                   <td>{user.email}</td>
                   <td>
@@ -626,6 +690,83 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                     </section>
                   ))
                 )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {groupDetailState && (
+        <div className="accompanied-modal-overlay" onClick={closeGroupDetailModal}>
+          <div className="accompanied-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="accompanied-modal__header">
+              <h3>Membros do grupo</h3>
+              <button type="button" className="accompanied-modal__close" onClick={closeGroupDetailModal} aria-label="Fechar">
+                ×
+              </button>
+            </div>
+            <p className="accompanied-modal__user">
+              <strong>{groupDetailState.groupChip?.name || 'Grupo'}</strong>
+              {' · '}
+              Linha: <strong>{groupDetailState.user?.name}</strong> ({groupDetailState.user?.email})
+            </p>
+            {groupDetailLoading && <p className="accompanied-modal__loading">Carregando…</p>}
+            {groupDetailError && (
+              <div className="accompanied-modal__error" role="alert">
+                {groupDetailError}
+              </div>
+            )}
+            {!groupDetailLoading && groupDetailPayload && (
+              <div className="accompanied-modal__body">
+                <section className="accompanied-modal__group">
+                  <ul className="accompanied-modal__meta">
+                    {groupDetailPayload.code ? (
+                      <li>
+                        <span>Código do grupo:</span> {groupDetailPayload.code}
+                      </li>
+                    ) : null}
+                    {groupDetailPayload.accompanied_name ? (
+                      <li>
+                        <span>Nome do acompanhado (cadastro):</span> {groupDetailPayload.accompanied_name}
+                      </li>
+                    ) : null}
+                    {(groupDetailPayload.admin_name || groupDetailPayload.admin_email) ? (
+                      <li>
+                        <span>Administrador do grupo:</span>{' '}
+                        {[groupDetailPayload.admin_name, groupDetailPayload.admin_email].filter(Boolean).join(' · ')}
+                      </li>
+                    ) : null}
+                  </ul>
+                  <p className="accompanied-modal__members-title">Membros ativos</p>
+                  <div className="accompanied-modal__table-wrap">
+                    <table className="accompanied-modal__table">
+                      <thead>
+                        <tr>
+                          <th>Nome</th>
+                          <th>E-mail</th>
+                          <th>Perfil</th>
+                          <th>Papel no grupo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupDetailPayload.members && groupDetailPayload.members.length > 0 ? (
+                          groupDetailPayload.members.map((m) => (
+                            <tr key={m.member_id}>
+                              <td>{m.name || '—'}</td>
+                              <td>{m.email || '—'}</td>
+                              <td>{m.profile || '—'}</td>
+                              <td>{m.role_label || m.role || '—'}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4}>Nenhum membro listado.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
               </div>
             )}
           </div>

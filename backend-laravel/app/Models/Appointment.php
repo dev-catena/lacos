@@ -147,6 +147,128 @@ class Appointment extends Model
     }
 
     /**
+     * Ambíguo se houver homônimos; usado quando doctor_id veio vazio e o título parece nome do médico.
+     */
+    private static function resolveDoctorUserByNameGuess(string $rawTitle): ?User
+    {
+        $trimmed = trim($rawTitle);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        $base = trim(preg_replace('/^(dra\.?|dr\.?|doutora\.?|doutor\.?)\s+/iu', '', $trimmed));
+        if ($base === '') {
+            $base = $trimmed;
+        }
+
+        $candidates = array_values(array_unique(array_filter([$trimmed, $base])));
+        $q = User::query()->where('profile', 'doctor');
+        $q->where(function ($sub) use ($candidates) {
+            foreach ($candidates as $c) {
+                $sub->orWhereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($c)]);
+            }
+        });
+
+        $users = $q->get();
+        if ($users->count() === 1) {
+            return $users->first();
+        }
+
+        return null;
+    }
+
+    private static function honorificFromTitleString(string $title): ?string
+    {
+        $t = trim($title);
+        if ($t === '') {
+            return null;
+        }
+        if (preg_match('/^(dra\.?|doutora\.?)\s+/iu', $t)) {
+            return 'Dra.';
+        }
+        if (preg_match('/^(dr\.?|doutor\.?)\s+/iu', $t)) {
+            return 'Dr.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Linha do médico em textos de atividade/notificação (ex.: "Dra. Marcela — Cardiologia").
+     */
+    public static function doctorLineForActivityDescription(self $appointment): ?string
+    {
+        if (($appointment->type ?? '') !== 'medical') {
+            return null;
+        }
+
+        $docUser = null;
+        if (! empty($appointment->doctor_id)) {
+            $docUser = self::resolveDoctorUserForNotification((int) $appointment->doctor_id);
+        }
+        if ($docUser === null) {
+            $docUser = self::resolveDoctorUserByNameGuess((string) ($appointment->title ?? ''));
+        }
+
+        $titleStr = trim((string) ($appointment->title ?? ''));
+        if ($docUser === null && $titleStr === '') {
+            return null;
+        }
+
+        $rawName = $docUser?->name ?? $appointment->title ?? '';
+        $baseName = trim(preg_replace('/^(dra\.?|dr\.?|doutora\.?|doutor\.?)\s+/iu', '', (string) $rawName));
+        if ($baseName === '') {
+            $baseName = $titleStr !== '' ? trim(preg_replace('/^(dra\.?|dr\.?|doutora\.?|doutor\.?)\s+/iu', '', $titleStr)) : '';
+        }
+        if ($baseName === '') {
+            $baseName = 'Médico(a)';
+        }
+
+        $honorific = self::honorificFromTitleString($titleStr) ?? 'Dr(a).';
+        if ($docUser !== null && $docUser->gender !== null && (string) $docUser->gender !== '') {
+            $g = mb_strtolower(trim((string) $docUser->gender));
+            if (in_array($g, ['f', 'female', 'feminino', 'mulher', 'fem'], true)) {
+                $honorific = 'Dra.';
+            } elseif (in_array($g, ['m', 'male', 'masculino', 'homem', 'mas'], true)) {
+                $honorific = 'Dr.';
+            }
+        }
+
+        $specialty = null;
+        if (! empty($appointment->medical_specialty_id) && Schema::hasTable('medical_specialties')) {
+            $row = DB::table('medical_specialties')->where('id', $appointment->medical_specialty_id)->value('name');
+            $specialty = $row ? (string) $row : null;
+        }
+        if (($specialty === null || $specialty === '') && $docUser && ! empty($docUser->medical_specialty_id) && Schema::hasTable('medical_specialties')) {
+            $row = DB::table('medical_specialties')->where('id', $docUser->medical_specialty_id)->value('name');
+            $specialty = $row ? (string) $row : null;
+        }
+        if (($specialty === null || $specialty === '') && ! empty($appointment->doctor_id)) {
+            $doctorRow = DB::table('doctors')->where('id', $appointment->doctor_id)->first();
+            if ($doctorRow && ! empty($doctorRow->specialty)) {
+                $specialty = trim((string) $doctorRow->specialty);
+            }
+        }
+        if (($specialty === null || $specialty === '') && $docUser && Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'user_id')) {
+            $doctorRow = DB::table('doctors')->where('user_id', $docUser->id)->first();
+            if ($doctorRow && ! empty($doctorRow->specialty)) {
+                $specialty = trim((string) $doctorRow->specialty);
+            }
+        }
+
+        if ($specialty === null || $specialty === '') {
+            $specialty = 'Clínica Médica';
+        }
+
+        $label = trim($honorific.' '.$baseName);
+        if ($specialty !== null && $specialty !== '') {
+            $label .= ' — '.$specialty;
+        }
+
+        return $label;
+    }
+
+    /**
      * Accessor para obter dados do médico (de doctors ou users)
      */
     public function getDoctorUserAttribute()

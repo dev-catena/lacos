@@ -218,7 +218,7 @@ class GroupActivity extends Model
     /**
      * Registrar criação de compromisso/agenda
      */
-    public static function logAppointmentCreated($groupId, $userId, $userName, $appointmentTitle, $appointmentDate, $appointmentType = 'common', $appointmentId = null)
+    public static function logAppointmentCreated($groupId, $userId, $userName, $appointmentTitle, $appointmentDate, $appointmentType = 'common', $appointmentId = null, ?string $displayTitle = null)
     {
         $typeLabels = [
             'common' => 'compromisso',
@@ -228,6 +228,12 @@ class GroupActivity extends Model
         ];
         
         $typeLabel = $typeLabels[$appointmentType] ?? 'compromisso';
+        $titlePart = ($displayTitle !== null && trim((string) $displayTitle) !== '')
+            ? trim((string) $displayTitle)
+            : $appointmentTitle;
+
+        $useUma = in_array($appointmentType, ['medical', 'fisioterapia'], true);
+        $article = $useUma ? 'uma' : 'um';
         // Formatar data de forma mais simples e rápida
         try {
             // Tentar parse direto primeiro
@@ -245,17 +251,22 @@ class GroupActivity extends Model
             }
         }
         
+        $metadata = [
+            'appointment_id' => $appointmentId,
+            'appointment_title' => $appointmentTitle,
+            'appointment_date' => $appointmentDate,
+            'appointment_type' => $appointmentType,
+        ];
+        if ($displayTitle !== null && trim((string) $displayTitle) !== '') {
+            $metadata['doctor_display'] = trim((string) $displayTitle);
+        }
+
         return self::create([
             'group_id' => $groupId,
             'user_id' => $userId,
             'action_type' => 'appointment_created',
-            'description' => "{$userName} agendou um {$typeLabel}: {$appointmentTitle} para {$formattedDate}",
-            'metadata' => [
-                'appointment_id' => $appointmentId,
-                'appointment_title' => $appointmentTitle,
-                'appointment_date' => $appointmentDate,
-                'appointment_type' => $appointmentType,
-            ],
+            'description' => "{$userName} agendou {$article} {$typeLabel}: {$titlePart} para {$formattedDate}",
+            'metadata' => $metadata,
         ]);
     }
 
@@ -393,6 +404,131 @@ class GroupActivity extends Model
                 'cancelled_by' => $cancelledBy,
             ],
         ]);
+    }
+
+    /**
+     * Corrige artigo em textos legados ("um consulta" → "uma consulta").
+     */
+    public static function fixLegacyUmConsultaMedica(string $description): string
+    {
+        $fixed = preg_replace('/\bagendou\s+um\s+consulta\s+médica\b/ui', 'agendou uma consulta médica', $description);
+        $fixed = preg_replace('/\bagendou\s+um\s+sessão\b/ui', 'agendou uma sessão', $fixed ?? $description);
+
+        return $fixed ?? $description;
+    }
+
+    /**
+     * Recompõe a descrição de compromisso agendado (Dra./Dr. + especialidade + artigo correto)
+     * a partir do appointment atual. Não altera o banco; usado na API para o app e linhas antigas.
+     */
+    public static function refreshAppointmentCreatedDescription(self $activity): string
+    {
+        $original = (string) ($activity->description ?? '');
+        $meta = is_array($activity->metadata) ? $activity->metadata : [];
+        $appointmentId = $meta['appointment_id'] ?? null;
+        if ($activity->action_type !== 'appointment_created') {
+            return self::fixLegacyUmConsultaMedica($original);
+        }
+
+        try {
+            /**
+             * Linhas antigas sem appointment_id na metadata: recompõe Dra./especialidade só pelo título.
+             */
+            if (! $appointmentId) {
+                if (preg_match('/^(.+?)\s+agendou\s+(?:um|uma)\s+consulta\s+médica:\s*(.+?)\s+para\s+(\d{2}\/\d{2}\/\d{4})\s*$/u', $original, $legacy)) {
+                    $actorName = trim($legacy[1]);
+                    $titleRaw = trim($legacy[2]);
+                    $formattedDate = $legacy[3];
+                    $fake = new Appointment([
+                        'type' => 'medical',
+                        'title' => $titleRaw,
+                        'medical_specialty_id' => null,
+                        'doctor_id' => null,
+                    ]);
+                    $line = Appointment::doctorLineForActivityDescription($fake);
+                    $titlePart = $line !== null && $line !== '' ? $line : $titleRaw;
+
+                    return "{$actorName} agendou uma consulta médica: {$titlePart} para {$formattedDate}";
+                }
+
+                return self::fixLegacyUmConsultaMedica($original);
+            }
+
+            $appt = Appointment::find($appointmentId);
+            if (! $appt) {
+                if (preg_match('/^(.+?)\s+agendou\s+(?:um|uma)\s+consulta\s+médica:\s*(.+?)\s+para\s+(\d{2}\/\d{2}\/\d{4})\s*$/u', $original, $legacy)) {
+                    $actorName = trim($legacy[1]);
+                    $titleRaw = trim($legacy[2]);
+                    $formattedDate = $legacy[3];
+                    $fake = new Appointment([
+                        'type' => 'medical',
+                        'title' => $titleRaw,
+                        'medical_specialty_id' => null,
+                        'doctor_id' => null,
+                    ]);
+                    $line = Appointment::doctorLineForActivityDescription($fake);
+                    $titlePart = $line !== null && $line !== '' ? $line : $titleRaw;
+
+                    return "{$actorName} agendou uma consulta médica: {$titlePart} para {$formattedDate}";
+                }
+
+                return self::fixLegacyUmConsultaMedica($original);
+            }
+
+            $actorName = null;
+            if ($activity->user_id) {
+                $actorName = optional(User::find($activity->user_id))->name;
+            }
+            if (! $actorName && preg_match('/^(.+?)\s+agendou/u', $original, $m)) {
+                $actorName = trim($m[1]);
+            }
+            if (! $actorName) {
+                $actorName = 'Alguém';
+            }
+
+            $typeLabels = [
+                'common' => 'compromisso',
+                'medical' => 'consulta médica',
+                'fisioterapia' => 'sessão de fisioterapia',
+                'exames' => 'exame',
+            ];
+            $type = $appt->type ?? ($meta['appointment_type'] ?? 'common');
+            if (mb_stripos($original, 'consulta médica', 0, 'UTF-8') !== false) {
+                $type = 'medical';
+            }
+            $typeLabel = $typeLabels[$type] ?? 'compromisso';
+            $useUma = in_array($type, ['medical', 'fisioterapia'], true);
+            $article = $useUma ? 'uma' : 'um';
+
+            $savedType = $appt->getRawOriginal('type') ?? $appt->type;
+            if ($type === 'medical' && ($appt->type ?? '') !== 'medical') {
+                $appt->type = 'medical';
+            }
+            $line = Appointment::doctorLineForActivityDescription($appt);
+            if ($type === 'medical' && ($savedType ?? '') !== 'medical') {
+                $appt->type = $savedType;
+            }
+            $titlePart = $line ?? ($appt->title ?? ($meta['appointment_title'] ?? ''));
+
+            $dateRaw = $appt->scheduled_at ?? $appt->appointment_date ?? ($meta['appointment_date'] ?? null);
+            $formattedDate = $dateRaw ? \Carbon\Carbon::parse($dateRaw)->format('d/m/Y') : '';
+
+            return "{$actorName} agendou {$article} {$typeLabel}: {$titlePart} para {$formattedDate}";
+        } catch (\Throwable $e) {
+            return self::fixLegacyUmConsultaMedica($original);
+        }
+    }
+
+    /**
+     * Descrição enriquecida para respostas JSON (sem gravar em group_activities).
+     */
+    public static function descriptionForApiResponse(self $activity): string
+    {
+        if ($activity->action_type === 'appointment_created') {
+            return self::refreshAppointmentCreatedDescription($activity);
+        }
+
+        return self::fixLegacyUmConsultaMedica((string) ($activity->description ?? ''));
     }
 
     private static function getRoleLabel($role)

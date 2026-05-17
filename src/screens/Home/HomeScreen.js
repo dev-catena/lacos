@@ -286,10 +286,18 @@ const HomeScreen = ({ navigation }) => {
           
           const meta =
             activity.metadata && typeof activity.metadata === 'object' ? activity.metadata : null;
+          const normalizedDesc = activityService.normalizeActivityDescription(activity.description);
+          const split = activityService.splitMedicalAppointmentHomeLines(
+            normalizedDesc,
+            activity.action_type,
+            meta
+          );
           return {
             id: activity.id,
             title: activityService.getActivityTypeLabel(activity.action_type),
-            description: activity.description,
+            description: split.mode === 'single' ? split.text : null,
+            appointmentHeadline: split.mode === 'split' ? split.headline : null,
+            appointmentDoctorLine: split.mode === 'split' ? split.doctorLine : null,
             groupName: groupName,
             groupId: groupId,
             icon: activityService.getActivityIcon(activity.action_type),
@@ -842,7 +850,18 @@ const HomeScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.activityContent}>
                           <Text style={styles.activityTitle}>{activity.title}</Text>
-                          <Text style={styles.activityDescription}>{activity.description}</Text>
+                          {activity.appointmentHeadline && activity.appointmentDoctorLine ? (
+                            <>
+                              <Text style={styles.activityDescription}>
+                                {activity.appointmentHeadline}
+                              </Text>
+                              <Text style={styles.activityDoctorLine}>
+                                {activity.appointmentDoctorLine}
+                              </Text>
+                            </>
+                          ) : activity.description ? (
+                            <Text style={styles.activityDescription}>{activity.description}</Text>
+                          ) : null}
                           {activity.slotLabel ? (
                             <Text style={styles.activitySlotLabel}>{activity.slotLabel}</Text>
                           ) : null}
@@ -1339,6 +1358,12 @@ const styles = StyleSheet.create({
   activityDescription: {
     fontSize: 14,
     color: colors.textLight,
+    marginBottom: 6,
+  },
+  activityDoctorLine: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '600',
     marginBottom: 6,
   },
   activitySlotLabel: {

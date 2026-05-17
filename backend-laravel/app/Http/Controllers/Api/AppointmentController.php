@@ -294,6 +294,7 @@ class AppointmentController extends Controller
         }
 
         $appointment = Appointment::create($validated);
+        $doctorActivityLabel = Appointment::doctorLineForActivityDescription($appointment);
         // Não carregar relacionamento doctor aqui pois pode causar timeout
         // O relacionamento doctor só funciona para tabela doctors, não para users
 
@@ -318,7 +319,8 @@ class AppointmentController extends Controller
                         $appointment->title,
                         $appointment->scheduled_at ?? $appointment->appointment_date,
                         $appointment->type,
-                        $appointment->id
+                        $appointment->id,
+                        $doctorActivityLabel
                     );
                     \Log::info('AppointmentController.store - Atividade criada:', ['activity_id' => $activity->id ?? 'N/A']);
                 } catch (\Exception $activityError) {
@@ -360,6 +362,9 @@ class AppointmentController extends Controller
                     'exames' => 'exame',
                 ];
                 $typeLabel = $typeLabels[$appointment->type] ?? 'compromisso';
+                $useUma = in_array($appointment->type, ['medical', 'fisioterapia'], true);
+                $article = $useUma ? 'uma' : 'um';
+                $appointmentSubjectLabel = $doctorActivityLabel ?? $appointment->title;
                 
                 foreach ($members as $member) {
                     $memberUser = \App\Models\User::find($member->user_id);
@@ -385,7 +390,7 @@ class AppointmentController extends Controller
                     }
                     
                     $title = 'Novo Compromisso Agendado';
-                    $message = "{$user->name} agendou um {$typeLabel}: {$appointment->title} para " . $appointmentDate->format('d/m/Y \à\s H:i');
+                    $message = "{$user->name} agendou {$article} {$typeLabel}: {$appointmentSubjectLabel} para " . $appointmentDate->format('d/m/Y \à\s H:i');
                     if ($appointment->location) {
                         $message .= " em {$appointment->location}";
                     }
