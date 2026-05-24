@@ -514,20 +514,33 @@ class AppointmentController extends Controller
             'recurrence_end' => 'nullable|date',
         ]);
 
-        // Garantir que recurrence_type sempre tenha um valor (padrão: 'none')
-        if (!isset($validated['recurrence_type']) || empty($validated['recurrence_type'])) {
-            $validated['recurrence_type'] = 'none';
-        }
-        
-        // Remover campos de recorrência se não foram fornecidos (exceto recurrence_type que já tem valor padrão)
-        if (!isset($validated['recurrence_days']) || empty($validated['recurrence_days'])) {
-            unset($validated['recurrence_days']);
-        }
-        if (!isset($validated['recurrence_start']) || empty($validated['recurrence_start'])) {
-            unset($validated['recurrence_start']);
-        }
-        if (!isset($validated['recurrence_end']) || empty($validated['recurrence_end'])) {
-            unset($validated['recurrence_end']);
+        // Só altera recorrência quando o cliente envia explicitamente esses campos
+        if (array_key_exists('recurrence_type', $validated)) {
+            if (empty($validated['recurrence_type'])) {
+                $validated['recurrence_type'] = 'none';
+            }
+            if ($validated['recurrence_type'] === 'none') {
+                $validated['recurrence_days'] = null;
+                $validated['recurrence_start'] = null;
+                $validated['recurrence_end'] = null;
+            } else {
+                if (!isset($validated['recurrence_days']) || $validated['recurrence_days'] === '') {
+                    unset($validated['recurrence_days']);
+                }
+                if (!isset($validated['recurrence_start']) || empty($validated['recurrence_start'])) {
+                    unset($validated['recurrence_start']);
+                }
+                if (!isset($validated['recurrence_end']) || empty($validated['recurrence_end'])) {
+                    unset($validated['recurrence_end']);
+                }
+            }
+        } else {
+            unset(
+                $validated['recurrence_type'],
+                $validated['recurrence_days'],
+                $validated['recurrence_start'],
+                $validated['recurrence_end']
+            );
         }
 
         $mergedDoctorId = isset($validated['doctor_id']) ? (int) $validated['doctor_id'] : (int) $appointment->doctor_id;

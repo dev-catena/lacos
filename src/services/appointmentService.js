@@ -120,6 +120,19 @@ class AppointmentService {
         notes: appointmentData.notes,
       };
 
+      if (appointmentData.recurrence_type != null) {
+        data.recurrence_type = appointmentData.recurrence_type;
+      }
+      if (appointmentData.recurrence_days != null) {
+        data.recurrence_days = appointmentData.recurrence_days;
+      }
+      if (appointmentData.recurrence_start != null) {
+        data.recurrence_start = appointmentData.recurrence_start;
+      }
+      if (appointmentData.recurrence_end != null) {
+        data.recurrence_end = appointmentData.recurrence_end;
+      }
+
       const response = await apiService.put(endpoint, data);
       return { success: true, data: response };
     } catch (error) {

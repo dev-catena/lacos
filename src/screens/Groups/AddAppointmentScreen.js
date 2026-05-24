@@ -361,20 +361,33 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   const loadAppointmentData = async () => {
     try {
       setIsEditing(true);
-      let appointmentData = appointment;
-      
-      // Se não veio nos params, buscar da API
-      if (!appointmentData && appointmentId) {
-        const result = await appointmentService.getAppointment(appointmentId);
+
+      const idToLoad = appointment?.isRecurringInstance
+        ? appointment.originalAppointmentId
+        : (appointmentId || appointment?.id);
+
+      let appointmentData = null;
+      if (idToLoad) {
+        const result = await appointmentService.getAppointment(idToLoad);
         if (result.success) {
           appointmentData = result.data;
         }
       }
-      
+      if (!appointmentData) {
+        appointmentData = appointment;
+      }
+
       if (appointmentData) {
         const appointmentDate = new Date(appointmentData.appointment_date || appointmentData.scheduled_at);
         setSelectedDate(appointmentDate);
-        
+
+        let recurrenceDays = [];
+        if (appointmentData.recurrence_days) {
+          recurrenceDays = typeof appointmentData.recurrence_days === 'string'
+            ? JSON.parse(appointmentData.recurrence_days)
+            : appointmentData.recurrence_days;
+        }
+
         const loadedLocation = appointmentData.location || '';
         setFormData({
           title: appointmentData.title || '',
@@ -387,7 +400,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           medicalSpecialtyId: appointmentData.medical_specialty_id || null,
           isTeleconsultation: appointmentData.is_teleconsultation || appointmentData.isTeleconsultation || false,
           recurrenceType: appointmentData.recurrence_type || 'none',
-          recurrenceDays: appointmentData.recurrence_days || (typeof appointmentData.recurrence_days === 'string' ? JSON.parse(appointmentData.recurrence_days) : []),
+          recurrenceDays,
           recurrenceStart: appointmentData.recurrence_start || appointmentDate.toISOString(),
           recurrenceEnd: appointmentData.recurrence_end || '',
           reminderOption: '3',
@@ -1117,8 +1130,11 @@ const AddAppointmentScreen = ({ route, navigation }) => {
 
       let result;
       if (isEditing && appointmentId) {
-        // Atualizar compromisso existente
-        result = await appointmentService.updateAppointment(appointmentId, {
+        const editId = appointment?.isRecurringInstance
+          ? appointment.originalAppointmentId
+          : appointmentId;
+
+        result = await appointmentService.updateAppointment(editId, {
           title: formData.title.trim(),
           type: formData.type,
           description: formData.notes.trim() || null,
@@ -1135,6 +1151,16 @@ const AddAppointmentScreen = ({ route, navigation }) => {
           isTeleconsultation: formData.isTeleconsultation || false,
           location: formData.address.trim() || null,
           notes: formData.notes.trim() || null,
+          recurrence_type: formData.recurrenceType !== 'none' ? formData.recurrenceType : 'none',
+          recurrence_days: formData.recurrenceType === 'custom' && formData.recurrenceDays.length > 0
+            ? JSON.stringify(formData.recurrenceDays)
+            : null,
+          recurrence_start: formData.recurrenceType !== 'none'
+            ? (formData.recurrenceStart || formData.date)
+            : null,
+          recurrence_end: formData.recurrenceType !== 'none' && formData.recurrenceEnd
+            ? formData.recurrenceEnd
+            : null,
         });
       } else {
         // Criar novo compromisso
