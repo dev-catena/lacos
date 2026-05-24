@@ -18,3 +18,13 @@ export function toAgoraUid(userId) {
   }
   return n % 2147483647 || 1;
 }
+
+/** ID numérico da consulta (ignora sufixo de instância recorrente, ex.: 89_2025-05-26). */
+export function resolveAppointmentIdForVideo(appointmentId) {
+  if (appointmentId == null || appointmentId === '') {
+    return null;
+  }
+  const base = String(appointmentId).split('_')[0];
+  const n = parseInt(base, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}

@@ -217,10 +217,14 @@ class AppointmentController extends Controller
             unset($validated['recurrence_end']);
         }
 
-        if (array_key_exists('reminder_times', $validated)) {
-            $validated['reminder_times'] = AppointmentReminderService::normalizeReminderMinutes($validated['reminder_times']);
+        if (Schema::hasColumn('appointments', 'reminder_times')) {
+            if (array_key_exists('reminder_times', $validated)) {
+                $validated['reminder_times'] = AppointmentReminderService::normalizeReminderMinutes($validated['reminder_times']);
+            } else {
+                $validated['reminder_times'] = AppointmentReminderService::DEFAULT_REMINDER_MINUTES;
+            }
         } else {
-            $validated['reminder_times'] = AppointmentReminderService::DEFAULT_REMINDER_MINUTES;
+            unset($validated['reminder_times']);
         }
 
         // Adicionar created_by_user_id com o ID do usuário autenticado

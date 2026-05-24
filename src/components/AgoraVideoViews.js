@@ -7,8 +7,8 @@ import { PersonIcon, VideoCamIcon } from './CustomIcons';
 /**
  * Vídeo remoto em tela cheia (participante da consulta).
  */
-export function RemoteVideoView({ uid, isJoined, waitingLabel, participantName }) {
-  if (isAgoraAvailable && isJoined && uid != null) {
+export function RemoteVideoView({ uid, isJoined, isCallActive, waitingLabel, participantName }) {
+  if (isAgoraAvailable && isCallActive && uid != null) {
     return (
       <RtcSurfaceView
         style={styles.fill}
@@ -45,12 +45,13 @@ export function RemoteVideoView({ uid, isJoined, waitingLabel, participantName }
 /**
  * Vídeo local picture-in-picture (própria câmera).
  */
-export function LocalVideoView({ isJoined, videoOff, label = 'Você' }) {
-  if (isAgoraAvailable && isJoined && !videoOff) {
+export function LocalVideoView({ localUid = 0, isJoined, isCallActive, videoOff, label = 'Você' }) {
+  const showVideo = isAgoraAvailable && (isJoined || isCallActive) && !videoOff;
+  if (showVideo) {
     return (
       <RtcSurfaceView
         style={styles.fill}
-        canvas={{ uid: 0 }}
+        canvas={{ uid: localUid || 0 }}
         zOrderMediaOverlay
       />
     );

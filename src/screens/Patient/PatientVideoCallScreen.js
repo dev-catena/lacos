@@ -58,11 +58,12 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
     isInitializing,
     callError,
     primaryRemoteUid,
+    localUid,
     endCall,
     retryCall,
   } = useAgoraVideoCall({
     appointmentId: appointment?.id,
-    userId: user?.id || appointment?.group_id,
+    userId: user?.id,
     navigation,
     onJoined: () => {
       if (appointment?.id) {
@@ -372,6 +373,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
           <RemoteVideoView
             uid={primaryRemoteUid}
             isJoined={isJoined}
+            isCallActive={isCallActive}
             participantName={doctorInfo?.name || 'Dr(a). Médico'}
             waitingLabel="Aguardando médico entrar na chamada..."
           />
@@ -379,7 +381,13 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
 
         {/* Vídeo do Paciente (picture-in-picture) */}
         <View style={styles.pipVideo}>
-          <LocalVideoView isJoined={isJoined} videoOff={isVideoOff} label="Você" />
+          <LocalVideoView
+            localUid={localUid}
+            isJoined={isJoined}
+            isCallActive={isCallActive}
+            videoOff={isVideoOff}
+            label="Você"
+          />
         </View>
 
         {/* Informações do Médico */}

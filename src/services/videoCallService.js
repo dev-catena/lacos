@@ -84,19 +84,28 @@ class VideoCallService {
       this.engine.initialize({ appId: AGORA_APP_ID });
 
       this.eventHandler = {
-        onJoinChannelSuccess: (_connection, uid) => {
-          this.localUid = uid;
-          this.handlers.onJoinChannelSuccess?.(uid);
+        onJoinChannelSuccess: (connection, _elapsed) => {
+          const assignedUid = connection?.localUid ?? connection?.uid ?? this.localUid;
+          if (assignedUid) {
+            this.localUid = assignedUid;
+          }
+          this.handlers.onJoinChannelSuccess?.(this.localUid);
         },
-        onUserJoined: (_connection, uid) => {
-          this.handlers.onUserJoined?.(uid);
+        onUserJoined: (_connection, remoteUid, _elapsed) => {
+          const uid = Number(remoteUid);
+          if (Number.isFinite(uid)) {
+            this.handlers.onUserJoined?.(uid);
+          }
         },
-        onUserOffline: (_connection, uid) => {
-          this.handlers.onUserOffline?.(uid);
+        onUserOffline: (_connection, remoteUid, _reason) => {
+          const uid = Number(remoteUid);
+          if (Number.isFinite(uid)) {
+            this.handlers.onUserOffline?.(uid);
+          }
         },
-        onError: (err) => {
-          console.error('❌ Agora onError:', err);
-          this.handlers.onError?.(err);
+        onError: (err, msg) => {
+          console.error('❌ Agora onError:', err, msg);
+          this.handlers.onError?.(err, msg);
         },
       };
 
@@ -200,6 +209,10 @@ class VideoCallService {
     } catch (error) {
       return { success: false, error: error.message };
     }
+  }
+
+  getLocalUid() {
+    return this.localUid || 0;
   }
 
   async destroy() {

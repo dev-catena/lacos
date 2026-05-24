@@ -63,7 +63,9 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
   const [messageText, setMessageText] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [prescriptionText, setPrescriptionText] = useState('');
+  const [callDuration, setCallDuration] = useState(0);
   const chatFlatListRef = useRef(null);
+  const durationIntervalRef = useRef(null);
 
   const {
     isCallActive,
@@ -71,6 +73,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
     isInitializing,
     callError,
     primaryRemoteUid,
+    localUid,
     endCall,
     retryCall,
   } = useAgoraVideoCall({
@@ -108,6 +111,28 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
 
     setCanStartCall(true);
   }, [appointment, navigation]);
+
+  useEffect(() => {
+    if (isCallActive) {
+      durationIntervalRef.current = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
+    return () => {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+      }
+    };
+  }, [isCallActive]);
+
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleEndCall = () => {
     Alert.alert(
@@ -623,6 +648,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
           <RemoteVideoView
             uid={primaryRemoteUid}
             isJoined={isJoined}
+            isCallActive={isCallActive}
             participantName={patientInfo?.name || 'Paciente'}
             waitingLabel="Aguardando paciente entrar na chamada..."
           />
@@ -630,13 +656,21 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
 
         {/* Vídeo do Médico (picture-in-picture) */}
         <View style={styles.pipVideo}>
-          <LocalVideoView isJoined={isJoined} videoOff={isVideoOff} label="Você" />
+          <LocalVideoView
+            localUid={localUid}
+            isJoined={isJoined}
+            isCallActive={isCallActive}
+            videoOff={isVideoOff}
+            label="Você"
+          />
         </View>
 
         {/* Informações do Paciente */}
         <View style={styles.patientInfoOverlay}>
           <Text style={styles.patientName}>{patientInfo?.name || 'Paciente'}</Text>
-          <Text style={styles.callDuration}>00:00</Text>
+          {callDuration > 0 && (
+            <Text style={styles.callDuration}>{formatDuration(callDuration)}</Text>
+          )}
         </View>
       </View>
       </SafeAreaView>

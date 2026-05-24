@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import videoCallService from '../services/videoCallService';
-import { getTeleconsultChannelName, toAgoraUid } from '../config/agora';
+import {
+  getTeleconsultChannelName,
+  toAgoraUid,
+  resolveAppointmentIdForVideo,
+} from '../config/agora';
 
 /**
  * Hook compartilhado para iniciar/encerrar chamada Agora na teleconsulta.
@@ -18,6 +22,7 @@ export default function useAgoraVideoCall({
   const [isInitializing, setIsInitializing] = useState(true);
   const [callError, setCallError] = useState(null);
   const [remoteUsers, setRemoteUsers] = useState([]);
+  const [localUid, setLocalUid] = useState(0);
   const [isMockMode, setIsMockMode] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
 
@@ -31,10 +36,11 @@ export default function useAgoraVideoCall({
     frozenUserIdRef.current = userId;
   }
 
-  const appointmentIdRef = useRef(appointmentId);
-  appointmentIdRef.current = appointmentId;
+  const resolvedAppointmentId = resolveAppointmentIdForVideo(appointmentId);
+  const appointmentIdRef = useRef(resolvedAppointmentId);
+  appointmentIdRef.current = resolvedAppointmentId;
 
-  const readyToCall = enabled && appointmentId && frozenUserIdRef.current;
+  const readyToCall = enabled && resolvedAppointmentId && frozenUserIdRef.current;
 
   useEffect(() => {
     if (!enabled) {
@@ -56,10 +62,13 @@ export default function useAgoraVideoCall({
         setRemoteUsers([]);
         setIsJoined(false);
         setIsCallActive(false);
+        setLocalUid(0);
 
         videoCallService.setEventHandlers({
-          onJoinChannelSuccess: () => {
+          onJoinChannelSuccess: (uid) => {
             if (cancelled) return;
+            const resolved = Number(uid) || videoCallService.getLocalUid() || 0;
+            setLocalUid(resolved);
             setIsJoined(true);
             setIsCallActive(true);
           },
@@ -88,6 +97,8 @@ export default function useAgoraVideoCall({
         const channelName = getTeleconsultChannelName(appointmentIdRef.current);
         const agoraUid = toAgoraUid(frozenUserIdRef.current);
 
+        console.log('📹 Agora join:', { channelName, agoraUid, appointmentId: appointmentIdRef.current });
+
         const joinResult = await videoCallService.joinChannel(channelName, agoraUid);
         if (cancelled) return;
 
@@ -100,6 +111,12 @@ export default function useAgoraVideoCall({
 
         if (initResult.mock) {
           setIsJoined(true);
+          setLocalUid(agoraUid);
+        } else {
+          const currentLocal = videoCallService.getLocalUid();
+          if (currentLocal) {
+            setLocalUid(currentLocal);
+          }
         }
 
         onJoinedRef.current?.({ mock: joinResult.mock, channelName, uid: agoraUid });
@@ -127,7 +144,7 @@ export default function useAgoraVideoCall({
       videoCallService.leaveChannel().catch(() => {});
       videoCallService.destroy().catch(() => {});
     };
-  }, [enabled, readyToCall, appointmentId, retryKey]);
+  }, [enabled, readyToCall, resolvedAppointmentId, retryKey]);
 
   const endCall = async () => {
     try {
@@ -135,6 +152,7 @@ export default function useAgoraVideoCall({
       await videoCallService.destroy();
       setIsCallActive(false);
       setIsJoined(false);
+      setLocalUid(0);
       setRemoteUsers([]);
     } catch (error) {
       console.error('Erro ao encerrar chamada:', error);
@@ -156,6 +174,7 @@ export default function useAgoraVideoCall({
     callError,
     remoteUsers,
     primaryRemoteUid,
+    localUid,
     isMockMode,
     endCall,
     retryCall,

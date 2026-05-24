@@ -1083,7 +1083,6 @@ const AddAppointmentScreen = ({ route, navigation }) => {
     setLoading(true);
 
     try {
-      // Preparar dados para API — preferir users.id quando o cadastro doctors estiver ligado à plataforma
       const sel = formData.selectedDoctor;
       const doctorId =
         sel?.user_id != null && sel.user_id !== ''
@@ -1092,24 +1091,37 @@ const AddAppointmentScreen = ({ route, navigation }) => {
             ? Number(sel.id)
             : null;
 
+      const isTeleconsult = isTeleconsultationMode || formData.isTeleconsultation;
+      const effectiveTitle =
+        formData.title.trim() ||
+        sel?.name?.trim() ||
+        (isTeleconsult ? 'Teleconsulta' : '');
+
+      if (!effectiveTitle) {
+        Alert.alert('Atenção', 'Digite um título para o compromisso');
+        setLoading(false);
+        return;
+      }
+
       console.log('📤 Preparando dados do compromisso:', {
         selectedDoctor: formData.selectedDoctor,
         doctorId: doctorId,
         type: formData.type,
-        isTeleconsultation: formData.isTeleconsultation,
+        isTeleconsultation: isTeleconsult,
         date: formData.date,
+        title: effectiveTitle,
       });
       
       const appointmentData = {
-        group_id: parseInt(groupId), // Converter para número
-        title: formData.title.trim(),
-        type: formData.type, // ADICIONADO: tipo do compromisso
+        group_id: parseInt(groupId),
+        title: effectiveTitle,
+        type: formData.type,
         description: formData.notes.trim() || null,
         scheduled_at: formData.date,
-        appointment_date: formData.date, // Backend espera este campo também
-        doctor_id: doctorId, // ID do médico (obrigatório para consultas médicas)
-        medical_specialty_id: formData.medicalSpecialtyId || null, // Especialidade médica
-        is_teleconsultation: formData.isTeleconsultation || false, // Teleconsulta
+        appointment_date: formData.date,
+        doctor_id: doctorId,
+        medical_specialty_id: formData.medicalSpecialtyId || null,
+        is_teleconsultation: isTeleconsult,
         location: formData.address.trim() || null,
         notes: formData.notes.trim() || null,
         // Dados de recorrência

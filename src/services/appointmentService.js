@@ -37,8 +37,8 @@ class AppointmentService {
       // Capturar mensagens de erro específicas da validação
       let errorMessage = 'Erro ao criar compromisso';
       if (error.errors) {
-        errorMessage = Object.values(error.errors).flat().join(', ');
-        console.error('❌ Erros de validação:', error.errors);
+        const fromErrors = Object.values(error.errors).flat().filter(Boolean).join(', ');
+        if (fromErrors) errorMessage = fromErrors;
       } else if (error.message) {
         errorMessage = error.message;
       }
