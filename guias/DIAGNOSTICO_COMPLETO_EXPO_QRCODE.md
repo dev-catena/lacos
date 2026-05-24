@@ -2,7 +2,7 @@
 
 ## 📋 Situação Atual
 
-- ✅ **Android**: Funciona apenas digitando URL manualmente (`exp://192.168.0.20:8081`)
+- ✅ **Android**: Funciona apenas digitando URL manualmente (`exp://192.168.100.10:8081`)
 - ❌ **iOS**: Não tem campo para digitar URL, então não funciona
 - ❌ **QR Code**: Não funciona em nenhuma plataforma
 
@@ -68,7 +68,7 @@ cd /home/darley/lacos
 
 # 1. Verificar IP atual
 hostname -I
-# Deve mostrar: 192.168.0.20
+# Deve mostrar: 192.168.100.10
 
 # 2. Verificar se porta 8081 está acessível
 netstat -tuln | grep 8081
@@ -98,8 +98,8 @@ rm -rf .expo
 rm -rf node_modules/.cache
 
 # Configurar variáveis
-export REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.20
-export EXPO_PACKAGER_HOSTNAME=192.168.0.20
+export REACT_NATIVE_PACKAGER_HOSTNAME=192.168.100.10
+export EXPO_PACKAGER_HOSTNAME=192.168.100.10
 export EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
 
 # Criar .expo/settings.json
@@ -113,8 +113,8 @@ cat > .expo/settings.json << EOF
 EOF
 
 # Iniciar
-REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.20 \
-EXPO_PACKAGER_HOSTNAME=192.168.0.20 \
+REACT_NATIVE_PACKAGER_HOSTNAME=192.168.100.10 \
+EXPO_PACKAGER_HOSTNAME=192.168.100.10 \
 EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0 \
 npx expo start --lan --clear
 ```
@@ -160,8 +160,8 @@ echo ""
 echo "1️⃣ Verificando IP da máquina..."
 IP=$(hostname -I | awk '{print $1}')
 echo "   IP encontrado: $IP"
-echo "   IP esperado: 192.168.0.20"
-if [ "$IP" != "192.168.0.20" ]; then
+echo "   IP esperado: 192.168.100.10"
+if [ "$IP" != "192.168.100.10" ]; then
     echo "   ⚠️  IP diferente do esperado!"
 fi
 echo ""
@@ -189,11 +189,11 @@ echo ""
 
 # 4. Verificar rede
 echo "4️⃣ Verificando conectividade de rede..."
-ping -c 1 192.168.0.20 > /dev/null 2>&1
+ping -c 1 192.168.100.10 > /dev/null 2>&1
 if [ $? -eq 0 ]; then
-    echo "   ✅ IP 192.168.0.20 responde"
+    echo "   ✅ IP 192.168.100.10 responde"
 else
-    echo "   ❌ IP 192.168.0.20 não responde"
+    echo "   ❌ IP 192.168.100.10 não responde"
 fi
 echo ""
 
@@ -211,8 +211,8 @@ echo ""
 echo "6️⃣ Verificando metro.config.js..."
 if [ -f "metro.config.js" ]; then
     echo "   ✅ metro.config.js existe"
-    if grep -q "192.168.0.20" metro.config.js; then
-        echo "   ✅ IP 192.168.0.20 configurado no Metro"
+    if grep -q "192.168.100.10" metro.config.js; then
+        echo "   ✅ IP 192.168.100.10 configurado no Metro"
     else
         echo "   ⚠️  IP não encontrado no Metro config"
     fi

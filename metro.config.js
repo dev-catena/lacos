@@ -6,7 +6,7 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
-const EXPO_IP = process.env.EXPO_IP || process.env.REACT_NATIVE_PACKAGER_HOSTNAME || '10.102.0.178';
+const EXPO_IP = process.env.EXPO_IP || process.env.REACT_NATIVE_PACKAGER_HOSTNAME || '192.168.100.10';
 const EXPO_PORT = '8081';
 
 process.env.REACT_NATIVE_PACKAGER_HOSTNAME = EXPO_IP;

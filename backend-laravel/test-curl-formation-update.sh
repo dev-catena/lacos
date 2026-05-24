@@ -7,7 +7,7 @@
 #
 # Uso:
 #   ./test-curl-formation-update.sh                    # usa localhost:8000
-#   ./test-curl-formation-update.sh http://192.168.0.20:8000
+#   ./test-curl-formation-update.sh http://192.168.100.10:8000
 #   TOKEN=xxx USER_ID=5 ./test-curl-formation-update.sh  # token/user manual
 # =============================================================================
 

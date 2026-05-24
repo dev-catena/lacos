@@ -73,8 +73,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="http"/>
-        <data android:host="192.168.0.20"/>
-        <data android:host="192.168.1.105"/>
+        <data android:host="192.168.100.10"/>
         <data android:pathPrefix="/grupo"/>
       </intent-filter>
       <intent-filter>
@@ -82,8 +81,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="http"/>
-        <data android:host="192.168.0.20"/>
-        <data android:host="192.168.1.105"/>
+        <data android:host="192.168.100.10"/>
         <data android:pathPrefix="/join"/>
       </intent-filter>
       <intent-filter>
@@ -91,8 +89,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="http"/>
-        <data android:host="192.168.0.20"/>
-        <data android:host="192.168.1.105"/>
+        <data android:host="192.168.100.10"/>
       </intent-filter>
       <intent-filter>
         <action android:name="android.intent.action.VIEW"/>

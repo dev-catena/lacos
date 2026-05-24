@@ -13,10 +13,10 @@ Na sua máquina local, execute:
 cd ~/lacos/backend-laravel
 
 # Copiar para o home do usuário (não precisa de sudo)
-scp create_plans_table.php darley@192.168.0.20:~/
-scp create_user_plans_table.php darley@192.168.0.20:~/
-scp Plan.php darley@192.168.0.20:~/
-scp PlanController.php darley@192.168.0.20:~/
+scp create_plans_table.php darley@192.168.100.10:~/
+scp create_user_plans_table.php darley@192.168.100.10:~/
+scp Plan.php darley@192.168.100.10:~/
+scp PlanController.php darley@192.168.100.10:~/
 ```
 
 ### Passo 2: No servidor, mover os arquivos com sudo
@@ -24,7 +24,7 @@ scp PlanController.php darley@192.168.0.20:~/
 Conecte-se ao servidor e execute:
 
 ```bash
-ssh darley@192.168.0.20
+ssh darley@192.168.100.10
 sudo mv ~/create_plans_table.php /var/www/lacos-backend/
 sudo mv ~/create_user_plans_table.php /var/www/lacos-backend/
 sudo mv ~/Plan.php /var/www/lacos-backend/app/Models/

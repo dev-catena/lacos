@@ -19,18 +19,18 @@ Executei o script que força o uso do Expo Go:
 ### 1. Verifique o Terminal
 O terminal deve mostrar:
 ```
-Metro waiting on exp://192.168.1.105:8081
+Metro waiting on exp://192.168.100.10:8081
 ```
 
 **NÃO deve mostrar:**
 - `http://localhost:8081`
-- `http://192.168.1.105:8081`
+- `http://192.168.100.10:8081`
 - Qualquer coisa com `dev-client`
 
 ### 2. Verifique o QR Code
 O QR code deve mostrar:
 ```
-exp://192.168.1.105:8081
+exp://192.168.100.10:8081
 ```
 
 **NÃO deve mostrar:**
@@ -68,8 +68,8 @@ rm -rf node_modules/.cache
 
 # Forçar Expo Go
 export EXPO_USE_DEV_CLIENT=0
-export REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.105
-export EXPO_PACKAGER_HOSTNAME=192.168.1.105
+export REACT_NATIVE_PACKAGER_HOSTNAME=192.168.100.10
+export EXPO_PACKAGER_HOSTNAME=192.168.100.10
 
 # Iniciar
 npx expo start --tunnel --clear
@@ -80,7 +80,7 @@ Se o QR code não funcionar, você pode:
 
 1. Abrir Expo Go manualmente
 2. Toque em "Enter URL manually"
-3. Digite: `exp://192.168.1.105:8081`
+3. Digite: `exp://192.168.100.10:8081`
 4. Toque em "Connect"
 
 ### Opção 3: Verificar Rede

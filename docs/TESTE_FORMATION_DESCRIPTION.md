@@ -11,14 +11,14 @@ O campo **"Detalhes da Formação"** (`formation_description`) foi testado em ba
 cd backend-laravel
 ./test-curl-formation-update.sh
 # ou com URL remota:
-./test-curl-formation-update.sh http://192.168.0.20:8000
+./test-curl-formation-update.sh http://192.168.100.10:8000
 ```
 
 ### 2. Ciclo de Vida Frontend (Node.js)
 ```bash
 node scripts/test-frontend-formation-lifecycle.js
 # ou com URL remota:
-BASE_URL=http://192.168.0.20:8000 node scripts/test-frontend-formation-lifecycle.js
+BASE_URL=http://192.168.100.10:8000 node scripts/test-frontend-formation-lifecycle.js
 ```
 
 ---

@@ -2,21 +2,21 @@
 //
 // Expo local (`npx expo start`): bundler/UI no teu PC; a API pode ser produção ou LAN.
 //
-// Cenário atual — recomendado para ti agora:
+// Cenário atual — desenvolvimento local:
 //   • Expo corre localmente
-//   • Todas as chamadas vão para o backend em PRODUÇÃO (HTTPS no gateway)
+//   • API no Laravel da tua máquina (LAN ou ngrok)
 //
-// Para voltar a usar o Laravel na tua máquina (IP/ngrok) durante o dev:
-//   mude EXPO_USE_LOCAL_LARAVEL para true e ajusta LOCAL_* / NGROK_URL abaixo.
+// Para usar produção (gateway) durante o dev:
+//   mude EXPO_USE_LOCAL_LARAVEL para false.
 
-/** false = com Expo em dev, a API continua sendo a de produção (gateway). true = API no Laravel local (LAN ou ngrok). */
-const EXPO_USE_LOCAL_LARAVEL = false;
+/** false = API de produção (gateway). true = Laravel local (LAN ou ngrok). */
+const EXPO_USE_LOCAL_LARAVEL = true;
 
 const PRODUCTION_API_BASE_URL = 'https://gateway.lacosapp.com/api';
 
 // --- Só usados quando EXPO_USE_LOCAL_LARAVEL && __DEV__ ---
 const NGROK_URL = null; // ex.: 'https://abc123.ngrok-free.app'
-const LOCAL_BACKEND_HOST = '10.102.0.178';
+const LOCAL_BACKEND_HOST = '192.168.100.10';
 const LOCAL_BACKEND_PORT = '8000';
 
 function resolveApiBaseUrl() {

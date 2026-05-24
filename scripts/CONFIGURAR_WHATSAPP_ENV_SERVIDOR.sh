@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para configurar variáveis de ambiente do WhatsApp no servidor
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 PORT="63022"
 USER="darley"
 PASSWORD="yhvh77"

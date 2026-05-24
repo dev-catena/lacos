@@ -2,7 +2,7 @@
 
 # Script para verificar e diagnosticar problemas com grupos de usuários
 
-SERVER_IP="192.168.0.20"
+SERVER_IP="192.168.100.10"
 SERVER_USER="darley"
 SERVER_PASSWORD="yhvh77"
 PORT="63022"

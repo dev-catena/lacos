@@ -130,6 +130,17 @@ function getDoctorDetailsForModal(d) {
   };
 }
 
+const REMINDER_PRESETS = {
+  '1': [1440, 180, 60, 15],
+  '2': [180, 60, 15],
+  '3': [60, 15],
+  '4': [15],
+};
+
+function mapReminderOptionToMinutes(option) {
+  return REMINDER_PRESETS[option] || REMINDER_PRESETS['1'];
+}
+
 const AddAppointmentScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
   let { groupId, groupName, appointmentId, appointment, isTeleconsultation } = route.params || {};
@@ -1097,6 +1108,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
         recurrence_end: formData.recurrenceType !== 'none' && formData.recurrenceEnd 
           ? formData.recurrenceEnd 
           : null,
+        reminder_times: mapReminderOptionToMinutes(formData.reminderOption),
       };
 
       console.log('📤 Salvando compromisso:', appointmentData);

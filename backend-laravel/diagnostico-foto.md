@@ -9,7 +9,7 @@
 
 ### ✅ TESTE 2: Endereço corresponde ao usado pelo componente?
 **RESPOSTA: SIM**
-- URL construída: `http://192.168.0.20:8000/storage/groups/yyTR90bXKMxgspM4Od0izSvwYXkSc7IVMudb2Jfh.jpg`
+- URL construída: `http://192.168.100.10:8000/storage/groups/yyTR90bXKMxgspM4Od0izSvwYXkSc7IVMudb2Jfh.jpg`
 - Link simbólico: ✅ Funcionando
 - Arquivo acessível: ✅ SIM
 - Status HTTP: ✅ 200 OK

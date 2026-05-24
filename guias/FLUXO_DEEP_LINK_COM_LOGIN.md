@@ -6,7 +6,7 @@
 
 O QR code contém uma URL como:
 - `https://lacos.com/grupo/ABC123` (produção)
-- `http://192.168.1.105/grupo/ABC123` (desenvolvimento)
+- `http://192.168.100.10/grupo/ABC123` (desenvolvimento)
 
 ### 2. App é Aberto (ou Navegador Redireciona)
 
@@ -50,9 +50,9 @@ O app verifica se o usuário está logado:
 - `https://lacos.com/ABC123`
 
 ### Desenvolvimento:
-- `http://192.168.1.105/grupo/ABC123`
-- `http://192.168.1.105/join?code=ABC123`
-- `http://192.168.1.105/ABC123`
+- `http://192.168.100.10/grupo/ABC123`
+- `http://192.168.100.10/join?code=ABC123`
+- `http://192.168.100.10/ABC123`
 
 ### Deep Link Customizado (apenas em build nativo):
 - `lacos://grupo/ABC123`
@@ -70,7 +70,7 @@ O app verifica se o usuário está logado:
 2. **Use o Dev Menu:**
    - Agite o celular ou pressione menu
    - Toque em "Open URL"
-   - Digite: `http://192.168.1.105/grupo/TESTE123`
+   - Digite: `http://192.168.100.10/grupo/TESTE123`
 
 3. **Cenário 1 - Não está logado:**
    - App mostra toast: "Código de convite recebido - Faça login..."
@@ -90,7 +90,7 @@ O app verifica se o usuário está logado:
 
 ## ⚠️ Importante
 
-- URLs públicas (`http://192.168.1.105/grupo/ABC123`) **não permitem entrar em grupos sem login**
+- URLs públicas (`http://192.168.100.10/grupo/ABC123`) **não permitem entrar em grupos sem login**
 - O código é apenas **salvo temporariamente** e processado após autenticação
 - Se o usuário fechar o app sem fazer login, o código é perdido (comportamento esperado)
 

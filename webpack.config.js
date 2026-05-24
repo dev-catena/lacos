@@ -1,6 +1,6 @@
 // Configuração Webpack para Expo Web escutar em 0.0.0.0
 
-const EXPO_IP = process.env.EXPO_IP || '10.102.0.178';
+const EXPO_IP = process.env.EXPO_IP || '192.168.100.10';
 const EXPO_PORT = process.env.EXPO_PORT || '8081';
 
 module.exports = {

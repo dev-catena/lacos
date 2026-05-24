@@ -2,7 +2,7 @@
 
 ## ⚠️ SOLUÇÃO DEFINITIVA para Android travado em "downloading"
 
-**Se o Android fica travado mesmo digitando exp://192.168.0.20:8081**, o celular **não consegue conectar** ao seu computador (rede diferente, firewall, etc.). 
+**Se o Android fica travado mesmo digitando exp://192.168.100.10:8081**, o celular **não consegue conectar** ao seu computador (rede diferente, firewall, etc.). 
 
 **Use o modo TUNNEL** – o celular conecta aos servidores do Expo, que fazem túnel até seu PC:
 
@@ -35,14 +35,14 @@ npx expo start --clear
 ```
 
 ### 2. Verificar o IP da sua máquina
-O projeto usa IP fixo `192.168.0.20`. **Se sua máquina tem outro IP, o dispositivo não conecta!**
+O projeto usa IP fixo `192.168.100.10`. **Se sua máquina tem outro IP, o dispositivo não conecta!**
 
 Para ver seu IP atual:
 ```bash
 node scripts/obter-ip-rede.js
 ```
 
-Se o IP for diferente (ex: 192.168.1.105), edite:
+Se o IP for diferente (ex: 192.168.100.10), edite:
 - `metro.config.js` - linha 7: altere `EXPO_IP` para seu IP
 - `start-expo-ip-forcado.js` - linha 13: altere `FORCED_IP` para seu IP
 
@@ -79,7 +79,7 @@ O Tunnel usa servidores do Expo e funciona mesmo com firewall/NAT.
 ### 3. Corrigir o IP (mais comum)
 Se o IP em `metro.config.js` e `start-expo-ip-forcado.js` estiver errado, o Android tenta conectar em um endereço inacessível e trava.
 
-**Verifique:** O QR code mostra `exp://192.168.0.20:8081`? Se sua rede é 192.168.x.x, está errado!
+**Verifique:** O QR code mostra `exp://192.168.100.10:8081`? Se sua rede é 192.168.x.x, está errado!
 
 ### 4. Usar IP automático ou Tunnel
 ```bash

@@ -11,7 +11,7 @@ Table 'lacos.caregiver_reviews' doesn't exist
 Execute no servidor:
 
 ```bash
-ssh darley@192.168.0.20
+ssh darley@192.168.100.10
 cd /var/www/lacos-backend
 
 # 1. Copiar migrations

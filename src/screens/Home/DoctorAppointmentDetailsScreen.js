@@ -13,6 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import colors from '../../constants/colors';
 import moment from 'moment';
 import 'moment/locale/pt-br';
+import { getDocumentDisplayTitle, normalizeDocument } from '../../utils/documentTypeLabels';
 import groupService from '../../services/groupService';
 import documentService from '../../services/documentService';
 import appointmentService from '../../services/appointmentService';
@@ -117,15 +118,14 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
           
           const patientRoles = ['patient', 'priority_contact', 'accompanied'];
           const patientMember = members.find((m) => {
-            const hasPatientRole = patientRoles.includes(m.role);
-            const hasUser = !!m.user;
-            console.log(`🔍 Verificando membro: role="${m.role}", hasUser=${hasUser}, userName="${m.user?.name}"`);
-            return hasPatientRole && hasUser;
+            if (!patientRoles.includes(m.role)) return false;
+            return !!(m.user?.name || m.name);
           });
           
-          if (patientMember && patientMember.user) {
-            const patient = patientMember.user;
-            console.log('✅ DoctorAppointmentDetailsScreen - Paciente encontrado:', { id: patient.id, name: patient.name });
+          if (patientMember) {
+            const patient = patientMember.user || patientMember;
+            const patientName = patientMember.user?.name || patientMember.name;
+            console.log('✅ DoctorAppointmentDetailsScreen - Paciente encontrado:', { id: patient.id, name: patientName });
             
             // Calcular idade
             let age = null;
@@ -165,8 +165,8 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
             };
             
             const patientInfoData = {
-              id: patient.id, // IMPORTANTE: Incluir o ID do paciente
-              name: patient.name || 'Paciente',
+              id: patient.id || patientMember.user_id,
+              name: patientName || 'Paciente',
               age: age,
               gender: genderMap[patient.gender] || patient.gender || 'Não informado',
               comorbidities: comorbidities,
@@ -174,7 +174,7 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
               bloodType: patient.blood_type || 'Não informado',
               medications: [], // TODO: Buscar medicações do paciente se necessário
               cpf: patient.cpf || '',
-              birth_date: patient.birth_date || null,
+              birth_date: patient.birth_date || patientMember.birth_date || null,
             };
             
             setPatientInfo(patientInfoData);
@@ -195,9 +195,14 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
         group_name: appointment?.group?.name,
       });
       
-      // IMPORTANTE: NÃO usar appointment.group?.name como nome do paciente no fallback
-      // Priorizar appointment.patient_name ou appointment.accompanied_name
-      const fallbackName = appointment?.patient_name || appointment?.accompanied_name || 'Paciente';
+      const groupLabel = appointment?.group?.name || appointment?.group_name || '';
+      const rawFallback =
+        appointment?.patient_name || appointment?.accompanied_name || 'Paciente';
+      const fallbackName =
+        groupLabel &&
+        String(rawFallback).trim().toLowerCase() === String(groupLabel).trim().toLowerCase()
+          ? 'Paciente'
+          : rawFallback;
       console.log('⚠️ DoctorAppointmentDetailsScreen - Nome do fallback (sem usar grupo):', fallbackName);
       
       const fallbackInfo = {
@@ -224,7 +229,14 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
       
       // IMPORTANTE: NÃO usar appointment.group?.name como nome do paciente no fallback
       // Priorizar appointment.patient_name ou appointment.accompanied_name
-      const fallbackName = appointment?.patient_name || appointment?.accompanied_name || 'Paciente';
+      const groupLabel = appointment?.group?.name || appointment?.group_name || '';
+      const rawFallback =
+        appointment?.patient_name || appointment?.accompanied_name || 'Paciente';
+      const fallbackName =
+        groupLabel &&
+        String(rawFallback).trim().toLowerCase() === String(groupLabel).trim().toLowerCase()
+          ? 'Paciente'
+          : rawFallback;
       console.log('⚠️ DoctorAppointmentDetailsScreen - Nome do fallback por erro (sem usar grupo):', fallbackName);
       
       const fallbackInfo = {
@@ -259,9 +271,12 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
 
       console.log('📂 DoctorAppointmentDetailsScreen - Carregando documentos do grupo:', groupId);
       const docs = await documentService.getDocumentsByGroup(groupId);
+      const docList = Array.isArray(docs) ? docs : docs?.data || [];
       
+      const normalizedDocs = docList.map(normalizeDocument);
+
       // Limitar a 5 documentos mais recentes para o card
-      const recentDocs = docs
+      const recentDocs = normalizedDocs
         .sort((a, b) => new Date(b.document_date || b.date) - new Date(a.document_date || a.date))
         .slice(0, 5);
       
@@ -273,6 +288,28 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
     } finally {
       setLoadingDocuments(false);
     }
+  };
+
+  const formatBirthDate = (dateStr) => {
+    if (!dateStr) return null;
+    const parsed = moment(dateStr);
+    return parsed.isValid() ? parsed.format('DD/MM/YYYY') : null;
+  };
+
+  const formatPatientSummary = (info) => {
+    if (!info) return '';
+    const parts = [];
+    const birthLabel = formatBirthDate(info.birth_date);
+    if (birthLabel) {
+      parts.push(`Data de nascimento: ${birthLabel}`);
+    }
+    if (info.age != null && !Number.isNaN(info.age)) {
+      parts.push(`${info.age} anos`);
+    }
+    if (info.gender && info.gender !== 'Não informado') {
+      parts.push(info.gender);
+    }
+    return parts.join(' • ') || 'Dados pessoais não informados';
   };
 
   const getDocumentIcon = (type) => {
@@ -549,7 +586,7 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
                 <View style={styles.patientBasicInfo}>
                   <Text style={styles.patientName}>{patientInfo.name}</Text>
                   <Text style={styles.patientDetails}>
-                    {patientInfo.age} anos • {patientInfo.gender}
+                    {formatPatientSummary(patientInfo)}
                   </Text>
                   {patientInfo.bloodType && (
                     <Text style={styles.patientDetails}>
@@ -660,11 +697,10 @@ const DoctorAppointmentDetailsScreen = ({ route, navigation }) => {
                         </View>
                         <View style={styles.fileContent}>
                           <Text style={styles.fileTitle} numberOfLines={1}>
-                            {doc.title || 'Documento sem título'}
+                            {getDocumentDisplayTitle(doc)}
                           </Text>
                           <Text style={styles.fileMeta}>
                             {formatDocumentDate(doc.document_date || doc.date)}
-                            {doc.doctor_name && ` • ${doc.doctor_name}`}
                           </Text>
                         </View>
                         <ChevronForwardIcon

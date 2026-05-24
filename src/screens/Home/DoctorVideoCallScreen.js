@@ -41,124 +41,71 @@ import colors from '../../constants/colors';
 import videoCallService from '../../services/videoCallService';
 import appointmentService from '../../services/appointmentService';
 import { useAuth } from '../../contexts/AuthContext';
+import useAgoraVideoCall from '../../hooks/useAgoraVideoCall';
+import { LocalVideoView, RemoteVideoView } from '../../components/AgoraVideoViews';
 import {
   isTeleconsultPaidForVideoStart,
   isTeleconsultAppointment,
   isWithinTeleconsultVideoJoinWindow,
 } from '../../utils/teleconsultationHonorarium';
-// Importar RTCView do Agora.io (será disponível após build)
-// import { RtcSurfaceView, RtcSurfaceViewMode } from 'react-native-agora';
 
 const DoctorVideoCallScreen = ({ route, navigation }) => {
   const { appointment, patientInfo } = route.params || {};
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const [isCallActive, setIsCallActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [prescriptionType, setPrescriptionType] = useState(null);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [callError, setCallError] = useState(null);
-  const [remoteUid, setRemoteUid] = useState(null);
+  const [canStartCall, setCanStartCall] = useState(null);
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [prescriptionText, setPrescriptionText] = useState('');
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
   const chatFlatListRef = useRef(null);
+
+  const {
+    isCallActive,
+    isInitializing,
+    callError,
+    primaryRemoteUid,
+    endCall,
+  } = useAgoraVideoCall({
+    appointmentId: appointment?.id,
+    userId: user?.id || appointment?.doctor_id,
+    navigation,
+    enabled: canStartCall,
+    onJoined: () => {
+      if (appointment?.id) {
+        appointmentService.videoJoin(appointment.id, 'doctor');
+      }
+    },
+  });
 
   useEffect(() => {
     if (isTeleconsultAppointment(appointment) && !isTeleconsultPaidForVideoStart(appointment)) {
+      setCanStartCall(false);
       Alert.alert(
         'Pagamento pendente',
         'A videochamada só pode ser iniciada após o paciente concluir o pagamento.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-      setIsInitializing(false);
-      return undefined;
+      return;
     }
 
     if (isTeleconsultAppointment(appointment) && !isWithinTeleconsultVideoJoinWindow(appointment, Date.now())) {
+      setCanStartCall(false);
       Alert.alert(
         'Fora do horário da videochamada',
         'A entrada só é permitida entre 15 minutos antes e 40 minutos após o horário agendado.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-      setIsInitializing(false);
-      return undefined;
+      return;
     }
 
-    initializeCall();
-
-    return () => {
-      endCall();
-    };
-  }, []);
-
-  const initializeCall = async () => {
-    try {
-      setIsInitializing(true);
-      setCallError(null);
-
-      // Inicializar serviço de vídeo
-      const initResult = await videoCallService.initialize();
-      if (!initResult.success) {
-        throw new Error(initResult.error || 'Erro ao inicializar serviço de vídeo');
-      }
-
-      // Modo mock (Expo Go) - mostrar aviso
-      if (initResult.mock) {
-        console.log('⚠️ Modo MOCK: Vídeo não está funcionando (Expo Go). Use expo-dev-client para vídeo real.');
-      }
-
-      // Gerar nome do canal baseado no appointment
-      const channelName = `consulta-${appointment?.id || Date.now()}`;
-      const userId = appointment?.doctor_id || 1; // ID do médico
-
-      // Entrar no canal
-      const joinResult = await videoCallService.joinChannel(channelName, userId);
-      if (!joinResult.success) {
-        throw new Error(joinResult.error || 'Erro ao entrar no canal');
-      }
-
-      // Registrar entrada do médico no backend (para rastreamento de no-show)
-      if (appointment?.id) {
-        appointmentService.videoJoin(appointment.id, 'doctor');
-      }
-
-      setIsCallActive(true);
-      setIsInitializing(false);
-      console.log('✅ Chamada de vídeo iniciada com sucesso' + (joinResult.mock ? ' (MODO MOCK)' : ''));
-    } catch (error) {
-      console.error('❌ Erro ao inicializar chamada:', error);
-      setCallError(error.message);
-      setIsInitializing(false);
-      Alert.alert(
-        'Erro ao Iniciar Chamada',
-        error.message || 'Não foi possível iniciar a chamada de vídeo. Verifique sua conexão e tente novamente.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
-    }
-  };
-
-  const endCall = async () => {
-    try {
-      await videoCallService.leaveChannel();
-      await videoCallService.destroy();
-      setIsCallActive(false);
-      console.log('✅ Chamada encerrada');
-    } catch (error) {
-      console.error('❌ Erro ao encerrar chamada:', error);
-    }
-  };
+    setCanStartCall(true);
+  }, [appointment, navigation]);
 
   const handleEndCall = () => {
     Alert.alert(
@@ -607,7 +554,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
     );
   };
 
-  if (isInitializing) {
+  if (canStartCall === null || isInitializing) {
     return (
       <View style={styles.container}>
         <StatusBar style="light" />
@@ -665,57 +612,16 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
       <View style={styles.videoContainer}>
         {/* Vídeo do Paciente (tela principal) */}
         <View style={styles.mainVideo}>
-          {remoteUid ? (
-            // TODO: Descomentar após build com Agora.io
-            // <RtcSurfaceView
-            //   ref={remoteVideoRef}
-            //   canvas={{ uid: remoteUid }}
-            //   mode={RtcSurfaceViewMode.RtcSurfaceViewModeFit}
-            //   style={styles.videoView}
-            // />
-            <View style={styles.videoPlaceholder}>
-              <VideoIcon size={80} color={colors.primary} off={false} />
-              <Text style={styles.videoPlaceholderText}>Vídeo do Paciente</Text>
-              <Text style={styles.videoNote}>
-                {callError ? 'Erro ao conectar' : 'Aguardando paciente entrar na chamada...'}
-              </Text>
-              {!callError && (
-                <Text style={[styles.videoNote, { marginTop: 8, fontSize: 11, color: colors.textLight }]}>
-                  (Modo desenvolvimento - Expo Go)
-                </Text>
-              )}
-            </View>
-          ) : (
-            <View style={styles.videoPlaceholder}>
-              <PersonIcon size={80} color={colors.textLight} />
-              <Text style={styles.videoPlaceholderText}>
-                {patientInfo?.name || 'Paciente'}
-              </Text>
-              <Text style={styles.videoNote}>
-                (Aguardando paciente entrar na chamada...)
-              </Text>
-            </View>
-          )}
+          <RemoteVideoView
+            uid={primaryRemoteUid}
+            participantName={patientInfo?.name || 'Paciente'}
+            waitingLabel="Aguardando paciente entrar na chamada..."
+          />
         </View>
 
         {/* Vídeo do Médico (picture-in-picture) */}
         <View style={styles.pipVideo}>
-          {!isVideoOff ? (
-            // TODO: Descomentar após build com Agora.io
-            // <RtcSurfaceView
-            //   ref={localVideoRef}
-            //   canvas={{ uid: 0 }} // 0 = local view
-            //   mode={RtcSurfaceViewMode.RtcSurfaceViewModeFit}
-            //   style={styles.pipVideoView}
-            // />
-            <View style={styles.pipPlaceholder}>
-              <VideoIcon size={24} color={colors.primary} off={false} />
-            </View>
-          ) : (
-            <View style={styles.pipPlaceholder}>
-              <PersonIcon size={24} color={colors.textLight} />
-            </View>
-          )}
+          <LocalVideoView videoOff={isVideoOff} label="Você" />
         </View>
 
         {/* Informações do Paciente */}

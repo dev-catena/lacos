@@ -311,7 +311,7 @@ Use esta lista para marcar o que já testou:
 
 2. **Verifique logs do backend:**
    ```bash
-   ssh root@192.168.0.20
+   ssh root@192.168.100.10
    tail -f /var/log/nginx/error.log
    tail -f /var/www/lacos-backend/storage/logs/laravel.log
    ```

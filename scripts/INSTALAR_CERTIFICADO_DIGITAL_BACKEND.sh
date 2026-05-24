@@ -3,7 +3,7 @@
 set -e
 
 # Configurações do servidor
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 USER="darley"
 PASSWORD="yhvh77"
 REMOTE_TMP="/tmp/certificado_digital_backend"

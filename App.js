@@ -21,7 +21,7 @@ import { initNotificationHandler } from './src/services/notificationService';
 SplashScreen.preventAutoHideAsync();
 
 // Função para extrair código de convite da URL
-// Suporta: lacos.com (produção) e 192.168.1.105 (desenvolvimento local)
+// Suporta: lacos.com (produção) e servidor LAN em desenvolvimento (192.168.100.10)
 // IMPORTANTE: Ignora URLs do Expo (exp://, exp+://) para não interferir com Expo Go
 const extractInviteCodeFromUrl = (url) => {
   if (!url) return null;
@@ -45,9 +45,7 @@ const extractInviteCodeFromUrl = (url) => {
     const supportedHosts = [
       'lacos.com',
       'www.lacos.com',
-      '10.102.0.178',
-      '192.168.1.105',
-      '192.168.0.20',
+      '192.168.100.10',
       'localhost',
       '127.0.0.1',
     ];
@@ -63,13 +61,13 @@ const extractInviteCodeFromUrl = (url) => {
       return null;
     }
     
-    // Formato: https://lacos.com/grupo/ABC123 ou http://192.168.1.105/grupo/ABC123
+    // Formato: https://lacos.com/grupo/ABC123 ou http://192.168.100.10/grupo/ABC123
     const pathMatch = urlObj.pathname.match(/\/(grupo|join)\/([A-Z0-9]+)/i);
     if (pathMatch && pathMatch[2]) {
       return pathMatch[2];
     }
     
-    // Formato: https://lacos.com/join?code=ABC123 ou http://192.168.1.105/join?code=ABC123
+    // Formato: https://lacos.com/join?code=ABC123 ou http://192.168.100.10/join?code=ABC123
     const codeParam = urlObj.searchParams.get('code');
     if (codeParam) {
       return codeParam;
@@ -87,7 +85,7 @@ const extractInviteCodeFromUrl = (url) => {
       }
     }
     
-    // Se a URL contém apenas o código (ex: https://lacos.com/ABC123 ou http://192.168.1.105/ABC123)
+    // Se a URL contém apenas o código (ex: https://lacos.com/ABC123 ou http://192.168.100.10/ABC123)
     const simpleCodeMatch = urlObj.pathname.match(/^\/([A-Z0-9]{6,20})$/i);
     if (simpleCodeMatch && simpleCodeMatch[1]) {
       return simpleCodeMatch[1];

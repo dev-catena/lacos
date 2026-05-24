@@ -17,12 +17,12 @@ fi
 # Verificar se as variáveis já existem
 if grep -q "^APP_HOST=" "$ENV_FILE"; then
     echo "📝 Atualizando APP_HOST..."
-    sed -i "s|^APP_HOST=.*|APP_HOST=192.168.0.20|" "$ENV_FILE"
+    sed -i "s|^APP_HOST=.*|APP_HOST=192.168.100.10|" "$ENV_FILE"
 else
     echo "➕ Adicionando APP_HOST..."
     echo "" >> "$ENV_FILE"
     echo "# Backend Host Configuration" >> "$ENV_FILE"
-    echo "APP_HOST=192.168.0.20" >> "$ENV_FILE"
+    echo "APP_HOST=192.168.100.10" >> "$ENV_FILE"
 fi
 
 if grep -q "^APP_PORT=" "$ENV_FILE"; then

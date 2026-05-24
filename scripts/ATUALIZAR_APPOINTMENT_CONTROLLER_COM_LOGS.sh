@@ -2,7 +2,7 @@
 
 # Script para atualizar AppointmentController com logs de debug
 
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 USER="darley"
 PASSWORD="yhvh77"
 BACKEND_PATH="/var/www/lacos-backend"

@@ -23,7 +23,7 @@ class GroupController extends Controller
         if (!$photoPath) {
             return null;
         }
-        $baseUrl = config('app.url', 'http://192.168.0.20:8000');
+        $baseUrl = config('app.url', 'http://192.168.100.10:8000');
         // Garantir que não tenha barra dupla
         $baseUrl = rtrim($baseUrl, '/');
         $photoPath = ltrim($photoPath, '/');
@@ -1272,6 +1272,12 @@ class GroupController extends Controller
                 if (Schema::hasColumn('users', 'profile')) {
                     $memberColumns[] = "users.profile";
                 }
+                $optionalUserFields = ['birth_date', 'gender', 'blood_type', 'cpf', 'chronic_diseases', 'allergies'];
+                foreach ($optionalUserFields as $field) {
+                    if (Schema::hasColumn('users', $field)) {
+                        $memberColumns[] = "users.{$field}";
+                    }
+                }
                 
                 $hasPhotoColumn = Schema::hasColumn('users', 'photo');
                 $hasPhotoUrlColumn = Schema::hasColumn('users', 'photo_url');
@@ -1306,6 +1312,12 @@ class GroupController extends Controller
                             "is_emergency_contact" => isset($m->is_emergency_contact) ? (bool) $m->is_emergency_contact : false,
                             "profile" => $m->profile ?? null, 
                             "joined_at" => $m->joined_at,
+                            "birth_date" => $m->birth_date ?? null,
+                            "gender" => $m->gender ?? null,
+                            "blood_type" => $m->blood_type ?? null,
+                            "cpf" => $m->cpf ?? null,
+                            "chronic_diseases" => $m->chronic_diseases ?? null,
+                            "allergies" => $m->allergies ?? null,
                             "user" => [
                                 "id" => $m->user_id,
                                 "name" => $m->name,
@@ -1314,6 +1326,12 @@ class GroupController extends Controller
                                 "photo" => $photo,
                                 "photo_url" => $photoUrl ?: $this->buildPhotoUrl($photo),
                                 "profile" => $m->profile ?? null,
+                                "birth_date" => $m->birth_date ?? null,
+                                "gender" => $m->gender ?? null,
+                                "blood_type" => $m->blood_type ?? null,
+                                "cpf" => $m->cpf ?? null,
+                                "chronic_diseases" => $m->chronic_diseases ?? null,
+                                "allergies" => $m->allergies ?? null,
                             ]
                         ];
                     })

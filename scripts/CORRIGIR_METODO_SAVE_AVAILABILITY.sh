@@ -4,7 +4,7 @@
 
 set -e
 
-SERVER="darley@192.168.0.20"
+SERVER="darley@192.168.100.10"
 SSH_PORT="63022"
 BACKEND_PATH="/var/www/lacos-backend"
 
@@ -256,7 +256,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "💡 Agora teste salvando a agenda novamente no app."
     echo "💡 Depois, verifique os logs:"
-    echo "   ssh darley@192.168.0.20 -p 63022"
+    echo "   ssh darley@192.168.100.10 -p 63022"
     echo "   sudo tail -f /var/www/lacos-backend/storage/logs/laravel.log"
 else
     echo ""

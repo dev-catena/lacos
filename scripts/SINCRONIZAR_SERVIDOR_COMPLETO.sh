@@ -2,7 +2,7 @@
 
 # Script para sincronizar controllers, models e migrations do servidor
 
-SERVER="darley@192.168.0.20"
+SERVER="darley@192.168.100.10"
 PORT="63022"
 REMOTE_PATH="/var/www/lacos-backend"
 LOCAL_PATH="/home/darley/lacos/backend-laravel"

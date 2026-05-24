@@ -17,7 +17,7 @@ if [ -z "$1" ]; then
     echo "📋 Uso: $0 usuario@servidor"
     echo ""
     echo "Exemplo:"
-    echo "  $0 root@192.168.0.20"
+    echo "  $0 root@192.168.100.10"
     echo ""
     exit 1
 fi

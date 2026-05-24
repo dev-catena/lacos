@@ -11,7 +11,7 @@ Os arquivos foram copiados para `/tmp` no servidor:
 ### 1. Adicionar Método ao DoctorController
 
 ```bash
-ssh darley@192.168.0.20
+ssh darley@192.168.100.10
 sudo nano /var/www/lacos-backend/app/Http/Controllers/Api/DoctorController.php
 ```
 
@@ -58,7 +58,7 @@ sudo php artisan cache:clear
 ### 6. Testar Endpoint
 
 ```bash
-curl -H "Authorization: Bearer {seu_token}" http://192.168.0.20/api/doctors/28/availability
+curl -H "Authorization: Bearer {seu_token}" http://192.168.100.10/api/doctors/28/availability
 ```
 
 ## Estrutura de Resposta Esperada

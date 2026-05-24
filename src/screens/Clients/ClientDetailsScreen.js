@@ -29,6 +29,7 @@ import planService from '../../services/planService';
 import API_CONFIG from '../../config/api';
 import appointmentService from '../../services/appointmentService';
 import { appointmentMatchesLoggedInDoctor } from '../../utils/appointmentDoctorMatch';
+import { getDocumentDisplayTitle, normalizeDocument } from '../../utils/documentTypeLabels';
 
 const ClientDetailsScreen = ({ route, navigation }) => {
   const { client: clientParam } = route.params || {};
@@ -203,9 +204,11 @@ const ClientDetailsScreen = ({ route, navigation }) => {
       }
 
       const docs = await documentService.getDocumentsByGroup(groupId);
+      const docList = Array.isArray(docs) ? docs : docs?.data || [];
       
-      // Ordenar por data (mais recentes primeiro) e manter todos para contagem correta
-      const sortedDocs = docs.sort((a, b) => new Date(b.document_date || b.date) - new Date(a.document_date || a.date));
+      const sortedDocs = docList
+        .map(normalizeDocument)
+        .sort((a, b) => new Date(b.document_date || b.date) - new Date(a.document_date || a.date));
       
       setDocuments(sortedDocs);
       console.log('✅ ClientDetailsScreen - Documentos carregados:', sortedDocs.length);
@@ -224,10 +227,12 @@ const ClientDetailsScreen = ({ route, navigation }) => {
       
       // Buscar documentos diretamente do paciente usando patient_id
       const docs = await documentService.getDocumentsByPatient(patientId);
-      console.log('✅ ClientDetailsScreen - Documentos do paciente carregados:', docs.length);
+      const docList = Array.isArray(docs) ? docs : docs?.data || [];
+      console.log('✅ ClientDetailsScreen - Documentos do paciente carregados:', docList.length);
       
-      // Ordenar por data (mais recentes primeiro) e manter todos para contagem correta
-      const sortedDocs = docs.sort((a, b) => new Date(b.document_date || b.date) - new Date(a.document_date || a.date));
+      const sortedDocs = docList
+        .map(normalizeDocument)
+        .sort((a, b) => new Date(b.document_date || b.date) - new Date(a.document_date || a.date));
       
       setDocuments(sortedDocs);
       console.log('✅ ClientDetailsScreen - Documentos do paciente exibidos:', sortedDocs.length);
@@ -685,11 +690,10 @@ const ClientDetailsScreen = ({ route, navigation }) => {
                       </View>
                       <View style={styles.fileContent}>
                         <Text style={styles.fileTitle} numberOfLines={1}>
-                          {doc.title || 'Documento sem título'}
+                          {getDocumentDisplayTitle(doc)}
                         </Text>
                         <Text style={styles.fileMeta}>
                           {formatDocumentDate(doc.document_date || doc.date)}
-                          {doc.doctor_name && ` • ${doc.doctor_name}`}
                         </Text>
                       </View>
                       <View style={{ width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>

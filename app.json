@@ -65,6 +65,7 @@
       "url": "https://u.expo.dev/51c90380-5f5d-44ca-8416-e0dfaa4d3f34"
     },
     "plugins": [
+      "expo-dev-client",
       "expo-asset",
       "expo-font",
       [

@@ -135,7 +135,7 @@ Após importar, você pode verificar:
 
 ```bash
 # Via API
-curl http://192.168.0.20/api/medications/stats
+curl http://192.168.100.10/api/medications/stats
 
 # Via Tinker
 php artisan tinker
@@ -147,13 +147,13 @@ php artisan tinker
 
 ```bash
 # Buscar medicamentos
-curl "http://192.168.0.20/api/medications/search?q=paracetamol&limit=10"
+curl "http://192.168.100.10/api/medications/search?q=paracetamol&limit=10"
 
 # Informações de um medicamento
-curl "http://192.168.0.20/api/medications/info?name=Paracetamol"
+curl "http://192.168.100.10/api/medications/info?name=Paracetamol"
 
 # Estatísticas
-curl "http://192.168.0.20/api/medications/stats"
+curl "http://192.168.100.10/api/medications/stats"
 ```
 
 ## ⚠️ Importante

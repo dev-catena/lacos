@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para adicionar método createClientReview no servidor
-# Execute este script NO SERVIDOR (192.168.0.20)
+# Execute este script NO SERVIDOR (192.168.100.10)
 
 echo "🔧 Adicionando método createClientReview no CaregiverController..."
 echo ""

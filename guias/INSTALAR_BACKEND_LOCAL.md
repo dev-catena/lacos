@@ -119,7 +119,7 @@ Se você tem acesso SSH ao servidor, pode copiar o projeto:
 
 ```bash
 # Do servidor para local
-scp -r darley@192.168.0.20:/var/www/lacos-backend /home/darley/lacos/backend-laravel-completo
+scp -r darley@192.168.100.10:/var/www/lacos-backend /home/darley/lacos/backend-laravel-completo
 ```
 
 ## 🚀 Iniciar Servidor

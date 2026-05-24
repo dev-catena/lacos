@@ -9,7 +9,7 @@ echo "=============================================="
 echo ""
 
 # Configurações
-SSH_HOST="192.168.0.20"
+SSH_HOST="192.168.100.10"
 SSH_PORT="63022"
 SSH_USER="darley"
 BACKEND_PATH="/var/www/lacos-backend"

@@ -3,7 +3,7 @@
 # Script para verificar se o certificado foi salvo no banco de dados
 
 SSH_USER="darley"
-SSH_HOST="192.168.0.20"
+SSH_HOST="192.168.100.10"
 SSH_PORT="63022"
 SSH_PASS="yhvh77"
 

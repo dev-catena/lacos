@@ -74,7 +74,7 @@ npx expo start --tunnel --clear --go
 **No Expo Go Android:**
 1. Abra Expo Go
 2. Toque em **"Enter URL manually"**
-3. Digite a URL que aparece no terminal (ex: `exp://192.168.1.105:8081`)
+3. Digite a URL que aparece no terminal (ex: `exp://192.168.100.10:8081`)
 4. Toque em **"Connect"**
 
 ### Solução 7: Verificar Logs

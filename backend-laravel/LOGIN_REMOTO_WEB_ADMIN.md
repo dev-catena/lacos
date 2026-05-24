@@ -1,4 +1,4 @@
-# Login remoto no Web Admin (192.168.0.20:8081)
+# Login remoto no Web Admin (192.168.100.10:8081)
 
 ## Problema
 O login com `admin@lacos.com` / `admin123` funciona na máquina onde está hospedado, mas **não funciona de máquinas remotas**.
@@ -48,11 +48,11 @@ sudo ufw reload
 De uma máquina remota:
 ```bash
 # Testar se a API está acessível
-curl http://192.168.0.20:8000/api/gateway/status
+curl http://192.168.100.10:8000/api/gateway/status
 # Deve retornar: {"status":"ativo"}
 
 # Testar se o Web Admin está acessível
-curl -s -o /dev/null -w "%{http_code}" http://192.168.0.20:8081
+curl -s -o /dev/null -w "%{http_code}" http://192.168.100.10:8081
 # Deve retornar: 200
 ```
 

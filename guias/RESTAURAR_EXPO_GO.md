@@ -41,8 +41,8 @@ rm -rf node_modules/.cache
 
 # Configurar para Expo Go
 export EXPO_USE_DEV_CLIENT=0
-export REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.105
-export EXPO_PACKAGER_HOSTNAME=192.168.1.105
+export REACT_NATIVE_PACKAGER_HOSTNAME=192.168.100.10
+export EXPO_PACKAGER_HOSTNAME=192.168.100.10
 
 # Iniciar Expo Go
 npx expo start --tunnel --clear
@@ -52,14 +52,14 @@ npx expo start --tunnel --clear
 
 Após iniciar, o terminal deve mostrar:
 ```
-Metro waiting on exp://192.168.1.105:8081
+Metro waiting on exp://192.168.100.10:8081
 ```
 
 **NÃO deve mostrar:** `http://localhost:8081` ou qualquer coisa com `dev-client`
 
 ## 📱 Fluxo Esperado
 
-1. ✅ Escaneia QR code: `exp://192.168.1.105:8081`
+1. ✅ Escaneia QR code: `exp://192.168.100.10:8081`
 2. ✅ Expo Go abre normalmente
 3. ✅ Tela de boas-vindas aparece
 4. ✅ Usuário escolhe fazer login

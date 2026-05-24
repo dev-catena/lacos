@@ -23,9 +23,9 @@ echo ""
 
 # 2. Verificar formato do QR code
 echo "2️⃣ Verificando formato do QR code..."
-echo "   O QR code deve mostrar: exp://192.168.1.105:8081"
+echo "   O QR code deve mostrar: exp://192.168.100.10:8081"
 echo "   NÃO deve mostrar: http://localhost:8081"
-echo "   NÃO deve mostrar: http://192.168.1.105:8081"
+echo "   NÃO deve mostrar: http://192.168.100.10:8081"
 echo ""
 
 # 3. Verificar se expo-dev-client está causando problema
@@ -42,7 +42,7 @@ echo ""
 # 4. Verificar IP e rede
 echo "4️⃣ Verificando IP e rede..."
 CURRENT_IP=$(hostname -I | awk '{print $1}')
-EXPECTED_IP="192.168.1.105"
+EXPECTED_IP="192.168.100.10"
 echo "   IP atual: $CURRENT_IP"
 echo "   IP esperado: $EXPECTED_IP"
 if [ "$CURRENT_IP" = "$EXPECTED_IP" ]; then

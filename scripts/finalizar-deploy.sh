@@ -2,7 +2,7 @@
 
 # Script para finalizar o deploy no servidor
 set timeout 120
-set SERVER "192.168.0.20"
+set SERVER "192.168.100.10"
 set PORT "63022"
 set USER "darley"
 set PASSWORD "yhvh77"

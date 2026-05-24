@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import colors from '../../constants/colors';
 import videoCallService from '../../services/videoCallService';
 import appointmentService from '../../services/appointmentService';
 import { useAuth } from '../../contexts/AuthContext';
+import useAgoraVideoCall from '../../hooks/useAgoraVideoCall';
+import { LocalVideoView, RemoteVideoView } from '../../components/AgoraVideoViews';
 import {
   AlertCircleIcon,
   VideoCamIcon,
@@ -40,96 +42,33 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
   const { appointment, doctorInfo } = route.params || {};
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const [isCallActive, setIsCallActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [callError, setCallError] = useState(null);
-  const [remoteUid, setRemoteUid] = useState(null);
   const [callDuration, setCallDuration] = useState(0);
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
   const durationIntervalRef = useRef(null);
   const chatFlatListRef = useRef(null);
 
-  const initializeCall = useCallback(async () => {
-    try {
-      setIsInitializing(true);
-      setCallError(null);
-
-      // Inicializar serviço de vídeo
-      const initResult = await videoCallService.initialize();
-      if (!initResult.success) {
-        throw new Error(initResult.error || 'Erro ao inicializar serviço de vídeo');
-      }
-
-      // Modo mock (Expo Go) - mostrar aviso
-      if (initResult.mock) {
-        console.log('⚠️ Modo MOCK: Vídeo não está funcionando (Expo Go). Use expo-dev-client para vídeo real.');
-      }
-
-      // Gerar nome do canal baseado no appointment
-      const channelName = `consulta-${appointment?.id || Date.now()}`;
-      const userId = appointment?.group_id || 1; // ID do paciente/grupo
-
-      // Entrar no canal
-      const joinResult = await videoCallService.joinChannel(channelName, userId);
-      if (!joinResult.success) {
-        throw new Error(joinResult.error || 'Erro ao entrar no canal');
-      }
-
-      // Registrar entrada do paciente no backend (para rastreamento de no-show)
+  const {
+    isCallActive,
+    isInitializing,
+    callError,
+    primaryRemoteUid,
+    endCall,
+    retryCall,
+  } = useAgoraVideoCall({
+    appointmentId: appointment?.id,
+    userId: user?.id || appointment?.group_id,
+    navigation,
+    onJoined: () => {
       if (appointment?.id) {
         appointmentService.videoJoin(appointment.id, 'patient');
       }
-
-      setIsCallActive(true);
-      setIsInitializing(false);
-      console.log('✅ Chamada de vídeo iniciada com sucesso' + (joinResult.mock ? ' (MODO MOCK)' : ''));
-    } catch (error) {
-      console.error('❌ Erro ao inicializar chamada:', error);
-      setCallError(error.message);
-      setIsInitializing(false);
-      Alert.alert(
-        'Erro ao Iniciar Chamada',
-        error.message || 'Não foi possível iniciar a chamada de vídeo. Verifique sua conexão e tente novamente.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
-    }
-  }, [appointment?.id, appointment?.group_id, navigation]);
-
-  const endCall = useCallback(async () => {
-    try {
-      await videoCallService.leaveChannel();
-      await videoCallService.destroy();
-      setIsCallActive(false);
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-      }
-      console.log('✅ Chamada encerrada');
-    } catch (error) {
-      console.error('❌ Erro ao encerrar chamada:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    initializeCall();
-    
-    return () => {
-      // Cleanup ao sair da tela
-      endCall();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    },
+  });
 
   useEffect(() => {
     if (isCallActive) {
@@ -401,10 +340,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
             <Text style={styles.connectingSubtext}>{callError}</Text>
             <TouchableOpacity
               style={styles.retryButton}
-              onPress={() => {
-                setCallError(null);
-                initializeCall();
-              }}
+              onPress={retryCall}
             >
               <Text style={styles.retryButtonText}>Tentar Novamente</Text>
             </TouchableOpacity>
@@ -432,43 +368,16 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
         <View style={styles.videoContainer}>
         {/* Vídeo do Médico (tela principal) */}
         <View style={styles.mainVideo}>
-          {remoteUid ? (
-            <View style={styles.videoPlaceholder}>
-              <VideoCamIcon size={80} color={colors.primary} />
-              <Text style={styles.videoPlaceholderText}>Vídeo do Médico</Text>
-              <Text style={styles.videoNote}>
-                {callError ? 'Erro ao conectar' : 'Aguardando médico entrar na chamada...'}
-              </Text>
-              {!callError && (
-                <Text style={[styles.videoNote, { marginTop: 8, fontSize: 11, color: colors.textLight }]}>
-                  (Modo desenvolvimento - Expo Go)
-                </Text>
-              )}
-            </View>
-          ) : (
-            <View style={styles.videoPlaceholder}>
-              <PersonIcon size={80} color={colors.textLight} />
-              <Text style={styles.videoPlaceholderText}>
-                {doctorInfo?.name || 'Dr(a). Médico'}
-              </Text>
-              <Text style={styles.videoNote}>
-                (Aguardando médico entrar na chamada...)
-              </Text>
-            </View>
-          )}
+          <RemoteVideoView
+            uid={primaryRemoteUid}
+            participantName={doctorInfo?.name || 'Dr(a). Médico'}
+            waitingLabel="Aguardando médico entrar na chamada..."
+          />
         </View>
 
         {/* Vídeo do Paciente (picture-in-picture) */}
         <View style={styles.pipVideo}>
-          {isVideoOff ? (
-            <View style={styles.pipPlaceholder}>
-              <PersonIcon size={24} color={colors.textLight} />
-            </View>
-          ) : (
-            <View style={styles.pipPlaceholder}>
-              <Text style={styles.pipText}>Você</Text>
-            </View>
-          )}
+          <LocalVideoView videoOff={isVideoOff} label="Você" />
         </View>
 
         {/* Informações do Médico */}

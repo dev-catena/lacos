@@ -8,6 +8,8 @@ use App\Models\AppointmentException;
 use App\Models\DoctorReview;
 use App\Models\GroupActivity;
 use App\Services\AppointmentPaymentService;
+use App\Services\AppointmentReminderService;
+use App\Services\GroupPatientNameResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -137,35 +139,17 @@ class AppointmentController extends Controller
                 }
             }
             
-            // Buscar nome do paciente do grupo (accompanied_name ou membro com role='patient')
-            if ($appointment->group_id && !isset($appointmentData['patient_name'])) {
+            // Nome do paciente (membro do grupo — nunca o nome do grupo)
+            if ($appointment->group_id) {
                 try {
-                    $group = DB::table('groups')->where('id', $appointment->group_id)->first();
-                    if ($group) {
-                        // Primeiro tentar usar accompanied_name do grupo
-                        if (isset($group->accompanied_name) && $group->accompanied_name) {
-                            $appointmentData['patient_name'] = $group->accompanied_name;
-                        } else {
-                            // Se não tiver accompanied_name, buscar membro com role='patient' ou 'priority_contact'
-                            $patientMember = DB::table('group_members')
-                                ->where('group_id', $appointment->group_id)
-                                ->whereIn('role', ['patient', 'priority_contact', 'accompanied'])
-                                ->join('users', 'group_members.user_id', '=', 'users.id')
-                                ->select('users.name', 'group_members.role')
-                                ->orderByRaw("CASE WHEN group_members.role = 'patient' THEN 1 WHEN group_members.role = 'priority_contact' THEN 2 ELSE 3 END")
-                                ->first();
-                            
-                            if ($patientMember && isset($patientMember->name) && $patientMember->name) {
-                                $appointmentData['patient_name'] = $patientMember->name;
-                            }
-                        }
+                    $resolvedPatient = GroupPatientNameResolver::resolve((int) $appointment->group_id);
+                    if ($resolvedPatient) {
+                        $appointmentData['patient_name'] = $resolvedPatient;
                     }
                 } catch (\Exception $e) {
-                    // Log do erro para debug
-                    \Log::warning('Erro ao buscar nome do paciente no appointment: ' . $e->getMessage(), [
+                    \Log::warning('Erro ao buscar nome do paciente no appointment: '.$e->getMessage(), [
                         'appointment_id' => $appointment->id,
                         'group_id' => $appointment->group_id,
-                        'trace' => $e->getTraceAsString()
                     ]);
                 }
             }
@@ -209,6 +193,7 @@ class AppointmentController extends Controller
             'recurrence_days' => 'nullable|string',
             'recurrence_start' => 'nullable|date',
             'recurrence_end' => 'nullable|date',
+            'reminder_times' => 'nullable',
         ]);
 
         // Se scheduled_at não foi fornecido, usar appointment_date
@@ -230,6 +215,12 @@ class AppointmentController extends Controller
         }
         if (!isset($validated['recurrence_end']) || empty($validated['recurrence_end'])) {
             unset($validated['recurrence_end']);
+        }
+
+        if (array_key_exists('reminder_times', $validated)) {
+            $validated['reminder_times'] = AppointmentReminderService::normalizeReminderMinutes($validated['reminder_times']);
+        } else {
+            $validated['reminder_times'] = AppointmentReminderService::DEFAULT_REMINDER_MINUTES;
         }
 
         // Adicionar created_by_user_id com o ID do usuário autenticado
@@ -365,6 +356,8 @@ class AppointmentController extends Controller
                 $useUma = in_array($appointment->type, ['medical', 'fisioterapia'], true);
                 $article = $useUma ? 'uma' : 'um';
                 $appointmentSubjectLabel = $doctorActivityLabel ?? $appointment->title;
+                $reminderService = app(AppointmentReminderService::class);
+                $detailsMessage = $reminderService->buildDetailsMessage($appointment, $appointmentDate, $timezone);
                 
                 foreach ($members as $member) {
                     $memberUser = \App\Models\User::find($member->user_id);
@@ -390,10 +383,7 @@ class AppointmentController extends Controller
                     }
                     
                     $title = 'Novo Compromisso Agendado';
-                    $message = "{$user->name} agendou {$article} {$typeLabel}: {$appointmentSubjectLabel} para " . $appointmentDate->format('d/m/Y \à\s H:i');
-                    if ($appointment->location) {
-                        $message .= " em {$appointment->location}";
-                    }
+                    $message = "{$user->name} agendou {$article} {$typeLabel}.\n\n{$detailsMessage}";
                     
                     \Log::info('AppointmentController.store - Enviando notificação', [
                         'user_id' => $memberUser->id,
@@ -472,6 +462,17 @@ class AppointmentController extends Controller
                 ->where('author_id', Auth::id())
                 ->exists();
             $data['has_user_review'] = $hasReview;
+        }
+
+        if ($appointment->group_id) {
+            try {
+                $resolvedPatient = GroupPatientNameResolver::resolve((int) $appointment->group_id);
+                if ($resolvedPatient) {
+                    $data['patient_name'] = $resolvedPatient;
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Erro ao buscar nome do paciente no show appointment: '.$e->getMessage());
+            }
         }
 
         return response()->json($data);

@@ -384,6 +384,14 @@ const AgendaScreen = ({ route, navigation }) => {
       return true;
     });
 
+    if (activeFilter === 'past') {
+      filtered.sort((a, b) => {
+        const timeA = new Date(a.appointment_date || a.scheduled_at || a.date).getTime();
+        const timeB = new Date(b.appointment_date || b.scheduled_at || b.date).getTime();
+        return timeB - timeA;
+      });
+    }
+
     console.log('✅ AgendaScreen - getFilteredAppointments resultado:', {
       total: appointments.length,
       filtered: filtered.length,
@@ -397,108 +405,99 @@ const AgendaScreen = ({ route, navigation }) => {
   const handleCancelAppointment = (appointment) => {
     const appointmentDate = new Date(appointment.appointment_date || appointment.scheduled_at);
     const now = new Date();
-    
-    // Calcular diferença em milissegundos
     const timeDifference = appointmentDate.getTime() - now.getTime();
-    const oneHourInMs = 60 * 60 * 1000; // 1 hora em milissegundos
-    
-    // Verificar se está cancelando com menos de 1 hora de antecedência
+    const oneHourInMs = 60 * 60 * 1000;
     const isLessThanOneHour = timeDifference > 0 && timeDifference < oneHourInMs;
-    
-    // Verificar se a consulta foi paga (verificar múltiplos campos possíveis)
     const paymentStatus = appointment.payment_status || appointment.paymentStatus;
-    const isPaid = paymentStatus === 'paid_held' || 
-                   paymentStatus === 'paid' || 
-                   paymentStatus === 'released';
-    
-    // Log para debug
-    console.log('🔍 AgendaScreen - handleCancelAppointment:', {
-      appointmentId: appointment.id,
-      appointmentDate: appointmentDate.toISOString(),
-      now: now.toISOString(),
-      timeDifferenceMs: timeDifference,
-      timeDifferenceMinutes: Math.floor(timeDifference / (60 * 1000)),
-      isLessThanOneHour,
-      paymentStatus,
-      isPaid,
-      isTeleconsultation: appointment.is_teleconsultation,
-    });
-    
-    // Montar mensagem de confirmação
-    let confirmationMessage = 'Tem certeza que deseja cancelar esta consulta? O médico e o paciente serão notificados.';
-    
-    if (isLessThanOneHour) {
-      // Sempre avisar se for menos de 1 hora
-      confirmationMessage += '\n\n⚠️ ATENÇÃO: O cancelamento está sendo feito com menos de 1 hora de antecedência.';
-      
-      // Se for teleconsulta, sempre avisar sobre não reembolso (teleconsultas são sempre pagas)
-      // Se não for teleconsulta mas estiver paga, também avisar
-      if (appointment.is_teleconsultation) {
-        confirmationMessage += '\n\n💰 IMPORTANTE: Como esta é uma teleconsulta cancelada em cima da hora, o valor pago NÃO será reembolsado.';
-      } else if (isPaid) {
-        confirmationMessage += '\n\n💰 O valor pago NÃO será reembolsado.';
+    const isPaid = paymentStatus === 'paid_held' || paymentStatus === 'paid' || paymentStatus === 'released';
+    const isTeleconsultation = !!(appointment.is_teleconsultation || appointment.isTeleconsultation);
+    const isRecurringInstance = appointment.isRecurringInstance;
+    const hasRecurrence = appointment.recurrence_type && appointment.recurrence_type !== 'none';
+
+    const deleteSingleDate = async () => {
+      const appointmentIdToDelete = isRecurringInstance
+        ? appointment.originalAppointmentId
+        : appointment.id;
+      const instanceDate =
+        appointment.instanceDate ||
+        (appointment.appointment_date ? appointment.appointment_date.split('T')[0] : null);
+
+      if (!instanceDate) {
+        Alert.alert('Erro', 'Não foi possível identificar a data do compromisso');
+        return;
       }
-    } else if (isPaid) {
-      // Cancelamento com mais de 1 hora e está paga: haverá reembolso
-      confirmationMessage += '\n\nO valor pago será reembolsado.';
+
+      const result = await appointmentService.deleteAppointment(appointmentIdToDelete, instanceDate);
+      if (result.success) {
+        Alert.alert('Data excluída', 'Este dia foi removido da recorrência', [
+          { text: 'OK', onPress: () => loadAppointments() },
+        ]);
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível excluir este dia');
+      }
+    };
+
+    const deleteAllRecurrences = async () => {
+      const appointmentIdToDelete = isRecurringInstance
+        ? appointment.originalAppointmentId
+        : appointment.id;
+      const result = await appointmentService.deleteAppointment(appointmentIdToDelete);
+      if (result.success) {
+        Alert.alert('Compromisso excluído', 'Todos os dias da recorrência foram removidos', [
+          { text: 'OK', onPress: () => loadAppointments() },
+        ]);
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível excluir o compromisso');
+      }
+    };
+
+    const cancelTeleconsultation = async () => {
+      const appointmentId = isRecurringInstance ? appointment.originalAppointmentId : appointment.id;
+      const result = await appointmentService.cancelAppointment(appointmentId, 'patient', null);
+      if (result.success) {
+        Alert.alert('Consulta cancelada', 'A consulta foi cancelada com sucesso.', [
+          { text: 'OK', onPress: () => loadAppointments() },
+        ]);
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível cancelar a consulta');
+      }
+    };
+
+    if (isTeleconsultation) {
+      let confirmationMessage =
+        'Tem certeza que deseja cancelar esta teleconsulta? O médico e o paciente serão notificados.';
+      if (isLessThanOneHour) {
+        confirmationMessage +=
+          '\n\n⚠️ ATENÇÃO: Cancelamento com menos de 1 hora de antecedência.\n\n💰 O valor pago NÃO será reembolsado.';
+      } else if (isPaid) {
+        confirmationMessage += '\n\nO valor pago será reembolsado.';
+      }
+      Alert.alert('Cancelar Teleconsulta', confirmationMessage, [
+        { text: 'Não', style: 'cancel' },
+        { text: 'Sim, cancelar', style: 'destructive', onPress: cancelTeleconsultation },
+      ]);
+      return;
+    }
+
+    if (isRecurringInstance || hasRecurrence) {
+      Alert.alert(
+        'Excluir Compromisso',
+        'Este é um compromisso recorrente. O que deseja fazer?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Excluir apenas este dia', onPress: deleteSingleDate },
+          { text: 'Excluir todos os dias', style: 'destructive', onPress: deleteAllRecurrences },
+        ]
+      );
+      return;
     }
 
     Alert.alert(
-      'Cancelar Consulta',
-      confirmationMessage,
+      'Excluir Compromisso',
+      'Tem certeza que deseja excluir este compromisso? Esta ação não pode ser desfeita.',
       [
-        {
-          text: 'Não',
-          style: 'cancel',
-        },
-        {
-          text: 'Sim, cancelar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await appointmentService.cancelAppointment(
-                appointment.id,
-                'patient', // Cuidador/amigo cancela como 'patient'
-                null
-              );
-
-              if (result.success) {
-                let successMessage = 'A consulta foi cancelada com sucesso. O médico e o paciente foram notificados.';
-                
-                // Verificar novamente o status de pagamento após cancelamento
-                const finalPaymentStatus = result.data?.payment_status || result.data?.data?.payment_status || paymentStatus;
-                const finalIsPaid = finalPaymentStatus === 'paid_held' || 
-                                   finalPaymentStatus === 'paid' || 
-                                   finalPaymentStatus === 'released';
-                
-                if (isLessThanOneHour && (appointment.is_teleconsultation || finalIsPaid)) {
-                  successMessage += '\n\n⚠️ O valor pago não foi reembolsado devido ao cancelamento com menos de 1 hora de antecedência.';
-                } else if (finalIsPaid && result.data?.refund_id) {
-                  successMessage += '\n\nO reembolso foi processado.';
-                }
-                
-                Alert.alert(
-                  'Consulta Cancelada',
-                  successMessage,
-                  [
-                    {
-                      text: 'OK',
-                      onPress: () => {
-                        // Recarregar consultas
-                        loadAppointments();
-                      },
-                    },
-                  ]
-                );
-              } else {
-                Alert.alert('Erro', result.error || 'Não foi possível cancelar a consulta');
-              }
-            } catch (error) {
-              console.error('Erro ao cancelar consulta:', error);
-              Alert.alert('Erro', 'Não foi possível cancelar a consulta. Tente novamente.');
-            }
-          },
-        },
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: deleteAllRecurrences },
       ]
     );
   };

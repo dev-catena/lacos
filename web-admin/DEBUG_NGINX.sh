@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para debugar problemas do Nginx
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 USER="darley"
 PASSWORD="yhvh77"
 

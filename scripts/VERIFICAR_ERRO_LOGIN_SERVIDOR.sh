@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Script para verificar erro 500 no login
-# Servidor: 192.168.0.20 (porta 63022)
+# Servidor: 192.168.100.10 (porta 63022)
 
 set -e
 
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 PORT="63022"
 USER="darley"
 PASSWORD="yhvh77"

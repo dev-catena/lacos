@@ -201,7 +201,7 @@ echo ""
 
 # Copiar para servidor
 echo "📤 Copiando CSV processado para o servidor..."
-SERVER_HOST="192.168.0.20"
+SERVER_HOST="192.168.100.10"
 SERVER_PORT="63022"
 SERVER_USER="darley"
 SERVER_PASS="yhvh77"

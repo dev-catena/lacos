@@ -106,7 +106,7 @@ bash scripts/RESTAURAR_ENV_BACKUP.sh
 cd backend-laravel
 sed -i 's/APP_ENV=production/APP_ENV=local/' .env
 sed -i 's/APP_DEBUG=false/APP_DEBUG=true/' .env
-sed -i 's|APP_URL=http://192.168.0.20|APP_URL=http://localhost:8000|' .env
+sed -i 's|APP_URL=http://192.168.100.10|APP_URL=http://localhost:8000|' .env
 ```
 
 ## ⚠️ Importante

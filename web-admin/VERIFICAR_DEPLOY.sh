@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para verificar se o deploy foi realizado corretamente
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 USER="darley"
 PASSWORD="yhvh77"
 WEB_DIR="/var/www/web"

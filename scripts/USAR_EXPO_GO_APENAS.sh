@@ -36,7 +36,7 @@ cat > .expo/settings.json << EOF
 EOF
 
 # IP e Porta (usar IP local do usuário)
-EXPO_IP="192.168.1.105"
+EXPO_IP="192.168.100.10"
 EXPO_PORT="8081"
 
 # Verificar IP atual

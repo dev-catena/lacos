@@ -17,6 +17,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
+import { getDocumentTypeLabel, getDocumentDisplayTitle } from '../../utils/documentTypeLabels';
 import documentService from '../../services/documentService';
 import { useAuth } from '../../contexts/AuthContext';
 import API_CONFIG from '../../config/api';
@@ -39,19 +40,6 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
   
   // Verificar se o usuário é médico (médicos não podem excluir documentos)
   const isDoctor = user?.profile === 'doctor';
-
-  const getDocumentTypeLabel = (type) => {
-    const typeMap = {
-      'exam_lab': 'Exame Lab',
-      'exam_image': 'Imagem',
-      'prescription': 'Receita',
-      'medical_leave': 'Afastamento',
-      'medical_certificate': 'Afastamento',
-      'report': 'Atestado',
-      'other': 'Outro',
-    };
-    return typeMap[type] || type;
-  };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Data não informada';
@@ -265,7 +253,7 @@ const DocumentDetailsScreen = ({ route, navigation }) => {
 
         {/* Informações */}
         <View style={styles.infoSection}>
-          <Text style={styles.documentTitle}>{document.title}</Text>
+          <Text style={styles.documentTitle}>{getDocumentDisplayTitle(document)}</Text>
           
           <View style={styles.infoRow}>
             <FolderIcon size={20} color={colors.gray600} />

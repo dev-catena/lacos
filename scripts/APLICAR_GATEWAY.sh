@@ -3,7 +3,7 @@
 # Script para aplicar as mudanças do gateway no servidor
 # Este script copia os arquivos necessários e prepara a configuração
 
-SERVER_IP="192.168.0.20"
+SERVER_IP="192.168.100.10"
 SERVER_USER="darley"
 SERVER_PASSWORD="yhvh77"
 PORT="63022"

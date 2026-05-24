@@ -2,7 +2,7 @@
 
 # Script para verificar estrutura das tabelas de availability
 
-SERVER="darley@192.168.0.20"
+SERVER="darley@192.168.100.10"
 SSH_PORT="63022"
 BACKEND_PATH="/var/www/lacos-backend"
 

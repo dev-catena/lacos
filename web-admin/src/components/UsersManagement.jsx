@@ -490,7 +490,7 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                   Data de Solicitação {getSortIcon('created_at')}
                 </button>
               </th>
-              <th>Ações</th>
+              <th className="users-table__actions-header">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -569,9 +569,10 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                   <td>
                     {user.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'}
                   </td>
-                  <td>
-                    <div className="action-buttons">
+                  <td className="users-table__actions-cell">
+                    <div className="users-table__action-stack">
                       <button
+                        type="button"
                         className="action-btn password-btn-change"
                         onClick={() => openPasswordModal(user)}
                         title="Trocar senha do usuário"
@@ -580,6 +581,7 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                       </button>
                       {user.is_blocked ? (
                         <button
+                          type="button"
                           className="action-btn unblock-btn"
                           onClick={() => handleUnblockUser(user.id)}
                           title="Desbloquear usuário"
@@ -588,6 +590,7 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                         </button>
                       ) : (
                         <button
+                          type="button"
                           className="action-btn block-btn"
                           onClick={() => handleBlockUser(user.id)}
                           title="Bloquear usuário"
@@ -596,6 +599,7 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                         </button>
                       )}
                       <button
+                        type="button"
                         className="action-btn delete-btn"
                         onClick={() => handleDeleteUser(user.id)}
                         title="Excluir usuário permanentemente"

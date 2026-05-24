@@ -4,7 +4,7 @@
 # Script para Obter Token de Teste
 ##############################################
 
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 USER="darley"
 PASSWORD="yhvh77"
 REMOTE_PATH="/var/www/lacos-backend"

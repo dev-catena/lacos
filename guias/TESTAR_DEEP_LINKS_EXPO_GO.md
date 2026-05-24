@@ -30,11 +30,11 @@ Você **NÃO precisa fazer build nativo** para testar deep links com Expo Go! O 
 
 4. **Digite ou acesse uma URL de teste:**
    ```
-   http://192.168.1.105/grupo/TESTE123
+   http://192.168.100.10/grupo/TESTE123
    ```
    ou
    ```
-   http://192.168.1.105/join?code=TESTE123
+   http://192.168.100.10/join?code=TESTE123
    ```
 
 5. **O Android deve perguntar qual app abrir:**
@@ -67,7 +67,7 @@ Vou criar um botão de teste que você pode usar no Expo Go para simular deep li
 ```javascript
 // Adicionar em uma tela de teste
 const testDeepLink = () => {
-  const testUrl = 'http://192.168.1.105/grupo/TESTE123';
+  const testUrl = 'http://192.168.100.10/grupo/TESTE123';
   Linking.openURL(testUrl);
 };
 ```

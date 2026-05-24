@@ -2,7 +2,7 @@
 
 # Script para atualizar o método enable2FA para enviar código WhatsApp ao ativar
 
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 USER="darley"
 PORT="63022"
 PASSWORD="yhvh77"

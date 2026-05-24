@@ -8,8 +8,8 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-// IP: use variável EXPO_IP para override, ou 192.168.0.20 como padrão
-const FORCED_IP = process.env.EXPO_IP || '192.168.0.20';
+// IP: use variável EXPO_IP para override, ou 192.168.100.10 como padrão
+const FORCED_IP = process.env.EXPO_IP || '192.168.100.10';
 const FORCED_PORT = '8081';
 
 const userArgs = process.argv.slice(2);

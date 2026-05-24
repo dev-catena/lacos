@@ -4,7 +4,7 @@
 # Script de Teste dos Endpoints
 ##############################################
 
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 API_URL="http://$SERVER/api"
 
 echo "🧪 Teste dos Endpoints - Mídias e Alertas"

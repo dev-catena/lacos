@@ -32,7 +32,7 @@ O código de deep links que implementamos **já funciona no Expo Go**! O Expo Go
 
 4. **Toque em "Open URL"** ou digite manualmente:
    ```
-   http://192.168.1.105/grupo/TESTE123
+   http://192.168.100.10/grupo/TESTE123
    ```
 
 5. **O app deve processar a URL** e abrir o modal com o código preenchido
@@ -43,7 +43,7 @@ O código de deep links que implementamos **já funciona no Expo Go**! O Expo Go
 
 2. **No navegador do dispositivo**, acesse:
    ```
-   http://192.168.1.105/grupo/TESTE123
+   http://192.168.100.10/grupo/TESTE123
    ```
 
 3. **Se o Android perguntar qual app abrir**, selecione o Expo Go

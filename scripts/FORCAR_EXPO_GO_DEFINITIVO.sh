@@ -22,7 +22,7 @@ rm -rf .expo 2>/dev/null || true
 rm -rf node_modules/.cache 2>/dev/null || true
 
 # IP
-EXPO_IP="192.168.1.105"
+EXPO_IP="192.168.100.10"
 EXPO_PORT="8081"
 
 echo "📱 Configuração:"

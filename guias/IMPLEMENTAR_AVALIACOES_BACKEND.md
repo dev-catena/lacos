@@ -23,14 +23,14 @@
 ### Opção 1: Executar script automático (Recomendado)
 
 ```bash
-ssh darley@192.168.0.20
+ssh darley@192.168.100.10
 sudo bash /tmp/ATUALIZAR_AVALIACOES_BACKEND.sh
 ```
 
 ### Opção 2: Executar manualmente
 
 ```bash
-ssh darley@192.168.0.20
+ssh darley@192.168.100.10
 cd /var/www/lacos-backend
 
 # 1. Fazer backup do controller atual

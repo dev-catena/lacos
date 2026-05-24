@@ -35,7 +35,7 @@ Após o script iniciar, o terminal deve mostrar:
 
 **✅ CORRETO:**
 ```
-› Metro waiting on exp://192.168.1.105:8081
+› Metro waiting on exp://192.168.100.10:8081
 ```
 
 **❌ ERRADO (se ainda aparecer):**
@@ -97,7 +97,7 @@ npx expo start --tunnel --clear
 ## 🎯 O Que Deve Aparecer
 
 **QR Code Correto:**
-- Formato: `exp://192.168.1.105:8081` ou `exp://xxxxx.exp.direct:80`
+- Formato: `exp://192.168.100.10:8081` ou `exp://xxxxx.exp.direct:80`
 - **NÃO** deve ter `exp+lacos://` ou `expo-development-client`
 
 **Terminal Correto:**

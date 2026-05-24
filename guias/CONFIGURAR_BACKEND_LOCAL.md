@@ -134,7 +134,7 @@ Se precisar voltar ao servidor remoto:
 cp src/config/api.js.backup.* src/config/api.js
 
 # Ou editar manualmente
-# BASE_URL: 'http://192.168.0.20/api',
+# BASE_URL: 'http://192.168.100.10/api',
 ```
 
 ## 🛠️ Scripts Disponíveis

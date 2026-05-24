@@ -58,7 +58,7 @@ Teste o endpoint:
 
 ```bash
 curl -H "Authorization: Bearer {seu_token}" \
-     http://192.168.0.20/api/doctors/28/availability
+     http://192.168.100.10/api/doctors/28/availability
 ```
 
 Resposta esperada (se não houver dados ainda):

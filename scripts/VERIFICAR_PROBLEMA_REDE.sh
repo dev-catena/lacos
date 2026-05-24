@@ -4,7 +4,7 @@
 
 set -e
 
-EXPO_IP="192.168.0.20"
+EXPO_IP="192.168.100.10"
 EXPO_PORT="8081"
 
 echo "🔍 DIAGNÓSTICO: Por que outros dispositivos não conseguem acessar?"

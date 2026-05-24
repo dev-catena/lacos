@@ -17,7 +17,7 @@ echo "   3. Configurar Metro para NUNCA usar localhost"
 echo "   4. Interceptar TODA saída do terminal"
 echo ""
 
-EXPO_IP="192.168.0.20"
+EXPO_IP="192.168.100.10"
 EXPO_PORT="8081"
 EXPO_URL="exp://${EXPO_IP}:${EXPO_PORT}"
 

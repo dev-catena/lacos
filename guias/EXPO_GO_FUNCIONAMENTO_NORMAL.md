@@ -3,7 +3,7 @@
 ## ✅ Fluxo Correto (Restaurado)
 
 ### 1. QR Code do Expo Go
-- Escaneia QR code no terminal: `exp://192.168.1.105:8081`
+- Escaneia QR code no terminal: `exp://192.168.100.10:8081`
 - Expo Go abre normalmente
 - **NÃO interfere com deep links de convite**
 
@@ -16,7 +16,7 @@
 - Após login, vê seus grupos ou pode criar novo
 
 ### 4. Deep Links de Convite (Separado)
-- Deep links HTTP/HTTPS (`http://192.168.1.105/grupo/ABC123`) são processados **apenas se vierem de fora do Expo Go**
+- Deep links HTTP/HTTPS (`http://192.168.100.10/grupo/ABC123`) são processados **apenas se vierem de fora do Expo Go**
 - URLs do Expo (`exp://`) são **completamente ignoradas** pelo sistema de deep links
 
 ## 🔧 O Que Foi Corrigido
@@ -37,7 +37,7 @@ npx expo start --tunnel
 
 ### Teste 2: Deep Link de Convite (Separado)
 - Use Dev Menu do Expo
-- Digite: `http://192.168.1.105/grupo/TESTE123`
+- Digite: `http://192.168.100.10/grupo/TESTE123`
 - Deve processar código de convite (se logado)
 
 ## ⚠️ Importante

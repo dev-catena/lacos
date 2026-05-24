@@ -31,7 +31,7 @@ echo ""
 
 # 3. Verificar IP
 IP=$(hostname -I | awk '{print $1}')
-EXPO_IP="192.168.0.20"
+EXPO_IP="192.168.100.10"
 EXPO_PORT="8081"
 
 if [ "$IP" != "$EXPO_IP" ]; then

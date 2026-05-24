@@ -47,7 +47,7 @@ Este script copia:
 ## 🔧 Configurações do Servidor
 
 O script está configurado com:
-- **Host:** 192.168.0.20
+- **Host:** 192.168.100.10
 - **Porta:** 63022
 - **Usuário:** darley
 - **Pasta temporária:** /tmp
@@ -57,7 +57,7 @@ O script está configurado com:
 
 1. **Copia CSV para /tmp:**
    ```bash
-   scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv darley@192.168.0.20:/tmp/
+   scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv darley@192.168.100.10:/tmp/
    ```
 
 2. **Conecta ao servidor e:**
@@ -95,10 +95,10 @@ Na primeira vez, você precisa:
 
 ```bash
 # Estatísticas
-curl "http://192.168.0.20/api/medications/stats"
+curl "http://192.168.100.10/api/medications/stats"
 
 # Buscar medicamentos
-curl "http://192.168.0.20/api/medications/search?q=paracetamol&limit=5"
+curl "http://192.168.100.10/api/medications/search?q=paracetamol&limit=5"
 ```
 
 ## 🔍 Verificar no Servidor
@@ -106,7 +106,7 @@ curl "http://192.168.0.20/api/medications/search?q=paracetamol&limit=5"
 Se quiser verificar manualmente no servidor:
 
 ```bash
-ssh -p 63022 darley@192.168.0.20
+ssh -p 63022 darley@192.168.100.10
 cd /var/www/lacos-backend
 
 # Estatísticas

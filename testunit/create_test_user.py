@@ -10,7 +10,7 @@ import getpass
 from datetime import datetime
 
 # Configurações
-API_BASE_URL = "https://gateway.lacosapp.com/api"  # ou "http://192.168.0.20/api" para local
+API_BASE_URL = "https://gateway.lacosapp.com/api"  # ou "http://192.168.100.10/api" para local
 
 def create_test_user(api_url=None):
     """Cria um usuário de teste"""

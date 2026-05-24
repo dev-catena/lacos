@@ -39,7 +39,7 @@ tail -f storage/logs/laravel.log
 E teste a rota diretamente:
 
 ```bash
-curl -X GET "http://192.168.0.20/api/caregivers" \
+curl -X GET "http://192.168.100.10/api/caregivers" \
   -H "Authorization: Bearer SEU_TOKEN_AQUI" \
   -H "Accept: application/json"
 ```

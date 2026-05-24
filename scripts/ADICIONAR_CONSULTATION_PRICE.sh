@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Script para adicionar campo consultation_price no backend
-# Servidor: 192.168.0.20
+# Servidor: 192.168.100.10
 # Usuário: darley
 # Senha: yhvh77
 
 echo "🔧 Adicionando campo consultation_price no backend..."
 echo ""
 
-SERVER="darley@192.168.0.20"
+SERVER="darley@192.168.100.10"
 BACKEND_PATH="/var/www/lacos-backend"
 
 sshpass -p 'yhvh77' ssh "$SERVER" bash << 'ENDSSH'

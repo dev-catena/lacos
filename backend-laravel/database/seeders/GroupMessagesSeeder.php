@@ -142,7 +142,7 @@ class GroupMessagesSeeder extends Seeder
     'user_id' => 70,
     'content' => '',
     'type' => 'image',
-    'image_url' => 'http://192.168.0.20:8000/storage/group-messages/aDygwmLwZufCehvDBRQa7dWjG7rU7FvArhgvGCKl.jpg',
+    'image_url' => 'http://192.168.100.10:8000/storage/group-messages/aDygwmLwZufCehvDBRQa7dWjG7rU7FvArhgvGCKl.jpg',
     'is_read' => 0,
     'created_at' => '2026-03-01 14:30:05',
     'updated_at' => '2026-03-01 14:30:05',

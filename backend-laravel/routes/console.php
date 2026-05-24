@@ -13,3 +13,8 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('appointments:check-teleconsultation-no-shows')
     ->everyFifteenMinutes()
     ->withoutOverlapping(10);
+
+// Lembretes de compromissos (24h, 3h, 1h, 15min — conforme reminder_times do agendamento)
+Schedule::command('notifications:check-appointments')
+    ->everyMinute()
+    ->withoutOverlapping(2);

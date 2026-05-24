@@ -2,7 +2,7 @@
 
 ## ⚠️ Importante
 
-A importação **DEVE ser feita no servidor** (192.168.0.20), não localmente. O banco de dados está no servidor.
+A importação **DEVE ser feita no servidor** (192.168.100.10), não localmente. O banco de dados está no servidor.
 
 ## 📋 Passo a Passo
 
@@ -10,7 +10,7 @@ A importação **DEVE ser feita no servidor** (192.168.0.20), não localmente. O
 
 ```bash
 # Do seu computador local
-scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@192.168.0.20:/var/www/lacos-backend/
+scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@192.168.100.10:/var/www/lacos-backend/
 ```
 
 **Substitua `usuario` pelo seu usuário SSH no servidor.**
@@ -18,7 +18,7 @@ scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@192.168.0.20:/var/www/lacos-b
 ### 2. Conectar ao Servidor
 
 ```bash
-ssh usuario@192.168.0.20
+ssh usuario@192.168.100.10
 ```
 
 ### 3. Executar Script no Servidor
@@ -51,7 +51,7 @@ php artisan tinker --execute="
 "
 
 # Testar API
-curl "http://192.168.0.20/api/medications/search?q=paracetamol&limit=5"
+curl "http://192.168.100.10/api/medications/search?q=paracetamol&limit=5"
 ```
 
 ## 🔄 Alternativa: Script Automatizado
@@ -91,10 +91,10 @@ chmod +x IMPORTAR_MEDICAMENTOS_ANVISA_SERVIDOR.sh
 
 ```bash
 # 1. Copiar CSV
-scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@192.168.0.20:/var/www/lacos-backend/
+scp scripts/DADOS_ABERTOS_MEDICAMENTOS.csv usuario@192.168.100.10:/var/www/lacos-backend/
 
 # 2. Conectar
-ssh usuario@192.168.0.20
+ssh usuario@192.168.100.10
 
 # 3. Importar
 cd /var/www/lacos-backend

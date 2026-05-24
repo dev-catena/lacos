@@ -52,7 +52,7 @@
 
 ### 1. Aplicar Migração
 ```bash
-ssh -p 63022 darley@192.168.0.20
+ssh -p 63022 darley@192.168.100.10
 cd /var/www/lacos-backend
 sudo bash /tmp/APLICAR_ASSINATURA_DIGITAL_APX_SERVIDOR.sh
 ```

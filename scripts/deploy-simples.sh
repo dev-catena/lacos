@@ -3,7 +3,7 @@
 # Script simples de deploy: build local + deploy
 set -e
 
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 PORT="63022"
 USER="darley"
 LOCAL_PATH="/Users/darley/lacos/website"

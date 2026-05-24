@@ -206,7 +206,9 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  /* auto: não cortar botões da coluna Ações; scroll horizontal se a tabela for larga */
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .users-table {
@@ -267,6 +269,39 @@
 
 .users-table tbody tr:hover {
   background-color: var(--color-background-soft);
+}
+
+/* Coluna Ações: pilha vertical, espaço entre botões, largura mínima dentro da célula */
+.users-table__actions-header,
+.users-table__actions-cell {
+  vertical-align: top;
+  min-width: 12.5rem;
+  width: 1%;
+  box-sizing: border-box;
+}
+
+.users-table__action-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.users-table__action-stack .action-btn,
+.users-table__action-stack .delete-btn {
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.users-table__action-stack button + button {
+  margin-left: 0;
+  margin-top: 0;
 }
 
 .users-table tbody tr.blocked {

@@ -2,150 +2,29 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Appointment;
-use App\Models\User;
-use App\Services\NotificationService;
+use App\Services\AppointmentReminderService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class CheckAppointmentNotifications extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'notifications:check-appointments';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Verificar consultas e enviar notificações 10 minutos antes';
+    protected $description = 'Enviar lembretes de compromissos (recorrentes ou únicos) para cuidadores e pacientes do grupo';
 
-    protected $notificationService;
-
-    public function __construct()
+    public function handle(AppointmentReminderService $reminderService): int
     {
-        parent::__construct();
-        $this->notificationService = new NotificationService();
-    }
-
-    /**
-     * Execute the console command.
-     */
-    public function handle()
-    {
-        $this->info('Verificando consultas para notificações...');
+        $this->info('Verificando lembretes de compromissos...');
 
         try {
-            // Buscar consultas agendadas que estão 10 minutos antes do horário
-            $now = Carbon::now();
-            $tenMinutesFromNow = $now->copy()->addMinutes(10);
-            
-            // Consultas no intervalo (usa scheduled_at quando existir — teleconsultas)
-            $appointments = Appointment::query()
-                ->where('status', 'scheduled')
-                ->whereRaw(
-                    'COALESCE(scheduled_at, appointment_date) BETWEEN ? AND ?',
-                    [$now->format('Y-m-d H:i:s'), $tenMinutesFromNow->format('Y-m-d H:i:s')]
-                )
-                ->with(['group.members.user'])
-                ->get();
-
-            $sentCount = 0;
-
-            foreach ($appointments as $appointment) {
-                // Buscar médico associado à consulta
-                $doctor = null;
-                
-                if ($appointment->doctor_id) {
-                    // Tentar buscar na tabela users primeiro (médicos do sistema)
-                    $doctor = User::where('id', $appointment->doctor_id)
-                        ->where('profile', 'doctor')
-                        ->first();
-                }
-
-                if (!$doctor) {
-                    continue;
-                }
-
-                // Alinhado ao NotificationService: sem registro de preferências = permitir
-                $preferences = $doctor->notificationPreferences;
-                if ($preferences && ! $preferences->appointment_patient_notification) {
-                    continue;
-                }
-
-                $group = $appointment->group;
-                if (!$group) {
-                    continue;
-                }
-
-                $patientMember = $group->members->first(function ($member) {
-                    $role = strtolower((string) $member->role);
-
-                    return in_array($role, ['patient', 'priority_contact', 'accompanied'], true);
-                });
-
-                if (!$patientMember || !$patientMember->user) {
-                    continue;
-                }
-
-                $patientName = $patientMember->user->name ?? 'Paciente';
-                $patientUserId = $patientMember->user_id;
-
-                // Verificar se já foi enviada notificação para esta consulta nos últimos 15 minutos
-                $existingNotification = \App\Models\Notification::where('user_id', $doctor->id)
-                    ->where('type', 'appointment')
-                    ->whereRaw("JSON_EXTRACT(data, '$.appointment_id') = ?", [$appointment->id])
-                    ->where('created_at', '>=', Carbon::now()->subMinutes(15))
-                    ->exists();
-
-                if ($existingNotification) {
-                    continue;
-                }
-
-                // Enviar notificação ao médico
-                // Usar timezone do Brasil (GMT-3) para formatar a data
-                $timezone = 'America/Sao_Paulo';
-                $appointmentTime = Carbon::parse($appointment->scheduled_at ?? $appointment->appointment_date)
-                    ->setTimezone($timezone);
-                $title = 'Consulta em 10 minutos';
-                $message = "Você tem uma consulta agendada em 10 minutos com {$patientName}.\n";
-                $message .= 'Horário: '.$appointmentTime->format('d/m/Y H:i')."\n";
-                if ($appointment->title) {
-                    $message .= "Título: {$appointment->title}";
-                }
-
-                $this->notificationService->sendNotification(
-                    $doctor,
-                    'appointment',
-                    $title,
-                    $message,
-                    [
-                        'appointment_id' => $appointment->id,
-                        'patient_id' => $patientUserId,
-                        'patient_name' => $patientName,
-                        'appointment_date' => $appointmentTime->toIso8601String(),
-                        'group_id' => $appointment->group_id,
-                    ],
-                    false, // Não enviar WhatsApp por padrão
-                    $appointment->group_id
-                );
-
-                $sentCount++;
-                $this->info("Notificação enviada para médico {$doctor->name} sobre consulta com {$patientName}");
-            }
-
-            $this->info("Total de notificações enviadas: {$sentCount}");
+            $sentCount = $reminderService->processDueReminders();
+            $this->info("Total de lembretes enviados: {$sentCount}");
             Log::info('CheckAppointmentNotifications executado', ['sent_count' => $sentCount]);
 
             return 0;
         } catch (\Exception $e) {
-            $this->error('Erro ao verificar consultas: ' . $e->getMessage());
-            Log::error('Erro em CheckAppointmentNotifications: ' . $e->getMessage(), [
+            $this->error('Erro ao verificar lembretes: '.$e->getMessage());
+            Log::error('Erro em CheckAppointmentNotifications: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 

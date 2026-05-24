@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Script para verificar credenciais do MySQL e corrigir foreign key
-# Servidor: 192.168.0.20
+# Servidor: 192.168.100.10
 # Usuário: darley
 # Senha: yhvh77
 
 echo "🔧 Verificando credenciais do MySQL e corrigindo foreign key..."
 
-SERVER="darley@192.168.0.20"
+SERVER="darley@192.168.100.10"
 
 sshpass -p 'yhvh77' ssh "$SERVER" bash << 'ENDSSH'
 cd /var/www/lacos-backend

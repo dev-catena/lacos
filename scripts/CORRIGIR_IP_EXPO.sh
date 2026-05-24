@@ -18,7 +18,7 @@ echo "📍 IP detectado: $CURRENT_IP"
 echo ""
 
 # IP correto esperado
-CORRECT_IP="192.168.1.105"
+CORRECT_IP="192.168.100.10"
 
 if [ "$CURRENT_IP" != "$CORRECT_IP" ]; then
     echo "⚠️  IP atual ($CURRENT_IP) diferente do esperado ($CORRECT_IP)"

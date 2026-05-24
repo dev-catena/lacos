@@ -9,20 +9,23 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  Platform,
   Image,
-  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import colors from '../../constants/colors';
-import groupService from '../../services/groupService';
 import groupMemberService from '../../services/groupMemberService';
 import apiService from '../../services/apiService';
 import Toast from 'react-native-toast-message';
+import {
+  formatDateInputBR,
+  formatDateToBR,
+  isValidBirthDateBR,
+  birthDateBRToISO,
+} from '../../utils/dateInputMask';
+
+const PATIENT_ROLES = ['patient', 'priority_contact', 'accompanied'];
 
 const EditPatientDataScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params || {};
@@ -33,8 +36,7 @@ const EditPatientDataScreen = ({ route, navigation }) => {
   // Dados do paciente
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [birthDate, setBirthDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState('female');
   const [bloodType, setBloodType] = useState('');
   const [phone, setPhone] = useState('');
@@ -46,12 +48,13 @@ const EditPatientDataScreen = ({ route, navigation }) => {
   const [patientPhoto, setPatientPhoto] = useState(null);
   const [newPhoto, setNewPhoto] = useState(null);
 
-  // Estado temporário para o picker customizado (Android)
-  const [tempDate, setTempDate] = useState({
-    day: new Date().getDate(),
-    month: new Date().getMonth() + 1,
-    year: new Date().getFullYear(),
-  });
+  const findPatientMember = (members) => {
+    for (const role of PATIENT_ROLES) {
+      const member = members.find((m) => m.role === role);
+      if (member?.user) return member;
+    }
+    return null;
+  };
 
   // Formatar telefone: +55(00)00000-0000 com limite de 11 dígitos (DDD + número)
   const formatPhoneBR = (text) => {
@@ -110,8 +113,8 @@ const EditPatientDataScreen = ({ route, navigation }) => {
       if (membersResult.success && membersResult.data) {
         const members = membersResult.data;
         
-        // Encontrar o paciente
-        const patientMember = members.find(m => m.role === 'patient');
+        // Encontrar o paciente (patient, priority_contact ou accompanied)
+        const patientMember = findPatientMember(members);
         
         if (patientMember && patientMember.user) {
           const patient = patientMember.user;
@@ -137,13 +140,7 @@ const EditPatientDataScreen = ({ route, navigation }) => {
           if (patient.gender) setGender(patient.gender);
           if (patient.blood_type) setBloodType(patient.blood_type);
           if (patient.birth_date) {
-            const loadedDate = new Date(patient.birth_date);
-            setBirthDate(loadedDate);
-            setTempDate({
-              day: loadedDate.getDate(),
-              month: loadedDate.getMonth() + 1,
-              year: loadedDate.getFullYear(),
-            });
+            setBirthDate(formatDateToBR(patient.birth_date));
           }
           // Sempre definir os campos, mesmo se vazios
           setChronicDiseases(patient.chronic_diseases || '');
@@ -183,6 +180,16 @@ const EditPatientDataScreen = ({ route, navigation }) => {
       return;
     }
 
+    const trimmedBirthDate = birthDate.trim();
+    let birthDateISO = null;
+    if (trimmedBirthDate) {
+      if (!isValidBirthDateBR(trimmedBirthDate)) {
+        Alert.alert('Atenção', 'Data de nascimento inválida. Use o formato dd/mm/aaaa');
+        return;
+      }
+      birthDateISO = birthDateBRToISO(trimmedBirthDate);
+    }
+
     try {
       setSaving(true);
 
@@ -194,9 +201,12 @@ const EditPatientDataScreen = ({ route, navigation }) => {
         formData.append('phone', phone.trim());
         formData.append('cpf', cpf ? cpf.replace(/\D/g, '') : '');
         formData.append('gender', gender);
-        formData.append('blood_type', bloodType.trim());
-        formData.append('birth_date', birthDate.toISOString().split('T')[0]);
-        // Sempre enviar os campos, mesmo se vazios
+        if (bloodType.trim()) {
+          formData.append('blood_type', bloodType.trim());
+        }
+        if (birthDateISO) {
+          formData.append('birth_date', birthDateISO);
+        }
         formData.append('chronic_diseases', chronicDiseases ? chronicDiseases.trim() : '');
         formData.append('allergies', allergies ? allergies.trim() : '');
 
@@ -231,11 +241,16 @@ const EditPatientDataScreen = ({ route, navigation }) => {
           phone: phone.trim(),
           cpf: cpf ? cpf.replace(/\D/g, '') : '',
           gender: gender,
-          blood_type: bloodType.trim(),
-          birth_date: birthDate.toISOString().split('T')[0],
           chronic_diseases: chronicDiseases ? chronicDiseases.trim() : '',
           allergies: allergies ? allergies.trim() : '',
         };
+
+        if (bloodType.trim()) {
+          userData.blood_type = bloodType.trim();
+        }
+        if (birthDateISO) {
+          userData.birth_date = birthDateISO;
+        }
 
         console.log('💾 Atualizando usuário:', patientUserId, userData);
         console.log('📋 Doenças crônicas enviadas:', chronicDiseases ? chronicDiseases.trim() : '(vazio)');
@@ -264,75 +279,6 @@ const EditPatientDataScreen = ({ route, navigation }) => {
     } finally {
       setSaving(false);
     }
-  };
-
-  const onDateChange = (event, selectedDate) => {
-    // iOS: Não fechar automaticamente ao selecionar data
-    // Só atualiza a data se houver seleção
-    if (selectedDate && Platform.OS === 'ios') {
-      setBirthDate(selectedDate);
-      setTempDate({
-        day: selectedDate.getDate(),
-        month: selectedDate.getMonth() + 1,
-        year: selectedDate.getFullYear(),
-      });
-    }
-  };
-
-  const handleTempDateChange = (field, value) => {
-    const newTempDate = { ...tempDate, [field]: parseInt(value) };
-    setTempDate(newTempDate);
-    
-    // Criar nova data com os valores temporários
-    const newDate = new Date(newTempDate.year, newTempDate.month - 1, newTempDate.day);
-    // Validar se a data é válida (ex: 31/02 não existe)
-    if (newDate.getDate() === newTempDate.day && 
-        newDate.getMonth() === newTempDate.month - 1 && 
-        newDate.getFullYear() === newTempDate.year) {
-      setBirthDate(newDate);
-    }
-  };
-
-  const confirmCustomDate = () => {
-    const newDate = new Date(tempDate.year, tempDate.month - 1, tempDate.day);
-    if (newDate.getDate() === tempDate.day && 
-        newDate.getMonth() === tempDate.month - 1 && 
-        newDate.getFullYear() === tempDate.year) {
-      setBirthDate(newDate);
-    }
-    setShowDatePicker(false);
-  };
-
-  // Gerar arrays de dias, meses e anos
-  const getDaysInMonth = (month, year) => {
-    return new Date(year, month, 0).getDate();
-  };
-
-  const generateDays = () => {
-    const daysInMonth = getDaysInMonth(tempDate.month, tempDate.year);
-    return Array.from({ length: daysInMonth }, (_, i) => i + 1);
-  };
-
-  const generateMonths = () => {
-    const months = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-    return months.map((name, index) => ({ label: name, value: index + 1 }));
-  };
-
-  const generateYears = () => {
-    const currentYear = new Date().getFullYear();
-    const minYear = 1900;
-    const years = [];
-    for (let year = currentYear; year >= minYear; year--) {
-      years.push(year);
-    }
-    return years;
-  };
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString('pt-BR');
   };
 
   const pickPhoto = async () => {
@@ -488,148 +434,16 @@ const EditPatientDataScreen = ({ route, navigation }) => {
           {/* Data de Nascimento */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Data de Nascimento</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDatePicker(true)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-              <Text style={styles.dateButtonText}>{formatDate(birthDate)}</Text>
-            </TouchableOpacity>
+            <TextInput
+              style={styles.input}
+              value={birthDate}
+              onChangeText={(text) => setBirthDate(formatDateInputBR(text))}
+              placeholder="dd/mm/aaaa"
+              placeholderTextColor={colors.gray400}
+              keyboardType="numeric"
+              maxLength={10}
+            />
           </View>
-
-          {Platform.OS === 'ios' ? (
-            // iOS: Modal para permitir fechar clicando fora
-            showDatePicker && (
-              <Modal
-                visible={showDatePicker}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowDatePicker(false)}
-              >
-                <TouchableOpacity
-                  style={styles.modalOverlay}
-                  activeOpacity={1}
-                  onPress={() => setShowDatePicker(false)}
-                >
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    onPress={(e) => e.stopPropagation()}
-                    style={styles.modalContent}
-                  >
-                    <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>Data de Nascimento</Text>
-                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                        <Ionicons name="close" size={24} color={colors.text} />
-                      </TouchableOpacity>
-                    </View>
-                    <DateTimePicker
-                      value={birthDate}
-                      mode="date"
-                      display="spinner"
-                      onChange={onDateChange}
-                      maximumDate={new Date()}
-                      minimumDate={new Date(1900, 0, 1)}
-                      style={styles.datePickerIOS}
-                    />
-                    <TouchableOpacity
-                      style={styles.modalButton}
-                      onPress={() => setShowDatePicker(false)}
-                    >
-                      <Text style={styles.modalButtonText}>Confirmar</Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              </Modal>
-            )
-          ) : (
-            // Android: Picker customizado que não fecha automaticamente
-            showDatePicker && (
-              <Modal
-                visible={showDatePicker}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowDatePicker(false)}
-              >
-                <TouchableOpacity
-                  style={styles.modalOverlay}
-                  activeOpacity={1}
-                  onPress={() => setShowDatePicker(false)}
-                >
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    onPress={(e) => e.stopPropagation()}
-                    style={styles.modalContentAndroid}
-                  >
-                    <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>Data de Nascimento</Text>
-                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                        <Ionicons name="close" size={24} color={colors.text} />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.customPickerContainer}>
-                      {/* Picker de Dia */}
-                      <View style={styles.pickerColumn}>
-                        <Text style={styles.pickerLabel}>Dia</Text>
-                        <View style={styles.pickerWrapper}>
-                          <Picker
-                            selectedValue={tempDate.day}
-                            onValueChange={(value) => handleTempDateChange('day', value)}
-                            style={styles.picker}
-                            itemStyle={styles.pickerItem}
-                          >
-                            {generateDays().map((day) => (
-                              <Picker.Item key={day} label={day.toString()} value={day} />
-                            ))}
-                          </Picker>
-                        </View>
-                      </View>
-
-                      {/* Picker de Mês */}
-                      <View style={styles.pickerColumn}>
-                        <Text style={styles.pickerLabel}>Mês</Text>
-                        <View style={styles.pickerWrapper}>
-                          <Picker
-                            selectedValue={tempDate.month}
-                            onValueChange={(value) => handleTempDateChange('month', value)}
-                            style={styles.picker}
-                            itemStyle={styles.pickerItem}
-                          >
-                            {generateMonths().map((month) => (
-                              <Picker.Item key={month.value} label={month.label} value={month.value} />
-                            ))}
-                          </Picker>
-                        </View>
-                      </View>
-
-                      {/* Picker de Ano */}
-                      <View style={styles.pickerColumn}>
-                        <Text style={styles.pickerLabel}>Ano</Text>
-                        <View style={styles.pickerWrapper}>
-                          <Picker
-                            selectedValue={tempDate.year}
-                            onValueChange={(value) => handleTempDateChange('year', value)}
-                            style={styles.picker}
-                            itemStyle={styles.pickerItem}
-                          >
-                            {generateYears().map((year) => (
-                              <Picker.Item key={year} label={year.toString()} value={year} />
-                            ))}
-                          </Picker>
-                        </View>
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.modalButton}
-                      onPress={confirmCustomDate}
-                    >
-                      <Text style={styles.modalButtonText}>Confirmar</Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              </Modal>
-            )
-          )}
 
           {/* Sexo */}
           <View style={styles.inputGroup}>
@@ -780,8 +594,6 @@ const EditPatientDataScreen = ({ route, navigation }) => {
               keyboardType="numeric"
               maxLength={14}
             />
-              autoCapitalize="none"
-            />
           </View>
         </View>
 
@@ -893,21 +705,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundLight,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 12,
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: colors.text,
-  },
   genderContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -1011,105 +808,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.secondary,
     marginTop: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 20,
-    width: '90%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  modalContentAndroid: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 20,
-    width: '90%',
-    maxWidth: 400,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  datePickerIOS: {
-    width: '100%',
-    height: 200,
-  },
-  modalButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  modalButtonText: {
-    color: colors.textWhite,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  customPickerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-start',
-    paddingVertical: 20,
-    gap: 8,
-    width: '100%',
-  },
-  pickerColumn: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  pickerLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  pickerWrapper: {
-    backgroundColor: colors.backgroundLight,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  picker: {
-    width: '100%',
-    height: 150,
-  },
-  pickerItem: {
-    fontSize: 16,
-    color: colors.text,
   },
 });
 

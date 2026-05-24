@@ -11,7 +11,7 @@ $apiServidor = '/tmp/api_servidor.php';
 if (!file_exists($apiServidor)) {
     echo "❌ Arquivo do servidor não encontrado: $apiServidor\n";
     echo "Por favor, baixe o arquivo primeiro:\n";
-    echo "  scp -P 63022 darley@192.168.0.20:/var/www/lacos-backend/routes/api.php $apiServidor\n";
+    echo "  scp -P 63022 darley@192.168.100.10:/var/www/lacos-backend/routes/api.php $apiServidor\n";
     exit(1);
 }
 

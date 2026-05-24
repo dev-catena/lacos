@@ -239,25 +239,26 @@ const DoctorHomeScreen = ({ navigation, route }) => {
               let patientName = null;
               if (groupResult.success && groupResult.data) {
                 groupName = groupResult.data.name || groupResult.data.groupName || null;
-                if (groupResult.data.accompanied_name) {
-                  patientName = groupResult.data.accompanied_name;
-                }
               }
-              if (!patientName) {
-                try {
-                  const membersResult = await groupService.getGroupMembers(groupId);
-                  if (membersResult.success && membersResult.data) {
-                    const patientMember = membersResult.data.find(
-                      (m) =>
-                        ['patient', 'priority_contact', 'accompanied'].includes(m.role) &&
-                        (m.user?.name || m.name)
-                    );
-                    if (patientMember) {
-                      patientName = patientMember.user?.name || patientMember.name;
-                    }
+              try {
+                const membersResult = await groupService.getGroupMembers(groupId);
+                if (membersResult.success && membersResult.data) {
+                  const patientMember = membersResult.data.find(
+                    (m) =>
+                      ['patient', 'priority_contact', 'accompanied'].includes(m.role) &&
+                      (m.user?.name || m.name)
+                  );
+                  if (patientMember) {
+                    patientName = patientMember.user?.name || patientMember.name;
                   }
-                } catch (error) {
-                  console.error(`Erro ao buscar paciente do grupo ${groupId}:`, error);
+                }
+              } catch (error) {
+                console.error(`Erro ao buscar paciente do grupo ${groupId}:`, error);
+              }
+              if (!patientName && groupResult.success && groupResult.data?.accompanied_name) {
+                const accompanied = groupResult.data.accompanied_name;
+                if (groupName && accompanied.trim().toLowerCase() !== groupName.trim().toLowerCase()) {
+                  patientName = accompanied;
                 }
               }
               return { groupId, groupName, patientName };
@@ -282,17 +283,31 @@ const DoctorHomeScreen = ({ navigation, route }) => {
         }
 
         const resolvePatientForAppointment = (apt) => {
+          const groupLabel =
+            apt.group?.name || apt.group_name || groupNamesCache[cacheKey(apt.group_id)] || '';
           const k = cacheKey(apt.group_id);
           const fromApt = apt.patient_name && String(apt.patient_name).trim();
-          if (fromApt) return fromApt;
+          const fromAptValid =
+            fromApt &&
+            (!groupLabel || fromApt.toLowerCase() !== String(groupLabel).trim().toLowerCase())
+              ? fromApt
+              : null;
+          if (fromAptValid) return fromAptValid;
           if (!k) return null;
-          return (
+          const cached =
             patientPatchFromApi[k] ||
             patientPatchFromFetch[k] ||
             patientNamesCache[k] ||
             patientNamesCache[apt.group_id] ||
-            null
-          );
+            null;
+          if (
+            cached &&
+            groupLabel &&
+            String(cached).trim().toLowerCase() === String(groupLabel).trim().toLowerCase()
+          ) {
+            return null;
+          }
+          return cached;
         };
 
         const withResolvedNames = doctorAppointments.map((apt) => {
@@ -1016,18 +1031,20 @@ const DoctorHomeScreen = ({ navigation, route }) => {
                   Date.now()
                 );
                 
-                // Buscar nome do paciente de várias fontes possíveis
-                // 1. patient_name direto (se vier da API) - PRIORIDADE MÁXIMA
-                // 2. Cache de nomes de pacientes (busca através dos membros do grupo)
-                // 3. Fallback para nome do grupo apenas se não encontrar paciente
-                const patientName = 
-                  appointment.patient_name ||
-                  (appointment.group_id && patientNamesCache[appointment.group_id]) ||
+                const groupLabel =
                   appointment.group?.name ||
                   appointment.group_name ||
                   (appointment.group_id && groupNamesCache[appointment.group_id]) ||
-                  (appointment.group && typeof appointment.group === 'string' ? appointment.group : null) ||
-                  'Não informado';
+                  '';
+                const patientName =
+                  appointment.patient_name ||
+                  (appointment.group_id && patientNamesCache[appointment.group_id]) ||
+                  'Paciente';
+                const displayPatientName =
+                  groupLabel &&
+                  patientName.trim().toLowerCase() === groupLabel.trim().toLowerCase()
+                    ? 'Paciente'
+                    : patientName;
                 
                 // Log para debug de teleconsultas
                 if (isTele) {
@@ -1036,7 +1053,7 @@ const DoctorHomeScreen = ({ navigation, route }) => {
                     patient_name_from_api: appointment.patient_name,
                     patient_name_from_cache: appointment.group_id ? patientNamesCache[appointment.group_id] : null,
                     group_id: appointment.group_id,
-                    final_patient_name: patientName,
+                    final_patient_name: displayPatientName,
                   });
                 }
                 
@@ -1077,7 +1094,7 @@ const DoctorHomeScreen = ({ navigation, route }) => {
                       {/* Sempre mostrar nome do paciente nas teleconsultas */}
                       {isTele && (
                         <Text style={styles.appointmentPatient}>
-                          Paciente: {patientName}
+                          Paciente: {displayPatientName}
                         </Text>
                       )}
                       {isTele &&

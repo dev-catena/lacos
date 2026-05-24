@@ -28,6 +28,7 @@ class Appointment extends Model
         'recurrence_days',
         'recurrence_start',
         'recurrence_end',
+        'reminder_times',
         'is_teleconsultation',
         'created_by_user_id',
         // Campos de pagamento
@@ -58,6 +59,7 @@ class Appointment extends Model
         'scheduled_at' => 'datetime',
         'recurrence_start' => 'datetime',
         'recurrence_end' => 'datetime',
+        'reminder_times' => 'array',
         'is_teleconsultation' => 'boolean',
         'amount' => 'decimal:2',
         'doctor_amount' => 'decimal:2',

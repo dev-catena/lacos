@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Script para enviar e aplicar 2FA WhatsApp no servidor remoto
-# Servidor: 192.168.0.20 (porta 63022)
+# Servidor: 192.168.100.10 (porta 63022)
 # Usuário: darley
 
 set -e
 
-SERVER="192.168.0.20"
+SERVER="192.168.100.10"
 PORT="63022"
 USER="darley"
 PASSWORD="yhvh77"

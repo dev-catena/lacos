@@ -69,6 +69,9 @@ class UserController extends Controller
             'professional_qualification_level' => 'sometimes|nullable|array',
             'professional_qualification_level.*' => 'in:especialista,residencia,mestrado,doutorado,pos_doutorado',
             'consultation_price' => 'sometimes|nullable|numeric|min:0',
+            // Campos de saúde do paciente
+            'chronic_diseases' => 'sometimes|nullable|string',
+            'allergies' => 'sometimes|nullable|string',
         ];
 
         $request->validate($rules);
@@ -76,11 +79,22 @@ class UserController extends Controller
         // Construir array de dados condicionalmente baseado nas colunas existentes
         $data = [];
         
-        // Campos sempre presentes
-        $alwaysFields = ['name', 'email', 'phone', 'blood_type', 'birth_date'];
-        foreach ($alwaysFields as $field) {
-            if ($request->has($field)) {
+        // Campos básicos (verificar se existem na tabela)
+        $basicFields = ['name', 'email', 'phone', 'blood_type', 'birth_date'];
+        foreach ($basicFields as $field) {
+            if ($request->has($field) && Schema::hasColumn('users', $field)) {
                 $data[$field] = $request->input($field);
+            }
+        }
+
+        // Campos de saúde do paciente (verificar se existem)
+        $healthFields = ['chronic_diseases', 'allergies'];
+        foreach ($healthFields as $field) {
+            if (
+                ($request->has($field) || array_key_exists($field, $request->all()))
+                && Schema::hasColumn('users', $field)
+            ) {
+                $data[$field] = $request->input($field, '');
             }
         }
         

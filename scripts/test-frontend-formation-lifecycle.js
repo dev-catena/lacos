@@ -10,7 +10,7 @@
  *
  * Uso:
  *   node scripts/test-frontend-formation-lifecycle.js
- *   BASE_URL=http://192.168.0.20:8000 node scripts/test-frontend-formation-lifecycle.js
+ *   BASE_URL=http://192.168.100.10:8000 node scripts/test-frontend-formation-lifecycle.js
  *   TOKEN=xxx USER_ID=9 node scripts/test-frontend-formation-lifecycle.js
  */
 

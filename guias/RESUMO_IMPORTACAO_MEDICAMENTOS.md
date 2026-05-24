@@ -65,7 +65,7 @@ php artisan medications:import ../scripts/DADOS_ABERTOS_MEDICAMENTOS.csv --chunk
 
 ```bash
 # Via API
-curl "http://192.168.0.20/api/medications/stats"
+curl "http://192.168.100.10/api/medications/stats"
 
 # Via Tinker
 php artisan tinker

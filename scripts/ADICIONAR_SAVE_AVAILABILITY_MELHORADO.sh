@@ -5,7 +5,7 @@
 
 set -e
 
-SERVER="darley@192.168.0.20"
+SERVER="darley@192.168.100.10"
 SSH_PORT="63022"
 BACKEND_PATH="/var/www/lacos-backend"
 
@@ -33,7 +33,7 @@ else
     echo "💡 Verifique:"
     echo "   - Se o servidor está acessível"
     echo "   - Se a senha está correta"
-    echo "   - Se o IP está correto: 192.168.0.20"
+    echo "   - Se o IP está correto: 192.168.100.10"
     exit 1
 fi
 

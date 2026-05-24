@@ -2,7 +2,7 @@
 
 # Script para criar MedicalSpecialtyController no servidor
 
-SERVER="darley@192.168.0.20"
+SERVER="darley@192.168.100.10"
 PORT="63022"
 PASSWORD="yhvh77"
 TMP_DIR="/tmp"

@@ -6,11 +6,11 @@
  */
 
 const API_CONFIG = {
-  BASE_URL: 'http://192.168.0.20:8000/api',
+  BASE_URL: 'http://192.168.100.10:8000/api',
 };
 
 // Simular o que o backend retorna
-const testPhotoUrl = 'http://192.168.0.20:8000/storage/groups/photo.jpg';
+const testPhotoUrl = 'http://192.168.100.10:8000/storage/groups/photo.jpg';
 const testPhotoUrlRelative = '/storage/groups/photo.jpg';
 const testPhotoUrlNoSlash = 'storage/groups/photo.jpg';
 

@@ -12,7 +12,7 @@ Todas as referências ao IP do servidor backend foram centralizadas em arquivos 
 
 **Variáveis no `.env`**:
 ```env
-APP_HOST=192.168.0.20
+APP_HOST=192.168.100.10
 APP_PORT=8000
 APP_URL=http://${APP_HOST}:${APP_PORT}
 ```
@@ -35,7 +35,7 @@ $port = config('backend.port');
 
 **Valores padrão**:
 ```javascript
-const BACKEND_HOST = '192.168.0.20';
+const BACKEND_HOST = '192.168.100.10';
 const BACKEND_PORT = '8000';
 ```
 
@@ -59,7 +59,7 @@ const API_CONFIG = {
 
 **Valores padrão**:
 ```javascript
-const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST || '192.168.0.20';
+const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST || '192.168.100.10';
 const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || '8000';
 ```
 
@@ -74,7 +74,7 @@ const API_BASE_URL = BACKEND_BASE_URL;
 - **Opção 1**: Edite `BACKEND_HOST` no arquivo `website/src/config/env.js`
 - **Opção 2**: Crie arquivo `.env` na raiz do projeto `website/`:
   ```env
-  VITE_BACKEND_HOST=192.168.0.20
+  VITE_BACKEND_HOST=192.168.100.10
   VITE_BACKEND_PORT=8000
   ```
 
@@ -86,7 +86,7 @@ const API_BASE_URL = BACKEND_BASE_URL;
 
 **Valores padrão**:
 ```javascript
-const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST || '192.168.0.20';
+const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST || '192.168.100.10';
 const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT || '8000';
 ```
 
@@ -101,7 +101,7 @@ const API_BASE_URL = BACKEND_BASE_URL;
 - **Opção 1**: Edite `BACKEND_HOST` no arquivo `web-admin/src/config/env.js`
 - **Opção 2**: Crie arquivo `.env` na raiz do projeto `web-admin/`:
   ```env
-  VITE_BACKEND_HOST=192.168.0.20
+  VITE_BACKEND_HOST=192.168.100.10
   VITE_BACKEND_PORT=8000
   ```
 

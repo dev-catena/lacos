@@ -23,7 +23,7 @@
 ### Aplicação Web
 
 A aplicação web já está configurada para se conectar ao backend em:
-- URL: `http://192.168.0.20/api`
+- URL: `http://192.168.100.10/api`
 - Endpoints: `/api/plans/*`
 
 ## 🚀 Como Instalar
@@ -99,7 +99,7 @@ if (plan.features.grupoCuidados) {
 
 ```bash
 # Listar planos
-curl -X GET http://192.168.0.20/api/plans \
+curl -X GET http://192.168.100.10/api/plans \
   -H "Authorization: Bearer SEU_TOKEN" \
   -H "Accept: application/json"
 ```

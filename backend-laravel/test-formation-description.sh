@@ -7,7 +7,7 @@
 
 # Configuração - ajuste se necessário
 BASE_URL="${BASE_URL:-http://127.0.0.1:8000/api}"
-# Para backend remoto: BASE_URL="http://192.168.0.20:8000/api" ./test-formation-description.sh
+# Para backend remoto: BASE_URL="http://192.168.100.10:8000/api" ./test-formation-description.sh
 
 echo "🧪 Teste: formation_description (Detalhes da Formação)"
 echo "======================================================"

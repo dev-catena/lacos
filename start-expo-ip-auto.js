@@ -2,7 +2,7 @@
 
 /**
  * Script para iniciar Expo com IP DETECTADO AUTOMATICAMENTE
- * Use este script quando o IP fixo (192.168.0.20) não funcionar
+ * Use este script quando o IP fixo (192.168.100.10) não funcionar
  * 
  * Uso: node start-expo-ip-auto.js
  *      node start-expo-ip-auto.js --tunnel  (para usar tunnel)

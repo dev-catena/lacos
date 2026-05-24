@@ -26,7 +26,7 @@ echo "💡 Para testar deep links:"
 echo "   1. Abra o Expo Go no seu dispositivo Android"
 echo "   2. Escaneie o QR code"
 echo "   3. Para testar URLs, use o navegador do dispositivo e acesse:"
-echo "      http://192.168.1.105/grupo/TESTE123"
+echo "      http://192.168.100.10/grupo/TESTE123"
 echo "   4. O Android deve perguntar qual app abrir (se o app estiver instalado)"
 
 
