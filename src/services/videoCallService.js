@@ -4,6 +4,8 @@
  */
 
 import { Platform, PermissionsAndroid } from 'react-native';
+import { Audio } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
 import { AGORA_APP_ID } from '../config/agora';
 
 let createAgoraRtcEngine = null;
@@ -26,17 +28,21 @@ try {
 export { RtcSurfaceView, isAgoraAvailable };
 
 async function requestCameraAndMicPermissions() {
-  if (Platform.OS !== 'android') return true;
+  if (Platform.OS === 'android') {
+    const granted = await PermissionsAndroid.requestMultiple([
+      PermissionsAndroid.PERMISSIONS.CAMERA,
+      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+    ]);
 
-  const granted = await PermissionsAndroid.requestMultiple([
-    PermissionsAndroid.PERMISSIONS.CAMERA,
-    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-  ]);
+    return (
+      granted[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED &&
+      granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED
+    );
+  }
 
-  return (
-    granted[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED &&
-    granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED
-  );
+  const camera = await ImagePicker.requestCameraPermissionsAsync();
+  const audio = await Audio.requestPermissionsAsync();
+  return camera.status === 'granted' && audio.status === 'granted';
 }
 
 class VideoCallService {
@@ -124,7 +130,7 @@ class VideoCallService {
       }
 
       const uid = Number(userId) || 0;
-      await this.engine.joinChannel(token || '', channelName, uid, {
+      const result = this.engine.joinChannel(token || '', channelName, uid, {
         clientRoleType: ClientRoleType.ClientRoleBroadcaster,
         channelProfile: ChannelProfileType.ChannelProfileCommunication,
         publishMicrophoneTrack: true,
@@ -132,6 +138,10 @@ class VideoCallService {
         autoSubscribeAudio: true,
         autoSubscribeVideo: true,
       });
+
+      if (result !== 0) {
+        return { success: false, error: `Falha ao entrar no canal (código ${result})` };
+      }
 
       return { success: true, mock: false };
     } catch (error) {

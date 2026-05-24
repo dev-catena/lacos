@@ -67,15 +67,17 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
 
   const {
     isCallActive,
+    isJoined,
     isInitializing,
     callError,
     primaryRemoteUid,
     endCall,
+    retryCall,
   } = useAgoraVideoCall({
     appointmentId: appointment?.id,
     userId: user?.id || appointment?.doctor_id,
     navigation,
-    enabled: canStartCall,
+    enabled: canStartCall === true,
     onJoined: () => {
       if (appointment?.id) {
         appointmentService.videoJoin(appointment.id, 'doctor');
@@ -578,9 +580,15 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
             <Text style={styles.errorText}>{callError}</Text>
             <TouchableOpacity
               style={styles.retryButton}
+              onPress={retryCall}
+            >
+              <Text style={styles.retryButtonText}>Tentar Novamente</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Text style={styles.retryButtonText}>Voltar</Text>
+              <Text style={styles.backButtonText}>Voltar</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -614,6 +622,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
         <View style={styles.mainVideo}>
           <RemoteVideoView
             uid={primaryRemoteUid}
+            isJoined={isJoined}
             participantName={patientInfo?.name || 'Paciente'}
             waitingLabel="Aguardando paciente entrar na chamada..."
           />
@@ -621,7 +630,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
 
         {/* Vídeo do Médico (picture-in-picture) */}
         <View style={styles.pipVideo}>
-          <LocalVideoView videoOff={isVideoOff} label="Você" />
+          <LocalVideoView isJoined={isJoined} videoOff={isVideoOff} label="Você" />
         </View>
 
         {/* Informações do Paciente */}
@@ -837,6 +846,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  backButton: {
+    marginTop: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  backButtonText: {
+    color: colors.textLight,
+    fontSize: 14,
   },
   header: {
     flexDirection: 'row',

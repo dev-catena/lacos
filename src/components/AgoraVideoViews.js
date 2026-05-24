@@ -7,8 +7,8 @@ import { PersonIcon, VideoCamIcon } from './CustomIcons';
 /**
  * Vídeo remoto em tela cheia (participante da consulta).
  */
-export function RemoteVideoView({ uid, waitingLabel, participantName }) {
-  if (isAgoraAvailable && uid != null) {
+export function RemoteVideoView({ uid, isJoined, waitingLabel, participantName }) {
+  if (isAgoraAvailable && isJoined && uid != null) {
     return (
       <RtcSurfaceView
         style={styles.fill}
@@ -45,8 +45,8 @@ export function RemoteVideoView({ uid, waitingLabel, participantName }) {
 /**
  * Vídeo local picture-in-picture (própria câmera).
  */
-export function LocalVideoView({ videoOff, label = 'Você' }) {
-  if (isAgoraAvailable && !videoOff) {
+export function LocalVideoView({ isJoined, videoOff, label = 'Você' }) {
+  if (isAgoraAvailable && isJoined && !videoOff) {
     return (
       <RtcSurfaceView
         style={styles.fill}

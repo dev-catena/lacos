@@ -54,6 +54,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
 
   const {
     isCallActive,
+    isJoined,
     isInitializing,
     callError,
     primaryRemoteUid,
@@ -370,6 +371,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
         <View style={styles.mainVideo}>
           <RemoteVideoView
             uid={primaryRemoteUid}
+            isJoined={isJoined}
             participantName={doctorInfo?.name || 'Dr(a). Médico'}
             waitingLabel="Aguardando médico entrar na chamada..."
           />
@@ -377,7 +379,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
 
         {/* Vídeo do Paciente (picture-in-picture) */}
         <View style={styles.pipVideo}>
-          <LocalVideoView videoOff={isVideoOff} label="Você" />
+          <LocalVideoView isJoined={isJoined} videoOff={isVideoOff} label="Você" />
         </View>
 
         {/* Informações do Médico */}
