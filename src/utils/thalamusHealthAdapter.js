@@ -13,6 +13,8 @@ function unwrapArray(data) {
     if (Array.isArray(data.values)) return data.values;
     if (Array.isArray(data.oxygenLevels)) return data.oxygenLevels;
     if (Array.isArray(data.oxygen_levels)) return data.oxygen_levels;
+    if (Array.isArray(data.bodyTemperatures)) return data.bodyTemperatures;
+    if (Array.isArray(data.body_temperatures)) return data.body_temperatures;
   }
   return [];
 }
@@ -174,6 +176,68 @@ function parseOxygenRow(row) {
   }
 
   return null;
+}
+
+function parseTemperatureRow(row) {
+  if (!row || typeof row !== 'object') return null;
+
+  const candidates = [
+    row.temperature,
+    row.bodyTemperature,
+    row.body_temperature,
+    row.temp,
+    row.skinTemperature,
+    row.skin_temperature,
+    row.value,
+  ];
+
+  for (const nested of [row.reading, row.measurement, row.payload, row.data]) {
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      const inner = parseTemperatureRow(nested);
+      if (inner != null) return inner;
+    }
+  }
+
+  for (const v of candidates) {
+    if (v == null || v === '') continue;
+    const n = parseFloat(v);
+    if (!Number.isFinite(n)) continue;
+    // Alguns dispositivos enviam Fahrenheit (ex.: 98.6)
+    if (n > 60 && n <= 120) {
+      return Math.round(((n - 32) * (5 / 9)) * 10) / 10;
+    }
+    if (n >= 30 && n <= 45) return n;
+    if (n > 0 && n < 30) return n;
+  }
+
+  for (const k of Object.keys(row)) {
+    const lk = k.toLowerCase();
+    if (!lk.includes('temp')) continue;
+    const n = parseFloat(row[k]);
+    if (Number.isFinite(n) && n >= 30 && n <= 120) {
+      if (n > 60 && n <= 120) {
+        return Math.round(((n - 32) * (5 / 9)) * 10) / 10;
+      }
+      return n;
+    }
+  }
+
+  return null;
+}
+
+function collectTemperatureRows(health) {
+  const rows = [...sectionData(health, 'body_temperatures')];
+
+  const comp = health?.comprehensive_health;
+  if (comp?.ok && comp.data != null && typeof comp.data === 'object') {
+    const c = comp.data;
+    rows.push(...unwrapArray(c.bodyTemperatures));
+    rows.push(...unwrapArray(c.body_temperatures));
+    rows.push(...unwrapArray(c.temperatures));
+    rows.push(...asRowsIfSingleReading(c, (o) => parseTemperatureRow(o) != null));
+  }
+
+  return rows;
 }
 
 function rowsToChartPoints(rows, valueParser) {
@@ -380,6 +444,9 @@ export function buildWatchVitalData(health) {
   const oxRows = collectOxygenRows(health);
   const oxygen_saturation = rowsToChartPoints(oxRows, parseOxygenRow);
 
+  const tempRows = collectTemperatureRows(health);
+  const temperature = rowsToChartPoints(tempRows, parseTemperatureRow);
+
   const fallRows = sectionData(health, 'fall_down_alerts');
   const fallAlerts = fallRows.map(parseFallRow).sort(
     (a, b) => new Date(b.measured_at) - new Date(a.measured_at)
@@ -408,12 +475,14 @@ export function buildWatchVitalData(health) {
     heart_rate: computeBasalForNumeric(heart_rate),
     blood_pressure: computeBasalBp(blood_pressure),
     oxygen_saturation: computeBasalForNumeric(oxygen_saturation),
+    temperature: computeBasalForNumeric(temperature),
   };
 
   return {
     heart_rate,
     blood_pressure,
     oxygen_saturation,
+    temperature,
     fallAlerts,
     ecgList,
     sleepSessionsList,

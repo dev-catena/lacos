@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import Toast from 'react-native-toast-message';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { PanicAlertProvider } from './src/contexts/PanicAlertContext';
+import PanicAlertOverlay from './src/components/PanicAlertOverlay';
 import RootNavigator from './src/navigation/RootNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import colors from './src/constants/colors';
@@ -288,21 +290,24 @@ export default function App() {
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <AuthProvider>
-            <NavigationContainer 
-              ref={navigationRef}
-              onReady={() => {
-                console.log('🧭 NavigationContainer pronto');
-              }}
-              onStateChange={(state) => {
-                // Preservar estado de navegação
-                const currentRoute = state?.routes[state?.index]?.name;
-                console.log('🧭 NavigationContainer - Rota atual:', currentRoute);
-              }}
-            >
-              <DeepLinkHandler />
-              <RootNavigator />
-              <Toast />
-            </NavigationContainer>
+            <PanicAlertProvider>
+              <NavigationContainer 
+                ref={navigationRef}
+                onReady={() => {
+                  console.log('🧭 NavigationContainer pronto');
+                }}
+                onStateChange={(state) => {
+                  // Preservar estado de navegação
+                  const currentRoute = state?.routes[state?.index]?.name;
+                  console.log('🧭 NavigationContainer - Rota atual:', currentRoute);
+                }}
+              >
+                <DeepLinkHandler />
+                <RootNavigator />
+                <PanicAlertOverlay />
+                <Toast />
+              </NavigationContainer>
+            </PanicAlertProvider>
           </AuthProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>

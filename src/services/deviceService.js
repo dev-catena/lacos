@@ -80,6 +80,30 @@ class DeviceService {
   }
 
   /**
+   * Solicita leitura imediata de sinais vitais no relógio (Thalamus sendCommand via backend).
+   */
+  async requestSmartwatchHealthReading(groupId) {
+    try {
+      const response = await apiService.post(`/groups/${groupId}/smartwatch-health/measure-now`, {});
+      if (response && response.success === false) {
+        return {
+          success: false,
+          error: response.message || 'Falha ao solicitar leitura',
+          data: response,
+        };
+      }
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Erro ao solicitar leitura no relógio:', error);
+      return {
+        success: false,
+        error: error.message || 'Erro ao solicitar leitura no relógio',
+        data: null,
+      };
+    }
+  }
+
+  /**
    * Envia áudio gravado para o relógio (Thalamus via backend, multipart campo "file").
    * @param {string} groupId
    * @param {{ uri: string, name: string, type: string }} file - Parte de arquivo React Native (FormData)

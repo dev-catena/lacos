@@ -359,6 +359,97 @@ class DeviceController extends Controller
     }
 
     /**
+     * Solicita leitura imediata de sinais vitais no relógio (Thalamus sendCommand).
+     * POST /api/groups/{groupId}/smartwatch-health/measure-now
+     */
+    public function postGroupSmartwatchHealthMeasureNow($groupId, ThalamusSmartwatchClient $thalamus)
+    {
+        try {
+            $user = Auth::user();
+
+            if (! $user) {
+                return response()->json([
+                    'error' => 'Usuário não autenticado',
+                    'message' => 'É necessário estar autenticado para acessar esta funcionalidade',
+                ], 401);
+            }
+
+            $group = Group::find($groupId);
+            if (! $group) {
+                return response()->json([
+                    'error' => 'Grupo não encontrado',
+                    'message' => 'O grupo informado não existe',
+                ], 404);
+            }
+
+            $isMember = $group->members()->where('user_id', $user->id)->where('is_active', true)->exists();
+            if (! $isMember) {
+                return response()->json([
+                    'error' => 'Acesso negado',
+                    'message' => 'Você não tem permissão para acessar os dados deste grupo',
+                ], 403);
+            }
+
+            $device = Device::where('group_id', $groupId)
+                ->where('type', 'smartwatch')
+                ->whereNotNull('identifier')
+                ->where('identifier', '!=', '')
+                ->orderByDesc('created_at')
+                ->first();
+
+            if (! $device) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nenhum smartwatch com IMEI cadastrado neste grupo.',
+                ], 422);
+            }
+
+            $imei = (string) $device->identifier;
+            $parserModel = $device->parser_model;
+            $result = $thalamus->requestImmediateHealthReading($imei, is_string($parserModel) ? $parserModel : null);
+
+            if (! ($result['ok'] ?? false)) {
+                $status = 502;
+                $message = 'Não foi possível enviar o comando ao relógio.';
+                foreach ($result['commands'] ?? [] as $cmd) {
+                    if (($cmd['status'] ?? 0) === 404) {
+                        $status = 404;
+                        $message = 'Relógio offline ou indisponível. Verifique se está ligado e conectado.';
+                        break;
+                    }
+                    if (($cmd['status'] ?? 0) === 400) {
+                        $status = 400;
+                        $message = 'Comando rejeitado pelo relógio. Verifique o modelo/parser configurado.';
+                    }
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $message,
+                    'imei' => $imei,
+                    'parser_model' => $result['parser_model'] ?? $parserModel,
+                    'commands' => $result['commands'] ?? [],
+                ], $status);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Comando enviado ao relógio. Aguarde alguns segundos para a medição aparecer.',
+                'imei' => $imei,
+                'parser_model' => $result['parser_model'] ?? $parserModel,
+                'commands' => $result['commands'] ?? [],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Erro smartwatch-health-measure-now: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+    }
+
+    /**
      * Lista de áudios do relógio (proxy Thalamus). GET /api/groups/{groupId}/smartwatch-audios?limit=20
      */
     public function getGroupSmartwatchAudios(Request $request, $groupId, ThalamusSmartwatchClient $thalamus)

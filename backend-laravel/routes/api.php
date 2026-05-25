@@ -226,6 +226,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Dispositivos - Dispositivos dos Grupos (Smartwatch e Sensores)
     Route::get('/groups/{groupId}/devices', [DeviceController::class, 'getGroupDevices']);
     Route::get('/groups/{groupId}/smartwatch-health', [DeviceController::class, 'getGroupSmartwatchHealth']);
+    Route::post('/groups/{groupId}/smartwatch-health/measure-now', [DeviceController::class, 'postGroupSmartwatchHealthMeasureNow']);
     Route::get('/groups/{groupId}/smartwatch-locations', [DeviceController::class, 'getGroupSmartwatchLocations']);
     Route::get('/groups/{groupId}/smartwatch-audios', [DeviceController::class, 'getGroupSmartwatchAudios']);
     Route::get('/groups/{groupId}/smartwatch-audios/stream', [DeviceController::class, 'streamGroupSmartwatchAudio']);
@@ -338,6 +339,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Botão de Pânico - Emergência
     Route::post('/panic/trigger', [PanicController::class, 'trigger']);
     Route::put('/panic/{eventId}/end-call', [PanicController::class, 'endCall']);
+    Route::put('/panic/{eventId}/disarm', [PanicController::class, 'disarm']);
+    Route::get('/panic/active', [PanicController::class, 'active']);
     Route::get('/panic', [PanicController::class, 'index']);
     Route::get('/panic/config/{groupId}', [PanicController::class, 'checkConfig']);
     

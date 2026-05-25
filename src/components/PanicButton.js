@@ -5,37 +5,29 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  Dimensions,
   Linking,
-  Platform,
   Alert,
-  Modal,
-  ScrollView,
 } from 'react-native';
 import * as Location from 'expo-location';
 import Toast from 'react-native-toast-message';
 import colors from '../constants/colors';
 import panicService from '../services/panicService';
-import { NotificationIcon, CallIcon } from './CustomIcons';
+import { usePanicAlert } from '../contexts/PanicAlertContext';
+import { NotificationIcon } from './CustomIcons';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HOLD_DURATION = 5000; // 5 segundos
 
 const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
+  const { activateFromTrigger } = usePanicAlert();
   const [isHolding, setIsHolding] = useState(false);
-  const [isCallActive, setIsCallActive] = useState(false);
-  const [currentPanicEvent, setCurrentPanicEvent] = useState(null);
-  const [emergencyContacts, setEmergencyContacts] = useState([]);
-  const [callStartTime, setCallStartTime] = useState(null);
 
   const holdProgress = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   const sirenBlink = useRef(new Animated.Value(1)).current;
 
   // Animação de piscar da sirene quando botão está idle
   useEffect(() => {
-    if (!isHolding && !isCallActive) {
+    if (!isHolding) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(sirenBlink, {
@@ -53,29 +45,7 @@ const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
     } else {
       sirenBlink.setValue(1);
     }
-  }, [isHolding, isCallActive]);
-
-  // Animação de pulso quando chamada está ativa
-  useEffect(() => {
-    if (isCallActive) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [isCallActive]);
+  }, [isHolding]);
 
   const handlePressIn = () => {
     setIsHolding(true);
@@ -100,23 +70,20 @@ const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
   };
 
   const handlePressOut = () => {
-    if (!isCallActive) {
-      setIsHolding(false);
-      
-      // Resetar animações
-      Animated.parallel([
-        Animated.timing(holdProgress, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
+    setIsHolding(false);
+
+    Animated.parallel([
+      Animated.timing(holdProgress, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   const triggerPanic = async () => {
@@ -154,22 +121,16 @@ const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
       });
 
       if (response.success) {
-        setCurrentPanicEvent(response.data.panic_event);
-        setEmergencyContacts(response.data.emergency_contacts);
-        setIsCallActive(true);
-        setCallStartTime(Date.now());
         setIsHolding(false);
-
-        // Resetar animação de escala
         scaleAnim.setValue(1);
         holdProgress.setValue(0);
 
-        // Notificar parent component
+        activateFromTrigger(response.data);
+
         if (onPanicTriggered) {
           onPanicTriggered(response.data);
         }
 
-        // Iniciar chamada para o primeiro contato de emergência
         if (response.data.emergency_contacts.length > 0) {
           const firstContact = response.data.emergency_contacts[0];
           // Pode vir de emergency_contacts (tem emergency_contact.phone) ou group_members (tem user.phone)
@@ -221,109 +182,12 @@ const PanicButton = ({ groupId, onPanicTriggered, fullSize = false }) => {
       .catch((err) => console.error('Erro ao fazer chamada:', err));
   };
 
-  const endCall = async () => {
-    if (!currentPanicEvent) return;
-
-    const callDuration = Math.floor((Date.now() - callStartTime) / 1000);
-
-    try {
-      await panicService.endCall(currentPanicEvent.id, {
-        status: 'completed',
-        duration: callDuration,
-      });
-
-      setIsCallActive(false);
-      setCurrentPanicEvent(null);
-      setEmergencyContacts([]);
-      setCallStartTime(null);
-
-      Toast.show({
-        type: 'success',
-        text1: 'Chamada finalizada',
-        text2: `Duração: ${callDuration}s`,
-      });
-    } catch (error) {
-      console.error('Erro ao finalizar chamada:', error);
-    }
-  };
-
-  // Interpolação de cor do vermelho para vermelho mais escuro
   const backgroundColor = holdProgress.interpolate({
     inputRange: [0, 1],
     outputRange: ['#FF3B30', '#C70000'],
   });
 
   // Removido buttonSize interpolado - agora usa apenas scale transform
-
-  if (isCallActive) {
-    const getContactName = (c) => c.user?.name || c.emergency_contact?.name || 'Contato';
-    const getContactPhone = (c) => c.user?.phone || c.emergency_contact?.phone;
-
-    return (
-      <Modal
-        visible={true}
-        transparent={false}
-        animationType="none"
-        statusBarTranslucent={true}
-      >
-        <View style={styles.callActiveContainer}>
-          <Animated.View
-            style={[
-              styles.callActiveContent,
-              {
-                transform: [{ scale: pulseAnim }],
-              },
-            ]}
-          >
-            <View style={styles.sosIconContainer}>
-              <Text style={styles.sosText}>SOS</Text>
-            </View>
-            <Text style={styles.callActiveTitle}>🚨 PÂNICO ACIONADO</Text>
-            <Text style={styles.callActiveSubtitle}>
-              Todos os contatos de emergência foram notificados
-            </Text>
-
-            {/* Lista de todos os contatos de emergência notificados */}
-            {emergencyContacts.length > 0 && (
-              <View style={styles.contactsListContainer}>
-                <Text style={styles.contactsListTitle}>Contatos notificados:</Text>
-                <ScrollView
-                  style={styles.contactsScrollView}
-                  showsVerticalScrollIndicator={false}
-                  nestedScrollEnabled
-                >
-                  {emergencyContacts.map((contact, index) => (
-                    <View key={index} style={styles.contactItem}>
-                      <Text style={styles.contactItemName}>
-                        • {getContactName(contact)}
-                        {index === 0 && (
-                          <Text style={styles.contactItemCalling}> (ligando...)</Text>
-                        )}
-                      </Text>
-                      {getContactPhone(contact) && (
-                        <Text style={styles.contactItemPhone}>{getContactPhone(contact)}</Text>
-                      )}
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.endCallButton}
-              onPress={endCall}
-              activeOpacity={0.8}
-            >
-              <View style={{ transform: [{ rotate: '135deg' }] }}>
-                <CallIcon size={24} color="#FF3B30" />
-              </View>
-              <Text style={styles.endCallText}>Encerrar Pânico</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </Modal>
-    );
-  }
 
   return (
     <View style={fullSize ? styles.containerFull : styles.container}>
@@ -519,115 +383,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FF3B30',
     fontWeight: '500',
-  },
-  // Estilos para chamada ativa
-  callActiveContainer: {
-    flex: 1,
-    backgroundColor: '#FF3B30',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 9999,
-  },
-  callActiveContent: {
-    alignItems: 'center',
-    gap: 20,
-  },
-  sosIconContainer: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  sosText: {
-    fontSize: 56,
-    fontWeight: '900',
-    color: colors.white,
-    letterSpacing: 8,
-    textAlign: 'center',
-    width: '100%',
-  },
-  callActiveTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.white,
-    textAlign: 'center',
-    paddingHorizontal: 40,
-    maxWidth: SCREEN_WIDTH - 80,
-    flexWrap: 'wrap',
-  },
-  callActiveSubtitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    paddingHorizontal: 40,
-    maxWidth: SCREEN_WIDTH - 80,
-    flexWrap: 'wrap',
-  },
-  contactsListContainer: {
-    marginTop: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    maxWidth: SCREEN_WIDTH - 80,
-    maxHeight: 200,
-    alignSelf: 'center',
-  },
-  contactsScrollView: {
-    maxHeight: 160,
-  },
-  contactsListTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.white,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  contactItem: {
-    marginBottom: 8,
-  },
-  contactItemName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.white,
-  },
-  contactItemCalling: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontStyle: 'italic',
-  },
-  contactItemPhone: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginLeft: 16,
-    marginTop: 2,
-  },
-  endCallButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 30,
-    marginTop: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  endCallText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FF3B30',
   },
 });
 

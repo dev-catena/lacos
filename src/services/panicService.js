@@ -41,6 +41,32 @@ const panicService = {
   },
 
   /**
+   * Pânicos ativos (ongoing) — inclui sync do relógio no backend
+   */
+  async getActiveEvents() {
+    try {
+      const response = await apiService.get('/panic/active');
+      return response;
+    } catch (error) {
+      console.error('Erro ao buscar pânicos ativos:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Desarmar pânico (encerra evento + comando no relógio se aplicável)
+   */
+  async disarm(eventId, data = {}) {
+    try {
+      const response = await apiService.put(`/panic/${eventId}/disarm`, data);
+      return response;
+    } catch (error) {
+      console.error('Erro ao desarmar pânico:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Verificar configuração do botão de pânico
    */
   async checkConfig(groupId) {

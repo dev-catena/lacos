@@ -23,6 +23,9 @@ import VitalSignsLineChart from '../../components/VitalSignsLineChart';
 import moment from 'moment';
 import AddVitalSignModal from './AddVitalSignModal';
 import { buildWatchVitalData } from '../../utils/thalamusHealthAdapter';
+import Toast from 'react-native-toast-message';
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const WATCH_EXTRA_TEXT_KEYS = new Set([
   '__fall_alerts__',
@@ -80,6 +83,8 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
   const [watchError, setWatchError] = useState(null);
   const [refreshingManual, setRefreshingManual] = useState(false);
   const [refreshingWatch, setRefreshingWatch] = useState(false);
+  const [measuringNow, setMeasuringNow] = useState(false);
+  const [measureStatus, setMeasureStatus] = useState('');
 
   // Configuração dos indicadores
   const indicatorsConfig = [
@@ -280,6 +285,52 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
     }
   }, [groupId]);
 
+  const handleMeasureNow = useCallback(async () => {
+    if (!hasSmartwatch || measuringNow) return;
+
+    setMeasuringNow(true);
+    setMeasureStatus('Enviando comando ao relógio...');
+
+    try {
+      const result = await deviceService.requestSmartwatchHealthReading(groupId);
+
+      if (!result.success) {
+        Alert.alert(
+          'Não foi possível medir',
+          result.error || result.data?.message || 'Tente novamente em instantes.'
+        );
+        return;
+      }
+
+      setMeasureStatus('Aguardando leitura do relógio...');
+      Toast.show({
+        type: 'info',
+        text1: 'Leitura solicitada',
+        text2: 'O relógio está coletando os sinais vitais.',
+        visibilityTime: 4000,
+      });
+
+      for (let i = 0; i < 3; i += 1) {
+        await sleep(i === 0 ? 5000 : 7000);
+        setMeasureStatus(`Atualizando dados (${i + 1}/3)...`);
+        await onRefreshWatch();
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Dados atualizados',
+        text2: 'Verifique os gráficos com as novas leituras do relógio.',
+        visibilityTime: 4000,
+      });
+    } catch (error) {
+      console.error('Erro ao solicitar medição imediata:', error);
+      Alert.alert('Erro', 'Não foi possível solicitar a leitura no relógio.');
+    } finally {
+      setMeasuringNow(false);
+      setMeasureStatus('');
+    }
+  }, [groupId, hasSmartwatch, measuringNow, onRefreshWatch]);
+
   const handleChartPress = async (indicatorKey) => {
     if (activeTab === 'watch' && watchVitalData) {
       const data = watchVitalData[indicatorKey] || [];
@@ -431,6 +482,27 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
             </View>
           ) : (
             <>
+              <TouchableOpacity
+                style={[styles.measureNowButton, measuringNow && styles.measureNowButtonDisabled]}
+                onPress={handleMeasureNow}
+                disabled={measuringNow}
+                activeOpacity={0.85}
+              >
+                {measuringNow ? (
+                  <ActivityIndicator color={colors.textWhite} />
+                ) : (
+                  <SafeIcon name="pulse" size={22} color={colors.textWhite} />
+                )}
+                <View style={styles.measureNowTextWrap}>
+                  <Text style={styles.measureNowTitle}>
+                    {measuringNow ? 'Medindo no relógio...' : 'Medir todos os sinais agora'}
+                  </Text>
+                  <Text style={styles.measureNowSubtitle}>
+                    {measureStatus || 'Envia comando ao relógio para leitura imediata'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
               {watchError ? (
                 <View style={styles.watchErrorBanner}>
                   <Text style={styles.watchErrorText}>{watchError}</Text>
@@ -911,6 +983,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.warning,
     marginBottom: 12,
+  },
+  measureNowButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
+  },
+  measureNowButtonDisabled: {
+    opacity: 0.85,
+  },
+  measureNowTextWrap: {
+    flex: 1,
+  },
+  measureNowTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textWhite,
+  },
+  measureNowSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 2,
   },
   comprehensiveCard: {
     backgroundColor: colors.white,

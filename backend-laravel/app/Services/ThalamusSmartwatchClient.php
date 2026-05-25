@@ -304,6 +304,175 @@ class ThalamusSmartwatchClient
     }
 
     /**
+     * Alertas SOS recentes do relógio: GET /api/health/{imei}/sos-alerts
+     *
+     * @return array{ok: bool, status: int, data: mixed|null, body: string}
+     */
+    public function getSosAlerts(string $imei): array
+    {
+        $imei = trim($imei);
+        if ($imei === '') {
+            throw new \InvalidArgumentException('IMEI do relógio vazio.');
+        }
+
+        $escaped = rawurlencode($imei);
+
+        return $this->getAuthenticated("health/{$escaped}/sos-alerts");
+    }
+
+    /**
+     * Envia comando semântico ao relógio: POST /api/devices/{imei}/command
+     *
+     * @param  array<string, mixed>  $command
+     * @return array{ok: bool, status: int, data: mixed|null, body: string}
+     */
+    public function sendDeviceCommand(string $imei, array $command): array
+    {
+        $imei = trim($imei);
+        if ($imei === '') {
+            throw new \InvalidArgumentException('IMEI do relógio vazio.');
+        }
+
+        $escaped = rawurlencode($imei);
+        $url = $this->baseUrl().'/devices/'.$escaped.'/command';
+
+        $post = function (string $token) use ($url, $command) {
+            return Http::timeout(45)
+                ->acceptJson()
+                ->asJson()
+                ->withToken($token)
+                ->post($url, $command);
+        };
+
+        $token = $this->getAccessToken();
+        $response = $post($token);
+
+        if ($response->status() === 401) {
+            $token = $this->getAccessToken(true);
+            $response = $post($token);
+        }
+
+        return [
+            'ok' => $response->successful(),
+            'status' => $response->status(),
+            'data' => $response->json(),
+            'body' => $response->body(),
+        ];
+    }
+
+    /**
+     * Cancela SOS no relógio via comando RAW configurável (THALAMUS_SW_SOS_DISARM_PAYLOAD).
+     */
+    public function disarmWatchSos(string $imei): array
+    {
+        $payload = config('services.thalamus_smartwatch.sos_disarm_payload');
+        if (! is_array($payload) || empty($payload)) {
+            return [
+                'ok' => false,
+                'status' => 0,
+                'data' => null,
+                'body' => 'Comando de desarme não configurado (THALAMUS_SW_SOS_DISARM_PAYLOAD).',
+            ];
+        }
+
+        return $this->sendDeviceCommand($imei, $payload);
+    }
+
+    /**
+     * Solicita leitura imediata de sinais vitais no relógio (Thalamus sendCommand).
+     *
+     * @return array{ok: bool, parser_model: string|null, commands: list<array<string, mixed>>}
+     */
+    public function requestImmediateHealthReading(string $imei, ?string $parserModel = null): array
+    {
+        $imei = trim($imei);
+        if ($imei === '') {
+            throw new \InvalidArgumentException('IMEI do relógio vazio.');
+        }
+
+        if ($parserModel === null || trim($parserModel) === '') {
+            try {
+                $row = $this->authorizedDevicesByImei()[$imei] ?? null;
+                if (is_array($row)) {
+                    $parserModel = data_get($row, 'parserModel') ?? data_get($row, 'parser_model');
+                }
+            } catch (\Throwable $e) {
+                Log::debug('Thalamus: parser_model indisponível para measure-now', [
+                    'imei' => $imei,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $commands = $this->healthMeasureNowCommandsForModel(
+            is_string($parserModel) ? $parserModel : null
+        );
+
+        $results = [];
+        $anyOk = false;
+
+        foreach ($commands as $command) {
+            if (! is_array($command) || empty($command['action'])) {
+                continue;
+            }
+
+            $r = $this->sendDeviceCommand($imei, $command);
+            $results[] = [
+                'command' => $command,
+                'ok' => $r['ok'] ?? false,
+                'status' => $r['status'] ?? 0,
+                'body' => mb_substr((string) ($r['body'] ?? ''), 0, 500),
+            ];
+
+            if ($r['ok'] ?? false) {
+                $anyOk = true;
+            }
+
+            if (($r['status'] ?? 0) === 404) {
+                break;
+            }
+        }
+
+        return [
+            'ok' => $anyOk,
+            'parser_model' => is_string($parserModel) ? $parserModel : null,
+            'commands' => $results,
+        ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function healthMeasureNowCommandsForModel(?string $parserModel): array
+    {
+        $map = config('services.thalamus_smartwatch.health_measure_now_commands');
+        if (! is_array($map)) {
+            $map = [];
+        }
+
+        $default = $map['default'] ?? [['action' => 'RAW', 'payload' => 'CR']];
+        if (! is_array($default)) {
+            $default = [['action' => 'RAW', 'payload' => 'CR']];
+        }
+
+        if ($parserModel === null || trim($parserModel) === '') {
+            return $default;
+        }
+
+        $needle = strtolower(trim($parserModel));
+        foreach ($map as $key => $commands) {
+            if ($key === 'default' || ! is_string($key)) {
+                continue;
+            }
+            if (str_contains($needle, strtolower($key))) {
+                return is_array($commands) ? $commands : $default;
+            }
+        }
+
+        return $default;
+    }
+
+    /**
      * GET autenticado na API Thalamus com retry de token em 401.
      *
      * @return array{ok: bool, status: int, data: mixed|null, body: string}
@@ -355,6 +524,7 @@ class ThalamusSmartwatchClient
             'blood_pressures' => "health/{$escaped}/blood-pressures",
             'heartbeats' => "health/{$escaped}/heartbeats",
             'oxygen_levels' => "health/{$escaped}/oxygen-levels",
+            'body_temperatures' => "health/{$escaped}/body-temperatures",
             'fall_down_alerts' => "health/{$escaped}/fall-down-alerts",
             'ecg_data' => "health/{$escaped}/ecg-data",
             'sleep_sessions' => "health/{$escaped}/sleep-sessions",

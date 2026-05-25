@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\GroupMember;
+use App\Services\PanicWatchSyncService;
+use App\Services\ThalamusSmartwatchClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +14,11 @@ use Illuminate\Support\Facades\Schema;
 
 class PanicController extends Controller
 {
+    public function __construct(
+        protected PanicWatchSyncService $watchSync,
+        protected ThalamusSmartwatchClient $thalamus,
+    ) {}
+
     /**
      * Acionar botão de pânico
      * POST /api/panic/trigger
@@ -30,7 +37,7 @@ class PanicController extends Controller
 
             $request->validate([
                 'group_id' => 'required|integer|exists:groups,id',
-                'trigger_type' => 'required|in:manual,voice',
+                'trigger_type' => 'required|in:manual,voice,watch',
                 'latitude' => 'nullable|numeric',
                 'longitude' => 'nullable|numeric',
                 'location_address' => 'nullable|string|max:500',
@@ -192,6 +199,8 @@ class PanicController extends Controller
             // Buscar evento criado
             $panicEvent = DB::table('panic_events')->where('id', $panicEventId)->first();
 
+            $this->watchSync->notifyGroupAboutPanic($groupId, $panicEvent);
+
             Log::info('Pânico acionado', [
                 'event_id' => $panicEventId,
                 'group_id' => $groupId,
@@ -271,6 +280,8 @@ class PanicController extends Controller
 
             $updatedEvent = DB::table('panic_events')->where('id', $eventId)->first();
 
+            $this->disarmWatchIfNeeded($updatedEvent);
+
             Log::info('Chamada de pânico finalizada', [
                 'event_id' => $eventId,
                 'status' => $request->status,
@@ -294,6 +305,97 @@ class PanicController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Pânicos ativos (ongoing) dos grupos do usuário — inclui sync SOS do relógio.
+     * GET /api/panic/active
+     */
+    public function active(Request $request)
+    {
+        try {
+            $user = Auth::user();
+
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado',
+                ], 401);
+            }
+
+            if (! Schema::hasTable('panic_events')) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                ]);
+            }
+
+            $userGroups = DB::table('group_members')
+                ->where('user_id', $user->id)
+                ->pluck('group_id')
+                ->toArray();
+
+            if (empty($userGroups)) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                ]);
+            }
+
+            foreach ($userGroups as $gid) {
+                try {
+                    $this->watchSync->syncAll((int) $gid);
+                } catch (\Throwable $e) {
+                    Log::debug('Panic active: sync watch ignorado', [
+                        'group_id' => $gid,
+                        'message' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $select = [
+                'panic_events.*',
+                'users.name as user_name',
+                'groups.name as group_name',
+            ];
+
+            $query = DB::table('panic_events')
+                ->join('users', 'panic_events.user_id', '=', 'users.id')
+                ->join('groups', 'panic_events.group_id', '=', 'groups.id')
+                ->where('panic_events.call_status', 'ongoing')
+                ->whereIn('panic_events.group_id', $userGroups)
+                ->select($select)
+                ->orderBy('panic_events.created_at', 'desc');
+
+            $events = $query->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $events,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao listar pânicos ativos: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao listar pânicos ativos',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Desarmar pânico (alias explícito para encerrar + comando no relógio se aplicável).
+     * PUT /api/panic/{eventId}/disarm
+     */
+    public function disarm(Request $request, $eventId)
+    {
+        $request->merge([
+            'status' => 'completed',
+            'duration' => $request->input('duration', 0),
+        ]);
+
+        return $this->endCall($request, $eventId);
     }
 
     /**
@@ -447,6 +549,8 @@ class PanicController extends Controller
                     group_id BIGINT UNSIGNED NOT NULL,
                     user_id BIGINT UNSIGNED NOT NULL,
                     trigger_type VARCHAR(20) NOT NULL DEFAULT 'manual',
+                    device_imei VARCHAR(32) NULL,
+                    thalamus_alert_id BIGINT UNSIGNED NULL,
                     latitude DECIMAL(10, 8) NULL,
                     longitude DECIMAL(11, 8) NULL,
                     location_address VARCHAR(500) NULL,
@@ -462,6 +566,43 @@ class PanicController extends Controller
             ");
         } catch (\Exception $e) {
             Log::error('Erro ao criar tabela panic_events: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Envia comando de desarme ao relógio quando o pânico veio do smartwatch.
+     *
+     * @param  object|null  $panicEvent
+     */
+    protected function disarmWatchIfNeeded(?object $panicEvent): void
+    {
+        if (! $panicEvent || ($panicEvent->trigger_type ?? '') !== 'watch') {
+            return;
+        }
+
+        $imei = null;
+        if (Schema::hasColumn('panic_events', 'device_imei')) {
+            $imei = $panicEvent->device_imei ?? null;
+        }
+
+        if (! is_string($imei) || trim($imei) === '') {
+            return;
+        }
+
+        try {
+            $result = $this->thalamus->disarmWatchSos(trim($imei));
+            if (! ($result['ok'] ?? false)) {
+                Log::warning('Falha ao desarmar SOS no relógio', [
+                    'imei' => $imei,
+                    'status' => $result['status'] ?? null,
+                    'body' => mb_substr((string) ($result['body'] ?? ''), 0, 500),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Exceção ao desarmar SOS no relógio', [
+                'imei' => $imei,
+                'message' => $e->getMessage(),
+            ]);
         }
     }
 }

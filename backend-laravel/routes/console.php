@@ -18,3 +18,8 @@ Schedule::command('appointments:check-teleconsultation-no-shows')
 Schedule::command('notifications:check-appointments')
     ->everyMinute()
     ->withoutOverlapping(2);
+
+// Alertas SOS do smartwatch (Thalamus) → panic_events + notificações
+Schedule::command('panic:sync-watch-sos')
+    ->everyMinute()
+    ->withoutOverlapping(2);

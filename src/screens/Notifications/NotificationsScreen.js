@@ -55,6 +55,10 @@ const NotificationsScreen = ({ navigation }) => {
               icon = 'pulse';
               color = colors.error;
               break;
+            case 'panic':
+              icon = 'alert-circle';
+              color = colors.error;
+              break;
             default:
               icon = 'notifications';
               color = colors.primary;

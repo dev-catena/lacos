@@ -57,6 +57,24 @@ return [
         'device_audio_stream_path' => env('THALAMUS_SW_DEVICE_AUDIO_STREAM_PATH', 'device-audios/{audioId}/stream'),
         /** Path rel. à base para localização: placeholders {imei}, {limit}. Vazio = GET health/{imei}/locations */
         'locations_path' => env('THALAMUS_SW_LOCATIONS_PATH'),
+        /**
+         * Comando JSON para desarmar SOS no relógio (POST devices/{imei}/command).
+         * Ex.: {"action":"RAW","payload":"SOSOFF"} — ajuste conforme modelo/parser.
+         */
+        'health_measure_now_commands' => json_decode(
+            (string) env('THALAMUS_SW_HEALTH_MEASURE_NOW_COMMANDS', ''),
+            true
+        ) ?: [
+            'default' => [
+                ['action' => 'RAW', 'payload' => 'CR'],
+            ],
+            'GPSWatch' => [
+                ['action' => 'RAW', 'payload' => 'BP16'],
+            ],
+            '4PTouch' => [
+                ['action' => 'RAW', 'payload' => 'CR'],
+            ],
+        ],
     ],
 
 ];
