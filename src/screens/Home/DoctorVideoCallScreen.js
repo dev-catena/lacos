@@ -647,6 +647,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
           <RemoteVideoView
             uid={primaryRemoteUid}
             isCallActive={isCallActive}
+            isJoined={isJoined}
             participantName={patientInfo?.name || 'Paciente'}
             waitingLabel="Aguardando paciente entrar na chamada..."
           />
@@ -911,8 +912,7 @@ const styles = StyleSheet.create({
   mainVideo: {
     flex: 1,
     backgroundColor: '#1a1a1a',
-    justifyContent: 'center',
-    alignItems: 'center',
+    overflow: 'hidden',
   },
   videoView: {
     flex: 1,

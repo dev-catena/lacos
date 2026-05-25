@@ -26,10 +26,11 @@ function remoteCanvas(uid) {
 /**
  * Vídeo remoto em tela cheia (participante da consulta).
  */
-export function RemoteVideoView({ uid, isCallActive, waitingLabel, participantName }) {
+export function RemoteVideoView({ uid, isCallActive, isJoined, waitingLabel, participantName }) {
   const remoteUid = uid != null ? Number(uid) : null;
+  const ready = isJoined || isCallActive;
 
-  if (isAgoraAvailable && isCallActive && remoteUid != null && remoteUid > 0) {
+  if (isAgoraAvailable && ready && remoteUid != null && remoteUid > 0) {
     return (
       <RtcSurfaceView
         key={`remote-${remoteUid}`}

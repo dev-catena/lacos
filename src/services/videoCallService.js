@@ -93,13 +93,23 @@ class VideoCallService {
           if (assignedUid) {
             this.localUid = assignedUid;
           }
+          this.ensureLocalMediaPublished();
           this.handlers.onJoinChannelSuccess?.(this.localUid);
         },
         onUserJoined: (_connection, remoteUid, _elapsed) => {
           const uid = Number(remoteUid);
           if (!Number.isFinite(uid) || uid <= 0) return;
-          this.ensureRemoteMediaSubscribed(uid);
-          this.handlers.onUserJoined?.(uid);
+          this.notifyRemoteUser(uid);
+        },
+        onUserStateChanged: (_connection, remoteUid, _state) => {
+          const uid = Number(remoteUid);
+          if (!Number.isFinite(uid) || uid <= 0) return;
+          this.notifyRemoteUser(uid);
+        },
+        onFirstRemoteVideoFrame: (_connection, remoteUid, _width, _height, _elapsed) => {
+          const uid = Number(remoteUid);
+          if (!Number.isFinite(uid) || uid <= 0) return;
+          this.notifyRemoteUser(uid);
         },
         onUserOffline: (_connection, remoteUid, _reason) => {
           const uid = Number(remoteUid);
@@ -110,17 +120,14 @@ class VideoCallService {
         onFirstRemoteVideoDecoded: (_connection, remoteUid, _width, _height, _elapsed) => {
           const uid = Number(remoteUid);
           if (!Number.isFinite(uid) || uid <= 0) return;
-          this.ensureRemoteMediaSubscribed(uid);
-          this.handlers.onRemoteVideoReady?.(uid);
+          this.notifyRemoteUser(uid);
         },
         onRemoteVideoStateChanged: (_connection, remoteUid, state, _reason, _elapsed) => {
           const uid = Number(remoteUid);
           if (!Number.isFinite(uid) || uid <= 0) return;
-          // 1 = starting, 2 = decoding
-          if (state === 1 || state === 2) {
-            this.ensureRemoteMediaSubscribed(uid);
-            this.handlers.onRemoteVideoReady?.(uid);
-            this.handlers.onUserJoined?.(uid);
+          // RemoteVideoState: 1=starting, 2=decoding, 3=frozen
+          if (state === 1 || state === 2 || state === 3) {
+            this.notifyRemoteUser(uid);
           }
         },
         onConnectionStateChanged: (connection, state, reason) => {
@@ -189,6 +196,8 @@ class VideoCallService {
         this.engine.muteAllRemoteAudioStreams(false);
       }
 
+      this.ensureLocalMediaPublished();
+
       return { success: true, mock: false };
     } catch (error) {
       console.error('Erro ao entrar no canal:', error);
@@ -250,6 +259,36 @@ class VideoCallService {
 
   getLocalUid() {
     return this.localUid || 0;
+  }
+
+  notifyRemoteUser(uid) {
+    const n = Number(uid);
+    if (!Number.isFinite(n) || n <= 0) return;
+    this.ensureRemoteMediaSubscribed(n);
+    this.handlers.onUserJoined?.(n);
+    this.handlers.onRemoteVideoReady?.(n);
+  }
+
+  ensureLocalMediaPublished() {
+    if (this.isMockMode || !this.engine) return;
+    try {
+      if (this.engine.enableLocalVideo) {
+        this.engine.enableLocalVideo(true);
+      }
+      this.engine.muteLocalVideoStream(false);
+      this.engine.muteLocalAudioStream(false);
+      this.engine.startPreview();
+      if (this.engine.updateChannelMediaOptions) {
+        this.engine.updateChannelMediaOptions({
+          publishCameraTrack: true,
+          publishMicrophoneTrack: true,
+          clientRoleType: ClientRoleType.ClientRoleBroadcaster,
+          channelProfile: ChannelProfileType.ChannelProfileCommunication,
+        });
+      }
+    } catch (e) {
+      console.warn('Agora ensureLocalMediaPublished:', e?.message);
+    }
   }
 
   ensureRemoteMediaSubscribed(uid) {

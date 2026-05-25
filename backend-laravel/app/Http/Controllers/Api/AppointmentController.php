@@ -118,6 +118,34 @@ class AppointmentController extends Controller
         return [true, null];
     }
 
+    /** UID Agora do outro participante, quando já conhecido (ex.: paciente entrou antes do médico). */
+    private function resolveAgoraPeerUid(Appointment $appointment, bool $isDoctor, AgoraTokenService $agoraTokenService): ?int
+    {
+        if ($isDoctor) {
+            if ($appointment->patient_joined_by_user_id) {
+                return $agoraTokenService->toAgoraUid((int) $appointment->patient_joined_by_user_id);
+            }
+
+            return null;
+        }
+
+        $doctorUserId = (int) $appointment->doctor_id;
+        if ($doctorUserId <= 0) {
+            return null;
+        }
+
+        try {
+            $doc = $appointment->doctorUser;
+            if ($doc && ! empty($doc->platform_user_id)) {
+                $doctorUserId = (int) $doc->platform_user_id;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('resolveAgoraPeerUid doctorUser: '.$e->getMessage());
+        }
+
+        return $agoraTokenService->toAgoraUid($doctorUserId);
+    }
+
     public function index(Request $request)
     {
         $groupId = $request->query('group_id');
@@ -919,6 +947,7 @@ class AppointmentController extends Controller
             $channelName = $agoraTokenService->getChannelName((int) $appointment->id);
             $uid = $agoraTokenService->toAgoraUid((int) $user->id);
             $token = $agoraTokenService->buildRtcToken($channelName, $uid);
+            $peerUid = $this->resolveAgoraPeerUid($appointment, $isDoctor, $agoraTokenService);
 
             if (empty(config('services.agora.app_certificate'))) {
                 Log::warning('AGORA_APP_CERTIFICATE não configurado — token vazio (modo teste Agora)');
@@ -929,6 +958,7 @@ class AppointmentController extends Controller
                 'token' => $token,
                 'channel_name' => $channelName,
                 'uid' => $uid,
+                'peer_uid' => $peerUid,
                 'app_id' => config('services.agora.app_id'),
             ]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {

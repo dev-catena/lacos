@@ -26,6 +26,7 @@ export default function useAgoraVideoCall({
   const [localUid, setLocalUid] = useState(0);
   const [isMockMode, setIsMockMode] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const [fallbackRemoteUid, setFallbackRemoteUid] = useState(null);
 
   const onJoinedRef = useRef(onJoined);
   const navigationRef = useRef(navigation);
@@ -64,6 +65,7 @@ export default function useAgoraVideoCall({
         setIsJoined(false);
         setIsCallActive(false);
         setLocalUid(0);
+        setFallbackRemoteUid(null);
 
         videoCallService.setEventHandlers({
           onJoinChannelSuccess: (uid) => {
@@ -113,11 +115,14 @@ export default function useAgoraVideoCall({
           if (cancelled) return;
 
           if (tokenResult.success && tokenResult.data?.success) {
-            const { token, channel_name: apiChannel, uid: apiUid } = tokenResult.data;
+            const { token, channel_name: apiChannel, uid: apiUid, peer_uid: peerUid } = tokenResult.data;
             rtcToken = token || '';
             if (apiChannel) channelName = apiChannel;
             if (apiUid != null && Number(apiUid) > 0) {
               agoraUid = Number(apiUid);
+            }
+            if (peerUid != null && Number(peerUid) > 0) {
+              setFallbackRemoteUid(Number(peerUid));
             }
           } else {
             const errMsg = String(tokenResult.error || tokenResult.data?.message || '');
@@ -203,7 +208,8 @@ export default function useAgoraVideoCall({
     setRetryKey((k) => k + 1);
   };
 
-  const primaryRemoteUid = remoteUsers.length > 0 ? remoteUsers[0] : null;
+  const primaryRemoteUid =
+    remoteUsers.length > 0 ? remoteUsers[0] : fallbackRemoteUid;
 
   return {
     isCallActive,
@@ -212,6 +218,7 @@ export default function useAgoraVideoCall({
     callError,
     remoteUsers,
     primaryRemoteUid,
+    fallbackRemoteUid,
     localUid,
     isMockMode,
     endCall,
