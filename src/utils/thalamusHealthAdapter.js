@@ -59,8 +59,114 @@ function toMeasuredAtIso(ts) {
     const d = ts > 1e12 ? moment(ts) : moment(ts * 1000);
     return d.isValid() ? d.toISOString() : moment().toISOString();
   }
+  if (typeof ts === 'string') {
+    const trimmed = ts.trim();
+    // Thalamus costuma enviar ISO sem sufixo Z — tratar como UTC
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(trimmed)) {
+      const utc = moment.utc(trimmed);
+      if (utc.isValid()) return utc.toISOString();
+    }
+  }
   const d = moment(ts);
   return d.isValid() ? d.toISOString() : moment().toISOString();
+}
+
+function watchMetaRow(ts) {
+  return {
+    measured_at: toMeasuredAtIso(ts),
+    measured_by_name: 'Relógio',
+    wearable_name: 'Thalamus',
+  };
+}
+
+function mergePointIfNewer(series, point) {
+  if (!point?.measured_at) return series || [];
+  const list = Array.isArray(series) ? [...series] : [];
+  const key = `${point.measured_at}|${JSON.stringify(point.value)}`;
+  if (list.some((p) => `${p.measured_at}|${JSON.stringify(p.value)}` === key)) {
+    return list;
+  }
+  const latestMs = list.length
+    ? Math.max(...list.map((p) => new Date(p.measured_at).getTime()))
+    : 0;
+  const pointMs = new Date(point.measured_at).getTime();
+  if (pointMs >= latestMs) {
+    list.push(point);
+    list.sort((a, b) => new Date(a.measured_at) - new Date(b.measured_at));
+  }
+  return list;
+}
+
+/**
+ * O endpoint comprehensive-health traz o snapshot mais recente (FC, PA, SpO2, temperatura).
+ * Mesclar na série evita mostrar só histórico defasado após "Medir agora".
+ */
+function mergeComprehensiveHealthPoints(health, seriesByKey) {
+  const comp = health?.comprehensive_health;
+  if (!comp?.ok || comp.data == null) return seriesByKey;
+
+  const rows = unwrapArray(comp.data);
+  const candidates = rows.length ? rows : (typeof comp.data === 'object' ? [comp.data] : []);
+  if (!candidates.length) return seriesByKey;
+
+  const latestComp = [...candidates].sort((a, b) => {
+    const ta = pickTimestamp(a);
+    const tb = pickTimestamp(b);
+    return new Date(toMeasuredAtIso(tb)) - new Date(toMeasuredAtIso(ta));
+  })[0];
+
+  if (!latestComp || typeof latestComp !== 'object') return seriesByKey;
+
+  const ts = pickTimestamp(latestComp);
+  const meta = watchMetaRow(ts);
+  let out = { ...seriesByKey };
+
+  const hr = parseHeartRateRow(latestComp);
+  if (hr != null) {
+    out.heart_rate = mergePointIfNewer(out.heart_rate, { ...meta, value: hr });
+  }
+
+  const bp = parseBpRow(latestComp) ?? (
+    latestComp.systolicBp != null && latestComp.diastolicBp != null
+      ? { systolic: parseFloat(latestComp.systolicBp), diastolic: parseFloat(latestComp.diastolicBp) }
+      : null
+  );
+  if (bp) {
+    out.blood_pressure = mergePointIfNewer(out.blood_pressure, { ...meta, value: bp });
+  }
+
+  const spo2 = parseOxygenRow(latestComp) ?? (
+    latestComp.spo2 != null ? parseFloat(latestComp.spo2) : null
+  );
+  if (spo2 != null) {
+    out.oxygen_saturation = mergePointIfNewer(out.oxygen_saturation, { ...meta, value: spo2 });
+  }
+
+  const temp = parseTemperatureRow(latestComp) ?? (
+    latestComp.bodyTemperature != null ? parseFloat(latestComp.bodyTemperature) : null
+  );
+  if (temp != null) {
+    out.temperature = mergePointIfNewer(out.temperature, { ...meta, value: temp });
+  }
+
+  return out;
+}
+
+/** Maior timestamp (ms) entre as séries vitais do relógio. */
+export function getWatchVitalsLatestMs(vitalData) {
+  if (!vitalData) return 0;
+  const keys = ['heart_rate', 'blood_pressure', 'oxygen_saturation', 'temperature'];
+  let max = 0;
+  for (const key of keys) {
+    const rows = vitalData[key];
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows) {
+      if (!row?.measured_at) continue;
+      const ms = new Date(row.measured_at).getTime();
+      if (Number.isFinite(ms) && ms > max) max = ms;
+    }
+  }
+  return max;
 }
 
 function parseHeartRateRow(row) {
@@ -83,8 +189,8 @@ function parseBpRow(row) {
     const d = parseFloat(row.diastolic);
     if (Number.isFinite(s) && Number.isFinite(d)) return { systolic: s, diastolic: d };
   }
-  const s = row.bloodPressureSystolic ?? row.systolicPressure ?? row.high;
-  const d = row.bloodPressureDiastolic ?? row.diastolicPressure ?? row.low;
+  const s = row.bloodPressureSystolic ?? row.systolicPressure ?? row.systolicBp ?? row.high;
+  const d = row.bloodPressureDiastolic ?? row.diastolicPressure ?? row.diastolicBp ?? row.low;
   if (s != null && d != null) {
     const sy = parseFloat(s);
     const di = parseFloat(d);
@@ -445,7 +551,18 @@ export function buildWatchVitalData(health) {
   const oxygen_saturation = rowsToChartPoints(oxRows, parseOxygenRow);
 
   const tempRows = collectTemperatureRows(health);
-  const temperature = rowsToChartPoints(tempRows, parseTemperatureRow);
+  let temperature = rowsToChartPoints(tempRows, parseTemperatureRow);
+
+  const merged = mergeComprehensiveHealthPoints(health, {
+    heart_rate,
+    blood_pressure,
+    oxygen_saturation,
+    temperature,
+  });
+  heart_rate = merged.heart_rate;
+  blood_pressure = merged.blood_pressure;
+  oxygen_saturation = merged.oxygen_saturation;
+  temperature = merged.temperature;
 
   const fallRows = sectionData(health, 'fall_down_alerts');
   const fallAlerts = fallRows.map(parseFallRow).sort(

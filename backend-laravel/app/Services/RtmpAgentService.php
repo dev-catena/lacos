@@ -12,6 +12,19 @@ class RtmpAgentService
         return rtrim((string) config('services.rtmp_agent.url', 'http://177.104.165.210:8000'), '/');
     }
 
+    /** URL HTTPS pública para WHEP (proxy nginx no gateway). */
+    public function whepPublicBaseUrl(): string
+    {
+        return rtrim((string) config('services.rtmp_agent.whep_public_url', 'https://gateway.lacosapp.com/rtmp-whep'), '/');
+    }
+
+    public function buildWhepPublicUrl(string $streamPath, string $token): string
+    {
+        $path = trim($streamPath, '/');
+
+        return $this->whepPublicBaseUrl().'/'.$path.'/whep?token='.urlencode($token);
+    }
+
     protected function client()
     {
         $username = config('services.rtmp_agent.username');
@@ -47,23 +60,30 @@ class RtmpAgentService
      */
     public function getStreamStatus(string $cameraId): ?array
     {
-        $response = $this->client()->get($this->baseUrl().'/streams/status');
-        if (! $response->successful()) {
-            return null;
-        }
-
-        $items = $response->json() ?? [];
-        foreach ($items as $item) {
-            if (($item['camera_id'] ?? null) === $cameraId) {
-                return $item;
+        try {
+            $response = $this->client()->get($this->baseUrl().'/streams/status');
+            if (! $response->successful()) {
+                return null;
             }
+
+            $items = $response->json() ?? [];
+            foreach ($items as $item) {
+                if (($item['camera_id'] ?? null) === $cameraId) {
+                    return $item;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('RtmpAgent getStreamStatus failed', [
+                'camera_id' => $cameraId,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return null;
     }
 
     /**
-     * @return array{play_url: string, expires_at: int|null, stream_path: string|null}|null
+     * @return array{play_url: string, token: string|null, expires_at: int|null, stream_path: string|null}|null
      */
     public function getSecurePlayUrl(string $cameraId): ?array
     {
@@ -82,14 +102,15 @@ class RtmpAgentService
         }
 
         $data = $response->json();
-        if (empty($data['play_url'])) {
+        if (empty($data['token']) || empty($data['stream_path'])) {
             return null;
         }
 
         return [
-            'play_url' => $data['play_url'],
+            'play_url' => $data['play_url'] ?? null,
+            'token' => $data['token'],
             'expires_at' => isset($data['expires_at']) ? (int) $data['expires_at'] : null,
-            'stream_path' => $data['stream_path'] ?? null,
+            'stream_path' => $data['stream_path'],
         ];
     }
 

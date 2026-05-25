@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,7 @@ import deviceService from '../../services/deviceService';
 import VitalSignsLineChart from '../../components/VitalSignsLineChart';
 import moment from 'moment';
 import AddVitalSignModal from './AddVitalSignModal';
-import { buildWatchVitalData } from '../../utils/thalamusHealthAdapter';
+import { buildWatchVitalData, getWatchVitalsLatestMs } from '../../utils/thalamusHealthAdapter';
 import Toast from 'react-native-toast-message';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,6 +64,33 @@ function parseWatchBatteryFromSmartwatchPayload(data) {
   return Math.min(100, Math.max(0, Math.round(n)));
 }
 
+function getLatestWatchRow(data) {
+  if (!Array.isArray(data) || data.length === 0) return null;
+  return [...data].sort(
+    (a, b) => new Date(b.measured_at) - new Date(a.measured_at)
+  )[0];
+}
+
+function formatWatchDisplayValue(rawValue) {
+  let value = rawValue;
+  if (typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      // mantém string
+    }
+  }
+  if (Array.isArray(value) && value.length > 0) value = value[0];
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    if (value.systolic != null && value.diastolic != null) {
+      return `${value.systolic}/${value.diastolic}`;
+    }
+  }
+  const n = parseFloat(value);
+  if (!Number.isNaN(n)) return n.toFixed(1);
+  return String(value ?? '—');
+}
+
 const VitalSignsDetailScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params || {};
   
@@ -85,6 +112,8 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
   const [refreshingWatch, setRefreshingWatch] = useState(false);
   const [measuringNow, setMeasuringNow] = useState(false);
   const [measureStatus, setMeasureStatus] = useState('');
+  const [watchDataUpdatedAt, setWatchDataUpdatedAt] = useState(null);
+  const watchScrollRef = useRef(null);
 
   // Configuração dos indicadores
   const indicatorsConfig = [
@@ -137,6 +166,24 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
       enabledKey: 'monitor_respiratory_rate',
     },
   ];
+
+  const latestWatchReadings = useMemo(() => {
+    if (!watchVitalData) return [];
+    return indicatorsConfig
+      .map((indicator) => {
+        const row = getLatestWatchRow(watchVitalData[indicator.key]);
+        if (!row) return null;
+        return {
+          key: indicator.key,
+          label: indicator.label,
+          color: indicator.color,
+          unit: indicator.unit,
+          value: formatWatchDisplayValue(row.value),
+          measured_at: row.measured_at,
+        };
+      })
+      .filter(Boolean);
+  }, [watchVitalData]);
 
   const applyVitalSignsResult = useCallback((result) => {
     if (!result.success || !result.data) {
@@ -224,6 +271,7 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
             setWatchNickname(d.device_nickname || null);
             setWatchBatteryPercent(parseWatchBatteryFromSmartwatchPayload(d));
             setWatchVitalData(buildWatchVitalData(d.health));
+            setWatchDataUpdatedAt(new Date());
             setActiveTab('watch');
           } else {
             setHasSmartwatch(false);
@@ -277,12 +325,31 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
         setWatchNickname(watchRes.data.device_nickname || null);
         setWatchBatteryPercent(parseWatchBatteryFromSmartwatchPayload(watchRes.data));
         setHasSmartwatch(true);
-      } else if (watchRes.error) {
+        setWatchDataUpdatedAt(new Date());
+        return buildWatchVitalData(watchRes.data.health);
+      }
+      if (watchRes.error) {
         setWatchError(watchRes.error);
       }
     } finally {
       setRefreshingWatch(false);
     }
+    return null;
+  }, [groupId]);
+
+  const fetchWatchVitalData = useCallback(async () => {
+    const watchRes = await deviceService.getGroupSmartwatchHealth(groupId);
+    if (watchRes.success && watchRes.data?.has_smartwatch) {
+      const vitalData = buildWatchVitalData(watchRes.data.health);
+      setWatchVitalData(vitalData);
+      setWatchImei(watchRes.data.imei || null);
+      setWatchNickname(watchRes.data.device_nickname || null);
+      setWatchBatteryPercent(parseWatchBatteryFromSmartwatchPayload(watchRes.data));
+      setHasSmartwatch(true);
+      setWatchDataUpdatedAt(new Date());
+      return vitalData;
+    }
+    return null;
   }, [groupId]);
 
   const handleMeasureNow = useCallback(async () => {
@@ -303,25 +370,47 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
       }
 
       setMeasureStatus('Aguardando leitura do relógio...');
+      const baselineMs = getWatchVitalsLatestMs(watchVitalData);
+
       Toast.show({
         type: 'info',
         text1: 'Leitura solicitada',
-        text2: 'O relógio está coletando os sinais vitais.',
-        visibilityTime: 4000,
+        text2: 'Aguarde no relógio — pode levar até 1 minuto para aparecer.',
+        visibilityTime: 5000,
       });
 
-      for (let i = 0; i < 3; i += 1) {
-        await sleep(i === 0 ? 5000 : 7000);
-        setMeasureStatus(`Atualizando dados (${i + 1}/3)...`);
-        await onRefreshWatch();
+      const pollIntervalsMs = [8000, 10000, 12000, 15000, 15000, 20000];
+      let gotNewerReading = false;
+
+      for (let i = 0; i < pollIntervalsMs.length; i += 1) {
+        await sleep(pollIntervalsMs[i]);
+        setMeasureStatus(`Buscando leitura no servidor (${i + 1}/${pollIntervalsMs.length})...`);
+        const vitalData = await fetchWatchVitalData();
+        if (vitalData && getWatchVitalsLatestMs(vitalData) > baselineMs) {
+          gotNewerReading = true;
+          break;
+        }
       }
 
-      Toast.show({
-        type: 'success',
-        text1: 'Dados atualizados',
-        text2: 'Verifique os gráficos com as novas leituras do relógio.',
-        visibilityTime: 4000,
-      });
+      if (gotNewerReading) {
+        Toast.show({
+          type: 'success',
+          text1: 'Nova leitura recebida',
+          text2: 'Confira o resumo "Últimas leituras" abaixo.',
+          visibilityTime: 5000,
+        });
+      } else {
+        Toast.show({
+          type: 'info',
+          text1: 'Ainda sem leitura nova',
+          text2: 'O relógio pode demorar. Puxe a tela para atualizar em instantes.',
+          visibilityTime: 6000,
+        });
+      }
+
+      setTimeout(() => {
+        watchScrollRef.current?.scrollTo({ y: 220, animated: true });
+      }, 400);
     } catch (error) {
       console.error('Erro ao solicitar medição imediata:', error);
       Alert.alert('Erro', 'Não foi possível solicitar a leitura no relógio.');
@@ -329,7 +418,7 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
       setMeasuringNow(false);
       setMeasureStatus('');
     }
-  }, [groupId, hasSmartwatch, measuringNow, onRefreshWatch]);
+  }, [groupId, hasSmartwatch, measuringNow, watchVitalData, fetchWatchVitalData]);
 
   const handleChartPress = async (indicatorKey) => {
     if (activeTab === 'watch' && watchVitalData) {
@@ -465,6 +554,7 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
 
       {activeTab === 'watch' ? (
         <ScrollView
+          ref={watchScrollRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -498,10 +588,50 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
                     {measuringNow ? 'Medindo no relógio...' : 'Medir todos os sinais agora'}
                   </Text>
                   <Text style={styles.measureNowSubtitle}>
-                    {measureStatus || 'Envia comando ao relógio para leitura imediata'}
+                    {measureStatus || 'Os resultados aparecem no resumo e nos cards abaixo'}
                   </Text>
                 </View>
               </TouchableOpacity>
+
+              {latestWatchReadings.length > 0 ? (
+                <View style={styles.latestReadingsCard}>
+                  <View style={styles.latestReadingsHeader}>
+                    <Text style={styles.latestReadingsTitle}>Últimas leituras do relógio</Text>
+                    {watchDataUpdatedAt ? (
+                      <Text style={styles.latestReadingsUpdated}>
+                        Atualizado {moment(watchDataUpdatedAt).format('DD/MM HH:mm')}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.latestReadingsHint}>
+                    Toque em um item para ver o histórico completo com data e hora.
+                  </Text>
+                  {latestWatchReadings.map((item) => (
+                    <TouchableOpacity
+                      key={item.key}
+                      style={styles.latestReadingRow}
+                      onPress={() => handleChartPress(item.key)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.latestReadingLabel}>{item.label}</Text>
+                      <View style={styles.latestReadingValueWrap}>
+                        <Text style={[styles.latestReadingValue, { color: item.color }]}>
+                          {item.value} {item.unit}
+                        </Text>
+                        <Text style={styles.latestReadingTime}>
+                          {moment(item.measured_at).format('DD/MM HH:mm')}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.latestReadingsEmpty}>
+                  <Text style={styles.latestReadingsEmptyText}>
+                    Após medir, os valores aparecerão aqui e nos gráficos de cada sinal abaixo.
+                  </Text>
+                </View>
+              )}
 
               {watchError ? (
                 <View style={styles.watchErrorBanner}>
@@ -1009,6 +1139,72 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.9)',
     marginTop: 2,
+  },
+  latestReadingsCard: {
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  latestReadingsHeader: {
+    marginBottom: 6,
+  },
+  latestReadingsTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  latestReadingsUpdated: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginTop: 4,
+  },
+  latestReadingsHint: {
+    fontSize: 13,
+    color: colors.textLight,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  latestReadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  latestReadingLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+    paddingRight: 8,
+  },
+  latestReadingValueWrap: {
+    alignItems: 'flex-end',
+  },
+  latestReadingValue: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  latestReadingTime: {
+    fontSize: 11,
+    color: colors.textLight,
+    marginTop: 2,
+  },
+  latestReadingsEmpty: {
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  latestReadingsEmptyText: {
+    fontSize: 13,
+    color: colors.textLight,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   comprehensiveCard: {
     backgroundColor: colors.white,

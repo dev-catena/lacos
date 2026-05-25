@@ -5,9 +5,20 @@ class CameraService {
   async listGroupCameras(groupId) {
     try {
       const response = await apiService.get(`/groups/${groupId}/cameras`);
+      if (response && response.success === false) {
+        return {
+          success: false,
+          error: response.message || 'Erro ao listar câmeras',
+          cameras: response.cameras || [],
+        };
+      }
       return { success: true, cameras: response.cameras || [] };
     } catch (error) {
-      return { success: false, error: error.message || 'Erro ao listar câmeras' };
+      const msg =
+        error.response?.message ||
+        error.message ||
+        'Erro ao listar câmeras';
+      return { success: false, error: msg, cameras: [] };
     }
   }
 

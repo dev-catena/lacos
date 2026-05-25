@@ -43,6 +43,11 @@ use Illuminate\Support\Facades\Route;
 // Gateway Status - Rota pública
 Route::get('/gateway/status', [GatewayController::class, 'status']);
 
+// Player de câmera (URL assinada — HTTPS para iOS ATS)
+Route::get('/groups/{groupId}/cameras/{cameraId}/player', [GroupCameraController::class, 'player'])
+    ->name('camera.player')
+    ->middleware('signed');
+
 // ==================== ROTAS PÚBLICAS DE MEDICAMENTOS ====================
 // Busca de medicamentos (público - não requer autenticação)
 Route::get('/medications/search', [MedicationCatalogController::class, 'search']);

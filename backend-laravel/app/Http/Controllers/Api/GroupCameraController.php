@@ -10,6 +10,8 @@ use App\Services\RtmpAgentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 
 class GroupCameraController extends Controller
 {
@@ -80,13 +82,29 @@ class GroupCameraController extends Controller
         try {
             $this->assertGroupMember($groupId);
 
+            if (! Schema::hasTable('group_cameras')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Módulo de câmeras não instalado no servidor. Execute a migration group_cameras.',
+                    'cameras' => [],
+                ], 503);
+            }
+
             $cameras = GroupCamera::where('group_id', $groupId)
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get();
 
             $payload = $cameras->map(function (GroupCamera $camera) use ($rtmp) {
-                $status = $rtmp->getStreamStatus($camera->rtmp_camera_id);
+                $status = null;
+                try {
+                    $status = $rtmp->getStreamStatus($camera->rtmp_camera_id);
+                } catch (\Throwable $e) {
+                    Log::warning('GroupCameraController@index status', [
+                        'camera_id' => $camera->rtmp_camera_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
 
                 return [
                     'id' => $camera->id,
@@ -110,6 +128,8 @@ class GroupCameraController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erro ao listar câmeras',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+                'cameras' => [],
             ], 500);
         }
     }
@@ -122,6 +142,13 @@ class GroupCameraController extends Controller
     {
         try {
             $this->assertGroupAdmin($groupId);
+
+            if (! Schema::hasTable('group_cameras')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Módulo de câmeras não instalado no servidor. Execute a migration group_cameras.',
+                ], 503);
+            }
 
             $validated = $request->validate([
                 'rtmp_camera_id' => 'required|string|max:128',
@@ -194,7 +221,7 @@ class GroupCameraController extends Controller
             $camera = $this->findGroupCamera($groupId, $cameraId);
 
             $play = $rtmp->getSecurePlayUrl($camera->rtmp_camera_id);
-            if (! $play) {
+            if (! $play || empty($play['token']) || empty($play['stream_path'])) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Não foi possível obter o stream da câmera',
@@ -203,6 +230,19 @@ class GroupCameraController extends Controller
 
             $status = $rtmp->getStreamStatus($camera->rtmp_camera_id);
 
+            $expiresAt = $play['expires_at'] ?? null;
+            $expires = $expiresAt
+                ? \Illuminate\Support\Carbon::createFromTimestamp($expiresAt)
+                : now()->addMinutes(30);
+
+            // Player HTTPS no gateway (iOS bloqueia http:// do RTMP Agent — ATS)
+            $playUrl = URL::temporarySignedRoute('camera.player', $expires, [
+                'groupId' => $groupId,
+                'cameraId' => $cameraId,
+                'whepToken' => $play['token'],
+                'streamPath' => trim($play['stream_path'], '/'),
+            ]);
+
             return response()->json([
                 'success' => true,
                 'camera' => [
@@ -210,8 +250,8 @@ class GroupCameraController extends Controller
                     'name' => $camera->name,
                     'rtmp_camera_id' => $camera->rtmp_camera_id,
                 ],
-                'play_url' => $play['play_url'],
-                'expires_at' => $play['expires_at'],
+                'play_url' => $playUrl,
+                'expires_at' => $expiresAt,
                 'connected' => (bool) ($status['connected'] ?? false),
             ]);
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
@@ -229,6 +269,32 @@ class GroupCameraController extends Controller
                 'message' => 'Erro ao obter stream',
             ], 500);
         }
+    }
+
+    /**
+     * GET /api/groups/{groupId}/cameras/{cameraId}/player
+     * Página HTML WebRTC via HTTPS (URL assinada — WebView iOS não envia Bearer).
+     */
+    public function player(Request $request, int $groupId, int $cameraId, RtmpAgentService $rtmp)
+    {
+        $validated = $request->validate([
+            'whepToken' => 'required|string|max:512',
+            'streamPath' => 'required|string|max:256',
+        ]);
+
+        $camera = GroupCamera::where('group_id', $groupId)
+            ->where('id', $cameraId)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $whepUrl = $rtmp->buildWhepPublicUrl($validated['streamPath'], $validated['whepToken']);
+
+        return response()
+            ->view('camera-player', [
+                'cameraName' => $camera->name,
+                'whepUrl' => $whepUrl,
+            ])
+            ->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
     /**
@@ -277,7 +343,22 @@ class GroupCameraController extends Controller
     {
         try {
             $this->assertGroupAdmin($groupId);
-            $remote = $rtmp->listCameras();
+
+            if (! Schema::hasTable('group_cameras')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Módulo de câmeras não instalado no servidor. Execute a migration group_cameras.',
+                    'cameras' => [],
+                ], 503);
+            }
+
+            $remote = [];
+            try {
+                $remote = $rtmp->listCameras();
+            } catch (\Throwable $e) {
+                Log::warning('GroupCameraController@available rtmp', ['error' => $e->getMessage()]);
+            }
+
             $linked = GroupCamera::where('group_id', $groupId)
                 ->where('is_active', true)
                 ->pluck('rtmp_camera_id')

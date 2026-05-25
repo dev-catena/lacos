@@ -36,6 +36,8 @@ return [
         'username' => env('RTMP_AGENT_USERNAME'),
         'password' => env('RTMP_AGENT_PASSWORD'),
         'timeout' => (int) env('RTMP_AGENT_TIMEOUT', 10),
+        /** Proxy HTTPS no gateway → MediaMTX WHEP (porta 8890). */
+        'whep_public_url' => env('RTMP_AGENT_WHEP_PUBLIC_URL', 'https://gateway.lacosapp.com/rtmp-whep'),
     ],
 
     'thalamus_smartwatch' => [

@@ -36,7 +36,11 @@ const CamerasListScreen = ({ route, navigation }) => {
     if (result.success) {
       setCameras(result.cameras);
     } else {
-      Alert.alert('Erro', result.error || 'Não foi possível carregar as câmeras');
+      Alert.alert(
+        'Erro',
+        result.error || 'Não foi possível carregar as câmeras'
+      );
+      setCameras(result.cameras || []);
     }
   }, [groupId]);
 
