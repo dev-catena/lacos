@@ -52,7 +52,12 @@ class PlanService {
       return true;
     }
 
-    const enabled = plan.features[featureKey] === true;
+    const raw = plan.features[featureKey];
+    const enabled =
+      raw === true ||
+      raw === 1 ||
+      raw === '1' ||
+      raw === 'true';
     console.log('🔍 PlanService.isFeatureEnabled:', {
       featureKey,
       enabled,
