@@ -74,7 +74,15 @@ export default function useAgoraVideoCall({
           },
           onUserJoined: (uid) => {
             if (cancelled) return;
-            setRemoteUsers((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
+            const n = Number(uid);
+            if (!Number.isFinite(n) || n <= 0) return;
+            setRemoteUsers((prev) => (prev.includes(n) ? prev : [...prev, n]));
+          },
+          onRemoteVideoReady: (uid) => {
+            if (cancelled) return;
+            const n = Number(uid);
+            if (!Number.isFinite(n) || n <= 0) return;
+            setRemoteUsers((prev) => (prev.includes(n) ? prev : [...prev, n]));
           },
           onUserOffline: (uid) => {
             if (cancelled) return;

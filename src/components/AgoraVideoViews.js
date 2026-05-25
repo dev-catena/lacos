@@ -1,18 +1,40 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { RtcSurfaceView, isAgoraAvailable } from '../services/videoCallService';
+import {
+  RtcSurfaceView,
+  VideoSourceType,
+  RenderModeType,
+  isAgoraAvailable,
+} from '../services/videoCallService';
 import colors from '../constants/colors';
 import { PersonIcon, VideoCamIcon } from './CustomIcons';
+
+const localCanvas = {
+  uid: 0,
+  sourceType: VideoSourceType?.VideoSourceCamera,
+  renderMode: RenderModeType?.RenderModeFit,
+};
+
+function remoteCanvas(uid) {
+  return {
+    uid: Number(uid),
+    sourceType: VideoSourceType?.VideoSourceRemote,
+    renderMode: RenderModeType?.RenderModeFit,
+  };
+}
 
 /**
  * Vídeo remoto em tela cheia (participante da consulta).
  */
-export function RemoteVideoView({ uid, isJoined, isCallActive, waitingLabel, participantName }) {
-  if (isAgoraAvailable && isCallActive && uid != null) {
+export function RemoteVideoView({ uid, isCallActive, waitingLabel, participantName }) {
+  const remoteUid = uid != null ? Number(uid) : null;
+
+  if (isAgoraAvailable && isCallActive && remoteUid != null && remoteUid > 0) {
     return (
       <RtcSurfaceView
+        key={`remote-${remoteUid}`}
         style={styles.fill}
-        canvas={{ uid }}
+        canvas={remoteCanvas(remoteUid)}
         zOrderMediaOverlay={false}
       />
     );
@@ -20,7 +42,7 @@ export function RemoteVideoView({ uid, isJoined, isCallActive, waitingLabel, par
 
   return (
     <View style={styles.placeholder}>
-      {uid != null ? (
+      {remoteUid != null ? (
         <>
           <VideoCamIcon size={80} color={colors.primary} />
           <Text style={styles.placeholderTitle}>{participantName || 'Participante'}</Text>
@@ -44,14 +66,17 @@ export function RemoteVideoView({ uid, isJoined, isCallActive, waitingLabel, par
 
 /**
  * Vídeo local picture-in-picture (própria câmera).
+ * Agora v4: uid 0 + VideoSourceCamera = setupLocalVideo (nunca usar o UID remoto aqui).
  */
-export function LocalVideoView({ localUid = 0, isJoined, isCallActive, videoOff, label = 'Você' }) {
+export function LocalVideoView({ isJoined, isCallActive, videoOff, label = 'Você' }) {
   const showVideo = isAgoraAvailable && (isJoined || isCallActive) && !videoOff;
+
   if (showVideo) {
     return (
       <RtcSurfaceView
+        key="local-preview"
         style={styles.fill}
-        canvas={{ uid: localUid || 0 }}
+        canvas={localCanvas}
         zOrderMediaOverlay
       />
     );

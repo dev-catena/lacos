@@ -73,7 +73,6 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
     isInitializing,
     callError,
     primaryRemoteUid,
-    localUid,
     endCall,
     retryCall,
   } = useAgoraVideoCall({
@@ -647,17 +646,14 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
         <View style={styles.mainVideo}>
           <RemoteVideoView
             uid={primaryRemoteUid}
-            isJoined={isJoined}
             isCallActive={isCallActive}
             participantName={patientInfo?.name || 'Paciente'}
             waitingLabel="Aguardando paciente entrar na chamada..."
           />
         </View>
 
-        {/* Vídeo do Médico (picture-in-picture) */}
         <View style={styles.pipVideo}>
           <LocalVideoView
-            localUid={localUid}
             isJoined={isJoined}
             isCallActive={isCallActive}
             videoOff={isVideoOff}

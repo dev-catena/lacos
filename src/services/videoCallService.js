@@ -12,6 +12,8 @@ let createAgoraRtcEngine = null;
 let ChannelProfileType = null;
 let ClientRoleType = null;
 let RtcSurfaceView = null;
+let VideoSourceType = null;
+let RenderModeType = null;
 let isAgoraAvailable = false;
 
 try {
@@ -20,12 +22,14 @@ try {
   ChannelProfileType = agora.ChannelProfileType;
   ClientRoleType = agora.ClientRoleType;
   RtcSurfaceView = agora.RtcSurfaceView;
+  VideoSourceType = agora.VideoSourceType;
+  RenderModeType = agora.RenderModeType;
   isAgoraAvailable = true;
 } catch {
   isAgoraAvailable = false;
 }
 
-export { RtcSurfaceView, isAgoraAvailable };
+export { RtcSurfaceView, VideoSourceType, RenderModeType, isAgoraAvailable };
 
 async function requestCameraAndMicPermissions() {
   if (Platform.OS === 'android') {
@@ -93,15 +97,21 @@ class VideoCallService {
         },
         onUserJoined: (_connection, remoteUid, _elapsed) => {
           const uid = Number(remoteUid);
-          if (Number.isFinite(uid)) {
-            this.handlers.onUserJoined?.(uid);
-          }
+          if (!Number.isFinite(uid) || uid <= 0) return;
+          this.ensureRemoteMediaSubscribed(uid);
+          this.handlers.onUserJoined?.(uid);
         },
         onUserOffline: (_connection, remoteUid, _reason) => {
           const uid = Number(remoteUid);
           if (Number.isFinite(uid)) {
             this.handlers.onUserOffline?.(uid);
           }
+        },
+        onFirstRemoteVideoDecoded: (_connection, remoteUid, _width, _height, _elapsed) => {
+          const uid = Number(remoteUid);
+          if (!Number.isFinite(uid) || uid <= 0) return;
+          this.ensureRemoteMediaSubscribed(uid);
+          this.handlers.onRemoteVideoReady?.(uid);
         },
         onError: (err, msg) => {
           console.error('❌ Agora onError:', err, msg);
@@ -150,6 +160,13 @@ class VideoCallService {
 
       if (result !== 0) {
         return { success: false, error: `Falha ao entrar no canal (código ${result})` };
+      }
+
+      if (this.engine?.muteAllRemoteVideoStreams) {
+        this.engine.muteAllRemoteVideoStreams(false);
+      }
+      if (this.engine?.muteAllRemoteAudioStreams) {
+        this.engine.muteAllRemoteAudioStreams(false);
       }
 
       return { success: true, mock: false };
@@ -213,6 +230,16 @@ class VideoCallService {
 
   getLocalUid() {
     return this.localUid || 0;
+  }
+
+  ensureRemoteMediaSubscribed(uid) {
+    if (this.isMockMode || !this.engine) return;
+    try {
+      this.engine.muteRemoteVideoStream(uid, false);
+      this.engine.muteRemoteAudioStream(uid, false);
+    } catch (e) {
+      console.warn('Agora ensureRemoteMediaSubscribed:', e?.message);
+    }
   }
 
   async destroy() {
