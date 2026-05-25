@@ -113,6 +113,26 @@ class VideoCallService {
           this.ensureRemoteMediaSubscribed(uid);
           this.handlers.onRemoteVideoReady?.(uid);
         },
+        onRemoteVideoStateChanged: (_connection, remoteUid, state, _reason, _elapsed) => {
+          const uid = Number(remoteUid);
+          if (!Number.isFinite(uid) || uid <= 0) return;
+          // 1 = starting, 2 = decoding
+          if (state === 1 || state === 2) {
+            this.ensureRemoteMediaSubscribed(uid);
+            this.handlers.onRemoteVideoReady?.(uid);
+            this.handlers.onUserJoined?.(uid);
+          }
+        },
+        onConnectionStateChanged: (connection, state, reason) => {
+          console.log('📡 Agora connection:', {
+            channel: connection?.channelId,
+            state,
+            reason,
+          });
+          if (state === 5) {
+            this.handlers.onError?.(reason, 'Falha na conexão com o canal de vídeo');
+          }
+        },
         onError: (err, msg) => {
           console.error('❌ Agora onError:', err, msg);
           this.handlers.onError?.(err, msg);

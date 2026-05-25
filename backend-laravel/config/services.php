@@ -26,6 +26,11 @@ return [
         'whatsapp_from' => env('TWILIO_WHATSAPP_FROM'),
     ],
 
+    'agora' => [
+        'app_id' => env('AGORA_APP_ID', '75ae244af79944a18a059d2fcb18c1dc'),
+        'app_certificate' => env('AGORA_APP_CERTIFICATE'),
+    ],
+
     'thalamus_smartwatch' => [
         'base_url' => env('THALAMUS_SW_BASE_URL', 'https://smartwatchwebserver.thalamus.ind.br/api'),
         /** POST JSON { username, password } — padrão {base_url}/auth/token */

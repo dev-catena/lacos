@@ -186,6 +186,23 @@ class AppointmentService {
   }
 
   /**
+   * Token RTC Agora para videoconferência (canal + uid + token).
+   * @param {number|string} appointmentId
+   */
+  async getAgoraToken(appointmentId) {
+    try {
+      const response = await apiService.get(`/appointments/${appointmentId}/agora-token`);
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Erro ao obter token Agora:', error?.message);
+      return {
+        success: false,
+        error: error?.message || 'Não foi possível obter token de vídeo',
+      };
+    }
+  }
+
+  /**
    * Confirmar que a teleconsulta foi realizada (paciente/cuidador)
    * Libera o pagamento e opcionalmente registra avaliação do médico
    * @param {number} appointmentId

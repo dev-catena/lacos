@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import videoCallService from '../services/videoCallService';
+import appointmentService from '../services/appointmentService';
 import {
   getTeleconsultChannelName,
   toAgoraUid,
@@ -102,12 +103,41 @@ export default function useAgoraVideoCall({
 
         setIsMockMode(!!initResult.mock);
 
-        const channelName = getTeleconsultChannelName(appointmentIdRef.current);
-        const agoraUid = toAgoraUid(frozenUserIdRef.current);
+        const resolvedId = appointmentIdRef.current;
+        let channelName = getTeleconsultChannelName(resolvedId);
+        let agoraUid = toAgoraUid(frozenUserIdRef.current);
+        let rtcToken = '';
 
-        console.log('📹 Agora join:', { channelName, agoraUid, appointmentId: appointmentIdRef.current });
+        if (!initResult.mock) {
+          const tokenResult = await appointmentService.getAgoraToken(resolvedId);
+          if (cancelled) return;
 
-        const joinResult = await videoCallService.joinChannel(channelName, agoraUid);
+          if (tokenResult.success && tokenResult.data?.success) {
+            const { token, channel_name: apiChannel, uid: apiUid } = tokenResult.data;
+            rtcToken = token || '';
+            if (apiChannel) channelName = apiChannel;
+            if (apiUid != null && Number(apiUid) > 0) {
+              agoraUid = Number(apiUid);
+            }
+          } else {
+            const errMsg = String(tokenResult.error || tokenResult.data?.message || '');
+            const endpointMissing = /404|not found/i.test(errMsg);
+            if (endpointMissing) {
+              console.warn('⚠️ Endpoint agora-token indisponível — join legado sem token');
+            } else {
+              throw new Error(errMsg || 'Não foi possível obter token de vídeo');
+            }
+          }
+        }
+
+        console.log('📹 Agora join:', {
+          channelName,
+          agoraUid,
+          appointmentId: resolvedId,
+          hasToken: !!rtcToken,
+        });
+
+        const joinResult = await videoCallService.joinChannel(channelName, agoraUid, rtcToken);
         if (cancelled) return;
 
         if (!joinResult.success) {

@@ -1,6 +1,6 @@
 /**
  * Configuração Agora.io para videoconferência (teleconsulta).
- * Em modo Testing no console Agora, token vazio é aceito.
+ * Token RTC é obtido do backend (GET /appointments/{id}/agora-token).
  */
 export const AGORA_APP_ID = '75ae244af79944a18a059d2fcb18c1dc';
 

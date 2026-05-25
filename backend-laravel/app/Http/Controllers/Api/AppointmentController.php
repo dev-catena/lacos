@@ -9,6 +9,7 @@ use App\Models\DoctorReview;
 use App\Models\GroupActivity;
 use App\Services\AppointmentPaymentService;
 use App\Services\AppointmentReminderService;
+use App\Services\Agora\AgoraTokenService;
 use App\Services\GroupPatientNameResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -41,6 +42,80 @@ class AppointmentController extends Controller
         }
 
         return false;
+    }
+
+    /** ID numérico da consulta (ignora sufixo de instância recorrente, ex.: 89_2025-05-26). */
+    private function resolveAppointmentRouteId($id): int
+    {
+        $base = explode('_', (string) $id)[0];
+
+        return (int) $base;
+    }
+
+    private function findAppointmentForVideo($id): Appointment
+    {
+        return Appointment::findOrFail($this->resolveAppointmentRouteId($id));
+    }
+
+    private function userIsAppointmentGroupMember(Appointment $appointment, $user): bool
+    {
+        if (!$appointment->group_id) {
+            return false;
+        }
+
+        $userGroups = $user->groups()->pluck('groups.id')->toArray();
+        if (in_array($appointment->group_id, $userGroups, true)) {
+            return true;
+        }
+
+        return DB::table('group_members')
+            ->where('group_id', $appointment->group_id)
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    /**
+     * Valida janela de horário da teleconsulta (15 min antes até 40 min depois).
+     *
+     * @return array{0: bool, 1: ?\Illuminate\Http\JsonResponse}
+     */
+    private function validateTeleconsultVideoWindow(Appointment $appointment): array
+    {
+        if (!$appointment->is_teleconsultation) {
+            return [false, response()->json([
+                'success' => false,
+                'message' => 'Este compromisso não é uma teleconsulta',
+            ], 400)];
+        }
+
+        $scheduledAt = $appointment->scheduled_at ?? $appointment->appointment_date;
+        if (!$scheduledAt) {
+            return [false, response()->json([
+                'success' => false,
+                'message' => 'Horário da consulta não definido',
+            ], 400)];
+        }
+
+        $now = now();
+        $windowStart = $scheduledAt->copy()->subMinutes(15);
+        $windowEnd = $scheduledAt->copy()->addMinutes(40);
+
+        if ($now->lt($windowStart)) {
+            return [false, response()->json([
+                'success' => false,
+                'message' => 'A entrada na videoconferência é permitida a partir de 15 minutos antes do horário',
+            ], 400)];
+        }
+
+        if ($now->gt($windowEnd)) {
+            return [false, response()->json([
+                'success' => false,
+                'message' => 'O horário para entrar na videoconferência já passou (40 minutos após o início)',
+            ], 400)];
+        }
+
+        return [true, null];
     }
 
     public function index(Request $request)
@@ -807,6 +882,74 @@ class AppointmentController extends Controller
     }
 
     /**
+     * Token RTC Agora para entrar na videoconferência.
+     * GET /api/appointments/{id}/agora-token
+     */
+    public function agoraToken(Request $request, $id, AgoraTokenService $agoraTokenService)
+    {
+        try {
+            $appointment = $this->findAppointmentForVideo($id);
+            $user = Auth::user();
+
+            [$ok, $errorResponse] = $this->validateTeleconsultVideoWindow($appointment);
+            if (!$ok) {
+                return $errorResponse;
+            }
+
+            $isDoctor = $this->actingUserIsAssignedDoctor($appointment, $user);
+            $isPatient = $this->userIsAppointmentGroupMember($appointment, $user);
+
+            if (!$isDoctor && !$isPatient) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Você não tem permissão para entrar nesta videoconferência',
+                ], 403);
+            }
+
+            if ($isDoctor) {
+                $ps = $appointment->payment_status;
+                if (!in_array($ps, ['paid_held', 'paid', 'released'], true)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Pagamento pendente. A videoconferência só pode ser iniciada após a confirmação do pagamento.',
+                    ], 403);
+                }
+            }
+
+            $channelName = $agoraTokenService->getChannelName((int) $appointment->id);
+            $uid = $agoraTokenService->toAgoraUid((int) $user->id);
+            $token = $agoraTokenService->buildRtcToken($channelName, $uid);
+
+            if (empty(config('services.agora.app_certificate'))) {
+                Log::warning('AGORA_APP_CERTIFICATE não configurado — token vazio (modo teste Agora)');
+            }
+
+            return response()->json([
+                'success' => true,
+                'token' => $token,
+                'channel_name' => $channelName,
+                'uid' => $uid,
+                'app_id' => config('services.agora.app_id'),
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Consulta não encontrada',
+            ], 404);
+        } catch (\Exception $e) {
+            Log::error('Erro ao gerar token Agora', [
+                'appointment_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao gerar token de vídeo: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Registrar entrada na videoconferência
      * POST /api/appointments/{id}/video-join
      * Body: { "role": "doctor" | "patient" }
@@ -816,43 +959,16 @@ class AppointmentController extends Controller
     public function videoJoin(Request $request, $id)
     {
         try {
-            $appointment = Appointment::findOrFail($id);
+            $appointment = $this->findAppointmentForVideo($id);
             $user = Auth::user();
 
             $validated = $request->validate([
                 'role' => 'required|in:doctor,patient',
             ]);
 
-            if (!$appointment->is_teleconsultation) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Este compromisso não é uma teleconsulta',
-                ], 400);
-            }
-
-            $scheduledAt = $appointment->scheduled_at ?? $appointment->appointment_date;
-            if (!$scheduledAt) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Horário da consulta não definido',
-                ], 400);
-            }
-
-            $now = now();
-            $windowStart = $scheduledAt->copy()->subMinutes(15);
-            $windowEnd = $scheduledAt->copy()->addMinutes(40);
-
-            if ($now->lt($windowStart)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'A entrada na videoconferência é permitida a partir de 15 minutos antes do horário',
-                ], 400);
-            }
-            if ($now->gt($windowEnd)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'O horário para entrar na videoconferência já passou (40 minutos após o início)',
-                ], 400);
+            [$ok, $errorResponse] = $this->validateTeleconsultVideoWindow($appointment);
+            if (!$ok) {
+                return $errorResponse;
             }
 
             $updated = false;
@@ -872,23 +988,11 @@ class AppointmentController extends Controller
                     ], 403);
                 }
                 if (!$appointment->doctor_joined_at) {
-                    $appointment->update(['doctor_joined_at' => $now]);
+                    $appointment->update(['doctor_joined_at' => now()]);
                     $updated = true;
                 }
             } else {
-                $isMember = false;
-                if ($appointment->group_id) {
-                    $userGroups = $user->groups()->pluck('groups.id')->toArray();
-                    $isMember = in_array($appointment->group_id, $userGroups);
-                    if (!$isMember) {
-                        $isMember = DB::table('group_members')
-                            ->where('group_id', $appointment->group_id)
-                            ->where('user_id', $user->id)
-                            ->where('is_active', true)
-                            ->exists();
-                    }
-                }
-                if (!$isMember) {
+                if (!$this->userIsAppointmentGroupMember($appointment, $user)) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Apenas participantes do grupo podem registrar entrada como paciente',
@@ -896,7 +1000,7 @@ class AppointmentController extends Controller
                 }
                 if (!$appointment->patient_joined_at) {
                     $appointment->update([
-                        'patient_joined_at' => $now,
+                        'patient_joined_at' => now(),
                         'patient_joined_by_user_id' => $user->id,
                     ]);
                     $updated = true;

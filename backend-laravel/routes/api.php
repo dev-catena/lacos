@@ -253,6 +253,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
     Route::post('/appointments/{id}/confirm', [AppointmentController::class, 'confirm']);
     Route::post('/appointments/{id}/video-join', [AppointmentController::class, 'videoJoin']);
+    Route::get('/appointments/{id}/agora-token', [AppointmentController::class, 'agoraToken']);
     Route::post('/appointments/{id}/reviews', [AppointmentController::class, 'createReview']);
     Route::post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
     Route::post('/appointments/{id}/payment', [AppointmentController::class, 'processPayment']);
