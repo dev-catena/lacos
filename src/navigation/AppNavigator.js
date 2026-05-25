@@ -30,6 +30,8 @@ import FallSensorScreen from '../screens/Groups/FallSensorScreen';
 import SmartwatchScreen from '../screens/Groups/SmartwatchScreen';
 import WatchAudiosScreen from '../screens/Groups/WatchAudiosScreen';
 import SmartwatchLocationScreen from '../screens/Groups/SmartwatchLocationScreen';
+import CamerasListScreen from '../screens/Groups/CamerasListScreen';
+import CameraPlayerScreen from '../screens/Groups/CameraPlayerScreen';
 import AgendaScreen from '../screens/Groups/AgendaScreen';
 import AddAppointmentScreen from '../screens/Groups/AddAppointmentScreen';
 import AppointmentDetailsScreen from '../screens/Groups/AppointmentDetailsScreen';
@@ -210,6 +212,20 @@ const HomeStack = () => {
       <Stack.Screen 
         name="SmartwatchLocation" 
         component={SmartwatchLocationScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Cameras" 
+        component={CamerasListScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="CameraPlayer" 
+        component={CameraPlayerScreen}
         options={{ 
           headerShown: false 
         }}
@@ -558,6 +574,20 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="SmartwatchLocation" 
         component={SmartwatchLocationScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Cameras" 
+        component={CamerasListScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="CameraPlayer" 
+        component={CameraPlayerScreen}
         options={{ 
           headerShown: false 
         }}

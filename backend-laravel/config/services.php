@@ -31,6 +31,13 @@ return [
         'app_certificate' => env('AGORA_APP_CERTIFICATE'),
     ],
 
+    'rtmp_agent' => [
+        'url' => env('RTMP_AGENT_URL', 'http://177.104.165.210:8000'),
+        'username' => env('RTMP_AGENT_USERNAME'),
+        'password' => env('RTMP_AGENT_PASSWORD'),
+        'timeout' => (int) env('RTMP_AGENT_TIMEOUT', 10),
+    ],
+
     'thalamus_smartwatch' => [
         'base_url' => env('THALAMUS_SW_BASE_URL', 'https://smartwatchwebserver.thalamus.ind.br/api'),
         /** POST JSON { username, password } — padrão {base_url}/auth/token */

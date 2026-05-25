@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\SupplierOrderController;
 use App\Http\Controllers\Api\SupplierMessageController;
 use App\Http\Controllers\Api\StoreController;
 use App\Http\Controllers\Api\PlanController;
+use App\Http\Controllers\Api\GroupCameraController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\CaregiverController;
 use App\Http\Controllers\Api\MedicationController;
@@ -229,6 +230,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/groups/{groupId}/smartwatch-audios', [DeviceController::class, 'getGroupSmartwatchAudios']);
     Route::get('/groups/{groupId}/smartwatch-audios/stream', [DeviceController::class, 'streamGroupSmartwatchAudio']);
     Route::post('/groups/{groupId}/smartwatch-audios/send', [DeviceController::class, 'postGroupSmartwatchAudiosSend']);
+    Route::get('/groups/{groupId}/cameras', [GroupCameraController::class, 'index']);
+    Route::get('/groups/{groupId}/cameras/available', [GroupCameraController::class, 'available']);
+    Route::post('/groups/{groupId}/cameras', [GroupCameraController::class, 'store']);
+    Route::delete('/groups/{groupId}/cameras/{cameraId}', [GroupCameraController::class, 'destroy']);
+    Route::get('/groups/{groupId}/cameras/{cameraId}/stream', [GroupCameraController::class, 'stream']);
+    Route::get('/groups/{groupId}/cameras/{cameraId}/snapshot', [GroupCameraController::class, 'snapshot']);
     Route::post('/groups/{groupId}/devices', [DeviceController::class, 'createGroupDevice']);
     Route::delete('/groups/{groupId}/devices/{deviceId}', [DeviceController::class, 'destroy']);
     

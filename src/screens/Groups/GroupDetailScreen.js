@@ -35,6 +35,7 @@ import {
   InfoIcon,
   DocumentIcon,
   VideoCamOutlineIcon,
+  CameraIcon,
 } from '../../components/CustomIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
@@ -354,6 +355,21 @@ const GroupDetailScreen = ({ route, navigation }) => {
       onPress: () => navigation.navigate('GroupMedia', { 
         groupId, 
         groupName 
+      }),
+    },
+    {
+      id: 'cameras',
+      featureKey: 'cameras',
+      title: 'Câmeras',
+      subtitle: 'Visualizar câmeras da rede local',
+      icon: 'videocam',
+      IconComponent: CameraIcon,
+      color: '#2563EB',
+      backgroundColor: '#2563EB20',
+      onPress: () => navigation.navigate('Cameras', {
+        groupId,
+        groupName,
+        isAdmin,
       }),
     },
     {
