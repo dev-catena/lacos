@@ -85,6 +85,51 @@ class GroupMessageController extends Controller
         return ['allowed' => true, 'group' => $group];
     }
 
+    private function userIsGroupAdmin(int $groupId, $user): bool
+    {
+        $group = DB::table('groups')->where('id', $groupId)->first();
+        if (! $group) {
+            return false;
+        }
+
+        $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+        if ($createdBy && (int) $createdBy === (int) $user->id) {
+            return true;
+        }
+
+        if (! Schema::hasTable('group_members')) {
+            return false;
+        }
+
+        $query = DB::table('group_members')
+            ->where('group_id', $groupId)
+            ->where('user_id', $user->id)
+            ->where('role', 'admin');
+
+        if (Schema::hasColumn('group_members', 'is_active')) {
+            $query->where('is_active', true);
+        }
+
+        return $query->exists();
+    }
+
+    private function deleteMessageImageFile(?string $imageUrl): void
+    {
+        if (! $imageUrl) {
+            return;
+        }
+
+        $path = $imageUrl;
+        if (filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+            $path = parse_url($imageUrl, PHP_URL_PATH) ?: '';
+        }
+
+        $path = ltrim((string) preg_replace('#^/?storage/#', '', $path), '/');
+        if ($path && Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
+    }
+
     private function mapGroupMessageRow($message, $user): array
     {
         $imageUrl = $this->resolveAssetUrl($message->image_url ?? null);
@@ -320,6 +365,82 @@ class GroupMessageController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erro ao enviar mensagem'
+            ], 500);
+        }
+    }
+
+    /**
+     * DELETE /api/messages/group/{groupId}/{messageId}
+     */
+    public function destroy($groupId, $messageId)
+    {
+        try {
+            $user = Auth::user();
+
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado',
+                ], 401);
+            }
+
+            if (! Schema::hasTable('group_messages')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Módulo de mensagens não instalado no servidor.',
+                ], 503);
+            }
+
+            $access = $this->userCanAccessGroup((int) $groupId, $user);
+            if (! $access['allowed']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $access['message'],
+                ], $access['status'] ?? 403);
+            }
+
+            $message = DB::table('group_messages')
+                ->where('group_id', $groupId)
+                ->where('id', $messageId)
+                ->first();
+
+            if (! $message) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Mensagem não encontrada',
+                ], 404);
+            }
+
+            $isOwner = (int) $message->user_id === (int) $user->id;
+            $isAdmin = $this->userIsGroupAdmin((int) $groupId, $user);
+
+            if (! $isOwner && ! $isAdmin) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Você só pode excluir suas próprias mensagens',
+                ], 403);
+            }
+
+            if (! empty($message->image_url)) {
+                $this->deleteMessageImageFile($message->image_url);
+            }
+
+            DB::table('group_messages')->where('id', $messageId)->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Mensagem excluída',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao excluir mensagem do grupo', [
+                'group_id' => $groupId,
+                'message_id' => $messageId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao excluir mensagem',
             ], 500);
         }
     }

@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Pressable,
   ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -18,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import moment from 'moment';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import chatService from '../../services/chatService';
@@ -61,6 +63,7 @@ const GroupChatScreen = ({ route, navigation, groupId: groupIdProp, groupName: g
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deletingMessageId, setDeletingMessageId] = useState(null);
   const flatListRef = useRef(null);
   const pollingIntervalRef = useRef(null);
 
@@ -232,6 +235,43 @@ const GroupChatScreen = ({ route, navigation, groupId: groupIdProp, groupName: g
     }
   };
 
+  const canDeleteMessage = (item) => item.isOwn;
+
+  const handleMessageLongPress = (item) => {
+    if (!canDeleteMessage(item) || deletingMessageId) return;
+
+    Alert.alert(
+      'Excluir mensagem',
+      'Deseja excluir esta mensagem? Essa ação não pode ser desfeita.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () => handleDeleteMessage(item.id),
+        },
+      ]
+    );
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!groupId || deletingMessageId) return;
+
+    setDeletingMessageId(messageId);
+    try {
+      const result = await chatService.deleteGroupMessage(groupId, messageId);
+      if (result.success) {
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      } else {
+        Alert.alert('Erro', result.error || 'Não foi possível excluir a mensagem');
+      }
+    } catch (err) {
+      Alert.alert('Erro', 'Não foi possível excluir a mensagem');
+    } finally {
+      setDeletingMessageId(null);
+    }
+  };
+
   const renderMessage = ({ item }) => {
     const isOwn = item.isOwn;
     const isImageMessage =
@@ -263,13 +303,23 @@ const GroupChatScreen = ({ route, navigation, groupId: groupIdProp, groupName: g
           {!isOwn && (
             <Text style={styles.senderName}>{item.senderName}</Text>
           )}
-          <View
-            style={[
+          <Pressable
+            onLongPress={() => handleMessageLongPress(item)}
+            delayLongPress={400}
+            disabled={!canDeleteMessage(item) || deletingMessageId === item.id}
+            style={({ pressed }) => [
               styles.messageBubble,
               isOwn ? styles.ownBubble : styles.otherBubble,
+              canDeleteMessage(item) && pressed && styles.messageBubblePressed,
             ]}
           >
-            {isImageMessage ? (
+            {deletingMessageId === item.id ? (
+              <ActivityIndicator
+                size="small"
+                color={isOwn ? colors.primary : colors.textLight}
+                style={styles.messageDeleting}
+              />
+            ) : isImageMessage ? (
               item.imageUrl ? (
                 <Image
                   source={{ uri: item.imageUrl }}
@@ -300,7 +350,7 @@ const GroupChatScreen = ({ route, navigation, groupId: groupIdProp, groupName: g
             >
               {moment(item.timestamp).format('HH:mm')}
             </Text>
-          </View>
+          </Pressable>
         </View>
 
         {isOwn && (
@@ -571,6 +621,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderBottomLeftRadius: 4,
     alignSelf: 'flex-start',
+  },
+  messageBubblePressed: {
+    opacity: 0.85,
+  },
+  messageDeleting: {
+    paddingVertical: 24,
+    alignSelf: 'center',
   },
   messageText: {
     fontSize: 15,

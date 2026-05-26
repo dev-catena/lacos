@@ -324,7 +324,28 @@ class ChatService {
       };
     }
   }
+
+  /**
+   * Excluir mensagem do grupo
+   */
+  async deleteGroupMessage(groupId, messageId) {
+    try {
+      const response = await apiService.delete(`/messages/group/${groupId}/${messageId}`);
+      if (response && response.success !== false) {
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: response?.message || 'Erro ao excluir mensagem',
+      };
+    } catch (error) {
+      console.error('❌ ChatService - Erro ao excluir mensagem do grupo:', error);
+      return {
+        success: false,
+        error: error?.message || 'Erro ao excluir mensagem',
+      };
+    }
+  }
 }
 
 export default new ChatService();
-
