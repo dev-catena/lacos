@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Medication;
 use App\Models\GroupActivity;
+use App\Services\AccompaniedPersonResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -474,92 +475,18 @@ class MedicationController extends Controller
             }
         }
         
-        // Buscar o paciente do grupo (accompanied_person_id) - obrigatório
-        // A coluna referenced a tabela accompanied_people, não users
-        if (!isset($medicationData['accompanied_person_id']) && isset($medicationData['group_id'])) {
-            try {
-                // Primeiro, buscar o user_id do paciente no grupo
-                $patientUser = DB::table('group_members')
-                    ->join('users', 'group_members.user_id', '=', 'users.id')
-                    ->where('group_members.group_id', $medicationData['group_id'])
-                    ->whereIn('group_members.role', ['priority_contact', 'patient'])
-                    ->select('users.id as user_id')
-                    ->first();
-                
-                if ($patientUser && Schema::hasTable('accompanied_people')) {
-                    // Buscar o registro em accompanied_people que corresponde ao grupo e ao paciente
-                    $accompaniedPerson = DB::table('accompanied_people')
-                        ->where('group_id', $medicationData['group_id'])
-                        ->where('user_id', $patientUser->user_id)
-                        ->select('id')
-                        ->first();
-                    
-                    if ($accompaniedPerson) {
-                        $medicationData['accompanied_person_id'] = $accompaniedPerson->id;
-                        Log::info('MedicationController.store - Paciente acompanhado encontrado', [
-                            'group_id' => $medicationData['group_id'],
-                            'user_id' => $patientUser->user_id,
-                            'accompanied_person_id' => $accompaniedPerson->id
-                        ]);
-                    } else {
-                        // Se não encontrar em accompanied_people, criar um registro
-                        Log::warning('MedicationController.store - Registro não encontrado em accompanied_people, criando...', [
-                            'group_id' => $medicationData['group_id'],
-                            'user_id' => $patientUser->user_id
-                        ]);
-                        
-                        $userData = DB::table('users')->where('id', $patientUser->user_id)->first();
-                        if ($userData) {
-                            $accompaniedPersonId = DB::table('accompanied_people')->insertGetId([
-                                'group_id' => $medicationData['group_id'],
-                                'user_id' => $patientUser->user_id,
-                                'name' => $userData->name ?? 'Paciente',
-                                'email' => $userData->email ?? null,
-                                'phone' => $userData->phone ?? null,
-                                'created_at' => now(),
-                                'updated_at' => now(),
-                            ]);
-                            $medicationData['accompanied_person_id'] = $accompaniedPersonId;
-                            Log::info('MedicationController.store - Registro criado em accompanied_people', [
-                                'accompanied_person_id' => $accompaniedPersonId
-                            ]);
-                        }
-                    }
-                } else {
-                    Log::warning('MedicationController.store - Nenhum paciente encontrado no grupo', [
-                        'group_id' => $medicationData['group_id']
-                    ]);
-                    // Se não encontrar paciente, buscar o primeiro registro em accompanied_people do grupo
-                    if (Schema::hasTable('accompanied_people')) {
-                        $firstAccompanied = DB::table('accompanied_people')
-                            ->where('group_id', $medicationData['group_id'])
-                            ->select('id')
-                            ->first();
-                        if ($firstAccompanied) {
-                            $medicationData['accompanied_person_id'] = $firstAccompanied->id;
-                            Log::info('MedicationController.store - Usando primeiro registro de accompanied_people do grupo', [
-                                'accompanied_person_id' => $firstAccompanied->id
-                            ]);
-                        }
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::error('MedicationController.store - Erro ao buscar paciente do grupo: ' . $e->getMessage(), [
-                    'trace' => $e->getTraceAsString()
+        // Vincular ao paciente acompanhado do grupo (cria registro se necessário)
+        if (! isset($medicationData['accompanied_person_id']) && isset($medicationData['group_id'])) {
+            $resolvedId = AccompaniedPersonResolver::resolveForGroup((int) $medicationData['group_id']);
+            if ($resolvedId) {
+                $medicationData['accompanied_person_id'] = $resolvedId;
+            } else {
+                Log::warning('MedicationController.store - accompanied_person_id não resolvido, salvando com NULL', [
+                    'group_id' => $medicationData['group_id'],
                 ]);
             }
         }
-        
-        // Validar se accompanied_person_id foi preenchido
-        if (!isset($medicationData['accompanied_person_id'])) {
-            Log::error('MedicationController.store - accompanied_person_id não foi preenchido');
-            return response()->json([
-                'success' => false,
-                'message' => 'Não foi possível identificar o paciente do grupo',
-                'error' => 'accompanied_person_id is required'
-            ], 422);
-        }
-        
+
         $medication = Medication::create($medicationData);
         // Remover load('doctor') - relação não funciona sem doctor_id na tabela
         // $medication->load('doctor');
