@@ -542,13 +542,13 @@ export function buildWatchVitalData(health) {
     ...sectionData(health, 'heart_rates'),
     ...sectionData(health, 'heartbeats'),
   ];
-  const heart_rate = rowsToChartPoints(hrRows, parseHeartRateRow);
+  let heart_rate = rowsToChartPoints(hrRows, parseHeartRateRow);
 
   const bpRows = sectionData(health, 'blood_pressures');
-  const blood_pressure = rowsToChartPoints(bpRows, parseBpRow);
+  let blood_pressure = rowsToChartPoints(bpRows, parseBpRow);
 
   const oxRows = collectOxygenRows(health);
-  const oxygen_saturation = rowsToChartPoints(oxRows, parseOxygenRow);
+  let oxygen_saturation = rowsToChartPoints(oxRows, parseOxygenRow);
 
   const tempRows = collectTemperatureRows(health);
   let temperature = rowsToChartPoints(tempRows, parseTemperatureRow);

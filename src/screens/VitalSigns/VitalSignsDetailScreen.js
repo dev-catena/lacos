@@ -91,6 +91,15 @@ function formatWatchDisplayValue(rawValue) {
   return String(value ?? '—');
 }
 
+function safeBuildWatchVitalData(health) {
+  try {
+    return buildWatchVitalData(health);
+  } catch (error) {
+    console.error('❌ Erro ao processar dados do relógio:', error);
+    return null;
+  }
+}
+
 const VitalSignsDetailScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params || {};
   
@@ -281,7 +290,11 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
         setWatchImei(d.imei || null);
         setWatchNickname(d.device_nickname || null);
         setWatchBatteryPercent(parseWatchBatteryFromSmartwatchPayload(d));
-        setWatchVitalData(buildWatchVitalData(d.health));
+        const vitalData = safeBuildWatchVitalData(d.health);
+        setWatchVitalData(vitalData);
+        if (!vitalData) {
+          setWatchError('Não foi possível interpretar os dados do relógio.');
+        }
         setWatchDataUpdatedAt(new Date());
         setActiveTab('watch');
         setWatchError(null);
@@ -358,13 +371,14 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
     try {
       const watchRes = await deviceService.getGroupSmartwatchHealth(groupId);
       if (watchRes.success && watchRes.data?.has_smartwatch) {
-        setWatchVitalData(buildWatchVitalData(watchRes.data.health));
+        const vitalData = safeBuildWatchVitalData(watchRes.data.health);
+        setWatchVitalData(vitalData);
         setWatchImei(watchRes.data.imei || null);
         setWatchNickname(watchRes.data.device_nickname || null);
         setWatchBatteryPercent(parseWatchBatteryFromSmartwatchPayload(watchRes.data));
         setHasSmartwatch(true);
         setWatchDataUpdatedAt(new Date());
-        return buildWatchVitalData(watchRes.data.health);
+        return vitalData;
       }
       if (watchRes.error) {
         setWatchError(watchRes.error);
@@ -378,7 +392,7 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
   const fetchWatchVitalData = useCallback(async () => {
     const watchRes = await deviceService.getGroupSmartwatchHealth(groupId);
     if (watchRes.success && watchRes.data?.has_smartwatch) {
-      const vitalData = buildWatchVitalData(watchRes.data.health);
+      const vitalData = safeBuildWatchVitalData(watchRes.data.health);
       setWatchVitalData(vitalData);
       setWatchImei(watchRes.data.imei || null);
       setWatchNickname(watchRes.data.device_nickname || null);
