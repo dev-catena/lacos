@@ -222,6 +222,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/groups/join', [GroupController::class, 'join']);
     Route::put('/groups/{id}', [GroupController::class, 'update']);
     Route::post('/groups/{id}/photo', [GroupController::class, 'uploadPhoto']);
+    Route::delete('/groups/{id}/photo', [GroupController::class, 'deletePhoto']);
     Route::delete('/groups/{id}', [GroupController::class, 'destroy']);
     Route::get('/groups/{id}/members', [GroupController::class, 'members']);
     Route::put('/groups/{groupId}/members/{memberId}/role', [GroupController::class, 'updateMemberRole']);

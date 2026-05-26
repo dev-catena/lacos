@@ -1260,8 +1260,10 @@ const AddPrescriptionScreen = ({ route, navigation }) => {
               style={styles.addButton}
               onPress={handleAddMedication}
               activeOpacity={0.7}
+              accessibilityLabel="Adicionar medicamento"
+              accessibilityRole="button"
             >
-              <Text style={styles.addButtonText}>+ Adicionar Medicamentos</Text>
+              <Text style={styles.addButtonText}>+</Text>
             </TouchableOpacity>
           </View>
 
@@ -2045,13 +2047,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: PASTEL_BLUE,
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: PASTEL_BLUE,
     ...Platform.select({
@@ -2065,9 +2066,11 @@ const styles = StyleSheet.create({
     }),
   },
   addButtonText: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '600',
     color: colors.white,
+    lineHeight: 26,
+    marginTop: -2,
   },
   medicationCard: {
     backgroundColor: colors.white,

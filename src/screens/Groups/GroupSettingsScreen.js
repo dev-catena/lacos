@@ -28,6 +28,33 @@ import groupService from '../../services/groupService';
 import groupMemberService from '../../services/groupMemberService';
 import Toast from 'react-native-toast-message';
 import API_CONFIG from '../../config/api';
+
+const normalizeImageMimeType = (filename) => {
+  const ext = filename?.split('.').pop()?.toLowerCase();
+  if (ext === 'png') return 'image/png';
+  if (ext === 'gif') return 'image/gif';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'heic' || ext === 'heif') return 'image/jpeg';
+  return 'image/jpeg';
+};
+
+const buildGroupPhotoFormData = (photoUri, extraFields = {}) => {
+  const formData = new FormData();
+  Object.entries(extraFields).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      formData.append(key, String(value));
+    }
+  });
+
+  const filename = photoUri.split('/').pop();
+  formData.append('photo', {
+    uri: photoUri,
+    name: filename || `group_photo_${Date.now()}.jpg`,
+    type: normalizeImageMimeType(filename),
+  });
+
+  return formData;
+};
 import { BACKEND_HOST } from '../../config/env';
 import {
   VitalSignsIcon,
@@ -592,9 +619,37 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         {
           text: 'Remover',
           style: 'destructive',
-          onPress: () => {
-            setNewGroupPhoto(null);
-            setGroupPhotoUrl(null);
+          onPress: async () => {
+            try {
+              setSaving(true);
+              const result = await groupService.removeGroupPhoto(groupId);
+
+              if (result.success) {
+                setNewGroupPhoto(null);
+                setGroupPhotoUrl(null);
+                setImageSource(null);
+                setPhotoKey(Date.now());
+                setGroupData((prev) =>
+                  prev ? { ...prev, photo: null, photo_url: null } : prev
+                );
+
+                Toast.show({
+                  type: 'success',
+                  text1: 'Foto removida',
+                  text2: 'A foto do grupo foi removida com sucesso',
+                });
+              } else {
+                Alert.alert('Erro', result.error || 'Não foi possível remover a foto');
+              }
+            } catch (error) {
+              console.error('❌ GroupSettings.removeGroupPhoto - Erro:', error);
+              Alert.alert(
+                'Erro',
+                error?.message || 'Não foi possível remover a foto'
+              );
+            } finally {
+              setSaving(false);
+            }
           },
         },
       ]
@@ -632,53 +687,43 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           return;
         }
         
-        const formData = new FormData();
-        formData.append('name', editedGroupName);
-        formData.append('description', editedDescription || '');
-        
-        // Adicionar configurações de sinais vitais
-        Object.keys(vitalSigns).forEach(key => {
-          formData.append(key, vitalSigns[key] ? '1' : '0');
-        });
-        
-        // Adicionar permissões do acompanhado
-        Object.keys(permissions).forEach(key => {
-          formData.append(key, permissions[key] ? '1' : '0');
+        const formData = buildGroupPhotoFormData(newGroupPhoto, {
+          name: editedGroupName,
+          description: editedDescription || '',
+          ...Object.fromEntries(
+            Object.entries(vitalSigns).map(([key, value]) => [key, value ? '1' : '0'])
+          ),
+          ...Object.fromEntries(
+            Object.entries(permissions).map(([key, value]) => [key, value ? '1' : '0'])
+          ),
         });
 
-        const filename = newGroupPhoto.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        console.log('📤 GroupSettings - FormData preparado para fallback');
 
-        // Preparar objeto de arquivo para FormData
-        const photoFile = {
-          uri: newGroupPhoto,
-          name: filename || `group_photo_${Date.now()}.jpg`,
-          type: type,
-        };
+        // POST /groups/{id}/photo — PUT multipart costuma falhar no PHP/Laravel
+        let result = await groupService.uploadGroupPhotoSimple(groupId, newGroupPhoto);
+        if (!result.success) {
+          console.warn('📤 GroupSettings - uploadGroupPhotoSimple falhou, tentando PUT FormData...');
+          result = await groupService.updateGroup(groupId, formData);
+        }
 
-        formData.append('photo', photoFile);
+        if (!result.success) {
+          Alert.alert(
+            'Erro ao Salvar Foto',
+            result.error || 'Não foi possível atualizar a foto do grupo.'
+          );
+          return;
+        }
 
-        console.log('📤 GroupSettings - FormData preparado:', { 
-          name: editedGroupName, 
-          description: editedDescription,
-          photo: { 
-            filename: photoFile.name, 
-            type: photoFile.type,
-            uri: newGroupPhoto.substring(0, 50) + '...' // Log parcial da URI
-          }
+        const metaResult = await groupService.updateGroup(groupId, {
+          name: editedGroupName,
+          description: editedDescription || '',
+          ...vitalSigns,
+          ...permissions,
         });
 
-        console.log('📤 GroupSettings - Chamando groupService.updateGroup...');
-        console.log('📤 GroupSettings - Grupo ID:', groupId);
-        console.log('📤 GroupSettings - FormData preparado, enviando...');
-        try {
-          const result = await groupService.updateGroup(groupId, formData);
-          console.log('📤 GroupSettings - Resposta recebida:', result);
-        } catch (error) {
-          console.error('❌ GroupSettings - ERRO ao chamar updateGroup:', error);
-          console.error('❌ GroupSettings - Erro completo:', JSON.stringify(error, null, 2));
-          throw error;
+        if (!metaResult.success) {
+          console.warn('⚠️ GroupSettings - Foto salva, mas metadados falharam:', metaResult.error);
         }
         
         if (result.success) {
@@ -898,7 +943,10 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       }
     } catch (error) {
       console.error('❌ Erro ao salvar:', error);
-      Alert.alert('Erro', 'Não foi possível atualizar as informações');
+      Alert.alert(
+        'Erro',
+        error?.message || 'Não foi possível atualizar as informações'
+      );
     } finally {
       setSaving(false);
     }
@@ -1236,50 +1284,37 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         
         // Usar saveGroupBasicInfo que já tem a lógica de upload de foto
         // Mas primeiro adicionar as configurações ao FormData
-        const formData = new FormData();
-        formData.append('name', editedGroupName || groupData?.name || '');
-        formData.append('description', editedDescription || groupData?.description || '');
-        
-        // Adicionar permissões do acompanhado
-        Object.keys(permissions).forEach(key => {
-          formData.append(key, permissions[key] ? '1' : '0');
-        });
-        Object.keys(vitalSigns).forEach(key => {
-          formData.append(key, vitalSigns[key] ? '1' : '0');
-        });
-        
-        // Adicionar foto - IMPORTANTE: usar o formato correto para React Native
-        const filename = newGroupPhoto.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-        
-        console.log('💾 GroupSettings.handleSave - Preparando arquivo:', {
-          filename,
-          type,
-          uri: newGroupPhoto,
+        const formData = buildGroupPhotoFormData(newGroupPhoto, {
+          name: editedGroupName || groupData?.name || '',
+          description: editedDescription || groupData?.description || '',
+          ...Object.fromEntries(
+            Object.entries(permissions).map(([key, value]) => [key, value ? '1' : '0'])
+          ),
+          ...Object.fromEntries(
+            Object.entries(vitalSigns).map(([key, value]) => [key, value ? '1' : '0'])
+          ),
         });
         
-        const photoFile = {
-          uri: newGroupPhoto,
-          name: filename || `group_photo_${Date.now()}.jpg`,
-          type: type,
-        };
-        
-        formData.append('photo', photoFile);
-        
-        // Log do FormData para debug
-        console.log('💾 GroupSettings.handleSave - FormData preparado:');
-        for (let pair of formData.entries()) {
-          if (pair[1] && typeof pair[1] === 'object' && pair[1].uri) {
-            console.log(`  - ${pair[0]}: [FILE] ${pair[1].name} (${pair[1].type})`);
-          } else {
-            console.log(`  - ${pair[0]}: ${pair[1]}`);
+        console.log('💾 GroupSettings.handleSave - Enviando foto via POST /groups/{id}/photo...');
+        let result = await groupService.uploadGroupPhotoSimple(groupId, newGroupPhoto);
+        if (!result.success) {
+          console.warn('💾 GroupSettings.handleSave - POST falhou, tentando PUT FormData...');
+          result = await groupService.updateGroup(groupId, formData);
+        }
+
+        if (result.success) {
+          const metaResult = await groupService.updateGroup(groupId, {
+            name: editedGroupName || groupData?.name || '',
+            description: editedDescription || groupData?.description || '',
+            ...permissions,
+            ...vitalSigns,
+          });
+          if (!metaResult.success) {
+            console.warn('💾 GroupSettings.handleSave - Metadados não salvos:', metaResult.error);
           }
         }
         
-        console.log('💾 GroupSettings.handleSave - Chamando groupService.updateGroup com FormData...');
-        const result = await groupService.updateGroup(groupId, formData);
-        console.log('💾 GroupSettings.handleSave - Resultado do updateGroup:', {
+        console.log('💾 GroupSettings.handleSave - Resultado do upload:', {
           success: result.success,
           hasData: !!result.data,
           photo_url: result.data?.photo_url,
@@ -1531,6 +1566,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
                       style={[styles.photoActionButton, styles.photoRemoveButton]}
                       onPress={removeGroupPhoto}
                       activeOpacity={0.7}
+                      disabled={saving}
                     >
                       <SafeIcon name="trash-outline" size={20} color={colors.error} />
                       <Text style={[styles.photoActionText, { color: colors.error }]}>Remover</Text>

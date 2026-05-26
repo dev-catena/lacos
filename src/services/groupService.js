@@ -161,10 +161,14 @@ class GroupService {
           return { success: true, data: response };
         } catch (apiError) {
           console.error('❌ GroupService.updateGroup - Erro na API:', apiError);
-          console.error('❌ GroupService.updateGroup - Status:', apiError.status);
-          console.error('❌ GroupService.updateGroup - Mensagem:', apiError.message);
-          console.error('❌ GroupService.updateGroup - Error completo:', JSON.stringify(apiError, null, 2));
-          throw apiError;
+          const errorMessage =
+            apiError?.message ||
+            apiError?._rawErrorData?.message ||
+            'Erro ao atualizar grupo';
+          return {
+            success: false,
+            error: errorMessage,
+          };
         }
       }
       
@@ -218,6 +222,7 @@ class GroupService {
       if (groupData.accompanied_access_schedule !== undefined) data.accompanied_access_schedule = groupData.accompanied_access_schedule;
       if (groupData.accompanied_access_chat !== undefined) data.accompanied_access_chat = groupData.accompanied_access_chat;
       if (groupData.module_watch_audios !== undefined) data.module_watch_audios = groupData.module_watch_audios;
+      if (groupData.remove_photo !== undefined) data.remove_photo = groupData.remove_photo;
 
       console.log('📤 GroupService.updateGroup - Enviando dados JSON:', data);
       console.log('📤 GroupService.updateGroup - Endpoint:', endpoint);
@@ -298,6 +303,35 @@ class GroupService {
   }
 
   /**
+   * Remover foto do grupo
+   */
+  async removeGroupPhoto(groupId) {
+    const photoEndpoint = apiService.replaceParams('/groups/:id/photo', { id: groupId });
+
+    try {
+      const response = await apiService.delete(photoEndpoint);
+      return { success: true, data: response };
+    } catch (deleteError) {
+      console.warn('removeGroupPhoto DELETE falhou, tentando PUT remove_photo:', deleteError?.message);
+
+      try {
+        const response = await apiService.put(
+          apiService.replaceParams('/groups/:id', { id: groupId }),
+          { remove_photo: true }
+        );
+        return { success: true, data: response };
+      } catch (putError) {
+        const errorMessage =
+          putError?.message ||
+          putError?._rawErrorData?.message ||
+          deleteError?.message ||
+          'Erro ao remover foto do grupo';
+        return { success: false, error: errorMessage };
+      }
+    }
+  }
+
+  /**
    * Upload de foto do grupo - MÉTODO SIMPLES
    */
   async uploadGroupPhotoSimple(groupId, imageUri) {
@@ -305,8 +339,11 @@ class GroupService {
       const formData = new FormData();
       
       const filename = imageUri.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      const type = filename?.split('.').pop()?.toLowerCase() === 'png'
+        ? 'image/png'
+        : filename?.split('.').pop()?.toLowerCase() === 'gif'
+          ? 'image/gif'
+          : 'image/jpeg';
       
       const file = {
         uri: imageUri,
@@ -323,9 +360,13 @@ class GroupService {
       return { success: true, data: response };
     } catch (error) {
       console.error('❌ GroupService.uploadGroupPhotoSimple - Erro:', error);
+      const errorMessage =
+        error?.message ||
+        error?._rawErrorData?.message ||
+        'Erro ao fazer upload da foto';
       return { 
         success: false, 
-        error: error.message || 'Erro ao fazer upload da foto' 
+        error: errorMessage,
       };
     }
   }

@@ -860,6 +860,7 @@ class GroupController extends Controller
                 'accompanied_access_schedule' => 'sometimes',
                 'accompanied_access_chat' => 'sometimes',
                 'module_watch_audios' => 'sometimes',
+                'remove_photo' => 'sometimes',
             ];
 
             if ($hasPhotoColumn) {
@@ -943,6 +944,20 @@ class GroupController extends Controller
             }
             if (isset($validated['module_watch_audios'])) {
                 $data['module_watch_audios'] = $toBool($validated['module_watch_audios']);
+            }
+
+            // Remover foto do grupo (flag enviada pelo app)
+            $shouldRemovePhoto = $request->boolean('remove_photo')
+                || ($validated['remove_photo'] ?? null) === '1'
+                || ($validated['remove_photo'] ?? null) === 1
+                || ($validated['remove_photo'] ?? null) === true;
+
+            if ($shouldRemovePhoto && $hasPhotoColumn) {
+                if ($group->photo && Storage::disk('public')->exists($group->photo)) {
+                    Storage::disk('public')->delete($group->photo);
+                    Log::info("GroupController::update - Foto removida do grupo {$id}: {$group->photo}");
+                }
+                $data['photo'] = null;
             }
 
             // Upload de foto se fornecida
@@ -1500,6 +1515,81 @@ class GroupController extends Controller
             \Log::error("GroupController::uploadPhoto - ERRO: " . $e->getMessage());
             \Log::error("Stack: " . $e->getTraceAsString());
             return response()->json(['message' => 'Erro ao fazer upload', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Remover foto do grupo
+     * DELETE /api/groups/{id}/photo
+     */
+    public function deletePhoto($id)
+    {
+        try {
+            $user = Auth::user();
+
+            if (! $user) {
+                return response()->json(['message' => 'Usuário não autenticado'], 401);
+            }
+
+            $group = DB::table('groups')->where('id', $id)->first();
+
+            if (! $group) {
+                return response()->json(['message' => 'Grupo não encontrado'], 404);
+            }
+
+            $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+            $isCreator = $createdBy && (int) $createdBy === (int) $user->id;
+
+            $isAdmin = $isCreator;
+            if (! $isAdmin && Schema::hasTable('group_members')) {
+                $memberInfo = DB::table('group_members')
+                    ->where('group_id', $id)
+                    ->where('user_id', $user->id)
+                    ->first();
+                $isAdmin = $isAdmin || ($memberInfo && $memberInfo->role === 'admin');
+            }
+
+            if (! $isAdmin) {
+                return response()->json(['message' => 'Sem permissão'], 403);
+            }
+
+            if (! Schema::hasColumn('groups', 'photo')) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Foto removida',
+                    'photo' => null,
+                    'photo_url' => null,
+                ]);
+            }
+
+            if ($group->photo && Storage::disk('public')->exists($group->photo)) {
+                Storage::disk('public')->delete($group->photo);
+            }
+
+            DB::table('groups')->where('id', $id)->update([
+                'photo' => null,
+                'updated_at' => now(),
+            ]);
+
+            if (class_exists('App\Models\GroupActivity')) {
+                try {
+                    \App\Models\GroupActivity::logGroupPhotoUpdated((int) $id, $user->id, $user->name);
+                } catch (\Exception $e) {
+                    Log::warning('Erro ao registrar atividade de remoção de foto: '.$e->getMessage());
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Foto removida',
+                'id' => (int) $group->id,
+                'photo' => null,
+                'photo_url' => null,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('GroupController::deletePhoto - ERRO: '.$e->getMessage());
+
+            return response()->json(['message' => 'Erro ao remover foto', 'error' => $e->getMessage()], 500);
         }
     }
 

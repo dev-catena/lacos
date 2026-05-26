@@ -167,20 +167,22 @@ const DoctorsScreen = ({ route, navigation }) => {
         collapsable={false}
         needsOffscreenAlphaCompositing={false}
       >
-      {/* Badges */}
-      <View style={styles.badgesContainer}>
-        {item.is_primary && (
-          <View style={styles.primaryBadge}>
-            <Text style={styles.primaryBadgeText}>Principal</Text>
-          </View>
-        )}
-        {item.is_platform_doctor && (
-          <View style={styles.platformBadge}>
-            <CheckmarkCircleIcon size={12} color={colors.white} />
-            <Text style={styles.platformBadgeText}>Plataforma</Text>
-          </View>
-        )}
-      </View>
+      {/* Badges — fluxo normal (evita sobrepor o nome) */}
+      {(item.is_primary || item.is_platform_doctor) && (
+        <View style={styles.badgesContainer}>
+          {item.is_primary && (
+            <View style={styles.primaryBadge}>
+              <Text style={styles.primaryBadgeText}>Principal</Text>
+            </View>
+          )}
+          {item.is_platform_doctor && (
+            <View style={styles.platformBadge}>
+              <CheckmarkCircleIcon size={12} color={colors.white} />
+              <Text style={styles.platformBadgeText}>Plataforma</Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Avatar e Nome */}
       <View style={styles.doctorHeader}>
@@ -194,14 +196,9 @@ const DoctorsScreen = ({ route, navigation }) => {
           />
         </View>
         <View style={styles.doctorInfo}>
-          <View style={styles.nameRow}>
-            <Text style={styles.doctorName}>{item.name}</Text>
-            {item.is_platform_doctor && (
-              <View style={styles.platformIndicator}>
-                <CheckmarkCircleIcon size={16} color={colors.success} />
-              </View>
-            )}
-          </View>
+          <Text style={styles.doctorName} numberOfLines={2}>
+            {item.name}
+          </Text>
           {item.medical_specialty?.name && (
             <View style={styles.specialtyBadge}>
               <MedicalOutlineIcon size={14} color={colors.primary} />
@@ -409,12 +406,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success + '08', // Fundo levemente verde
   },
   badgesContainer: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
     gap: 6,
+    marginBottom: 8,
   },
   primaryBadge: {
     flexDirection: 'row',
@@ -460,21 +457,13 @@ const styles = StyleSheet.create({
   },
   doctorInfo: {
     flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 6,
+    minWidth: 0,
   },
   doctorName: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.text,
-    flex: 1,
-  },
-  platformIndicator: {
-    marginLeft: 4,
+    marginBottom: 4,
   },
   platformAvatar: {
     backgroundColor: colors.success + '20', // Fundo verde claro para avatar
