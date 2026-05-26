@@ -330,19 +330,29 @@ class ChatService {
    */
   async deleteGroupMessage(groupId, messageId) {
     try {
-      const response = await apiService.delete(`/messages/group/${groupId}/${messageId}`);
-      if (response && response.success !== false) {
+      const response = await apiService.delete(
+        `/messages/group/${groupId}/${messageId}`
+      );
+
+      if (response?.success === true || response?.message === 'Mensagem excluída') {
         return { success: true };
       }
+
       return {
         success: false,
         error: response?.message || 'Erro ao excluir mensagem',
       };
     } catch (error) {
       console.error('❌ ChatService - Erro ao excluir mensagem do grupo:', error);
+      const msg =
+        error?.message ||
+        error?._rawErrorData?.message ||
+        (error?.status === 404
+          ? 'Recurso não encontrado. Atualize o backend (rota DELETE de mensagens).'
+          : 'Erro ao excluir mensagem');
       return {
         success: false,
-        error: error?.message || 'Erro ao excluir mensagem',
+        error: msg,
       };
     }
   }

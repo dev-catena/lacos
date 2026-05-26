@@ -332,7 +332,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Mensagens de Grupo - Chat do grupo
     Route::get('/messages/group/{groupId}', [GroupMessageController::class, 'getGroupMessages']);
     Route::post('/messages/group', [GroupMessageController::class, 'sendGroupMessage']);
-    Route::delete('/messages/group/{groupId}/{messageId}', [GroupMessageController::class, 'destroy']);
+    Route::delete('/messages/group/{groupId}/{messageId}', [GroupMessageController::class, 'destroy'])
+        ->whereNumber(['groupId', 'messageId']);
     
     // Planos - Gestão de Planos (apenas root/admin)
     Route::get('/plans', [PlanController::class, 'index']);
