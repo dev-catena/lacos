@@ -28,6 +28,16 @@ import groupService from '../../services/groupService';
 import groupMemberService from '../../services/groupMemberService';
 import Toast from 'react-native-toast-message';
 import API_CONFIG from '../../config/api';
+import { BACKEND_HOST } from '../../config/env';
+import {
+  VitalSignsIcon,
+  PermissionsIcon,
+  NotificationIcon,
+  MedicalHistoryIcon,
+  MedicationIcon,
+  AppointmentIcon,
+  MessagesIcon,
+} from '../../components/CustomIcons';
 
 const normalizeImageMimeType = (filename) => {
   const ext = filename?.split('.').pop()?.toLowerCase();
@@ -55,16 +65,6 @@ const buildGroupPhotoFormData = (photoUri, extraFields = {}) => {
 
   return formData;
 };
-import { BACKEND_HOST } from '../../config/env';
-import {
-  VitalSignsIcon,
-  PermissionsIcon,
-  NotificationIcon,
-  MedicalHistoryIcon,
-  MedicationIcon,
-  AppointmentIcon,
-  MessagesIcon,
-} from '../../components/CustomIcons';
 
 const GROUPS_STORAGE_KEY = '@lacos_groups';
 

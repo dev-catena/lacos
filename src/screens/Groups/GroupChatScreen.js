@@ -22,7 +22,7 @@ import moment from 'moment';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import chatService from '../../services/chatService';
-import API_CONFIG from '../config/api';
+import API_CONFIG from '../../config/api';
 
 const API_ORIGIN = API_CONFIG.BASE_URL.replace(/\/api\/?$/, '');
 
