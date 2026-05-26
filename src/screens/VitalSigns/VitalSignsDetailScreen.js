@@ -186,14 +186,16 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
   }, [watchVitalData]);
 
   const applyVitalSignsResult = useCallback((result) => {
-    if (!result.success || !result.data) {
+    if (!result?.success) {
       return;
     }
+
+    const rows = Array.isArray(result.data) ? result.data : [];
     const organized = {};
     const basals = {};
 
     indicatorsConfig.forEach((indicator) => {
-      const typeData = result.data.filter((item) => item.type === indicator.key);
+      const typeData = rows.filter((item) => item.type === indicator.key);
 
       const sortedData = [...typeData].sort(
         (a, b) => new Date(a.measured_at) - new Date(b.measured_at)
@@ -249,6 +251,44 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
   useEffect(() => {
     let cancelled = false;
 
+    const loadWatchData = async (watchRes) => {
+      if (cancelled || !watchRes?.success || !watchRes.data) {
+        if (!cancelled) {
+          setHasSmartwatch(false);
+          setWatchImei(null);
+          setWatchNickname(null);
+          setWatchBatteryPercent(null);
+          setWatchVitalData(null);
+          if (watchRes?.error) setWatchError(watchRes.error);
+        }
+        return false;
+      }
+
+      const d = watchRes.data;
+      if (!d.has_smartwatch) {
+        if (!cancelled) {
+          setHasSmartwatch(false);
+          setWatchImei(null);
+          setWatchNickname(null);
+          setWatchBatteryPercent(null);
+          setWatchVitalData(null);
+        }
+        return false;
+      }
+
+      if (!cancelled) {
+        setHasSmartwatch(true);
+        setWatchImei(d.imei || null);
+        setWatchNickname(d.device_nickname || null);
+        setWatchBatteryPercent(parseWatchBatteryFromSmartwatchPayload(d));
+        setWatchVitalData(buildWatchVitalData(d.health));
+        setWatchDataUpdatedAt(new Date());
+        setActiveTab('watch');
+        setWatchError(null);
+      }
+      return true;
+    };
+
     const bootstrap = async () => {
       try {
         setLoading(true);
@@ -261,38 +301,36 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
 
         if (cancelled) return;
 
-        applyVitalSignsResult(vitRes);
+        const hasWatch = await loadWatchData(watchRes);
 
-        if (watchRes.success && watchRes.data) {
-          const d = watchRes.data;
-          if (d.has_smartwatch) {
-            setHasSmartwatch(true);
-            setWatchImei(d.imei || null);
-            setWatchNickname(d.device_nickname || null);
-            setWatchBatteryPercent(parseWatchBatteryFromSmartwatchPayload(d));
-            setWatchVitalData(buildWatchVitalData(d.health));
-            setWatchDataUpdatedAt(new Date());
-            setActiveTab('watch');
-          } else {
-            setHasSmartwatch(false);
-            setWatchImei(null);
-            setWatchNickname(null);
-            setWatchBatteryPercent(null);
-            setWatchVitalData(null);
-            setActiveTab('manual');
-          }
-        } else {
-          setHasSmartwatch(false);
-          setWatchImei(null);
-          setWatchNickname(null);
-          setWatchBatteryPercent(null);
-          setWatchVitalData(null);
+        try {
+          applyVitalSignsResult(vitRes);
+        } catch (applyError) {
+          console.error('❌ Erro ao processar sinais manuais:', applyError);
+        }
+
+        if (!hasWatch) {
           setActiveTab('manual');
-          if (watchRes.error) setWatchError(watchRes.error);
+        }
+
+        if (!vitRes.success && !hasWatch) {
+          Alert.alert(
+            'Erro',
+            vitRes.error || watchRes.error || 'Não foi possível carregar os sinais vitais'
+          );
+        } else if (!vitRes.success) {
+          Toast.show({
+            type: 'info',
+            text1: 'Histórico manual indisponível',
+            text2: vitRes.error || 'Os dados do relógio continuam disponíveis na aba Relógio.',
+            visibilityTime: 5000,
+          });
         }
       } catch (error) {
         console.error('❌ Erro ao carregar sinais vitais:', error);
-        if (!cancelled) Alert.alert('Erro', 'Não foi possível carregar os sinais vitais');
+        if (!cancelled) {
+          Alert.alert('Erro', 'Não foi possível carregar os sinais vitais');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

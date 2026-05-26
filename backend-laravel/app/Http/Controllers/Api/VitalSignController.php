@@ -15,57 +15,73 @@ class VitalSignController extends Controller
      */
     public function index(Request $request)
     {
-        $groupId = $request->query('group_id');
-        $type = $request->query('type');
-        $startDate = $request->query('start_date');
-        $endDate = $request->query('end_date');
+        try {
+            $groupId = $request->query('group_id');
+            $type = $request->query('type');
+            $startDate = $request->query('start_date');
+            $endDate = $request->query('end_date');
 
-        $query = VitalSign::query();
+            $query = VitalSign::query();
 
-        if ($groupId) {
-            $query->where('group_id', $groupId);
-        }
-
-        if ($type) {
-            $query->where('type', $type);
-        }
-
-        if ($startDate) {
-            $query->where('measured_at', '>=', $startDate);
-        }
-
-        if ($endDate) {
-            $query->where('measured_at', '<=', $endDate);
-        }
-
-        $vitalSigns = $query->with('recorder')->orderBy('measured_at', 'desc')->get();
-
-        // Adicionar informações do cuidador e wearable
-        $vitalSignsArray = $vitalSigns->map(function ($vitalSign) {
-            $data = $vitalSign->toArray();
-            
-            // Adicionar nome do cuidador
-            if ($vitalSign->recorder) {
-                $data['measured_by_name'] = $vitalSign->recorder->name;
+            if ($groupId) {
+                $query->where('group_id', $groupId);
             }
-            
-            // Extrair nome do wearable das notes (se houver)
-            // Formato esperado: "wearable: Nome do Wearable" ou similar
-            if ($vitalSign->notes) {
-                $notesLower = strtolower($vitalSign->notes);
-                if (strpos($notesLower, 'wearable') !== false) {
-                    // Tentar extrair nome do wearable das notes
-                    preg_match('/wearable[:\s]+([^\n]+)/i', $vitalSign->notes, $matches);
-                    if (!empty($matches[1])) {
-                        $data['wearable_name'] = trim($matches[1]);
-                    }
+
+            if ($type) {
+                $query->where('type', $type);
+            }
+
+            if ($startDate) {
+                $query->where('measured_at', '>=', $startDate);
+            }
+
+            if ($endDate) {
+                $query->where('measured_at', '<=', $endDate);
+            }
+
+            $vitalSigns = $query->orderBy('measured_at', 'desc')->get();
+
+            if ($vitalSigns->isNotEmpty()) {
+                try {
+                    $vitalSigns->load('recorder');
+                } catch (\Throwable $e) {
+                    \Log::warning('VitalSignController::index - Falha ao carregar recorder: '.$e->getMessage());
                 }
             }
-            
-            return $data;
-        });
 
-        return response()->json($vitalSignsArray);
+            $vitalSignsArray = $vitalSigns->map(function ($vitalSign) {
+                $data = $vitalSign->toArray();
+
+                if ($vitalSign->relationLoaded('recorder') && $vitalSign->recorder) {
+                    $data['measured_by_name'] = $vitalSign->recorder->name;
+                }
+
+                if ($vitalSign->notes) {
+                    $notesLower = strtolower($vitalSign->notes);
+                    if (strpos($notesLower, 'wearable') !== false) {
+                        preg_match('/wearable[:\s]+([^\n]+)/i', $vitalSign->notes, $matches);
+                        if (! empty($matches[1])) {
+                            $data['wearable_name'] = trim($matches[1]);
+                        }
+                    }
+                }
+
+                return $data;
+            });
+
+            return response()->json($vitalSignsArray);
+        } catch (\Throwable $e) {
+            \Log::error('VitalSignController::index - Erro: '.$e->getMessage(), [
+                'group_id' => $request->query('group_id'),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao carregar sinais vitais',
+                'data' => [],
+            ], 500);
+        }
     }
 
     /**

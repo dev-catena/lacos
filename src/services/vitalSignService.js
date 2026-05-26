@@ -49,6 +49,16 @@ class VitalSignService {
   }
 
   /**
+   * Normaliza resposta da API para array de registros.
+   */
+  normalizeVitalSignsList(response) {
+    if (Array.isArray(response)) return response;
+    if (response && Array.isArray(response.data)) return response.data;
+    if (response && Array.isArray(response.items)) return response.items;
+    return [];
+  }
+
+  /**
    * Listar sinais vitais de um grupo
    */
   async getVitalSigns(groupId = null, type = null, startDate = null, endDate = null) {
@@ -74,12 +84,13 @@ class VitalSignService {
       }
 
       const response = await apiService.get(endpoint);
-      return { success: true, data: response };
+      return { success: true, data: this.normalizeVitalSignsList(response) };
     } catch (error) {
       console.error('Erro ao buscar sinais vitais:', error);
       return { 
         success: false, 
-        error: error.message || 'Erro ao buscar sinais vitais' 
+        error: error.message || 'Erro ao buscar sinais vitais',
+        data: [],
       };
     }
   }
