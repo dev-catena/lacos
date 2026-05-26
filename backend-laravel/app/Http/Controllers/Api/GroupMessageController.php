@@ -12,6 +12,87 @@ use Illuminate\Support\Facades\Storage;
 
 class GroupMessageController extends Controller
 {
+    private function userPhotoSelectColumn(): ?string
+    {
+        if (Schema::hasColumn('users', 'profile_photo')) {
+            return 'users.profile_photo';
+        }
+        if (Schema::hasColumn('users', 'photo')) {
+            return 'users.photo';
+        }
+        if (Schema::hasColumn('users', 'photo_url')) {
+            return 'users.photo_url';
+        }
+
+        return null;
+    }
+
+    private function resolvePhotoUrl(?string $photoPath): ?string
+    {
+        if (! $photoPath) {
+            return null;
+        }
+        if (filter_var($photoPath, FILTER_VALIDATE_URL)) {
+            return $photoPath;
+        }
+
+        return url(Storage::url($photoPath));
+    }
+
+    private function userCanAccessGroup(int $groupId, $user): array
+    {
+        $group = DB::table('groups')->where('id', $groupId)->first();
+        if (! $group) {
+            return ['allowed' => false, 'status' => 404, 'message' => 'Grupo não encontrado'];
+        }
+
+        $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
+        $isCreator = $createdBy && (int) $createdBy === (int) $user->id;
+
+        $isMember = false;
+        if (Schema::hasTable('group_members')) {
+            $query = DB::table('group_members')
+                ->where('group_id', $groupId)
+                ->where('user_id', $user->id);
+            if (Schema::hasColumn('group_members', 'is_active')) {
+                $query->where('is_active', true);
+            }
+            $isMember = $query->exists();
+        }
+
+        if (! $isCreator && ! $isMember) {
+            return ['allowed' => false, 'status' => 403, 'message' => 'Você não tem acesso a este grupo'];
+        }
+
+        return ['allowed' => true, 'group' => $group];
+    }
+
+    private function mapGroupMessageRow($message, $user): array
+    {
+        $imageUrl = $message->image_url ?? null;
+        if ($imageUrl && ! filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+            $imageUrl = url($imageUrl);
+        }
+
+        $photoUrl = $this->resolvePhotoUrl($message->sender_photo ?? null);
+
+        return [
+            'id' => $message->id,
+            'group_id' => $message->group_id,
+            'sender_id' => $message->sender_id,
+            'sender' => [
+                'id' => $message->sender_id,
+                'name' => $message->sender_name,
+                'photo' => $photoUrl,
+                'photo_url' => $photoUrl,
+            ],
+            'message' => $message->message,
+            'type' => $message->type ?? 'text',
+            'image_url' => $imageUrl,
+            'is_read' => (bool) ($message->is_read ?? false),
+            'created_at' => $message->created_at,
+        ];
+    }
     /**
      * Obter mensagens do grupo
      * GET /api/messages/group/{groupId}
@@ -20,102 +101,66 @@ class GroupMessageController extends Controller
     {
         try {
             $user = Auth::user();
-            
-            if (!$user) {
+
+            if (! $user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Usuário não autenticado'
+                    'message' => 'Usuário não autenticado',
                 ], 401);
             }
 
-            // Verificar se o usuário tem acesso ao grupo
-            // 1. Verificar se é criador do grupo (created_by ou admin_user_id)
-            $group = DB::table('groups')->where('id', $groupId)->first();
-            if (!$group) {
+            if (! Schema::hasTable('group_messages')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Grupo não encontrado'
-                ], 404);
+                    'message' => 'Módulo de mensagens não instalado no servidor. Execute a migration group_messages.',
+                    'data' => [],
+                ], 503);
             }
 
-            $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
-            $isCreator = $createdBy && $createdBy == $user->id;
+            $access = $this->userCanAccessGroup((int) $groupId, $user);
+            if (! $access['allowed']) {
+                if (($access['status'] ?? 403) === 403) {
+                    Log::warning('Tentativa de acesso negada ao grupo', [
+                        'user_id' => $user->id,
+                        'group_id' => $groupId,
+                    ]);
+                }
 
-            // 2. Verificar se é membro via group_members
-            $isMember = false;
-            if (Schema::hasTable('group_members')) {
-                $isMember = DB::table('group_members')
-                    ->where('group_id', $groupId)
-                    ->where('user_id', $user->id)
-                    ->exists();
-            }
-
-            // 3. Se não for criador nem membro, negar acesso
-            if (!$isCreator && !$isMember) {
-                Log::warning('Tentativa de acesso negada ao grupo', [
-                    'user_id' => $user->id,
-                    'group_id' => $groupId,
-                    'created_by' => $createdBy,
-                    'isCreator' => $isCreator,
-                    'isMember' => $isMember
-                ]);
-                
                 return response()->json([
                     'success' => false,
-                    'message' => 'Você não tem acesso a este grupo'
-                ], 403);
+                    'message' => $access['message'],
+                ], $access['status'] ?? 403);
             }
 
-            // Buscar mensagens do grupo
+            $select = [
+                'group_messages.id',
+                'group_messages.group_id',
+                'group_messages.user_id as sender_id',
+                'group_messages.content as message',
+                'group_messages.is_read',
+                'group_messages.created_at',
+                'users.name as sender_name',
+            ];
+
+            if (Schema::hasColumn('group_messages', 'type')) {
+                $select[] = 'group_messages.type';
+            }
+            if (Schema::hasColumn('group_messages', 'image_url')) {
+                $select[] = 'group_messages.image_url';
+            }
+
+            $photoColumn = $this->userPhotoSelectColumn();
+            if ($photoColumn) {
+                $select[] = DB::raw($photoColumn.' as sender_photo');
+            }
+
             $messages = DB::table('group_messages')
-                ->where('group_id', $groupId)
+                ->where('group_messages.group_id', $groupId)
                 ->join('users', 'group_messages.user_id', '=', 'users.id')
-                ->select(
-                    'group_messages.id',
-                    'group_messages.group_id',
-                    'group_messages.user_id as sender_id',
-                    'group_messages.content as message',
-                    'group_messages.type',
-                    'group_messages.image_url',
-                    'group_messages.is_read',
-                    'group_messages.created_at',
-                    'users.name as sender_name',
-                    'users.profile_photo as sender_photo'
-                )
+                ->select($select)
                 ->orderBy('group_messages.created_at', 'asc')
                 ->get()
-                ->map(function ($message) use ($user) {
-                    // Converter URL relativa em URL completa se necessário
-                    $imageUrl = $message->image_url;
-                    if ($imageUrl && !filter_var($imageUrl, FILTER_VALIDATE_URL)) {
-                        // Se for URL relativa, converter para URL completa
-                        $imageUrl = url($imageUrl);
-                    }
-                    
-                    // Converter URL relativa em URL completa se necessário
-                    $photoUrl = $message->sender_photo;
-                    if ($photoUrl && !filter_var($photoUrl, FILTER_VALIDATE_URL)) {
-                        // Se for URL relativa, converter para URL completa
-                        $photoUrl = url(Storage::url($photoUrl));
-                    }
-                    
-                    return [
-                        'id' => $message->id,
-                        'group_id' => $message->group_id,
-                        'sender_id' => $message->sender_id,
-                        'sender' => [
-                            'id' => $message->sender_id,
-                            'name' => $message->sender_name,
-                            'photo' => $photoUrl,
-                            'photo_url' => $photoUrl,
-                        ],
-                        'message' => $message->message,
-                        'type' => $message->type ?? 'text',
-                        'image_url' => $imageUrl,
-                        'is_read' => $message->is_read,
-                        'created_at' => $message->created_at,
-                    ];
-                });
+                ->map(fn ($message) => $this->mapGroupMessageRow($message, $user));
 
             return response()->json([
                 'success' => true,
@@ -171,42 +216,19 @@ class GroupMessageController extends Controller
 
             $groupId = $validated['group_id'];
 
-            // Verificar se o usuário tem acesso ao grupo
-            // 1. Verificar se é criador do grupo (created_by ou admin_user_id)
-            $group = DB::table('groups')->where('id', $groupId)->first();
-            if (!$group) {
+            if (! Schema::hasTable('group_messages')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Grupo não encontrado'
-                ], 404);
+                    'message' => 'Módulo de mensagens não instalado no servidor. Execute a migration group_messages.',
+                ], 503);
             }
 
-            $createdBy = $group->created_by ?? $group->admin_user_id ?? null;
-            $isCreator = $createdBy && $createdBy == $user->id;
-
-            // 2. Verificar se é membro via group_members
-            $isMember = false;
-            if (Schema::hasTable('group_members')) {
-                $isMember = DB::table('group_members')
-                    ->where('group_id', $groupId)
-                    ->where('user_id', $user->id)
-                    ->exists();
-            }
-
-            // 3. Se não for criador nem membro, negar acesso
-            if (!$isCreator && !$isMember) {
-                Log::warning('Tentativa de enviar mensagem negada - sem acesso ao grupo', [
-                    'user_id' => $user->id,
-                    'group_id' => $groupId,
-                    'created_by' => $createdBy,
-                    'isCreator' => $isCreator,
-                    'isMember' => $isMember
-                ]);
-                
+            $access = $this->userCanAccessGroup((int) $groupId, $user);
+            if (! $access['allowed']) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Você não tem acesso a este grupo'
-                ], 403);
+                    'message' => $access['message'],
+                ], $access['status'] ?? 403);
             }
 
             $messageType = $validated['type'] ?? 'text';
@@ -221,67 +243,52 @@ class GroupMessageController extends Controller
             }
 
             // Inserir mensagem
-            $messageId = DB::table('group_messages')->insertGetId([
+            $insert = [
                 'group_id' => $groupId,
                 'user_id' => $user->id,
                 'content' => $validated['message'] ?? '',
-                'type' => $messageType,
-                'image_url' => $imageUrl,
                 'is_read' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
+            if (Schema::hasColumn('group_messages', 'type')) {
+                $insert['type'] = $messageType;
+            }
+            if (Schema::hasColumn('group_messages', 'image_url')) {
+                $insert['image_url'] = $imageUrl;
+            }
 
-            // Buscar mensagem criada com dados do usuário
+            $messageId = DB::table('group_messages')->insertGetId($insert);
+
+            $select = [
+                'group_messages.id',
+                'group_messages.group_id',
+                'group_messages.user_id as sender_id',
+                'group_messages.content as message',
+                'group_messages.is_read',
+                'group_messages.created_at',
+                'users.name as sender_name',
+            ];
+            if (Schema::hasColumn('group_messages', 'type')) {
+                $select[] = 'group_messages.type';
+            }
+            if (Schema::hasColumn('group_messages', 'image_url')) {
+                $select[] = 'group_messages.image_url';
+            }
+            $photoColumn = $this->userPhotoSelectColumn();
+            if ($photoColumn) {
+                $select[] = DB::raw($photoColumn.' as sender_photo');
+            }
+
             $message = DB::table('group_messages')
                 ->where('group_messages.id', $messageId)
                 ->join('users', 'group_messages.user_id', '=', 'users.id')
-                ->select(
-                    'group_messages.id',
-                    'group_messages.group_id',
-                    'group_messages.user_id as sender_id',
-                    'group_messages.content as message',
-                    'group_messages.type',
-                    'group_messages.image_url',
-                    'group_messages.is_read',
-                    'group_messages.created_at',
-                    'users.name as sender_name',
-                    'users.profile_photo as sender_photo'
-                )
+                ->select($select)
                 ->first();
-
-            // Converter URL relativa em URL completa se necessário
-            $imageUrl = $message->image_url;
-            if ($imageUrl && !filter_var($imageUrl, FILTER_VALIDATE_URL)) {
-                // Se for URL relativa, converter para URL completa
-                $imageUrl = url($imageUrl);
-            }
-            
-            // Converter URL relativa da foto do usuário em URL completa se necessário
-            $photoUrl = $message->sender_photo;
-            if ($photoUrl && !filter_var($photoUrl, FILTER_VALIDATE_URL)) {
-                // Se for URL relativa, converter para URL completa
-                $photoUrl = url(Storage::url($photoUrl));
-            }
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'id' => $message->id,
-                    'group_id' => $message->group_id,
-                    'sender_id' => $message->sender_id,
-                    'sender' => [
-                        'id' => $message->sender_id,
-                        'name' => $message->sender_name,
-                        'photo' => $photoUrl,
-                        'photo_url' => $photoUrl,
-                    ],
-                    'message' => $message->message,
-                    'type' => $message->type,
-                    'image_url' => $imageUrl,
-                    'is_read' => $message->is_read,
-                    'created_at' => $message->created_at,
-                ],
+                'data' => $this->mapGroupMessageRow($message, $user),
             ]);
 
         } catch (\Exception $e) {

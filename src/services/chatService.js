@@ -214,23 +214,28 @@ class ChatService {
         method: 'GET',
       });
 
-      if (response.success && response.data) {
-        console.log('✅ ChatService - Mensagens do grupo carregadas:', response.data.length, 'mensagens');
+      if (response && response.success !== false) {
+        const data = Array.isArray(response.data) ? response.data : [];
+        console.log('✅ ChatService - Mensagens do grupo carregadas:', data.length, 'mensagens');
         return {
           success: true,
-          data: response.data,
+          data,
         };
       }
 
       return {
         success: false,
-        error: response.message || 'Erro ao carregar mensagens do grupo',
+        error: response?.message || 'Erro ao carregar mensagens do grupo',
       };
     } catch (error) {
       console.error('❌ ChatService - Erro ao carregar mensagens do grupo:', error);
+      const msg =
+        error?.message ||
+        error?._rawErrorData?.message ||
+        'Erro ao carregar mensagens do grupo';
       return {
         success: false,
-        error: error.message || 'Erro ao carregar mensagens do grupo',
+        error: msg,
       };
     }
   }
