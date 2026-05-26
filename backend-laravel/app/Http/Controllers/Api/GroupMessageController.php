@@ -27,16 +27,34 @@ class GroupMessageController extends Controller
         return null;
     }
 
-    private function resolvePhotoUrl(?string $photoPath): ?string
+    private function resolveAssetUrl(?string $pathOrUrl): ?string
     {
-        if (! $photoPath) {
+        if (! $pathOrUrl) {
             return null;
         }
-        if (filter_var($photoPath, FILTER_VALIDATE_URL)) {
-            return $photoPath;
+
+        $base = rtrim((string) (config('app.url') ?: url('/')), '/');
+
+        if (filter_var($pathOrUrl, FILTER_VALIDATE_URL)) {
+            $host = parse_url($pathOrUrl, PHP_URL_HOST) ?: '';
+            if (in_array($host, ['localhost', '127.0.0.1', '0.0.0.0'], true)) {
+                $path = parse_url($pathOrUrl, PHP_URL_PATH) ?: '';
+                $query = parse_url($pathOrUrl, PHP_URL_QUERY);
+
+                return $base.$path.($query ? '?'.$query : '');
+            }
+
+            return $pathOrUrl;
         }
 
-        return url(Storage::url($photoPath));
+        $path = str_starts_with($pathOrUrl, '/') ? $pathOrUrl : Storage::url($pathOrUrl);
+
+        return $base.$path;
+    }
+
+    private function resolvePhotoUrl(?string $photoPath): ?string
+    {
+        return $this->resolveAssetUrl($photoPath);
     }
 
     private function userCanAccessGroup(int $groupId, $user): array
@@ -69,12 +87,13 @@ class GroupMessageController extends Controller
 
     private function mapGroupMessageRow($message, $user): array
     {
-        $imageUrl = $message->image_url ?? null;
-        if ($imageUrl && ! filter_var($imageUrl, FILTER_VALIDATE_URL)) {
-            $imageUrl = url($imageUrl);
-        }
-
+        $imageUrl = $this->resolveAssetUrl($message->image_url ?? null);
         $photoUrl = $this->resolvePhotoUrl($message->sender_photo ?? null);
+
+        $type = $message->type ?? 'text';
+        if ($imageUrl && $type === 'text') {
+            $type = 'image';
+        }
 
         return [
             'id' => $message->id,
@@ -87,7 +106,7 @@ class GroupMessageController extends Controller
                 'photo_url' => $photoUrl,
             ],
             'message' => $message->message,
-            'type' => $message->type ?? 'text',
+            'type' => $type,
             'image_url' => $imageUrl,
             'is_read' => (bool) ($message->is_read ?? false),
             'created_at' => $message->created_at,
@@ -238,7 +257,8 @@ class GroupMessageController extends Controller
             if ($request->hasFile('image')) {
                 $image = $request->file('image');
                 $path = $image->store('group-messages', 'public');
-                $imageUrl = url(Storage::url($path)); // URL completa com domínio
+                // Caminho relativo — URL absoluta montada na leitura (evita localhost no APP_URL)
+                $imageUrl = Storage::url($path);
                 $messageType = 'image';
             }
 

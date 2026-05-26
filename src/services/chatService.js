@@ -283,29 +283,25 @@ class ChatService {
   async sendGroupImageMessage(groupId, imageUri) {
     try {
       console.log('💬 ChatService - Enviando imagem para o grupo:', groupId);
-      
-      // Criar FormData para enviar a imagem
+
       const formData = new FormData();
       formData.append('group_id', groupId.toString());
       formData.append('type', 'image');
-      
-      // Adicionar a imagem
-      const filename = imageUri.split('/').pop();
+
+      const filename = imageUri.split('/').pop() || `photo_${Date.now()}.jpg`;
       const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : `image/jpeg`;
-      
+      let mime = match ? `image/${match[1].toLowerCase()}` : 'image/jpeg';
+      if (mime === 'image/jpg') mime = 'image/jpeg';
+
       formData.append('image', {
         uri: imageUri,
-        name: filename,
-        type: type,
+        name: filename.includes('.') ? filename : `${filename}.jpg`,
+        type: mime,
       });
-      
+
       const response = await apiService.request('/messages/group', {
         method: 'POST',
         body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
       });
 
       if (response.success && response.data) {

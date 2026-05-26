@@ -21,7 +21,34 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
 import chatService from '../../services/chatService';
-import moment from 'moment';
+import API_CONFIG from '../config/api';
+
+const API_ORIGIN = API_CONFIG.BASE_URL.replace(/\/api\/?$/, '');
+
+/** Converte /storage/... ou localhost em URL acessível pelo app. */
+function resolveBackendAssetUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+
+  let normalized = url.trim();
+  if (!normalized) return null;
+
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(normalized)) {
+    const path = normalized.replace(/^https?:\/\/[^/]+/i, '');
+    normalized = `${API_ORIGIN}${path}`;
+  } else if (!/^https?:\/\//i.test(normalized)) {
+    if (normalized.startsWith('/storage/')) {
+      normalized = `${API_ORIGIN}${normalized}`;
+    } else if (normalized.startsWith('storage/')) {
+      normalized = `${API_ORIGIN}/${normalized}`;
+    } else {
+      normalized = normalized.startsWith('/')
+        ? `${API_ORIGIN}${normalized}`
+        : `${API_ORIGIN}/storage/${normalized}`;
+    }
+  }
+
+  return normalized;
+}
 
 const GroupChatScreen = ({ route, navigation, groupId: groupIdProp, groupName: groupNameProp }) => {
   const params = route?.params || {};
@@ -77,10 +104,10 @@ const GroupChatScreen = ({ route, navigation, groupId: groupIdProp, groupName: g
           id: msg.id,
           senderId: msg.sender_id,
           senderName: msg.sender?.name || 'Usuário',
-          senderPhoto: msg.sender?.photo_url || msg.sender?.photo || null,
+          senderPhoto: resolveBackendAssetUrl(msg.sender?.photo_url || msg.sender?.photo),
           text: msg.message,
           type: msg.type,
-          imageUrl: msg.image_url,
+          imageUrl: resolveBackendAssetUrl(msg.image_url),
           timestamp: new Date(msg.created_at),
           isOwn: msg.sender_id === user?.id,
         }));
@@ -207,6 +234,8 @@ const GroupChatScreen = ({ route, navigation, groupId: groupIdProp, groupName: g
 
   const renderMessage = ({ item }) => {
     const isOwn = item.isOwn;
+    const isImageMessage =
+      item.type === 'image' || (!!item.imageUrl && !item.text?.trim());
 
     return (
       <View
@@ -240,7 +269,20 @@ const GroupChatScreen = ({ route, navigation, groupId: groupIdProp, groupName: g
               isOwn ? styles.ownBubble : styles.otherBubble,
             ]}
           >
-            {item.type === 'text' ? (
+            {isImageMessage ? (
+              item.imageUrl ? (
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={styles.messageImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.messageImagePlaceholder}>
+                  <Ionicons name="image-outline" size={32} color={colors.gray400} />
+                  <Text style={styles.messageImagePlaceholderText}>Imagem indisponível</Text>
+                </View>
+              )
+            ) : (
               <Text
                 style={[
                   styles.messageText,
@@ -249,11 +291,6 @@ const GroupChatScreen = ({ route, navigation, groupId: groupIdProp, groupName: g
               >
                 {item.text}
               </Text>
-            ) : (
-              <Image 
-                source={{ uri: item.imageUrl || item.imageUri }} 
-                style={styles.messageImage} 
-              />
             )}
             <Text
               style={[
@@ -550,6 +587,23 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 12,
     marginBottom: 4,
+    backgroundColor: colors.gray100 || '#f1f5f9',
+  },
+  messageImagePlaceholder: {
+    width: 200,
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 4,
+    backgroundColor: colors.gray100 || '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+  },
+  messageImagePlaceholderText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: colors.textLight,
+    textAlign: 'center',
   },
   messageTime: {
     fontSize: 11,
