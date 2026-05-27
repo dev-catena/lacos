@@ -8,6 +8,9 @@ import {
   resolveAppointmentIdForVideo,
 } from '../config/agora';
 
+const PEER_POLL_MS = 8000;
+const PEER_POLL_MAX = 8;
+
 /**
  * Hook compartilhado para iniciar/encerrar chamada Agora na teleconsulta.
  */
@@ -43,6 +46,53 @@ export default function useAgoraVideoCall({
   appointmentIdRef.current = resolvedAppointmentId;
 
   const readyToCall = enabled && resolvedAppointmentId && frozenUserIdRef.current;
+  const peerPollRef = useRef(null);
+
+  const registerRemoteUid = (uid) => {
+    const n = Number(uid);
+    if (!Number.isFinite(n) || n <= 0) return;
+    videoCallService.prepareRemoteUser(n);
+    setRemoteUsers((prev) => (prev.includes(n) ? prev : [...prev, n]));
+  };
+
+  const applyPeerUidFromToken = (peerUid) => {
+    const n = Number(peerUid);
+    if (!Number.isFinite(n) || n <= 0) return;
+    setFallbackRemoteUid(n);
+    videoCallService.prepareRemoteUser(n);
+  };
+
+  const refreshPeerUidFromServer = async () => {
+    const resolvedId = appointmentIdRef.current;
+    if (!resolvedId) return null;
+
+    const tokenResult = await appointmentService.getAgoraToken(resolvedId);
+    if (tokenResult.success && tokenResult.data?.success) {
+      const peerUid = tokenResult.data.peer_uid;
+      if (peerUid != null && Number(peerUid) > 0) {
+        applyPeerUidFromToken(peerUid);
+        return Number(peerUid);
+      }
+    }
+    return null;
+  };
+
+  const startPeerPolling = () => {
+    if (peerPollRef.current) {
+      clearInterval(peerPollRef.current);
+      peerPollRef.current = null;
+    }
+
+    let attempts = 0;
+    peerPollRef.current = setInterval(async () => {
+      attempts += 1;
+      await refreshPeerUidFromServer();
+      if (attempts >= PEER_POLL_MAX) {
+        clearInterval(peerPollRef.current);
+        peerPollRef.current = null;
+      }
+    }, PEER_POLL_MS);
+  };
 
   useEffect(() => {
     if (!enabled) {
@@ -74,18 +124,16 @@ export default function useAgoraVideoCall({
             setLocalUid(resolved);
             setIsJoined(true);
             setIsCallActive(true);
+            refreshPeerUidFromServer().catch(() => {});
+            startPeerPolling();
           },
           onUserJoined: (uid) => {
             if (cancelled) return;
-            const n = Number(uid);
-            if (!Number.isFinite(n) || n <= 0) return;
-            setRemoteUsers((prev) => (prev.includes(n) ? prev : [...prev, n]));
+            registerRemoteUid(uid);
           },
           onRemoteVideoReady: (uid) => {
             if (cancelled) return;
-            const n = Number(uid);
-            if (!Number.isFinite(n) || n <= 0) return;
-            setRemoteUsers((prev) => (prev.includes(n) ? prev : [...prev, n]));
+            registerRemoteUid(uid);
           },
           onUserOffline: (uid) => {
             if (cancelled) return;
@@ -122,7 +170,7 @@ export default function useAgoraVideoCall({
               agoraUid = Number(apiUid);
             }
             if (peerUid != null && Number(peerUid) > 0) {
-              setFallbackRemoteUid(Number(peerUid));
+              applyPeerUidFromToken(peerUid);
             }
           } else {
             const errMsg = String(tokenResult.error || tokenResult.data?.message || '');
@@ -160,6 +208,7 @@ export default function useAgoraVideoCall({
           if (currentLocal) {
             setLocalUid(currentLocal);
           }
+          startPeerPolling();
         }
 
         onJoinedRef.current?.({ mock: joinResult.mock, channelName, uid: agoraUid });
@@ -184,6 +233,10 @@ export default function useAgoraVideoCall({
 
     return () => {
       cancelled = true;
+      if (peerPollRef.current) {
+        clearInterval(peerPollRef.current);
+        peerPollRef.current = null;
+      }
       videoCallService.leaveChannel().catch(() => {});
       videoCallService.destroy().catch(() => {});
     };
@@ -191,6 +244,10 @@ export default function useAgoraVideoCall({
 
   const endCall = async () => {
     try {
+      if (peerPollRef.current) {
+        clearInterval(peerPollRef.current);
+        peerPollRef.current = null;
+      }
       await videoCallService.leaveChannel();
       await videoCallService.destroy();
       setIsCallActive(false);
@@ -209,7 +266,9 @@ export default function useAgoraVideoCall({
   };
 
   const primaryRemoteUid =
-    remoteUsers.length > 0 ? remoteUsers[0] : fallbackRemoteUid;
+    remoteUsers.length > 0
+      ? remoteUsers[remoteUsers.length - 1]
+      : fallbackRemoteUid;
 
   return {
     isCallActive,

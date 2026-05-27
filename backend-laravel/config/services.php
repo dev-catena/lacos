@@ -76,6 +76,9 @@ return [
             '4PTouch' => [
                 ['action' => 'RAW', 'payload' => 'CR'],
             ],
+            'TOUCH_4P' => [
+                ['action' => 'RAW', 'payload' => 'CR'],
+            ],
         ],
     ],
 

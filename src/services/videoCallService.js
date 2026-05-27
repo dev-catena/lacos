@@ -152,6 +152,9 @@ class VideoCallService {
       this.engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
       this.engine.enableVideo();
       this.engine.enableAudio();
+      if (this.engine.setDefaultAudioRouteToSpeakerphone) {
+        this.engine.setDefaultAudioRouteToSpeakerphone(true);
+      }
       this.engine.startPreview();
 
       this.isInitialized = true;
@@ -261,6 +264,10 @@ class VideoCallService {
     return this.localUid || 0;
   }
 
+  prepareRemoteUser(uid) {
+    this.notifyRemoteUser(uid);
+  }
+
   notifyRemoteUser(uid) {
     const n = Number(uid);
     if (!Number.isFinite(n) || n <= 0) return;
@@ -296,6 +303,13 @@ class VideoCallService {
     try {
       this.engine.muteRemoteVideoStream(uid, false);
       this.engine.muteRemoteAudioStream(uid, false);
+      if (this.engine.setupRemoteVideo && VideoSourceType && RenderModeType) {
+        this.engine.setupRemoteVideo({
+          uid: Number(uid),
+          sourceType: VideoSourceType.VideoSourceRemote,
+          renderMode: RenderModeType.RenderModeFit,
+        });
+      }
     } catch (e) {
       console.warn('Agora ensureRemoteMediaSubscribed:', e?.message);
     }

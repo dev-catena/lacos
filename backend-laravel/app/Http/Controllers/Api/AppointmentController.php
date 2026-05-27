@@ -129,21 +129,44 @@ class AppointmentController extends Controller
             return null;
         }
 
-        $doctorUserId = (int) $appointment->doctor_id;
-        if ($doctorUserId <= 0) {
+        $doctorPlatformUserId = $this->resolveDoctorPlatformUserId($appointment);
+        if ($doctorPlatformUserId === null) {
             return null;
+        }
+
+        return $agoraTokenService->toAgoraUid($doctorPlatformUserId);
+    }
+
+    /**
+     * users.id do médico na plataforma (Auth::user()->id ao entrar na chamada).
+     * appointments.doctor_id pode ser doctors.id — não usar esse ID direto no Agora.
+     */
+    private function resolveDoctorPlatformUserId(Appointment $appointment): ?int
+    {
+        if (! $appointment->doctor_id) {
+            return null;
+        }
+
+        $doctorId = (int) $appointment->doctor_id;
+
+        $userDoctor = DB::table('users')
+            ->where('id', $doctorId)
+            ->where('profile', 'doctor')
+            ->first();
+        if ($userDoctor) {
+            return $doctorId;
         }
 
         try {
             $doc = $appointment->doctorUser;
             if ($doc && ! empty($doc->platform_user_id)) {
-                $doctorUserId = (int) $doc->platform_user_id;
+                return (int) $doc->platform_user_id;
             }
         } catch (\Throwable $e) {
-            Log::warning('resolveAgoraPeerUid doctorUser: '.$e->getMessage());
+            Log::warning('resolveDoctorPlatformUserId: '.$e->getMessage());
         }
 
-        return $agoraTokenService->toAgoraUid($doctorUserId);
+        return null;
     }
 
     public function index(Request $request)

@@ -73,11 +73,12 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
     isInitializing,
     callError,
     primaryRemoteUid,
+    remoteUsers,
     endCall,
     retryCall,
   } = useAgoraVideoCall({
     appointmentId: appointment?.id,
-    userId: user?.id || appointment?.doctor_id,
+    userId: user?.id,
     navigation,
     enabled: canStartCall === true,
     onJoined: () => {
@@ -86,6 +87,12 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
       }
     },
   });
+
+  useEffect(() => {
+    if (canStartCall && appointment?.id) {
+      appointmentService.videoJoin(appointment.id, 'doctor');
+    }
+  }, [canStartCall, appointment?.id]);
 
   useEffect(() => {
     if (isTeleconsultAppointment(appointment) && !isTeleconsultPaidForVideoStart(appointment)) {
@@ -650,6 +657,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
             isJoined={isJoined}
             participantName={patientInfo?.name || 'Paciente'}
             waitingLabel="Aguardando paciente entrar na chamada..."
+            remoteConfirmed={remoteUsers.length > 0 || primaryRemoteUid != null}
           />
         </View>
 

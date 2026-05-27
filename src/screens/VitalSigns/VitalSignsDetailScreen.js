@@ -22,7 +22,7 @@ import deviceService from '../../services/deviceService';
 import VitalSignsLineChart from '../../components/VitalSignsLineChart';
 import moment from 'moment';
 import AddVitalSignModal from './AddVitalSignModal';
-import { buildWatchVitalData, getWatchVitalsLatestMs } from '../../utils/thalamusHealthAdapter';
+import { buildWatchVitalData, getWatchVitalsSnapshot } from '../../utils/thalamusHealthAdapter';
 import Toast from 'react-native-toast-message';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -422,25 +422,33 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
       }
 
       setMeasureStatus('Aguardando leitura do relógio...');
-      const baselineMs = getWatchVitalsLatestMs(watchVitalData);
+      const baselineSnapshot = getWatchVitalsSnapshot(watchVitalData);
 
       Toast.show({
         type: 'info',
         text1: 'Leitura solicitada',
-        text2: 'Aguarde no relógio — pode levar até 1 minuto para aparecer.',
+        text2: 'Aguarde no relógio — pode levar até 2 minutos para aparecer.',
         visibilityTime: 5000,
       });
 
-      const pollIntervalsMs = [8000, 10000, 12000, 15000, 15000, 20000];
+      const pollIntervalsMs = [6000, 8000, 10000, 12000, 15000, 15000, 20000, 20000, 25000];
       let gotNewerReading = false;
 
       for (let i = 0; i < pollIntervalsMs.length; i += 1) {
         await sleep(pollIntervalsMs[i]);
         setMeasureStatus(`Buscando leitura no servidor (${i + 1}/${pollIntervalsMs.length})...`);
         const vitalData = await fetchWatchVitalData();
-        if (vitalData && getWatchVitalsLatestMs(vitalData) > baselineMs) {
+        if (vitalData && getWatchVitalsSnapshot(vitalData) !== baselineSnapshot) {
           gotNewerReading = true;
           break;
+        }
+      }
+
+      if (!gotNewerReading) {
+        setMeasureStatus('Atualizando dados...');
+        const finalData = await fetchWatchVitalData();
+        if (finalData && getWatchVitalsSnapshot(finalData) !== baselineSnapshot) {
+          gotNewerReading = true;
         }
       }
 

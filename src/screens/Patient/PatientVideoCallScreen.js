@@ -58,6 +58,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
     isInitializing,
     callError,
     primaryRemoteUid,
+    remoteUsers,
     endCall,
     retryCall,
   } = useAgoraVideoCall({
@@ -70,6 +71,12 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
       }
     },
   });
+
+  useEffect(() => {
+    if (appointment?.id) {
+      appointmentService.videoJoin(appointment.id, 'patient');
+    }
+  }, [appointment?.id]);
 
   useEffect(() => {
     if (isCallActive) {
@@ -375,6 +382,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
             isJoined={isJoined}
             participantName={doctorInfo?.name || 'Dr(a). Médico'}
             waitingLabel="Aguardando médico entrar na chamada..."
+            remoteConfirmed={remoteUsers.length > 0 || primaryRemoteUid != null}
           />
         </View>
 

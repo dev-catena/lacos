@@ -61,10 +61,11 @@ function toMeasuredAtIso(ts) {
   }
   if (typeof ts === 'string') {
     const trimmed = ts.trim();
-    // Thalamus costuma enviar ISO sem sufixo Z — tratar como UTC
+    // Thalamus envia ISO sem fuso (ex.: 2026-05-25T17:21:48) já em horário local do Brasil.
+    // Não tratar como UTC — senão a exibição fica 3 h atrás (UTC-3).
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(trimmed)) {
-      const utc = moment.utc(trimmed);
-      if (utc.isValid()) return utc.toISOString();
+      const local = moment(trimmed);
+      if (local.isValid()) return local.toISOString();
     }
   }
   const d = moment(ts);
@@ -167,6 +168,29 @@ export function getWatchVitalsLatestMs(vitalData) {
     }
   }
   return max;
+}
+
+function latestSeriesRow(series) {
+  if (!Array.isArray(series) || series.length === 0) return null;
+  return [...series].sort(
+    (a, b) => new Date(b.measured_at) - new Date(a.measured_at)
+  )[0];
+}
+
+/**
+ * Assinatura das últimas leituras por indicador — detecta mudança de valor ou horário
+ * após "Medir agora", mesmo quando o timestamp máximo global não avança.
+ */
+export function getWatchVitalsSnapshot(vitalData) {
+  if (!vitalData) return '';
+  const keys = ['heart_rate', 'blood_pressure', 'oxygen_saturation', 'temperature'];
+  const parts = [];
+  for (const key of keys) {
+    const row = latestSeriesRow(vitalData[key]);
+    if (!row) continue;
+    parts.push(`${key}:${row.measured_at}|${JSON.stringify(row.value)}`);
+  }
+  return parts.join(';');
 }
 
 function parseHeartRateRow(row) {
