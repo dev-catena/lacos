@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AdminDoctorController;
 use App\Http\Controllers\Api\AdminCaregiverController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\AdminRtmpCameraController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MediaController;
@@ -115,6 +116,11 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('/devices', [DeviceController::class, 'store']);
     Route::put('/devices/{id}', [DeviceController::class, 'update']);
     Route::delete('/devices/{id}', [DeviceController::class, 'destroy']);
+
+    // Câmeras RTMP (proxy admin — evita CORS no web-admin)
+    Route::get('/rtmp/cameras', [AdminRtmpCameraController::class, 'index']);
+    Route::get('/rtmp/cameras/{cameraId}/snapshot', [AdminRtmpCameraController::class, 'snapshot'])
+        ->where('cameraId', '.+');
 });
 
 // ==================== ROTAS AUTENTICADAS ====================

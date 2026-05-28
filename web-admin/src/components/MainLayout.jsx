@@ -11,6 +11,7 @@ const MainLayout = ({ activeSection, onSectionChange, children, user, onLogout }
     { id: 'suppliers', label: 'Fornecedores', icon: 'store' },
     { id: 'recording', label: 'Gravação', icon: 'mic' },
     { id: 'devices', label: 'Smartwatch', icon: 'watch' },
+    { id: 'cameras', label: 'Câmeras', icon: 'videocam' },
   ];
 
   return (

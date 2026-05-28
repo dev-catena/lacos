@@ -337,6 +337,20 @@ const MicIcon = ({ size = 24, color = '#6366f1' }) => (
   </svg>
 );
 
+const VideocamIcon = ({ size = 24, color = '#6366f1' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <rect x="2" y="6" width="14" height="12" rx="2" fill={color} opacity="0.25" />
+    <path d="M16 10l6-4v12l-6-4V10z" fill={color} opacity="0.35" />
+    <rect x="2" y="6" width="14" height="12" rx="2" stroke={color} strokeWidth="2" />
+    <path
+      d="M16 10l6-4v12l-6-4V10z"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 const WatchIcon = ({ size = 24, color = '#6366f1' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <rect x="8" y="2" width="8" height="3" rx="1" fill={color} opacity="0.3" />
@@ -380,6 +394,7 @@ const iconMap = {
   'clock': ClockIcon,
   'unlock': UnlockIcon,
   'mic': MicIcon,
+  'videocam': VideocamIcon,
   'watch': WatchIcon,
 };
 

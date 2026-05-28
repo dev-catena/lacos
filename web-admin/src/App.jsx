@@ -8,6 +8,7 @@ import PlansManagement from './components/PlansManagement';
 import SuppliersManagement from './components/SuppliersManagement';
 import RecordingSettingsManagement from './components/RecordingSettingsManagement';
 import DevicesManagement from './components/DevicesManagement';
+import CamerasManagement from './components/CamerasManagement';
 import authService from './services/authService';
 import usersService from './services/usersService';
 import './App.css';
@@ -104,6 +105,8 @@ function App() {
         return <RecordingSettingsManagement />;
       case 'devices':
         return <DevicesManagement />;
+      case 'cameras':
+        return <CamerasManagement />;
       default:
         return <PlansManagement />;
     }
