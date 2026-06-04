@@ -59,6 +59,11 @@ export default function useAgoraVideoCall({
     const n = Number(peerUid);
     if (!Number.isFinite(n) || n <= 0) return;
     setFallbackRemoteUid(n);
+  };
+
+  const preparePeerAfterJoin = (peerUid) => {
+    const n = Number(peerUid);
+    if (!Number.isFinite(n) || n <= 0) return;
     videoCallService.prepareRemoteUser(n);
   };
 
@@ -124,16 +129,19 @@ export default function useAgoraVideoCall({
             setLocalUid(resolved);
             setIsJoined(true);
             setIsCallActive(true);
-            refreshPeerUidFromServer().catch(() => {});
+            refreshPeerUidFromServer()
+              .then((peer) => {
+                if (peer) preparePeerAfterJoin(peer);
+              })
+              .catch(() => {});
             startPeerPolling();
           },
           onUserJoined: (uid) => {
             if (cancelled) return;
             registerRemoteUid(uid);
           },
-          onRemoteVideoReady: (uid) => {
-            if (cancelled) return;
-            registerRemoteUid(uid);
+          onRemoteVideoReady: () => {
+            /* estado atualizado só em onUserJoined — evita registerRemoteUid duplicado */
           },
           onUserOffline: (uid) => {
             if (cancelled) return;
@@ -207,6 +215,10 @@ export default function useAgoraVideoCall({
           const currentLocal = videoCallService.getLocalUid();
           if (currentLocal) {
             setLocalUid(currentLocal);
+          }
+          const peerAfterToken = await refreshPeerUidFromServer();
+          if (!cancelled && peerAfterToken) {
+            preparePeerAfterJoin(peerAfterToken);
           }
           startPeerPolling();
         }

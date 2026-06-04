@@ -57,6 +57,9 @@ class VideoCallService {
     this.handlers = {};
     this.localUid = 0;
     this.eventHandler = null;
+    /** Evita loop notify → handler → prepare → setupRemoteVideo → evento Agora → notify */
+    this.notifiedRemoteUids = new Set();
+    this.subscribedRemoteUids = new Set();
   }
 
   setEventHandlers(handlers = {}) {
@@ -265,13 +268,17 @@ class VideoCallService {
   }
 
   prepareRemoteUser(uid) {
-    this.notifyRemoteUser(uid);
+    const n = Number(uid);
+    if (!Number.isFinite(n) || n <= 0) return;
+    this.ensureRemoteMediaSubscribed(n);
   }
 
   notifyRemoteUser(uid) {
     const n = Number(uid);
     if (!Number.isFinite(n) || n <= 0) return;
     this.ensureRemoteMediaSubscribed(n);
+    if (this.notifiedRemoteUids.has(n)) return;
+    this.notifiedRemoteUids.add(n);
     this.handlers.onUserJoined?.(n);
     this.handlers.onRemoteVideoReady?.(n);
   }
@@ -300,12 +307,16 @@ class VideoCallService {
 
   ensureRemoteMediaSubscribed(uid) {
     if (this.isMockMode || !this.engine) return;
+    const n = Number(uid);
+    if (!Number.isFinite(n) || n <= 0) return;
     try {
-      this.engine.muteRemoteVideoStream(uid, false);
-      this.engine.muteRemoteAudioStream(uid, false);
+      this.engine.muteRemoteVideoStream(n, false);
+      this.engine.muteRemoteAudioStream(n, false);
+      if (this.subscribedRemoteUids.has(n)) return;
+      this.subscribedRemoteUids.add(n);
       if (this.engine.setupRemoteVideo && VideoSourceType && RenderModeType) {
         this.engine.setupRemoteVideo({
-          uid: Number(uid),
+          uid: n,
           sourceType: VideoSourceType.VideoSourceRemote,
           renderMode: RenderModeType.RenderModeFit,
         });
@@ -320,6 +331,8 @@ class VideoCallService {
       if (this.isMockMode) {
         this.isInitialized = false;
         this.handlers = {};
+        this.notifiedRemoteUids.clear();
+        this.subscribedRemoteUids.clear();
         return { success: true, mock: true };
       }
 
@@ -335,6 +348,8 @@ class VideoCallService {
       this.isInitialized = false;
       this.handlers = {};
       this.localUid = 0;
+      this.notifiedRemoteUids.clear();
+      this.subscribedRemoteUids.clear();
       return { success: true };
     } catch (error) {
       console.error('Erro ao destruir engine:', error);
