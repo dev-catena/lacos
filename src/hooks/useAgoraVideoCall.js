@@ -30,6 +30,7 @@ export default function useAgoraVideoCall({
   const [isMockMode, setIsMockMode] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [fallbackRemoteUid, setFallbackRemoteUid] = useState(null);
+  const [remoteSurfaceKey, setRemoteSurfaceKey] = useState(0);
 
   const onJoinedRef = useRef(onJoined);
   const navigationRef = useRef(navigation);
@@ -51,20 +52,22 @@ export default function useAgoraVideoCall({
   const registerRemoteUid = (uid) => {
     const n = Number(uid);
     if (!Number.isFinite(n) || n <= 0) return;
+    const local = Number(videoCallService.getLocalUid()) || 0;
+    if (local > 0 && n === local) return;
+
     videoCallService.prepareRemoteUser(n);
-    setRemoteUsers((prev) => (prev.includes(n) ? prev : [...prev, n]));
+    setFallbackRemoteUid(n);
+    setRemoteUsers((prev) => {
+      if (prev.includes(n)) return prev;
+      setRemoteSurfaceKey((k) => k + 1);
+      return [...prev, n];
+    });
   };
 
   const applyPeerUidFromToken = (peerUid) => {
     const n = Number(peerUid);
     if (!Number.isFinite(n) || n <= 0) return;
     setFallbackRemoteUid(n);
-  };
-
-  const preparePeerAfterJoin = (peerUid) => {
-    const n = Number(peerUid);
-    if (!Number.isFinite(n) || n <= 0) return;
-    videoCallService.prepareRemoteUser(n);
   };
 
   const refreshPeerUidFromServer = async () => {
@@ -121,6 +124,7 @@ export default function useAgoraVideoCall({
         setIsCallActive(false);
         setLocalUid(0);
         setFallbackRemoteUid(null);
+        setRemoteSurfaceKey(0);
 
         videoCallService.setEventHandlers({
           onJoinChannelSuccess: (uid) => {
@@ -143,6 +147,7 @@ export default function useAgoraVideoCall({
           onRemoteVideoReady: (uid) => {
             if (cancelled) return;
             registerRemoteUid(uid);
+            setRemoteSurfaceKey((k) => k + 1);
           },
           onUserOffline: (uid) => {
             if (cancelled) return;
@@ -217,10 +222,7 @@ export default function useAgoraVideoCall({
           if (currentLocal) {
             setLocalUid(currentLocal);
           }
-          const peerAfterToken = await refreshPeerUidFromServer();
-          if (!cancelled && peerAfterToken) {
-            preparePeerAfterJoin(peerAfterToken);
-          }
+          await refreshPeerUidFromServer();
           startPeerPolling();
         }
 
@@ -278,9 +280,10 @@ export default function useAgoraVideoCall({
     setRetryKey((k) => k + 1);
   };
 
-  // Só usa UID visto no canal (eventos Agora); fallback do token não renderiza sozinho.
   const primaryRemoteUid =
-    remoteUsers.length > 0 ? remoteUsers[remoteUsers.length - 1] : null;
+    remoteUsers.length > 0
+      ? remoteUsers[remoteUsers.length - 1]
+      : fallbackRemoteUid;
 
   return {
     isCallActive,
@@ -290,6 +293,7 @@ export default function useAgoraVideoCall({
     remoteUsers,
     primaryRemoteUid,
     fallbackRemoteUid,
+    remoteSurfaceKey,
     localUid,
     isMockMode,
     endCall,

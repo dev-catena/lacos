@@ -59,6 +59,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
     callError,
     primaryRemoteUid,
     remoteUsers,
+    remoteSurfaceKey,
     endCall,
     retryCall,
   } = useAgoraVideoCall({
@@ -382,7 +383,8 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
             isJoined={isJoined}
             participantName={doctorInfo?.name || 'Dr(a). Médico'}
             waitingLabel="Aguardando médico entrar na chamada..."
-            remoteConfirmed={remoteUsers.length > 0}
+            remoteConfirmed={primaryRemoteUid != null}
+            surfaceKey={remoteSurfaceKey}
           />
         </View>
 

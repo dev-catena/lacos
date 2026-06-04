@@ -12,12 +12,13 @@ import {
   ChannelProfileType,
   ClientRoleType,
   RtcSurfaceView,
+  RtcTextureView,
   VideoSourceType,
   RenderModeType,
   isAgoraAvailable,
 } from './agoraBindings';
 
-export { RtcSurfaceView, VideoSourceType, RenderModeType, isAgoraAvailable };
+export { RtcSurfaceView, RtcTextureView, VideoSourceType, RenderModeType, isAgoraAvailable };
 
 async function requestCameraAndMicPermissions() {
   if (Platform.OS === 'android') {
@@ -261,14 +262,21 @@ class VideoCallService {
     this.ensureRemoteMediaSubscribed(n);
   }
 
-  notifyRemoteUser(uid) {
+  notifyRemoteUser(uid, forceSurfaceRefresh = false) {
     const n = Number(uid);
     if (!Number.isFinite(n) || n <= 0) return;
+    const local = Number(this.localUid) || 0;
+    if (local > 0 && n === local) return;
+
     this.ensureRemoteMediaSubscribed(n);
-    if (this.notifiedRemoteUids.has(n)) return;
-    this.notifiedRemoteUids.add(n);
-    this.handlers.onUserJoined?.(n);
-    this.handlers.onRemoteVideoReady?.(n);
+    const isNew = !this.notifiedRemoteUids.has(n);
+    if (isNew) {
+      this.notifiedRemoteUids.add(n);
+      this.handlers.onUserJoined?.(n);
+    }
+    if (isNew || forceSurfaceRefresh) {
+      this.handlers.onRemoteVideoReady?.(n);
+    }
   }
 
   ensureLocalMediaPublished() {

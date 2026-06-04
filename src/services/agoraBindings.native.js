@@ -2,6 +2,7 @@ let createAgoraRtcEngine = null;
 let ChannelProfileType = null;
 let ClientRoleType = null;
 let RtcSurfaceView = null;
+let RtcTextureView = null;
 let VideoSourceType = null;
 let RenderModeType = null;
 let isAgoraAvailable = false;
@@ -12,6 +13,7 @@ try {
   ChannelProfileType = agora.ChannelProfileType;
   ClientRoleType = agora.ClientRoleType;
   RtcSurfaceView = agora.RtcSurfaceView;
+  RtcTextureView = agora.RtcTextureView;
   VideoSourceType = agora.VideoSourceType;
   RenderModeType = agora.RenderModeType;
   isAgoraAvailable = true;
@@ -24,6 +26,7 @@ export {
   ChannelProfileType,
   ClientRoleType,
   RtcSurfaceView,
+  RtcTextureView,
   VideoSourceType,
   RenderModeType,
   isAgoraAvailable,

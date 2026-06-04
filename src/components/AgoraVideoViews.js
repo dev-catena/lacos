@@ -1,11 +1,14 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import videoCallService, {
   RtcSurfaceView,
+  RtcTextureView,
   VideoSourceType,
   RenderModeType,
   isAgoraAvailable,
 } from '../services/videoCallService';
+
+const RemoteRtcView = Platform.OS === 'android' ? RtcTextureView : RtcSurfaceView;
 import colors from '../constants/colors';
 import { PersonIcon, VideoCamIcon } from './CustomIcons';
 
@@ -33,6 +36,7 @@ export function RemoteVideoView({
   waitingLabel,
   participantName,
   remoteConfirmed = true,
+  surfaceKey = 0,
 }) {
   const remoteUid = uid != null ? Number(uid) : null;
   const ready = isJoined || isCallActive;
@@ -45,10 +49,10 @@ export function RemoteVideoView({
     }
   }, [shouldRender, remoteUid]);
 
-  if (shouldRender) {
+  if (shouldRender && RemoteRtcView) {
     return (
-      <RtcSurfaceView
-        key={`remote-${remoteUid}`}
+      <RemoteRtcView
+        key={`remote-${remoteUid}-${surfaceKey}`}
         style={styles.fill}
         canvas={remoteCanvas(remoteUid)}
         zOrderMediaOverlay={false}
