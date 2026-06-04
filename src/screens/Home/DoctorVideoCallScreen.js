@@ -657,7 +657,7 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
             isJoined={isJoined}
             participantName={patientInfo?.name || 'Paciente'}
             waitingLabel="Aguardando paciente entrar na chamada..."
-            remoteConfirmed={remoteUsers.length > 0 || primaryRemoteUid != null}
+            remoteConfirmed={remoteUsers.length > 0}
           />
         </View>
 

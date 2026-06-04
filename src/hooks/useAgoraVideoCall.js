@@ -140,8 +140,9 @@ export default function useAgoraVideoCall({
             if (cancelled) return;
             registerRemoteUid(uid);
           },
-          onRemoteVideoReady: () => {
-            /* estado atualizado só em onUserJoined — evita registerRemoteUid duplicado */
+          onRemoteVideoReady: (uid) => {
+            if (cancelled) return;
+            registerRemoteUid(uid);
           },
           onUserOffline: (uid) => {
             if (cancelled) return;
@@ -277,10 +278,9 @@ export default function useAgoraVideoCall({
     setRetryKey((k) => k + 1);
   };
 
+  // Só usa UID visto no canal (eventos Agora); fallback do token não renderiza sozinho.
   const primaryRemoteUid =
-    remoteUsers.length > 0
-      ? remoteUsers[remoteUsers.length - 1]
-      : fallbackRemoteUid;
+    remoteUsers.length > 0 ? remoteUsers[remoteUsers.length - 1] : null;
 
   return {
     isCallActive,

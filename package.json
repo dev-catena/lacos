@@ -26,7 +26,8 @@
     "debugger": "echo 'Pressione j no terminal do Expo para abrir DevTools, ou acesse: http://localhost:19000/debugger-ui/'",
     "eas:build:ios": "npx eas-cli build --platform ios --profile production",
     "eas:build:android-apk": "npx eas-cli build --platform android --profile preview",
-    "eas:submit:ios": "npx eas-cli submit --platform ios --profile production --latest"
+    "eas:submit:ios": "npx eas-cli submit --platform ios --profile production --latest",
+    "eas:update:production": "npx eas-cli update --channel production"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

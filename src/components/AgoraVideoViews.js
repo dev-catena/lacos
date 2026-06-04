@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import {
+import videoCallService, {
   RtcSurfaceView,
   VideoSourceType,
   RenderModeType,
@@ -38,6 +38,12 @@ export function RemoteVideoView({
   const ready = isJoined || isCallActive;
   const shouldRender =
     isAgoraAvailable && ready && remoteUid != null && remoteUid > 0 && remoteConfirmed;
+
+  useEffect(() => {
+    if (shouldRender && remoteUid > 0) {
+      videoCallService.prepareRemoteUser(remoteUid);
+    }
+  }, [shouldRender, remoteUid]);
 
   if (shouldRender) {
     return (

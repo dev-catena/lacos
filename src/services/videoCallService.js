@@ -7,27 +7,15 @@ import { Platform, PermissionsAndroid } from 'react-native';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { AGORA_APP_ID } from '../config/agora';
-
-let createAgoraRtcEngine = null;
-let ChannelProfileType = null;
-let ClientRoleType = null;
-let RtcSurfaceView = null;
-let VideoSourceType = null;
-let RenderModeType = null;
-let isAgoraAvailable = false;
-
-try {
-  const agora = require('react-native-agora');
-  createAgoraRtcEngine = agora.createAgoraRtcEngine;
-  ChannelProfileType = agora.ChannelProfileType;
-  ClientRoleType = agora.ClientRoleType;
-  RtcSurfaceView = agora.RtcSurfaceView;
-  VideoSourceType = agora.VideoSourceType;
-  RenderModeType = agora.RenderModeType;
-  isAgoraAvailable = true;
-} catch {
-  isAgoraAvailable = false;
-}
+import {
+  createAgoraRtcEngine,
+  ChannelProfileType,
+  ClientRoleType,
+  RtcSurfaceView,
+  VideoSourceType,
+  RenderModeType,
+  isAgoraAvailable,
+} from './agoraBindings';
 
 export { RtcSurfaceView, VideoSourceType, RenderModeType, isAgoraAvailable };
 
@@ -57,9 +45,8 @@ class VideoCallService {
     this.handlers = {};
     this.localUid = 0;
     this.eventHandler = null;
-    /** Evita loop notify → handler → prepare → setupRemoteVideo → evento Agora → notify */
+    /** Evita loop notify → handler → prepare → evento Agora → notify */
     this.notifiedRemoteUids = new Set();
-    this.subscribedRemoteUids = new Set();
   }
 
   setEventHandlers(handlers = {}) {
@@ -213,6 +200,7 @@ class VideoCallService {
 
   async leaveChannel() {
     try {
+      this.notifiedRemoteUids.clear();
       if (this.isMockMode) {
         return { success: true, mock: true };
       }
@@ -310,17 +298,9 @@ class VideoCallService {
     const n = Number(uid);
     if (!Number.isFinite(n) || n <= 0) return;
     try {
+      // Agora v4: vídeo remoto só via RtcSurfaceView (setupRemoteVideo foi removido).
       this.engine.muteRemoteVideoStream(n, false);
       this.engine.muteRemoteAudioStream(n, false);
-      if (this.subscribedRemoteUids.has(n)) return;
-      this.subscribedRemoteUids.add(n);
-      if (this.engine.setupRemoteVideo && VideoSourceType && RenderModeType) {
-        this.engine.setupRemoteVideo({
-          uid: n,
-          sourceType: VideoSourceType.VideoSourceRemote,
-          renderMode: RenderModeType.RenderModeFit,
-        });
-      }
     } catch (e) {
       console.warn('Agora ensureRemoteMediaSubscribed:', e?.message);
     }
@@ -332,7 +312,6 @@ class VideoCallService {
         this.isInitialized = false;
         this.handlers = {};
         this.notifiedRemoteUids.clear();
-        this.subscribedRemoteUids.clear();
         return { success: true, mock: true };
       }
 
@@ -349,7 +328,6 @@ class VideoCallService {
       this.handlers = {};
       this.localUid = 0;
       this.notifiedRemoteUids.clear();
-      this.subscribedRemoteUids.clear();
       return { success: true };
     } catch (error) {
       console.error('Erro ao destruir engine:', error);
