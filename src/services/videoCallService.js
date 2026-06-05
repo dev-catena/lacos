@@ -46,6 +46,7 @@ class VideoCallService {
     this.handlers = {};
     this.localUid = 0;
     this.eventHandler = null;
+    this.currentChannelName = '';
     /** Evita loop notify → handler → prepare → evento Agora → notify */
     this.notifiedRemoteUids = new Set();
   }
@@ -118,7 +119,7 @@ class VideoCallService {
           if (!Number.isFinite(uid) || uid <= 0) return;
           // RemoteVideoState: 1=starting, 2=decoding, 3=frozen
           if (state === 1 || state === 2 || state === 3) {
-            this.notifyRemoteUser(uid);
+            this.notifyRemoteUser(uid, state === 2);
           }
         },
         onConnectionStateChanged: (connection, state, reason) => {
@@ -182,6 +183,8 @@ class VideoCallService {
       if (result !== 0) {
         return { success: false, error: `Falha ao entrar no canal (código ${result})` };
       }
+
+      this.currentChannelName = channelName;
 
       if (this.engine?.muteAllRemoteVideoStreams) {
         this.engine.muteAllRemoteVideoStreams(false);
@@ -256,10 +259,37 @@ class VideoCallService {
     return this.localUid || 0;
   }
 
+  bindRemoteVideoCanvas(uid) {
+    if (this.isMockMode || !this.engine) return;
+    const n = Number(uid);
+    if (!Number.isFinite(n) || n <= 0) return;
+    if (!this.engine.setupRemoteVideo || !VideoSourceType) return;
+
+    const canvas = {
+      uid: n,
+      sourceType: VideoSourceType.VideoSourceRemote,
+      renderMode: RenderModeType?.RenderModeFit ?? 1,
+    };
+
+    try {
+      if (this.currentChannelName && this.engine.setupRemoteVideoEx) {
+        this.engine.setupRemoteVideoEx(canvas, {
+          channelId: this.currentChannelName,
+          localUid: this.localUid || 0,
+        });
+      } else {
+        this.engine.setupRemoteVideo(canvas);
+      }
+    } catch (e) {
+      console.warn('Agora bindRemoteVideoCanvas:', e?.message);
+    }
+  }
+
   prepareRemoteUser(uid) {
     const n = Number(uid);
     if (!Number.isFinite(n) || n <= 0) return;
     this.ensureRemoteMediaSubscribed(n);
+    this.bindRemoteVideoCanvas(n);
   }
 
   notifyRemoteUser(uid, forceSurfaceRefresh = false) {
@@ -269,6 +299,8 @@ class VideoCallService {
     if (local > 0 && n === local) return;
 
     this.ensureRemoteMediaSubscribed(n);
+    this.bindRemoteVideoCanvas(n);
+
     const isNew = !this.notifiedRemoteUids.has(n);
     if (isNew) {
       this.notifiedRemoteUids.add(n);
@@ -277,6 +309,13 @@ class VideoCallService {
     if (isNew || forceSurfaceRefresh) {
       this.handlers.onRemoteVideoReady?.(n);
     }
+  }
+
+  /** Reaplica bind do vídeo remoto sem remontar a surface (evita loop de surfaceKey). */
+  refreshRemoteVideoBinding(uid) {
+    const n = Number(uid);
+    if (!Number.isFinite(n) || n <= 0) return;
+    this.prepareRemoteUser(n);
   }
 
   ensureLocalMediaPublished() {
@@ -335,6 +374,7 @@ class VideoCallService {
       this.isInitialized = false;
       this.handlers = {};
       this.localUid = 0;
+      this.currentChannelName = '';
       this.notifiedRemoteUids.clear();
       return { success: true };
     } catch (error) {

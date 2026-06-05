@@ -8,8 +8,8 @@ import {
   resolveAppointmentIdForVideo,
 } from '../config/agora';
 
-const PEER_POLL_MS = 2500;
-const PEER_POLL_MAX = 24;
+const PEER_POLL_MS = 1500;
+const PEER_POLL_MAX = 40;
 
 /**
  * Hook compartilhado para iniciar/encerrar chamada Agora na teleconsulta.
@@ -31,6 +31,7 @@ export default function useAgoraVideoCall({
   const [retryKey, setRetryKey] = useState(0);
   const [fallbackRemoteUid, setFallbackRemoteUid] = useState(null);
   const [remoteSurfaceKey, setRemoteSurfaceKey] = useState(0);
+  const [rtcChannelName, setRtcChannelName] = useState('');
 
   const onJoinedRef = useRef(onJoined);
   const navigationRef = useRef(navigation);
@@ -128,6 +129,7 @@ export default function useAgoraVideoCall({
         setLocalUid(0);
         setFallbackRemoteUid(null);
         setRemoteSurfaceKey(0);
+        setRtcChannelName('');
 
         videoCallService.setEventHandlers({
           onJoinChannelSuccess: (uid) => {
@@ -206,6 +208,8 @@ export default function useAgoraVideoCall({
           appointmentId: resolvedId,
           hasToken: !!rtcToken,
         });
+
+        setRtcChannelName(channelName);
 
         const joinResult = await videoCallService.joinChannel(channelName, agoraUid, rtcToken);
         if (cancelled) return;
@@ -300,6 +304,9 @@ export default function useAgoraVideoCall({
     primaryRemoteUid,
     fallbackRemoteUid,
     remoteSurfaceKey,
+    rtcConnection: rtcChannelName
+      ? { channelId: rtcChannelName, localUid: localUid || 0 }
+      : undefined,
     localUid,
     isMockMode,
     endCall,

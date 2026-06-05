@@ -37,6 +37,7 @@ export function RemoteVideoView({
   participantName,
   remoteConfirmed = true,
   surfaceKey = 0,
+  connection,
 }) {
   const remoteUid = uid != null ? Number(uid) : null;
   const ready = isJoined || isCallActive;
@@ -44,10 +45,16 @@ export function RemoteVideoView({
     isAgoraAvailable && ready && remoteUid != null && remoteUid > 0 && remoteConfirmed;
 
   useEffect(() => {
-    if (shouldRender && remoteUid > 0) {
-      videoCallService.prepareRemoteUser(remoteUid);
-    }
-  }, [shouldRender, remoteUid]);
+    if (!shouldRender || remoteUid <= 0) return undefined;
+
+    videoCallService.prepareRemoteUser(remoteUid);
+    const delays = [300, 800, 1500, 3000];
+    const timers = delays.map((ms) =>
+      setTimeout(() => videoCallService.prepareRemoteUser(remoteUid), ms)
+    );
+
+    return () => timers.forEach(clearTimeout);
+  }, [shouldRender, remoteUid, surfaceKey]);
 
   if (shouldRender && RemoteRtcView) {
     return (
@@ -55,6 +62,7 @@ export function RemoteVideoView({
         key={`remote-${remoteUid}-${surfaceKey}`}
         style={styles.fill}
         canvas={remoteCanvas(remoteUid)}
+        connection={connection}
         zOrderMediaOverlay={false}
       />
     );

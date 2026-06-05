@@ -60,6 +60,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
     primaryRemoteUid,
     remoteUsers,
     remoteSurfaceKey,
+    rtcConnection,
     endCall,
     retryCall,
   } = useAgoraVideoCall({
@@ -385,6 +386,7 @@ const PatientVideoCallScreen = ({ route, navigation }) => {
             waitingLabel="Aguardando médico entrar na chamada..."
             remoteConfirmed={primaryRemoteUid != null}
             surfaceKey={remoteSurfaceKey}
+            connection={rtcConnection}
           />
         </View>
 
