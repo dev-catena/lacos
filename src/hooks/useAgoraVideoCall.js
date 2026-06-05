@@ -8,8 +8,8 @@ import {
   resolveAppointmentIdForVideo,
 } from '../config/agora';
 
-const PEER_POLL_MS = 8000;
-const PEER_POLL_MAX = 8;
+const PEER_POLL_MS = 2500;
+const PEER_POLL_MAX = 24;
 
 /**
  * Hook compartilhado para iniciar/encerrar chamada Agora na teleconsulta.
@@ -78,8 +78,10 @@ export default function useAgoraVideoCall({
     if (tokenResult.success && tokenResult.data?.success) {
       const peerUid = tokenResult.data.peer_uid;
       if (peerUid != null && Number(peerUid) > 0) {
-        applyPeerUidFromToken(peerUid);
-        return Number(peerUid);
+        const n = Number(peerUid);
+        applyPeerUidFromToken(n);
+        registerRemoteUid(n);
+        return n;
       }
     }
     return null;
@@ -94,7 +96,8 @@ export default function useAgoraVideoCall({
     let attempts = 0;
     peerPollRef.current = setInterval(async () => {
       attempts += 1;
-      await refreshPeerUidFromServer();
+      const peer = await refreshPeerUidFromServer();
+      if (peer) registerRemoteUid(peer);
       if (attempts >= PEER_POLL_MAX) {
         clearInterval(peerPollRef.current);
         peerPollRef.current = null;
@@ -135,7 +138,7 @@ export default function useAgoraVideoCall({
             setIsCallActive(true);
             refreshPeerUidFromServer()
               .then((peer) => {
-                if (peer) preparePeerAfterJoin(peer);
+                if (peer) registerRemoteUid(peer);
               })
               .catch(() => {});
             startPeerPolling();
@@ -222,7 +225,10 @@ export default function useAgoraVideoCall({
           if (currentLocal) {
             setLocalUid(currentLocal);
           }
-          await refreshPeerUidFromServer();
+          const peerAfterJoin = await refreshPeerUidFromServer();
+          if (!cancelled && peerAfterJoin) {
+            registerRemoteUid(peerAfterJoin);
+          }
           startPeerPolling();
         }
 
