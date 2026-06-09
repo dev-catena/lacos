@@ -27,6 +27,26 @@ import GOOGLE_MAPS_CONFIG from '../../config/maps';
 import { checkGoogleMapsConfig } from '../../utils/checkGoogleMapsConfig';
 import { BR_UFS } from '../../constants/brUfs';
 import { parseCrm, formatCrmValue } from '../../utils/crm';
+import { getApiErrorMessage } from '../../utils/apiValidationErrors';
+import { validateEmail } from '../../utils/emailValidation';
+
+const showSaveError = (error, title = 'Não foi possível salvar') => {
+  const details = getApiErrorMessage(error);
+  const hasFieldErrors =
+    error?.errors && typeof error.errors === 'object' && Object.keys(error.errors).length > 0;
+
+  if (hasFieldErrors || (details && details !== 'Dados inválidos')) {
+    Alert.alert(title, details);
+    return;
+  }
+
+  Toast.show({
+    type: 'error',
+    text1: title,
+    text2: details,
+    visibilityTime: 7000,
+  });
+};
 
 const AddDoctorScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
@@ -96,6 +116,7 @@ const AddDoctorScreen = ({ route, navigation }) => {
   const [specialtyModalVisible, setSpecialtyModalVisible] = useState(false);
   const [ufModalVisible, setUfModalVisible] = useState(false);
   const [addressListVisible, setAddressListVisible] = useState(false);
+  const [emailError, setEmailError] = useState('');
   // "lock" curto para evitar que o autocomplete limpe/reabra lista logo após selecionar um item
   const selectingAddressRef = useRef(false);
   const lastSelectedAddressRef = useRef('');
@@ -261,16 +282,39 @@ const AddDoctorScreen = ({ route, navigation }) => {
 
       await proceedWithSave();
     } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Erro ao salvar',
-        text2: error.message || 'Tente novamente',
-      });
+      showSaveError(error);
     }
   };
 
   const proceedWithSave = async () => {
     try {
+      const parsedGroupId = parseInt(String(groupId), 10);
+      if (!Number.isFinite(parsedGroupId) || parsedGroupId <= 0) {
+        Toast.show({
+          type: 'error',
+          text1: 'Grupo inválido',
+          text2: 'Não foi possível identificar o grupo. Volte e tente novamente.',
+        });
+        return;
+      }
+
+      const emailCheck = validateEmail(formData.email);
+      if (!emailCheck.valid) {
+        setEmailError(emailCheck.message);
+        Alert.alert('E-mail inválido', emailCheck.message);
+        return;
+      }
+      setEmailError('');
+
+      if (formData.address.trim().length > 1000) {
+        Toast.show({
+          type: 'error',
+          text1: 'Endereço muito longo',
+          text2: 'Reduza o endereço para até 1000 caracteres.',
+        });
+        return;
+      }
+
       // Validar CRM: se informado, deve ter UF e número com 6 dígitos
       if (formData.crmNumber || formData.crmUf) {
         if (!formData.crmUf) {
@@ -315,16 +359,30 @@ const AddDoctorScreen = ({ route, navigation }) => {
         }
       }
 
+      if (phoneValue && phoneValue.length > 20) {
+        Toast.show({
+          type: 'error',
+          text1: 'Telefone inválido',
+          text2: 'Use o formato +55(DDD)9XXXX-XXXX.',
+        });
+        return;
+      }
+
+      const specialtyId =
+        formData.medicalSpecialtyId != null
+          ? parseInt(String(formData.medicalSpecialtyId), 10)
+          : null;
+
       const doctorData = {
-        group_id: groupId,
+        group_id: parsedGroupId,
         name: formData.name.trim(),
-        medical_specialty_id: formData.medicalSpecialtyId,
+        medical_specialty_id: Number.isFinite(specialtyId) ? specialtyId : null,
         crm: crmValue.trim() || null,
         phone: phoneValue,
         email: formData.email.trim() || null,
         address: formData.address.trim() || null,
         notes: formData.notes.trim() || null,
-        is_primary: formData.isPrimary,
+        is_primary: !!formData.isPrimary,
       };
 
       let response;
@@ -334,20 +392,19 @@ const AddDoctorScreen = ({ route, navigation }) => {
         response = await doctorService.createDoctor(doctorData);
       }
 
-      if (response.success) {
+      if (response?.success) {
         Toast.show({
           type: 'success',
           text1: isEditing ? 'Médico atualizado' : 'Médico cadastrado',
           text2: 'Dados salvos com sucesso',
         });
         navigation.goBack();
+        return;
       }
+
+      showSaveError(response || { message: 'Não foi possível salvar o médico' });
     } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Erro ao salvar',
-        text2: error.message || 'Tente novamente',
-      });
+      showSaveError(error);
       throw error;
     }
   };
@@ -627,18 +684,33 @@ const AddDoctorScreen = ({ route, navigation }) => {
           {/* Email */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>E-mail</Text>
-            <View style={styles.inputWrapper}>
-              <SafeIcon name="mail-outline" size={20} color={colors.gray400} />
+            <View style={[styles.inputWrapper, emailError && styles.inputWrapperError]}>
+              <SafeIcon name="mail-outline" size={20} color={emailError ? colors.error : colors.gray400} />
               <TextInput
                 style={styles.input}
                 value={formData.email}
-                onChangeText={(text) => updateField('email', text)}
+                onChangeText={(text) => {
+                  updateField('email', text);
+                  if (emailError) {
+                    const check = validateEmail(text);
+                    setEmailError(check.valid ? '' : check.message);
+                  }
+                }}
+                onBlur={() => {
+                  const check = validateEmail(formData.email);
+                  setEmailError(check.valid ? '' : check.message);
+                }}
                 placeholder="contato@clinica.com.br"
                 placeholderTextColor={colors.gray400}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
             </View>
+            {emailError ? (
+              <Text style={styles.fieldError}>{emailError}</Text>
+            ) : (
+              <Text style={styles.hint}>Opcional — use @ e ponto (.), não dois pontos (:)</Text>
+            )}
           </View>
 
           {/* Endereço com Google Places */}
@@ -920,6 +992,15 @@ const styles = StyleSheet.create({
     color: colors.gray400,
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  inputWrapperError: {
+    borderColor: colors.error,
+    borderWidth: 1.5,
+  },
+  fieldError: {
+    fontSize: 12,
+    color: colors.error,
+    marginTop: 4,
   },
   selectButton: {
     flexDirection: 'row',

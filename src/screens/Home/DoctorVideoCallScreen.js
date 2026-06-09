@@ -651,7 +651,6 @@ const DoctorVideoCallScreen = ({ route, navigation }) => {
       
       {/* Área de Vídeo */}
       <View style={styles.videoContainer}>
-        {/* Vídeo do Paciente (tela principal) */}
         <View style={styles.mainVideo}>
           <RemoteVideoView
             uid={primaryRemoteUid}
@@ -954,6 +953,8 @@ const styles = StyleSheet.create({
     right: 20,
     width: 120,
     height: 160,
+    zIndex: 10,
+    elevation: 10,
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
     justifyContent: 'center',

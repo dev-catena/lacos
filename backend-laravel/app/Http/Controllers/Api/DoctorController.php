@@ -1103,9 +1103,20 @@ class DoctorController extends Controller
                 'crm' => 'nullable|string|max:20',
                 'phone' => 'nullable|string|max:20',
                 'email' => 'nullable|string|email|max:255',
-                'address' => 'nullable|string|max:500',
+                'address' => 'nullable|string|max:1000',
                 'notes' => 'nullable|string',
                 'is_primary' => 'nullable|boolean',
+            ], [
+                'group_id.required' => 'O grupo é obrigatório.',
+                'group_id.exists' => 'Grupo inválido ou inexistente.',
+                'name.required' => 'O nome do médico é obrigatório.',
+                'name.max' => 'O nome pode ter no máximo 255 caracteres.',
+                'medical_specialty_id.exists' => 'A especialidade selecionada não é válida.',
+                'crm.max' => 'O CRM pode ter no máximo 20 caracteres.',
+                'phone.max' => 'O telefone pode ter no máximo 20 caracteres (use +55 e o número).',
+                'email.email' => 'Informe um e-mail válido.',
+                'address.max' => 'O endereço pode ter no máximo 1000 caracteres.',
+                'is_primary.boolean' => 'O campo médico principal é inválido.',
             ]);
 
             // Verificar se o usuário tem acesso ao grupo
@@ -1226,9 +1237,20 @@ class DoctorController extends Controller
                 'crm' => 'nullable|string|max:20',
                 'phone' => 'nullable|string|max:20',
                 'email' => 'nullable|string|email|max:255',
-                'address' => 'nullable|string|max:500',
+                'address' => 'nullable|string|max:1000',
                 'notes' => 'nullable|string',
                 'is_primary' => 'nullable|boolean',
+            ], [
+                'group_id.required' => 'O grupo é obrigatório.',
+                'group_id.exists' => 'Grupo inválido ou inexistente.',
+                'name.required' => 'O nome do médico é obrigatório.',
+                'name.max' => 'O nome pode ter no máximo 255 caracteres.',
+                'medical_specialty_id.exists' => 'A especialidade selecionada não é válida.',
+                'crm.max' => 'O CRM pode ter no máximo 20 caracteres.',
+                'phone.max' => 'O telefone pode ter no máximo 20 caracteres (use +55 e o número).',
+                'email.email' => 'Informe um e-mail válido.',
+                'address.max' => 'O endereço pode ter no máximo 1000 caracteres.',
+                'is_primary.boolean' => 'O campo médico principal é inválido.',
             ]);
 
             // Verificar se o médico existe na tabela doctors

@@ -1051,20 +1051,27 @@ class AppointmentController extends Controller
                         'message' => 'Apenas participantes do grupo podem registrar entrada como paciente',
                     ], 403);
                 }
-                if (!$appointment->patient_joined_at) {
-                    $appointment->update([
-                        'patient_joined_at' => now(),
-                        'patient_joined_by_user_id' => $user->id,
-                    ]);
+                $patientJoinPayload = [
+                    'patient_joined_at' => $appointment->patient_joined_at ?? now(),
+                    'patient_joined_by_user_id' => $user->id,
+                ];
+                if (
+                    ! $appointment->patient_joined_at
+                    || (int) $appointment->patient_joined_by_user_id !== (int) $user->id
+                ) {
+                    $appointment->update($patientJoinPayload);
                     $updated = true;
                 }
             }
 
+            $fresh = $appointment->fresh();
+
             return response()->json([
                 'success' => true,
                 'joined' => $updated,
-                'doctor_joined_at' => $appointment->fresh()->doctor_joined_at?->toIso8601String(),
-                'patient_joined_at' => $appointment->fresh()->patient_joined_at?->toIso8601String(),
+                'doctor_joined_at' => $fresh->doctor_joined_at?->toIso8601String(),
+                'patient_joined_at' => $fresh->patient_joined_at?->toIso8601String(),
+                'patient_joined_by_user_id' => $fresh->patient_joined_by_user_id,
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;

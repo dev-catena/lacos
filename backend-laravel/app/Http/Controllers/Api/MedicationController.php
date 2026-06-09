@@ -824,19 +824,12 @@ class MedicationController extends Controller
                 ], 400);
             }
 
-            // Por enquanto, retornar preço simulado
-            // TODO: Integrar com med_price_anvisa quando disponível
-            $simulatedPrice = rand(1000, 6000) / 100; // Entre R$ 10,00 e R$ 60,00
-            
+            // Integração ANVISA (med_price_anvisa) ainda não ativa — não inventar preço.
             return response()->json([
-                'success' => true,
-                'name' => $medicationName,
-                'price' => $simulatedPrice,
-                'presentation' => null,
-                'manufacturer' => null,
-                'registration' => null,
-                'source' => 'simulated',
-            ]);
+                'success' => false,
+                'error' => 'Medicamento não encontrado na base de preços',
+                'message' => 'Preço de referência indisponível até a consulta à base ANVISA estar configurada.',
+            ], 404);
 
         } catch (\Exception $e) {
             Log::error('Erro ao buscar preço de medicamento: ' . $e->getMessage());

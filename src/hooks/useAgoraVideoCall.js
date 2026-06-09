@@ -138,6 +138,7 @@ export default function useAgoraVideoCall({
             setLocalUid(resolved);
             setIsJoined(true);
             setIsCallActive(true);
+            setRemoteSurfaceKey((k) => k + 1);
             refreshPeerUidFromServer()
               .then((peer) => {
                 if (peer) registerRemoteUid(peer);
@@ -189,7 +190,7 @@ export default function useAgoraVideoCall({
               agoraUid = Number(apiUid);
             }
             if (peerUid != null && Number(peerUid) > 0) {
-              applyPeerUidFromToken(peerUid);
+              registerRemoteUid(Number(peerUid));
             }
           } else {
             const errMsg = String(tokenResult.error || tokenResult.data?.message || '');
@@ -305,7 +306,10 @@ export default function useAgoraVideoCall({
     fallbackRemoteUid,
     remoteSurfaceKey,
     rtcConnection: rtcChannelName
-      ? { channelId: rtcChannelName, localUid: localUid || 0 }
+      ? {
+          channelId: rtcChannelName,
+          localUid: videoCallService.getLocalUid() || localUid || 0,
+        }
       : undefined,
     localUid,
     isMockMode,

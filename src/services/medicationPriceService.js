@@ -51,7 +51,7 @@ class MedicationPriceService {
       // Chamar endpoint do backend: GET /api/medications/price?name={medicationName}
       const response = await apiService.get(`/medications/price?name=${encodeURIComponent(medicationName)}`);
       
-      if (response && response.price !== undefined) {
+      if (response?.success !== false && response?.price != null && response?.source !== 'simulated') {
         return {
           success: true,
           data: {
@@ -60,7 +60,7 @@ class MedicationPriceService {
             presentation: response.presentation,
             manufacturer: response.manufacturer,
             registration: response.registration,
-            source: 'anvisa',
+            source: response.source || 'anvisa',
           },
         };
       }

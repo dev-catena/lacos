@@ -21,7 +21,6 @@ const localCanvas = {
 function remoteCanvas(uid) {
   return {
     uid: Number(uid),
-    sourceType: VideoSourceType?.VideoSourceRemote,
     renderMode: RenderModeType?.RenderModeFit,
   };
 }
@@ -40,9 +39,14 @@ export function RemoteVideoView({
   connection,
 }) {
   const remoteUid = uid != null ? Number(uid) : null;
-  const ready = isJoined || isCallActive;
+  const localUid = Number(connection?.localUid) || 0;
   const shouldRender =
-    isAgoraAvailable && ready && remoteUid != null && remoteUid > 0 && remoteConfirmed;
+    isAgoraAvailable &&
+    isJoined &&
+    remoteUid != null &&
+    remoteUid > 0 &&
+    remoteConfirmed &&
+    localUid > 0;
 
   useEffect(() => {
     if (!shouldRender || remoteUid <= 0) return undefined;
@@ -59,7 +63,7 @@ export function RemoteVideoView({
   if (shouldRender && RemoteRtcView) {
     return (
       <RemoteRtcView
-        key={`remote-${remoteUid}-${surfaceKey}`}
+        key={`remote-${remoteUid}-${localUid}-${surfaceKey}`}
         style={styles.fill}
         canvas={remoteCanvas(remoteUid)}
         connection={connection}
@@ -105,7 +109,7 @@ export function LocalVideoView({ isJoined, isCallActive, videoOff, label = 'VocÃ
         key="local-preview"
         style={styles.fill}
         canvas={localCanvas}
-        zOrderMediaOverlay
+        zOrderMediaOverlay={Platform.OS === 'android'}
       />
     );
   }

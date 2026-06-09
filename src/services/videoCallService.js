@@ -259,37 +259,18 @@ class VideoCallService {
     return this.localUid || 0;
   }
 
-  bindRemoteVideoCanvas(uid) {
-    if (this.isMockMode || !this.engine) return;
-    const n = Number(uid);
-    if (!Number.isFinite(n) || n <= 0) return;
-    if (!this.engine.setupRemoteVideo || !VideoSourceType) return;
-
-    const canvas = {
-      uid: n,
-      sourceType: VideoSourceType.VideoSourceRemote,
-      renderMode: RenderModeType?.RenderModeFit ?? 1,
+  getRtcConnection() {
+    if (!this.currentChannelName) return undefined;
+    return {
+      channelId: this.currentChannelName,
+      localUid: this.localUid || 0,
     };
-
-    try {
-      if (this.currentChannelName && this.engine.setupRemoteVideoEx) {
-        this.engine.setupRemoteVideoEx(canvas, {
-          channelId: this.currentChannelName,
-          localUid: this.localUid || 0,
-        });
-      } else {
-        this.engine.setupRemoteVideo(canvas);
-      }
-    } catch (e) {
-      console.warn('Agora bindRemoteVideoCanvas:', e?.message);
-    }
   }
 
   prepareRemoteUser(uid) {
     const n = Number(uid);
     if (!Number.isFinite(n) || n <= 0) return;
     this.ensureRemoteMediaSubscribed(n);
-    this.bindRemoteVideoCanvas(n);
   }
 
   notifyRemoteUser(uid, forceSurfaceRefresh = false) {
@@ -299,7 +280,6 @@ class VideoCallService {
     if (local > 0 && n === local) return;
 
     this.ensureRemoteMediaSubscribed(n);
-    this.bindRemoteVideoCanvas(n);
 
     const isNew = !this.notifiedRemoteUids.has(n);
     if (isNew) {
@@ -344,10 +324,15 @@ class VideoCallService {
     if (this.isMockMode || !this.engine) return;
     const n = Number(uid);
     if (!Number.isFinite(n) || n <= 0) return;
+    const connection = this.getRtcConnection();
     try {
-      // Agora v4: vídeo remoto só via RtcSurfaceView (setupRemoteVideo foi removido).
-      this.engine.muteRemoteVideoStream(n, false);
-      this.engine.muteRemoteAudioStream(n, false);
+      if (connection?.channelId && connection.localUid > 0 && this.engine.muteRemoteVideoStreamEx) {
+        this.engine.muteRemoteVideoStreamEx(n, false, connection);
+        this.engine.muteRemoteAudioStreamEx?.(n, false, connection);
+      } else {
+        this.engine.muteRemoteVideoStream(n, false);
+        this.engine.muteRemoteAudioStream(n, false);
+      }
     } catch (e) {
       console.warn('Agora ensureRemoteMediaSubscribed:', e?.message);
     }

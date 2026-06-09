@@ -33,6 +33,41 @@ export function normalizeMedicationSchedule(timesRaw, scheduleFromDetails) {
   return coerce(scheduleFromDetails);
 }
 
+export function timeToMinutes(timeStr) {
+  const [h, m] = String(timeStr || '0:0').split(':').map((v) => parseInt(v, 10));
+  if (!Number.isFinite(h)) return 0;
+  return h * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+/**
+ * Converte horário do cronograma em Date no calendário correto.
+ * Ex.: ciclo 08:00 → 16:00 → 00:00: o 00:00 é fim do dia (madrugada), não início.
+ */
+export function resolveScheduleDateTime(scheduleTime, scheduleList, referenceDate = new Date()) {
+  const [hours, minutes] = String(scheduleTime).split(':').map((v) => parseInt(v, 10));
+  const ref = new Date(referenceDate);
+  const scheduled = new Date(
+    ref.getFullYear(),
+    ref.getMonth(),
+    ref.getDate(),
+    Number.isFinite(hours) ? hours : 0,
+    Number.isFinite(minutes) ? minutes : 0,
+    0,
+    0
+  );
+
+  const list = Array.isArray(scheduleList) ? scheduleList.filter(Boolean) : [];
+  if (list.length > 1) {
+    const anchorMinutes = timeToMinutes(list[0]);
+    const slotMinutes = timeToMinutes(scheduleTime);
+    if (slotMinutes < anchorMinutes) {
+      scheduled.setDate(scheduled.getDate() + 1);
+    }
+  }
+
+  return scheduled;
+}
+
 /**
  * Monta lista de horários a partir do registro da API (times, frequency.details.schedule, time legado).
  */

@@ -24,7 +24,11 @@ import colors from '../../constants/colors';
 import medicationService from '../../services/medicationService';
 import medicationSearchService from '../../services/medicationSearchService';
 import medicationPriceService from '../../services/medicationPriceService';
-import { buildScheduleFromMedicationApi } from '../../utils/medicationSchedule';
+import {
+  buildScheduleFromMedicationApi,
+  resolveScheduleDateTime,
+  timeToMinutes,
+} from '../../utils/medicationSchedule';
 import NearbyPharmacies from '../../components/NearbyPharmacies';
 import PopularPharmacies from '../../components/PopularPharmacies';
 
@@ -166,14 +170,14 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
   const getDoseStatus = (scheduleTime) => {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
-    const [hours, minutes] = scheduleTime.split(':');
-    const scheduledDateTime = new Date(today);
-    scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    const scheduleList = Array.isArray(medication?.schedule) ? medication.schedule : [];
+    const scheduledDateTime = resolveScheduleDateTime(scheduleTime, scheduleList, now);
+    const scheduledDay = scheduledDateTime.toISOString().split('T')[0];
 
-    // Verificar se há registro para este horário hoje
-    const recordToday = doseHistory.find(h => {
+    // Verificar se há registro para este horário no dia do cronograma
+    const recordToday = doseHistory.find((h) => {
       const hDate = new Date(h.takenAt);
-      return hDate.toISOString().split('T')[0] === today && h.scheduledTime === scheduleTime;
+      return hDate.toISOString().split('T')[0] === scheduledDay && h.scheduledTime === scheduleTime;
     });
 
     // Verificar se foi marcado como não administrado
@@ -219,11 +223,16 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
     }
 
     // Ainda não chegou a hora
+    const isOvernight =
+      scheduleTime === '00:00' &&
+      scheduleList.length > 1 &&
+      timeToMinutes(scheduleTime) < timeToMinutes(scheduleList[0]);
+
     return {
       status: 'pending',
       color: colors.gray400,
       icon: 'time-outline',
-      label: 'Agendado',
+      label: isOvernight ? 'Agendado (madrugada)' : 'Agendado',
     };
   };
 
@@ -693,7 +702,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
             <View style={styles.priceCard}>
               <Text style={styles.priceNote}>Buscando preço de referência...</Text>
             </View>
-          ) : medicationPrice !== null && (
+          ) : medicationPrice !== null ? (
             <View style={styles.priceCard}>
               <View style={styles.priceHeader}>
                 <SafeIcon name="cash-outline" size={24} color={colors.primary} />
@@ -703,7 +712,13 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                 R$ {medicationPrice.toFixed(2).replace('.', ',')}
               </Text>
               <Text style={styles.priceNote}>
-                Preço médio de referência no mercado
+                Valor de referência na base ANVISA (pode variar na farmácia)
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.priceCard}>
+              <Text style={styles.priceNote}>
+                Preço de referência indisponível para este medicamento.
               </Text>
             </View>
           )}
