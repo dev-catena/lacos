@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Medication;
+use App\Models\PharmacyPrice;
 use App\Models\GroupActivity;
 use App\Services\AccompaniedPersonResolver;
 use Illuminate\Http\Request;
@@ -809,36 +810,84 @@ class MedicationController extends Controller
     }
 
     /**
-     * Buscar preço de medicamento na ANVISA
+     * Preço de referência: média dos últimos preços informados por farmácia + ANVISA (quando disponível).
      * GET /api/medications/price?name={nome_medicamento}
      */
     public function getPrice(Request $request)
     {
         try {
-            $medicationName = $request->query('name');
-            
-            if (!$medicationName || strlen(trim($medicationName)) < 2) {
+            $medicationName = trim((string) $request->query('name', ''));
+
+            if ($medicationName === '' || strlen($medicationName) < 2) {
                 return response()->json([
                     'success' => false,
                     'error' => 'Nome do medicamento inválido',
                 ], 400);
             }
 
-            // Integração ANVISA (med_price_anvisa) ainda não ativa — não inventar preço.
+            $community = $this->resolveCommunityReferencePrice($medicationName);
+
+            // TODO: integrar med_price_anvisa e combinar com $community['average']
+            if ($community) {
+                return response()->json([
+                    'success' => true,
+                    'name' => $medicationName,
+                    'price' => $community['average'],
+                    'sample_count' => $community['sample_count'],
+                    'source' => 'community',
+                    'presentation' => null,
+                    'manufacturer' => null,
+                    'registration' => null,
+                ]);
+            }
+
             return response()->json([
                 'success' => false,
                 'error' => 'Medicamento não encontrado na base de preços',
-                'message' => 'Preço de referência indisponível até a consulta à base ANVISA estar configurada.',
+                'message' => 'Informe preços nas farmácias próximas para calcular a média de referência.',
             ], 404);
 
         } catch (\Exception $e) {
             Log::error('Erro ao buscar preço de medicamento: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'error' => 'Erro ao buscar preço: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Média do último preço informado por farmácia para o medicamento.
+     */
+    private function resolveCommunityReferencePrice(string $medicationName): ?array
+    {
+        if (! Schema::hasTable('pharmacy_prices')) {
+            return null;
+        }
+
+        $normalized = mb_strtolower(trim($medicationName));
+
+        $rows = PharmacyPrice::query()
+            ->whereRaw('LOWER(TRIM(medication_name)) = ?', [$normalized])
+            ->orderByDesc('created_at')
+            ->get(['pharmacy_name', 'price']);
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $latestPerPharmacy = $rows->unique('pharmacy_name');
+        $prices = $latestPerPharmacy->pluck('price')->map(fn ($p) => (float) $p)->filter(fn ($p) => $p > 0);
+
+        if ($prices->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'average' => round($prices->avg(), 2),
+            'sample_count' => $prices->count(),
+        ];
     }
 }
 

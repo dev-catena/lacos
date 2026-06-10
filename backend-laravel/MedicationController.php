@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Medication;
+use App\Models\PharmacyPrice;
 use App\Models\GroupActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class MedicationController extends Controller
 {
@@ -303,10 +305,25 @@ class MedicationController extends Controller
                 ], 400);
             }
 
+            $community = $this->resolveCommunityReferencePrice($medicationName);
+
+            if ($community) {
+                return response()->json([
+                    'success' => true,
+                    'name' => $medicationName,
+                    'price' => $community['average'],
+                    'sample_count' => $community['sample_count'],
+                    'source' => 'community',
+                    'presentation' => null,
+                    'manufacturer' => null,
+                    'registration' => null,
+                ]);
+            }
+
             return response()->json([
                 'success' => false,
                 'error' => 'Medicamento não encontrado na base de preços',
-                'message' => 'Preço de referência indisponível até a consulta à base ANVISA estar configurada.',
+                'message' => 'Informe preços nas farmácias próximas para calcular a média de referência.',
             ], 404);
 
         } catch (\Exception $e) {
@@ -317,6 +334,36 @@ class MedicationController extends Controller
                 'error' => 'Erro ao buscar preço: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function resolveCommunityReferencePrice(string $medicationName): ?array
+    {
+        if (! Schema::hasTable('pharmacy_prices')) {
+            return null;
+        }
+
+        $normalized = mb_strtolower(trim($medicationName));
+
+        $rows = PharmacyPrice::query()
+            ->whereRaw('LOWER(TRIM(medication_name)) = ?', [$normalized])
+            ->orderByDesc('created_at')
+            ->get(['pharmacy_name', 'price']);
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $latestPerPharmacy = $rows->unique('pharmacy_name');
+        $prices = $latestPerPharmacy->pluck('price')->map(fn ($p) => (float) $p)->filter(fn ($p) => $p > 0);
+
+        if ($prices->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'average' => round($prices->avg(), 2),
+            'sample_count' => $prices->count(),
+        ];
     }
 }
 

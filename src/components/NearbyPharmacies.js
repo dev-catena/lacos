@@ -17,7 +17,7 @@ import colors from '../constants/colors';
 import pharmacyPriceService from '../services/pharmacyPriceService';
 import pharmacySearchService from '../services/pharmacySearchService';
 
-const NearbyPharmacies = ({ style, medicationName, groupId }) => {
+const NearbyPharmacies = ({ style, medicationName, groupId, onPriceSaved }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pharmacies, setPharmacies] = useState([]);
@@ -226,8 +226,9 @@ const NearbyPharmacies = ({ style, medicationName, groupId }) => {
           [pharmacy.id]: { price: '', notes: '', loading: false },
         }));
 
-        // Recarregar último preço
+        // Recarregar último preço e atualizar média de referência na tela do medicamento
         await loadLastPrices([pharmacy], medicationName);
+        onPriceSaved?.();
       } else {
         Toast.show({
           type: 'error',

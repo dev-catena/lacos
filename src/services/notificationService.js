@@ -2,8 +2,26 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resolveScheduleDateTime } from '../utils/medicationSchedule';
 
 const MEDICATIONS_STORAGE_KEY = '@lacos_medications';
+
+function formatMedicationDoseLabel(medication) {
+  const parts = [
+    medication.dosage,
+    medication.unit,
+    medication.doseQuantity,
+    medication.doseQuantityUnit,
+  ].filter((p) => p != null && String(p).trim() !== '');
+
+  if (parts.length > 0) {
+    return parts.join(' ').trim();
+  }
+  if (medication.form) {
+    return String(medication.form).trim();
+  }
+  return '';
+}
 
 // Verificar se está rodando no Expo Go (SDK 53+ removeu push notifications do Android no Expo Go)
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
@@ -127,23 +145,44 @@ export const scheduleMedicationNotifications = async (medication) => {
     // Cancelar notificações anteriores deste medicamento
     await cancelMedicationNotifications(medication.id);
 
-    // Agendar notificações para cada horário
+    const schedule = Array.isArray(medication.schedule) ? medication.schedule : [];
+    if (schedule.length === 0) {
+      return [];
+    }
+
+    const doseLabel = formatMedicationDoseLabel(medication);
+    const body = doseLabel
+      ? `Hora de tomar ${doseLabel}`
+      : `Hora de tomar ${medication.name}`;
+
     const notificationIds = [];
+    const now = new Date();
 
-    for (const time of medication.schedule) {
-      const [hours, minutes] = time.split(':').map(Number);
+    for (const time of schedule) {
+      const [hours, minutes] = String(time).split(':').map(Number);
+      if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+        continue;
+      }
 
-      // Criar identificador de notificação
+      // Horário já passou hoje (com tolerância de 30 min) → não alertar agora; daily só na próxima ocorrência
+      const nextOccurrence = resolveScheduleDateTime(time, schedule, now);
+      const thirtyMinAfter = new Date(nextOccurrence.getTime() + 30 * 60000);
+      if (now > thirtyMinAfter) {
+        console.log(
+          `⏭️ Lembrete ${medication.name} às ${time}: horário de hoje já passou, próximo alerta amanhã`
+        );
+      }
+
       const trigger = {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: hours,
         minute: minutes,
-        repeats: true,
       };
 
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
           title: `💊 ${medication.name}`,
-          body: `Hora de tomar ${medication.dosage} ${medication.unit}`,
+          body,
           data: {
             medicationId: medication.id,
             scheduledTime: time,
@@ -158,7 +197,7 @@ export const scheduleMedicationNotifications = async (medication) => {
 
       notificationIds.push(notificationId);
 
-      console.log(`✅ Notificação agendada: ${medication.name} às ${time} (ID: ${notificationId})`);
+      console.log(`✅ Notificação diária agendada: ${medication.name} às ${time} (ID: ${notificationId})`);
     }
 
     // Salvar IDs das notificações

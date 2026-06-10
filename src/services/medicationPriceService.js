@@ -57,6 +57,7 @@ class MedicationPriceService {
           data: {
             name: response.name || medicationName,
             price: parseFloat(response.price),
+            sampleCount: response.sample_count ?? null,
             presentation: response.presentation,
             manufacturer: response.manufacturer,
             registration: response.registration,

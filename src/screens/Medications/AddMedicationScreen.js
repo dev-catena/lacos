@@ -513,6 +513,11 @@ const AddMedicationScreen = ({ route, navigation }) => {
           const medication = {
             id: result.data.id,
             name: name.trim(),
+            dosage: dosage.trim(),
+            unit,
+            doseQuantity: doseQuantity.trim() || null,
+            doseQuantityUnit: doseQuantityUnit || null,
+            form: form.trim(),
             frequency,
             schedule,
             advancedFrequency: frequency === 'advanced' ? advancedFrequency : null,

@@ -24,19 +24,19 @@ import colors from '../../constants/colors';
 import medicationService from '../../services/medicationService';
 import medicationSearchService from '../../services/medicationSearchService';
 import medicationPriceService from '../../services/medicationPriceService';
+import { buildScheduleFromMedicationApi } from '../../utils/medicationSchedule';
+import { isMedicationCompleted } from '../../utils/medicationStatus';
 import {
-  buildScheduleFromMedicationApi,
-  resolveScheduleDateTime,
-  timeToMinutes,
-} from '../../utils/medicationSchedule';
+  DOSE_HISTORY_STORAGE_KEY,
+  computeDoseStatus,
+} from '../../utils/medicationDoseStatus';
 import NearbyPharmacies from '../../components/NearbyPharmacies';
 import PopularPharmacies from '../../components/PopularPharmacies';
 
 const MEDICATIONS_STORAGE_KEY = '@lacos_medications';
-const DOSE_HISTORY_STORAGE_KEY = '@lacos_dose_history';
 
 const MedicationDetailsScreen = ({ route, navigation }) => {
-  const { medicationId, groupId } = route.params;
+  const { medicationId, groupId, selectedScheduleTime } = route.params;
   const insets = useSafeAreaInsets();
   const [medication, setMedication] = useState(null);
   const [doseHistory, setDoseHistory] = useState([]);
@@ -49,6 +49,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
   const [justification, setJustification] = useState('');
   const [isFarmaciaPopular, setIsFarmaciaPopular] = useState(false);
   const [medicationPrice, setMedicationPrice] = useState(null);
+  const [priceMeta, setPriceMeta] = useState(null);
   const [loadingPrice, setLoadingPrice] = useState(false);
 
   useEffect(() => {
@@ -159,6 +160,13 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
       
       if (priceResult.success && priceResult.data && priceResult.data.price) {
         setMedicationPrice(priceResult.data.price);
+        setPriceMeta({
+          source: priceResult.data.source,
+          sampleCount: priceResult.data.sampleCount,
+        });
+      } else {
+        setMedicationPrice(null);
+        setPriceMeta(null);
       }
     } catch (error) {
       console.warn('Erro ao buscar preço (não crítico):', error);
@@ -167,74 +175,21 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
     }
   };
 
-  const getDoseStatus = (scheduleTime) => {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const scheduleList = Array.isArray(medication?.schedule) ? medication.schedule : [];
-    const scheduledDateTime = resolveScheduleDateTime(scheduleTime, scheduleList, now);
-    const scheduledDay = scheduledDateTime.toISOString().split('T')[0];
+  const getDoseStatus = (scheduleTime) =>
+    computeDoseStatus(
+      scheduleTime,
+      medication?.schedule,
+      doseHistory,
+      medicationId
+    );
 
-    // Verificar se há registro para este horário no dia do cronograma
-    const recordToday = doseHistory.find((h) => {
-      const hDate = new Date(h.takenAt);
-      return hDate.toISOString().split('T')[0] === scheduledDay && h.scheduledTime === scheduleTime;
-    });
-
-    // Verificar se foi marcado como não administrado
-    if (recordToday && recordToday.status === 'not_administered') {
-      return {
-        status: 'not_administered',
-        color: colors.error,
-        icon: 'close-circle',
-        label: recordToday.justification || 'Não administrado',
-      };
+  const scheduleTimesToShow = (() => {
+    const all = Array.isArray(medication?.schedule) ? medication.schedule : [];
+    if (selectedScheduleTime) {
+      return all.includes(selectedScheduleTime) ? [selectedScheduleTime] : [selectedScheduleTime];
     }
-
-    // Verificar se já foi tomado hoje
-    if (recordToday && recordToday.status === 'taken') {
-      return {
-        status: 'taken',
-        color: colors.success,
-        icon: 'checkmark-circle',
-        label: `Tomado às ${new Date(recordToday.takenAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
-      };
-    }
-
-    // Verificar se está atrasado (mais de 30min depois do horário)
-    const thirtyMinAfter = new Date(scheduledDateTime.getTime() + 30 * 60000);
-    if (now > thirtyMinAfter) {
-      return {
-        status: 'missed',
-        color: colors.error,
-        icon: 'alert-circle',
-        label: 'Atrasado',
-      };
-    }
-
-    // Verificar se está próximo (15min antes até 30min depois)
-    const fifteenMinBefore = new Date(scheduledDateTime.getTime() - 15 * 60000);
-    if (now >= fifteenMinBefore && now <= thirtyMinAfter) {
-      return {
-        status: 'due',
-        color: colors.warning,
-        icon: 'time',
-        label: 'Hora de tomar',
-      };
-    }
-
-    // Ainda não chegou a hora
-    const isOvernight =
-      scheduleTime === '00:00' &&
-      scheduleList.length > 1 &&
-      timeToMinutes(scheduleTime) < timeToMinutes(scheduleList[0]);
-
-    return {
-      status: 'pending',
-      color: colors.gray400,
-      icon: 'time-outline',
-      label: isOvernight ? 'Agendado (madrugada)' : 'Agendado',
-    };
-  };
+    return all;
+  })();
 
   const handleRegisterDose = async (scheduledTime, actualTime = null) => {
     try {
@@ -306,111 +261,6 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
       console.error('Erro ao registrar não administração:', error);
       Alert.alert('Erro', 'Não foi possível registrar');
     }
-  };
-
-  const handleDiscontinue = async () => {
-    Alert.alert(
-      'Descontinuar Medicamento',
-      `Tem certeza que deseja descontinuar ${medication.name}? O medicamento não será mais exibido na lista principal.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Descontinuar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Buscar dados completos do medicamento primeiro
-              const medResult = await medicationService.getMedication(medicationId);
-              
-              if (!medResult.success || !medResult.data) {
-                throw new Error('Não foi possível carregar dados do medicamento');
-              }
-              
-              const med = medResult.data;
-              
-              // Preparar dados para atualização
-              const frequency = typeof med.frequency === 'string' 
-                ? JSON.parse(med.frequency) 
-                : (med.frequency || {});
-              
-              const frequencyDetails = frequency.details || {};
-              const frequencyType = frequency.type || 'simple';
-              
-              const duration = typeof med.duration === 'string'
-                ? JSON.parse(med.duration)
-                : (med.duration || { type: 'continuo', value: null });
-              
-              // Preparar frequencyDetails para envio
-              let frequencyDetailsToSend;
-              if (frequencyType === 'advanced') {
-                frequencyDetailsToSend = frequencyDetails;
-              } else {
-                frequencyDetailsToSend = {
-                  interval: frequencyDetails.interval || '24',
-                  schedule: buildScheduleFromMedicationApi(med, frequencyDetails),
-                };
-              }
-              
-              console.log('📋 MedicationDetailsScreen - Dados para descontinuar:', {
-                medicationId,
-                isActive: false,
-                frequencyType,
-                frequencyDetails: frequencyDetailsToSend,
-              });
-              
-              // Atualizar na API - apenas marcar como inativo
-              const result = await medicationService.updateMedication(medicationId, {
-                name: med.name,
-                form: med.pharmaceutical_form || '',
-                dosage: med.dosage || '',
-                unit: med.unit || '',
-                administrationRoute: med.administration_route || '',
-                frequencyType: frequencyType,
-                frequencyDetails: frequencyDetailsToSend,
-                firstDoseAt: med.first_dose_at || null,
-                durationType: duration.type || 'continuo',
-                durationValue: duration.value || null,
-                notes: med.notes || '',
-                isActive: false, // Descontinuar = inativo
-              });
-
-              if (result.success) {
-                Toast.show({
-                  type: 'success',
-                  text1: 'Medicamento descontinuado',
-                  text2: `${medication.name} foi removido da lista`,
-                });
-
-                navigation.goBack();
-              } else {
-                throw new Error(result.error || 'Erro ao descontinuar');
-              }
-            } catch (error) {
-              console.error('❌ MedicationDetailsScreen - Erro ao descontinuar:', error);
-              console.error('❌ MedicationDetailsScreen - Detalhes do erro:', error.response?.data || error.message);
-              
-              let errorMessage = 'Não foi possível descontinuar o medicamento';
-              
-              // Tentar extrair mensagem de erro mais específica
-              if (error.response?.data) {
-                if (error.response.data.message) {
-                  errorMessage = error.response.data.message;
-                } else if (error.response.data.error) {
-                  errorMessage = error.response.data.error;
-                } else if (error.response.data.errors) {
-                  const errors = Object.values(error.response.data.errors).flat();
-                  errorMessage = errors.join(', ');
-                }
-              } else if (error.message) {
-                errorMessage = error.message;
-              }
-              
-              Alert.alert('Erro', errorMessage);
-            }
-          },
-        },
-      ]
-    );
   };
 
   const handleComplete = async () => {
@@ -492,7 +342,10 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                   text2: `${medication.name} foi movido para concluídos`,
                 });
 
-                navigation.goBack();
+                navigation.navigate('Medications', {
+                  groupId,
+                  selectedStatus: 'completed',
+                });
               } else {
                 throw new Error(result.error || 'Erro ao concluir medicamento');
               }
@@ -658,12 +511,14 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
         {/* Horários de Hoje */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Horários de Hoje</Text>
+            <Text style={styles.sectionTitle}>
+              {selectedScheduleTime ? 'Horário selecionado' : 'Horários de Hoje'}
+            </Text>
             <Text style={styles.sectionHint}>
               Pressione e segure para mais opções
             </Text>
           </View>
-          {(Array.isArray(medication.schedule) ? medication.schedule : []).map((time, index) => {
+          {scheduleTimesToShow.map((time, index) => {
             const status = getDoseStatus(time);
             return (
               <TouchableOpacity
@@ -712,13 +567,17 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
                 R$ {medicationPrice.toFixed(2).replace('.', ',')}
               </Text>
               <Text style={styles.priceNote}>
-                Valor de referência na base ANVISA (pode variar na farmácia)
+                {priceMeta?.source === 'community'
+                  ? priceMeta.sampleCount > 1
+                    ? `Média de ${priceMeta.sampleCount} preços informados pela comunidade em farmácias`
+                    : 'Preço informado pela comunidade em farmácia'
+                  : 'Valor de referência na base ANVISA (pode variar na farmácia)'}
               </Text>
             </View>
           ) : (
             <View style={styles.priceCard}>
               <Text style={styles.priceNote}>
-                Preço de referência indisponível para este medicamento.
+                Informe o preço em farmácias próximas para calcular a média de referência.
               </Text>
             </View>
           )}
@@ -746,34 +605,29 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
           {/* Farmácias Próximas (genéricas) */}
           {medication && medication.name && (
             <View style={{ marginTop: 12 }}>
-              <NearbyPharmacies 
-                medicationName={medication.name} 
-                groupId={groupId} 
+              <NearbyPharmacies
+                medicationName={medication.name}
+                groupId={groupId}
+                onPriceSaved={() => loadMedicationPrice(medication.name)}
               />
             </View>
           )}
         </View>
 
         {/* Ações do Medicamento */}
-        <View style={styles.section}>
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity
-              style={styles.completeButton}
-              onPress={handleComplete}
-            >
-              <SafeIcon name="checkmark-done-circle" size={24} color={colors.info} />
-              <Text style={styles.completeButtonText}>Concluir Medicamento</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.discontinueButton}
-              onPress={handleDiscontinue}
-            >
-              <SafeIcon name="close-circle" size={24} color={colors.error} />
-              <Text style={styles.discontinueButtonText}>Descontinuar Medicamento</Text>
-            </TouchableOpacity>
+        {medication && !isMedicationCompleted(medication) && (
+          <View style={styles.section}>
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity
+                style={styles.completeButton}
+                onPress={handleComplete}
+              >
+                <SafeIcon name="checkmark-done-circle" size={24} color={colors.info} />
+                <Text style={styles.completeButtonText}>Concluir Medicamento</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -1107,28 +961,11 @@ const styles = StyleSheet.create({
     borderColor: colors.info + '40',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
   },
   completeButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.info,
-  },
-  discontinueButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    backgroundColor: colors.error + '10',
-    borderWidth: 2,
-    borderColor: colors.error + '40',
-    borderRadius: 12,
-    padding: 16,
-  },
-  discontinueButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.error,
   },
   modalOverlay: {
     position: 'absolute',

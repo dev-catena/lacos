@@ -12,12 +12,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import colors from '../../constants/colors';
 import { LacosIcon } from '../../components/LacosLogo';
 import { ArrowBackIcon } from '../../components/CustomIcons';
 import SafeIcon from '../../components/SafeIcon';
 import medicationService from '../../services/medicationService';
 import { normalizeMedicationSchedule } from '../../utils/medicationSchedule';
+import {
+  DOSE_HISTORY_STORAGE_KEY,
+  computeDoseStatus,
+} from '../../utils/medicationDoseStatus';
+import { isMedicationCompleted, isMedicationInUse } from '../../utils/medicationStatus';
 
 const MedicationsScreen = ({ route, navigation }) => {
   let { groupId, groupName } = route.params || {};
@@ -27,14 +33,30 @@ const MedicationsScreen = ({ route, navigation }) => {
     groupId = 1;
   }
   const [medications, setMedications] = useState([]);
+  const [doseHistory, setDoseHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('all'); // all, morning, afternoon, night
-  const [selectedStatus, setSelectedStatus] = useState('active'); // active, discontinued, completed
+  const [selectedStatus, setSelectedStatus] = useState('active'); // active, completed
+
+  const loadDoseHistory = async () => {
+    try {
+      const historyJson = await AsyncStorage.getItem(DOSE_HISTORY_STORAGE_KEY);
+      setDoseHistory(historyJson ? JSON.parse(historyJson) : []);
+    } catch {
+      setDoseHistory([]);
+    }
+  };
 
   useFocusEffect(
     React.useCallback(() => {
+      const statusFromNav = route.params?.selectedStatus;
+      if (statusFromNav === 'active' || statusFromNav === 'completed') {
+        setSelectedStatus(statusFromNav);
+        navigation.setParams({ selectedStatus: undefined });
+      }
       loadMedications();
-    }, [groupId, selectedStatus])
+      loadDoseHistory();
+    }, [groupId, selectedStatus, route.params?.selectedStatus])
   );
 
   const loadMedications = async () => {
@@ -44,48 +66,14 @@ const MedicationsScreen = ({ route, navigation }) => {
       
       if (result.success) {
         const allMeds = result.data || [];
-        // Filtrar por status (ativo/descontinuado/concluído) baseado no selectedStatus
-        const filteredMeds = allMeds.filter(med => {
+        const filteredMeds = allMeds.filter((med) => {
           if (selectedStatus === 'active') {
-            // Em uso: ativo e não concluído
-            if (!med.is_active) return false;
-            if (med.end_date) {
-              const endDate = new Date(med.end_date);
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              return endDate >= today; // Ainda não terminou
-            }
-            return true; // Sem end_date = contínuo
-          }
-          if (selectedStatus === 'discontinued') {
-            // Descontinuado: não ativo (independente de end_date)
-            // Mas não deve aparecer se já foi concluído (end_date no passado)
-            if (med.is_active) return false;
-            
-            // Se tem end_date e está no passado, é concluído, não descontinuado
-            if (med.end_date) {
-              const endDate = new Date(med.end_date);
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              if (endDate < today) {
-                return false; // Já concluído, não é descontinuado
-              }
-            }
-            
-            // is_active === false e (sem end_date ou end_date no futuro) = descontinuado
-            return true;
+            return isMedicationInUse(med);
           }
           if (selectedStatus === 'completed') {
-            // Concluído: medicamento que terminou (end_date no passado)
-            if (med.end_date) {
-              const endDate = new Date(med.end_date);
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              return endDate < today;
-            }
-            return false;
+            return isMedicationCompleted(med);
           }
-          return true; // 'all' - mostrar todos
+          return true;
         });
         
         // Transformar dados da API para o formato esperado pela UI
@@ -237,20 +225,6 @@ const MedicationsScreen = ({ route, navigation }) => {
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.statusTab, selectedStatus === 'discontinued' && styles.statusTabActive]}
-            onPress={() => setSelectedStatus('discontinued')}
-          >
-            <SafeIcon 
-              name="archive-outline" 
-              size={20} 
-              color={selectedStatus === 'discontinued' ? colors.error : colors.textLight} 
-            />
-            <Text style={[styles.statusTabText, selectedStatus === 'discontinued' && styles.statusTabTextActive]}>
-              Descontinuado
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
             style={[styles.statusTab, selectedStatus === 'completed' && styles.statusTabActive]}
             onPress={() => setSelectedStatus('completed')}
           >
@@ -360,7 +334,6 @@ const MedicationsScreen = ({ route, navigation }) => {
           <View style={styles.emptyState}>
             <SafeIcon 
               name={
-                selectedStatus === 'discontinued' ? "archive-outline" :
                 selectedStatus === 'completed' ? "checkmark-done-circle-outline" :
                 "medical-outline"
               } 
@@ -368,16 +341,12 @@ const MedicationsScreen = ({ route, navigation }) => {
               color={colors.gray300} 
             />
             <Text style={styles.emptyTitle}>
-              {selectedStatus === 'discontinued' 
-                ? 'Nenhum remédio descontinuado' 
-                : selectedStatus === 'completed'
+              {selectedStatus === 'completed'
                 ? 'Nenhum remédio concluído'
                 : 'Nenhum remédio em uso'}
             </Text>
             <Text style={styles.emptyText}>
-              {selectedStatus === 'discontinued'
-                ? 'Medicamentos descontinuados aparecerão aqui'
-                : selectedStatus === 'completed'
+              {selectedStatus === 'completed'
                 ? 'Medicamentos concluídos aparecerão aqui'
                 : 'Cadastre os medicamentos da pessoa acompanhada para gerenciar horários e doses'}
             </Text>
@@ -414,17 +383,40 @@ const MedicationsScreen = ({ route, navigation }) => {
                       return 'medical-outline';
                     };
 
+                    const doseStatus = med.time
+                      ? computeDoseStatus(med.time, med.schedule, doseHistory, med.id)
+                      : null;
+
                     return (
                       <TouchableOpacity
-                        key={`${med.id}-${index}`}
-                        style={styles.medicationCard}
-                        onPress={() => navigation.navigate('MedicationDetails', { medicationId: med.id, groupId })}
-                        onLongPress={() => navigation.navigate('MedicationDetails', { medicationId: med.id, groupId })}
+                        key={`${med.id}-${med.time}-${index}`}
+                        style={[
+                          styles.medicationCard,
+                          doseStatus && { borderLeftWidth: 4, borderLeftColor: doseStatus.color },
+                        ]}
+                        onPress={() =>
+                          navigation.navigate('MedicationDetails', {
+                            medicationId: med.id,
+                            groupId,
+                            selectedScheduleTime: med.time,
+                          })
+                        }
+                        onLongPress={() =>
+                          navigation.navigate('MedicationDetails', {
+                            medicationId: med.id,
+                            groupId,
+                            selectedScheduleTime: med.time,
+                          })
+                        }
                         delayLongPress={500}
                       >
                         <View style={styles.medicationLeft}>
                           <View style={[styles.medicationIcon, { backgroundColor: period.color + '20' }]}>
-                            <SafeIcon name={getFormIcon(med.form)} size={24} color={period.color} />
+                            <SafeIcon
+                              name={doseStatus?.icon || getFormIcon(med.form)}
+                              size={24}
+                              color={doseStatus?.color || period.color}
+                            />
                           </View>
                           <View style={styles.medicationInfo}>
                             <Text style={styles.medicationName}>{med.name}</Text>
@@ -432,9 +424,14 @@ const MedicationsScreen = ({ route, navigation }) => {
                               {med.dosage} {med.unit} - {med.form}
                             </Text>
                             {med.time && (
-                              <Text style={styles.medicationTime}>
-                                <SafeIcon name="time-outline" size={14} color={colors.textLight} /> {med.time}
-                              </Text>
+                              <View style={styles.medicationTimeRow}>
+                                <Text style={styles.medicationTime}>{med.time}</Text>
+                                {doseStatus && (
+                                  <Text style={[styles.doseStatusBadge, { color: doseStatus.color }]}>
+                                    {doseStatus.label}
+                                  </Text>
+                                )}
+                              </View>
                             )}
                           </View>
                         </View>
@@ -692,9 +689,21 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginBottom: 4,
   },
+  medicationTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 2,
+  },
   medicationTime: {
     fontSize: 12,
     color: colors.textLight,
+    fontWeight: '600',
+  },
+  doseStatusBadge: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   fab: {
     position: 'absolute',
