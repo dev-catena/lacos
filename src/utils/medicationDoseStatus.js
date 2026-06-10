@@ -1,7 +1,72 @@
 import colors from '../constants/colors';
-import { resolveScheduleDateTime, timeToMinutes } from './medicationSchedule';
+import {
+  getLocalDateKey,
+  normalizeScheduleTime,
+  resolveScheduleDateTime,
+  timeToMinutes,
+} from './medicationSchedule';
 
 export const DOSE_HISTORY_STORAGE_KEY = '@lacos_dose_history';
+
+export function getScheduledDayKey(scheduleTime, scheduleList, referenceDate = new Date()) {
+  return getLocalDateKey(resolveScheduleDateTime(scheduleTime, scheduleList, referenceDate));
+}
+
+export function findDoseRecordForSlot(
+  doseHistory,
+  medicationId,
+  scheduleTime,
+  scheduleList,
+  referenceDate = new Date()
+) {
+  const history = Array.isArray(doseHistory) ? doseHistory : [];
+  const scheduledDay = getScheduledDayKey(scheduleTime, scheduleList, referenceDate);
+  const normalizedSlot = normalizeScheduleTime(scheduleTime);
+
+  return history.find((record) => {
+    if (medicationId != null && String(record.medicationId) !== String(medicationId)) {
+      return false;
+    }
+    if (normalizeScheduleTime(record.scheduledTime) !== normalizedSlot) {
+      return false;
+    }
+    const recordDay = record.scheduledDate || getLocalDateKey(record.takenAt);
+    return recordDay === scheduledDay;
+  });
+}
+
+export function filterDoseHistoryForMedication(doseHistory, medicationId) {
+  return (Array.isArray(doseHistory) ? doseHistory : []).filter(
+    (record) => String(record.medicationId) === String(medicationId)
+  );
+}
+
+export function upsertDoseRecord(history, doseRecord, scheduleList, referenceDate = new Date()) {
+  const allHistory = Array.isArray(history) ? [...history] : [];
+  const scheduledDay =
+    doseRecord.scheduledDate ||
+    getScheduledDayKey(doseRecord.scheduledTime, scheduleList, referenceDate);
+  const normalizedSlot = normalizeScheduleTime(doseRecord.scheduledTime);
+
+  const filteredHistory = allHistory.filter((record) => {
+    if (String(record.medicationId) !== String(doseRecord.medicationId)) {
+      return true;
+    }
+    if (normalizeScheduleTime(record.scheduledTime) !== normalizedSlot) {
+      return true;
+    }
+    const recordDay = record.scheduledDate || getLocalDateKey(record.takenAt);
+    return recordDay !== scheduledDay;
+  });
+
+  filteredHistory.push({
+    ...doseRecord,
+    scheduledDate: scheduledDay,
+    scheduledTime: normalizedSlot,
+  });
+
+  return filteredHistory;
+}
 
 /**
  * Status da dose de um horário (lista e detalhe do medicamento).
@@ -9,17 +74,8 @@ export const DOSE_HISTORY_STORAGE_KEY = '@lacos_dose_history';
 export function computeDoseStatus(scheduleTime, scheduleList, doseHistory, medicationId) {
   const now = new Date();
   const list = Array.isArray(scheduleList) ? scheduleList : [];
-  const history = Array.isArray(doseHistory) ? doseHistory : [];
   const scheduledDateTime = resolveScheduleDateTime(scheduleTime, list, now);
-  const scheduledDay = scheduledDateTime.toISOString().split('T')[0];
-
-  const recordToday = history.find((h) => {
-    if (medicationId != null && String(h.medicationId) !== String(medicationId)) {
-      return false;
-    }
-    const hDate = new Date(h.takenAt);
-    return hDate.toISOString().split('T')[0] === scheduledDay && h.scheduledTime === scheduleTime;
-  });
+  const recordToday = findDoseRecordForSlot(doseHistory, medicationId, scheduleTime, list, now);
 
   if (recordToday && recordToday.status === 'not_administered') {
     return {

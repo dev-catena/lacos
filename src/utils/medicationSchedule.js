@@ -9,7 +9,7 @@ export function normalizeMedicationSchedule(timesRaw, scheduleFromDetails) {
       return val
         .map((t) => (t != null ? String(t).trim() : ''))
         .filter((s) => s.length > 0)
-        .map((s) => (s.length >= 5 ? s.substring(0, 5) : s));
+        .map((s) => normalizeScheduleTime(s.length >= 5 ? s.substring(0, 5) : s));
     }
     if (typeof val === 'string') {
       const t = val.trim();
@@ -39,6 +39,18 @@ export function timeToMinutes(timeStr) {
   return h * 60 + (Number.isFinite(m) ? m : 0);
 }
 
+export function normalizeScheduleTime(timeStr) {
+  if (timeStr == null || timeStr === '') return '';
+  const [h, m] = String(timeStr).trim().split(':').map((v) => parseInt(v, 10));
+  if (!Number.isFinite(h)) return String(timeStr).trim();
+  return `${String(h).padStart(2, '0')}:${String(Number.isFinite(m) ? m : 0).padStart(2, '0')}`;
+}
+
+export function getLocalDateKey(date) {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /**
  * Converte horário do cronograma em Date no calendário correto.
  * Ex.: ciclo 08:00 → 16:00 → 00:00: o 00:00 é fim do dia (madrugada), não início.
@@ -62,6 +74,10 @@ export function resolveScheduleDateTime(scheduleTime, scheduleList, referenceDat
     const slotMinutes = timeToMinutes(scheduleTime);
     if (slotMinutes < anchorMinutes) {
       scheduled.setDate(scheduled.getDate() + 1);
+      // Madrugada já passou: ex. 01:00 com slot 00:00 é o 00:00 de hoje, não de amanhã
+      if (scheduled.getTime() - ref.getTime() > 20 * 60 * 60 * 1000) {
+        scheduled.setDate(scheduled.getDate() - 1);
+      }
     }
   }
 

@@ -22,6 +22,7 @@ import Toast from 'react-native-toast-message';
 import * as Location from 'expo-location';
 import colors from '../../constants/colors';
 import medicationService from '../../services/medicationService';
+import { cancelMedicationNotifications } from '../../services/notificationService';
 import medicationSearchService from '../../services/medicationSearchService';
 import medicationPriceService from '../../services/medicationPriceService';
 import { buildScheduleFromMedicationApi } from '../../utils/medicationSchedule';
@@ -29,6 +30,8 @@ import { isMedicationCompleted } from '../../utils/medicationStatus';
 import {
   DOSE_HISTORY_STORAGE_KEY,
   computeDoseStatus,
+  filterDoseHistoryForMedication,
+  upsertDoseRecord,
 } from '../../utils/medicationDoseStatus';
 import NearbyPharmacies from '../../components/NearbyPharmacies';
 import PopularPharmacies from '../../components/PopularPharmacies';
@@ -36,7 +39,7 @@ import PopularPharmacies from '../../components/PopularPharmacies';
 const MEDICATIONS_STORAGE_KEY = '@lacos_medications';
 
 const MedicationDetailsScreen = ({ route, navigation }) => {
-  const { medicationId, groupId, selectedScheduleTime } = route.params;
+  const { medicationId, groupId, selectedScheduleTime: initialScheduleTime } = route.params || {};
   const insets = useSafeAreaInsets();
   const [medication, setMedication] = useState(null);
   const [doseHistory, setDoseHistory] = useState([]);
@@ -44,7 +47,7 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
   const [nearestPharmacy, setNearestPharmacy] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
-  const [selectedScheduleTime, setSelectedScheduleTime] = useState(null);
+  const [selectedScheduleTime, setSelectedScheduleTime] = useState(initialScheduleTime ?? null);
   const [customTime, setCustomTime] = useState('');
   const [justification, setJustification] = useState('');
   const [isFarmaciaPopular, setIsFarmaciaPopular] = useState(false);
@@ -198,16 +201,21 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
         medicationId,
         scheduledTime,
         takenAt: actualTime || new Date().toISOString(),
-        registeredBy: 'caregiver', // Ou 'patient'
+        registeredBy: 'caregiver',
         status: 'taken',
       };
 
       const historyJson = await AsyncStorage.getItem(DOSE_HISTORY_STORAGE_KEY);
       const history = historyJson ? JSON.parse(historyJson) : [];
-      history.push(doseRecord);
-      await AsyncStorage.setItem(DOSE_HISTORY_STORAGE_KEY, JSON.stringify(history));
+      const updatedHistory = upsertDoseRecord(
+        history,
+        doseRecord,
+        medication?.schedule,
+        new Date()
+      );
+      await AsyncStorage.setItem(DOSE_HISTORY_STORAGE_KEY, JSON.stringify(updatedHistory));
 
-      setDoseHistory(history.filter(h => h.medicationId === medicationId));
+      setDoseHistory(filterDoseHistoryForMedication(updatedHistory, medicationId));
 
       Toast.show({
         type: 'success',
@@ -235,21 +243,15 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
 
       const historyJson = await AsyncStorage.getItem(DOSE_HISTORY_STORAGE_KEY);
       const history = historyJson ? JSON.parse(historyJson) : [];
-      
-      // Remover registro anterior do mesmo horário no mesmo dia, se houver
-      const today = new Date().toISOString().split('T')[0];
-      const filteredHistory = history.filter(h => {
-        const hDate = new Date(h.takenAt);
-        const hToday = hDate.toISOString().split('T')[0];
-        return !(h.medicationId === medicationId && h.scheduledTime === scheduledTime && hToday === today);
-      });
-      
-      filteredHistory.push(doseRecord);
-      await AsyncStorage.setItem(DOSE_HISTORY_STORAGE_KEY, JSON.stringify(filteredHistory));
+      const updatedHistory = upsertDoseRecord(
+        history,
+        doseRecord,
+        medication?.schedule,
+        new Date()
+      );
+      await AsyncStorage.setItem(DOSE_HISTORY_STORAGE_KEY, JSON.stringify(updatedHistory));
 
-      // Atualizar o estado local
-      const updatedHistory = filteredHistory.filter(h => h.medicationId === medicationId);
-      setDoseHistory(updatedHistory);
+      setDoseHistory(filterDoseHistoryForMedication(updatedHistory, medicationId));
 
       Toast.show({
         type: 'info',
@@ -370,6 +372,66 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
               }
               
               Alert.alert('Erro', errorMessage);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Excluir Medicamento',
+      `Tem certeza que deseja excluir ${medication.name}? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await medicationService.deleteMedication(medicationId);
+
+              if (!result.success) {
+                throw new Error(result.error || 'Erro ao excluir medicamento');
+              }
+
+              await cancelMedicationNotifications(medicationId);
+
+              const historyJson = await AsyncStorage.getItem(DOSE_HISTORY_STORAGE_KEY);
+              if (historyJson) {
+                const history = JSON.parse(historyJson);
+                const filteredHistory = history.filter(
+                  (record) => String(record.medicationId) !== String(medicationId)
+                );
+                await AsyncStorage.setItem(
+                  DOSE_HISTORY_STORAGE_KEY,
+                  JSON.stringify(filteredHistory)
+                );
+              }
+
+              const medsJson = await AsyncStorage.getItem(MEDICATIONS_STORAGE_KEY);
+              if (medsJson) {
+                const meds = JSON.parse(medsJson);
+                const filteredMeds = meds.filter(
+                  (med) => String(med.id) !== String(medicationId)
+                );
+                await AsyncStorage.setItem(MEDICATIONS_STORAGE_KEY, JSON.stringify(filteredMeds));
+              }
+
+              Toast.show({
+                type: 'success',
+                text1: 'Medicamento excluído',
+                text2: `${medication.name} foi removido`,
+              });
+
+              navigation.navigate('Medications', {
+                groupId,
+                selectedStatus: 'completed',
+              });
+            } catch (error) {
+              console.error('Erro ao excluir medicamento:', error);
+              Alert.alert('Erro', error.message || 'Não foi possível excluir o medicamento');
             }
           },
         },
@@ -624,6 +686,20 @@ const MedicationDetailsScreen = ({ route, navigation }) => {
               >
                 <SafeIcon name="checkmark-done-circle" size={24} color={colors.info} />
                 <Text style={styles.completeButtonText}>Concluir Medicamento</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {medication && isMedicationCompleted(medication) && (
+          <View style={styles.section}>
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={handleDelete}
+              >
+                <SafeIcon name="trash-outline" size={24} color={colors.error} />
+                <Text style={styles.deleteButtonText}>Excluir Medicamento</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -966,6 +1042,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.info,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    backgroundColor: colors.error + '10',
+    borderWidth: 2,
+    borderColor: colors.error + '40',
+    borderRadius: 12,
+    padding: 16,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.error,
   },
   modalOverlay: {
     position: 'absolute',
