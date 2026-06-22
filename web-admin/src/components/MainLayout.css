@@ -124,7 +124,9 @@
   flex: 1;
   margin-left: 280px;
   min-height: 100vh;
+  min-width: 0;
   background-color: var(--color-background-soft);
+  overflow-x: auto;
 }
 
 @media (max-width: 768px) {

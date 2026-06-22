@@ -20,25 +20,48 @@ class AdminUserController extends Controller
     public function index()
     {
         try {
-            $rows = User::leftJoin('user_plans', function ($join) {
-                $join->on('users.id', '=', 'user_plans.user_id')
-                     ->where('user_plans.is_active', '=', true);
-            })
-            ->leftJoin('plans', 'user_plans.plan_id', '=', 'plans.id')
-            ->select(
-                'users.id',
-                'users.name',
-                'users.email',
-                'users.profile',
-                'users.is_blocked',
-                'users.created_at',
-                'plans.name as plan_name',
-                'plans.id as plan_id'
-            )
-            ->orderBy('users.created_at', 'desc')
-            ->get();
+            $users = User::query()
+                ->select(
+                    'id',
+                    'name',
+                    'email',
+                    'profile',
+                    'is_blocked',
+                    'created_at'
+                )
+                ->orderByDesc('created_at')
+                ->get();
 
-            $userIds = $rows->pluck('id')->unique()->filter()->values()->all();
+            $userIds = $users->pluck('id')->all();
+
+            $plansByUserId = [];
+            if (count($userIds) > 0) {
+                $planRows = DB::table('user_plans')
+                    ->join('plans', 'user_plans.plan_id', '=', 'plans.id')
+                    ->whereIn('user_plans.user_id', $userIds)
+                    ->where('user_plans.is_active', true)
+                    ->select([
+                        'user_plans.user_id',
+                        'plans.id as plan_id',
+                        'plans.name as plan_name',
+                        'user_plans.started_at',
+                        'user_plans.id as user_plan_id',
+                    ])
+                    ->orderByDesc('user_plans.started_at')
+                    ->orderByDesc('user_plans.id')
+                    ->get();
+
+                foreach ($planRows as $planRow) {
+                    $uid = (int) $planRow->user_id;
+                    if (isset($plansByUserId[$uid])) {
+                        continue;
+                    }
+                    $plansByUserId[$uid] = [
+                        'id' => (int) $planRow->plan_id,
+                        'name' => $planRow->plan_name,
+                    ];
+                }
+            }
 
             $groupsByUserId = [];
             if (count($userIds) > 0) {
@@ -79,7 +102,7 @@ class AdminUserController extends Controller
                 }
             }
 
-            $users = $rows->map(function ($user) use ($groupsByUserId) {
+            $payload = $users->map(function ($user) use ($groupsByUserId, $plansByUserId) {
                 $uid = (int) $user->id;
 
                 return [
@@ -89,15 +112,12 @@ class AdminUserController extends Controller
                     'profile' => $user->profile,
                     'is_blocked' => (bool) ($user->is_blocked ?? false),
                     'created_at' => $user->created_at,
-                    'plan' => $user->plan_name ? [
-                        'id' => $user->plan_id,
-                        'name' => $user->plan_name,
-                    ] : null,
+                    'plan' => $plansByUserId[$uid] ?? null,
                     'groups' => $groupsByUserId[$uid] ?? [],
                 ];
-            });
+            })->values();
 
-            return response()->json($users);
+            return response()->json($payload);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Erro ao buscar usuários',

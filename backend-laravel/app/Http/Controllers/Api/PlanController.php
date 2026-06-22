@@ -187,22 +187,26 @@ class PlanController extends Controller
                 ->first();
 
             if (!$userPlan) {
-                // Se não tem plano, atribuir o plano padrão
+                // Se não tem plano, atribuir o plano padrão (evita duplicatas concorrentes)
                 $defaultPlan = Plan::where('is_default', true)->first();
                 if ($defaultPlan) {
-                    DB::table('user_plans')->insert([
-                        'user_id' => $user->id,
-                        'plan_id' => $defaultPlan->id,
-                        'is_active' => true,
-                        'started_at' => now(),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                    $userPlan = (object) [
-                        'user_id' => $user->id,
-                        'plan_id' => $defaultPlan->id,
-                        'is_active' => true,
-                    ];
+                    DB::table('user_plans')->updateOrInsert(
+                        [
+                            'user_id' => $user->id,
+                            'plan_id' => $defaultPlan->id,
+                        ],
+                        [
+                            'is_active' => true,
+                            'started_at' => now(),
+                            'updated_at' => now(),
+                            'created_at' => now(),
+                        ]
+                    );
+                    $userPlan = DB::table('user_plans')
+                        ->where('user_id', $user->id)
+                        ->where('plan_id', $defaultPlan->id)
+                        ->where('is_active', true)
+                        ->first();
                 } else {
                     return response()->json([
                         'error' => 'Nenhum plano padrão encontrado'

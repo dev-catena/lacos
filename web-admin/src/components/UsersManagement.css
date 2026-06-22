@@ -1,8 +1,10 @@
 .users-management {
   padding: 2.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   background-color: var(--color-background-soft);
+  box-sizing: border-box;
 }
 
 .section-header {
@@ -206,14 +208,16 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  /* auto: não cortar botões da coluna Ações; scroll horizontal se a tabela for larga */
   overflow-x: auto;
   overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
 }
 
 .users-table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 1180px;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .users-table thead {
@@ -265,19 +269,38 @@
   padding: 1.25rem;
   border-bottom: 1px solid var(--color-border);
   font-size: 1rem;
+  vertical-align: top;
 }
 
 .users-table tbody tr:hover {
   background-color: var(--color-background-soft);
 }
 
-/* Coluna Ações: pilha vertical, espaço entre botões, largura mínima dentro da célula */
+/* Coluna Ações: fixa à direita ao rolar; largura suficiente para os botões */
 .users-table__actions-header,
 .users-table__actions-cell {
+  position: sticky;
+  right: 0;
+  z-index: 2;
   vertical-align: top;
-  min-width: 12.5rem;
-  width: 1%;
+  min-width: 11.75rem;
+  width: 11.75rem;
   box-sizing: border-box;
+  background: white;
+  box-shadow: -6px 0 10px -8px rgba(15, 23, 42, 0.25);
+}
+
+.users-table thead .users-table__actions-header {
+  background: var(--color-background-soft);
+  z-index: 3;
+}
+
+.users-table tbody tr:hover .users-table__actions-cell {
+  background-color: var(--color-background-soft);
+}
+
+.users-table tbody tr.blocked .users-table__actions-cell {
+  background-color: #fff5f5;
 }
 
 .users-table__action-stack {
@@ -285,18 +308,21 @@
   flex-direction: column;
   align-items: stretch;
   gap: 0.5rem;
-  max-width: 100%;
+  width: 100%;
+  min-width: 10.5rem;
 }
 
 .users-table__action-stack .action-btn,
 .users-table__action-stack .delete-btn {
   width: 100%;
+  min-width: 0;
   margin: 0;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-align: center;
+  white-space: nowrap;
 }
 
 .users-table__action-stack button + button {
@@ -725,10 +751,6 @@
   .section-header {
     flex-direction: column;
     gap: 1rem;
-  }
-
-  .users-table-container {
-    overflow-x: auto;
   }
 
   .users-table {
