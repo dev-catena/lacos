@@ -23,6 +23,9 @@ import AddVitalSignsScreen from '../screens/Groups/AddVitalSignsScreen';
 import VitalSignsDetailScreen from '../screens/VitalSigns/VitalSignsDetailScreen';
 import WatchAudiosScreen from '../screens/Groups/WatchAudiosScreen';
 import SmartwatchLocationScreen from '../screens/Groups/SmartwatchLocationScreen';
+import CamerasListScreen from '../screens/Cameras/CamerasListScreen';
+import CameraPlayerScreen from '../screens/Cameras/CameraPlayerScreen';
+import ScanCameraQrScreen from '../screens/Cameras/ScanCameraQrScreen';
 import AgendaScreen from '../screens/Groups/AgendaScreen';
 import AddAppointmentScreen from '../screens/Groups/AddAppointmentScreen';
 import AppointmentDetailsScreen from '../screens/Groups/AppointmentDetailsScreen';
@@ -93,6 +96,27 @@ const HomeStack = () => {
       <Stack.Screen 
         name="GroupDetail" 
         component={GroupDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Cameras" 
+        component={CamerasListScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="CameraPlayer" 
+        component={CameraPlayerScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="ScanCameraQr" 
+        component={ScanCameraQrScreen}
         options={{ 
           headerShown: false 
         }}
@@ -388,6 +412,27 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="GroupDetail" 
         component={GroupDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="Cameras" 
+        component={CamerasListScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="CameraPlayer" 
+        component={CameraPlayerScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="ScanCameraQr" 
+        component={ScanCameraQrScreen}
         options={{ 
           headerShown: false 
         }}

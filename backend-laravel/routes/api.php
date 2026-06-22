@@ -25,6 +25,8 @@ use App\Http\Controllers\Api\AdminDoctorController;
 use App\Http\Controllers\Api\AdminCaregiverController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\AdminRtmpCameraController;
+use App\Http\Controllers\Api\AdminStreamCameraController;
+use App\Http\Controllers\Api\UserStreamAgentController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MediaController;
@@ -121,6 +123,9 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/rtmp/cameras', [AdminRtmpCameraController::class, 'index']);
     Route::get('/rtmp/cameras/{cameraId}/snapshot', [AdminRtmpCameraController::class, 'snapshot'])
         ->where('cameraId', '.+');
+
+    // Visão de usuários x agentes de câmera (web-admin)
+    Route::get('/users/cameras-overview', [AdminStreamCameraController::class, 'usersOverview']);
 });
 
 // ==================== ROTAS AUTENTICADAS ====================
@@ -349,6 +354,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/plans/{id}', [PlanController::class, 'update']);
     Route::delete('/plans/{id}', [PlanController::class, 'destroy']);
     Route::get('/user/plan', [PlanController::class, 'getUserPlan']);
+
+    // Agentes de câmera vinculados pelo app (QR)
+    Route::get('/user/stream-agents', [UserStreamAgentController::class, 'index']);
+    Route::post('/user/stream-agents', [UserStreamAgentController::class, 'store']);
+    Route::delete('/user/stream-agents', [UserStreamAgentController::class, 'destroy']);
     
     // Botão de Pânico - Emergência
     Route::post('/panic/trigger', [PanicController::class, 'trigger']);

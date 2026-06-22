@@ -1,109 +1,53 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import SafeIcon from './SafeIcon';
 import camerasService from '../services/camerasService';
-import { getCameraSnapshotProxyPath } from '../config/cameras';
 import './CamerasManagement.css';
 
-const SNAPSHOT_REFRESH_MS = 1000;
-
-function formatDateTime(iso) {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString('pt-BR');
-  } catch {
-    return iso;
-  }
-}
-
 const CamerasManagement = () => {
-  const [cameras, setCameras] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedId, setSelectedId] = useState(null);
-  const [snapshotSrc, setSnapshotSrc] = useState(null);
-  const [snapshotError, setSnapshotError] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
-  const snapshotObjectUrlRef = useRef(null);
+  const [searchText, setSearchText] = useState('');
+  const [filter, setFilter] = useState('all');
 
-  const selectedCamera = useMemo(
-    () => cameras.find((c) => c.id === selectedId) || null,
-    [cameras, selectedId]
-  );
-
-  const revokeSnapshotUrl = useCallback(() => {
-    if (snapshotObjectUrlRef.current) {
-      URL.revokeObjectURL(snapshotObjectUrlRef.current);
-      snapshotObjectUrlRef.current = null;
-    }
-  }, []);
-
-  const loadCameras = useCallback(async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const list = await camerasService.getCameras();
-      setCameras(list);
-      setSelectedId((current) => {
-        if (current && list.some((c) => c.id === current)) return current;
-        return list.length > 0 ? list[0].id : null;
-      });
+      const list = await camerasService.getUsersCamerasOverview();
+      setUsers(list);
     } catch (err) {
-      setError(err.message || 'Não foi possível carregar as câmeras.');
-      setCameras([]);
+      setError(err.message || 'Erro ao carregar usuários e câmeras.');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const loadSnapshot = useCallback(async (cameraId) => {
-    if (!cameraId) return;
-
-    try {
-      setSnapshotLoading(true);
-      setSnapshotError(false);
-      const blob = await camerasService.fetchSnapshotBlob(cameraId);
-      revokeSnapshotUrl();
-      const objectUrl = URL.createObjectURL(blob);
-      snapshotObjectUrlRef.current = objectUrl;
-      setSnapshotSrc(objectUrl);
-    } catch (err) {
-      console.error('Erro ao carregar snapshot:', err);
-      revokeSnapshotUrl();
-      setSnapshotSrc(null);
-      setSnapshotError(true);
-    } finally {
-      setSnapshotLoading(false);
-    }
-  }, [revokeSnapshotUrl]);
-
   useEffect(() => {
-    loadCameras();
-    return () => revokeSnapshotUrl();
-  }, [loadCameras, revokeSnapshotUrl]);
+    loadUsers();
+  }, [loadUsers]);
 
-  useEffect(() => {
-    if (!selectedId) {
-      revokeSnapshotUrl();
-      setSnapshotSrc(null);
-      return undefined;
-    }
+  const filteredUsers = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    return users.filter((user) => {
+      if (filter === 'linked' && !user.linked_to_agent) return false;
+      if (filter === 'unlinked' && user.linked_to_agent) return false;
+      if (filter === 'active' && !user.is_active) return false;
 
-    loadSnapshot(selectedId);
+      if (!query) return true;
+      return (
+        String(user.name || '').toLowerCase().includes(query) ||
+        String(user.email || '').toLowerCase().includes(query)
+      );
+    });
+  }, [users, searchText, filter]);
 
-    if (!autoRefresh) return undefined;
-
-    const timer = setInterval(() => {
-      loadSnapshot(selectedId);
-    }, SNAPSHOT_REFRESH_MS);
-
-    return () => clearInterval(timer);
-  }, [selectedId, autoRefresh, loadSnapshot, revokeSnapshotUrl]);
-
-  const handleSelectCamera = (camera) => {
-    setSelectedId(camera.id);
-    setSnapshotError(false);
-  };
+  const stats = useMemo(() => {
+    const linked = users.filter((user) => user.linked_to_agent).length;
+    const active = users.filter((user) => user.is_active).length;
+    const totalActiveCameras = users.reduce((sum, user) => sum + (user.cameras_active || 0), 0);
+    return { linked, active, totalActiveCameras };
+  }, [users]);
 
   return (
     <div className="cameras-management">
@@ -112,131 +56,157 @@ const CamerasManagement = () => {
           <div>
             <h2>Câmeras</h2>
             <p className="cameras-subtitle">
-              Monitoramento via snapshots em tempo quase real (proxy seguro via API)
+              Cada usuário vincula um agente de streaming (via QR no app). As câmeras ativas
+              são as publicadas naquele servidor de streaming.
             </p>
           </div>
-          <button type="button" className="cameras-refresh-btn" onClick={loadCameras}>
-            <SafeIcon name="refresh" size={18} color="#fff" style={{ marginRight: 8 }} />
-            Atualizar lista
+          <button type="button" className="cameras-refresh-btn" onClick={loadUsers}>
+            <SafeIcon name="refresh" size={18} color="#fff" style={{ marginRight: '8px' }} />
+            Atualizar
           </button>
         </header>
+
+        <div className="cameras-stats-row">
+          <div className="cameras-stat-card">
+            <span className="cameras-stat-label">Usuários com agente</span>
+            <strong>{stats.linked}</strong>
+          </div>
+          <div className="cameras-stat-card">
+            <span className="cameras-stat-label">Agentes com câmera ativa</span>
+            <strong>{stats.active}</strong>
+          </div>
+          <div className="cameras-stat-card">
+            <span className="cameras-stat-label">Câmeras ativas (total)</span>
+            <strong>{stats.totalActiveCameras}</strong>
+          </div>
+        </div>
+
+        <div className="cameras-toolbar">
+          <input
+            type="search"
+            className="cameras-search"
+            placeholder="Buscar por nome ou e-mail..."
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+          />
+          <div className="cameras-filters">
+            <button
+              type="button"
+              className={`cameras-filter-btn${filter === 'all' ? ' active' : ''}`}
+              onClick={() => setFilter('all')}
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              className={`cameras-filter-btn${filter === 'linked' ? ' active' : ''}`}
+              onClick={() => setFilter('linked')}
+            >
+              Com agente
+            </button>
+            <button
+              type="button"
+              className={`cameras-filter-btn${filter === 'unlinked' ? ' active' : ''}`}
+              onClick={() => setFilter('unlinked')}
+            >
+              Sem agente
+            </button>
+            <button
+              type="button"
+              className={`cameras-filter-btn${filter === 'active' ? ' active' : ''}`}
+              onClick={() => setFilter('active')}
+            >
+              Ativos
+            </button>
+          </div>
+        </div>
 
         {loading ? (
           <div className="cameras-state">
             <div className="cameras-spinner" />
-            <p>Carregando câmeras...</p>
+            <p>Carregando usuários...</p>
           </div>
         ) : error ? (
           <div className="cameras-state cameras-state-error">
-            <SafeIcon name="warning" size={48} color="#f59e0b" />
+            <SafeIcon name="warning" size={40} color="#b45309" />
             <p>{error}</p>
-            <button type="button" className="cameras-retry-btn" onClick={loadCameras}>
+            <button type="button" className="cameras-retry-btn" onClick={loadUsers}>
               Tentar novamente
             </button>
           </div>
         ) : (
-          <div className="cameras-layout">
-            <aside className="cameras-list-panel">
-              <h3 className="cameras-list-title">
-                {cameras.length} câmera{cameras.length !== 1 ? 's' : ''}
-              </h3>
-              {cameras.length === 0 ? (
-                <p className="cameras-empty">Nenhuma câmera cadastrada.</p>
-              ) : (
-                <ul className="cameras-list">
-                  {cameras.map((camera) => {
-                    const active = camera.id === selectedId;
-                    return (
-                      <li key={camera.id}>
-                        <button
-                          type="button"
-                          className={`cameras-list-item${active ? ' active' : ''}`}
-                          onClick={() => handleSelectCamera(camera)}
+          <div className="cameras-table-wrap">
+            <table className="cameras-users-table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Usuário</th>
+                  <th>E-mail</th>
+                  <th>Agente vinculado</th>
+                  <th>Qtd. agentes</th>
+                  <th>Câmeras ativas no agente</th>
+                  <th>Servidores do agente</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="cameras-table-empty">
+                      Nenhum usuário encontrado para os filtros selecionados.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <tr key={user.id}>
+                      <td>
+                        <span
+                          className={`cameras-signal${user.is_active ? ' active' : ''}`}
+                          title={user.is_active ? 'Agente com câmera ativa' : 'Sem câmera ativa no agente'}
+                        />
+                      </td>
+                      <td>
+                        <div className="cameras-user-name">{user.name || '—'}</div>
+                        <div className="cameras-user-profile">{user.profile || '—'}</div>
+                      </td>
+                      <td>{user.email || '—'}</td>
+                      <td>
+                        <span
+                          className={`cameras-badge${user.linked_to_agent ? ' linked' : ' unlinked'}`}
                         >
-                          <span className="cameras-list-item-icon">
-                            <SafeIcon name="videocam" size={22} color={active ? '#fff' : '#536173'} />
-                          </span>
-                          <span className="cameras-list-item-body">
-                            <span className="cameras-list-item-name">{camera.name || camera.id}</span>
-                            <span className="cameras-list-item-id">{camera.id}</span>
-                          </span>
-                          <span
-                            className={`cameras-status-badge${camera.enabled ? ' on' : ' off'}`}
-                          >
-                            {camera.enabled ? 'Ativa' : 'Inativa'}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </aside>
-
-            <section className="cameras-viewer-panel">
-              {!selectedCamera ? (
-                <div className="cameras-viewer-empty">
-                  <SafeIcon name="videocam" size={64} color="#9ca3af" />
-                  <p>Selecione uma câmera para ver a imagem ao vivo</p>
-                </div>
-              ) : (
-                <>
-                  <div className="cameras-viewer-toolbar">
-                    <div>
-                      <h3>{selectedCamera.name || selectedCamera.id}</h3>
-                      <p className="cameras-viewer-meta">
-                        Atualizado: {formatDateTime(selectedCamera.updated_at)}
-                      </p>
-                    </div>
-                    <label className="cameras-auto-refresh">
-                      <input
-                        type="checkbox"
-                        checked={autoRefresh}
-                        onChange={(e) => setAutoRefresh(e.target.checked)}
-                      />
-                      Atualizar a cada 1s
-                    </label>
-                    <button
-                      type="button"
-                      className="cameras-snapshot-btn"
-                      onClick={() => loadSnapshot(selectedCamera.id)}
-                      disabled={snapshotLoading}
-                    >
-                      {snapshotLoading ? 'Carregando...' : 'Capturar agora'}
-                    </button>
-                  </div>
-
-                  <div className="cameras-viewer-frame">
-                    {snapshotError ? (
-                      <div className="cameras-viewer-error">
-                        <SafeIcon name="warning" size={40} color="#f59e0b" />
-                        <p>Não foi possível carregar a imagem desta câmera.</p>
-                        <button
-                          type="button"
-                          className="cameras-retry-btn"
-                          onClick={() => loadSnapshot(selectedCamera.id)}
-                        >
-                          Tentar novamente
-                        </button>
-                      </div>
-                    ) : snapshotSrc ? (
-                      <img
-                        src={snapshotSrc}
-                        alt={`Câmera ${selectedCamera.name || selectedCamera.id}`}
-                        className="cameras-snapshot-img"
-                      />
-                    ) : (
-                      <div className="cameras-viewer-empty">
-                        <div className="cameras-spinner" />
-                        <p>Carregando imagem...</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="cameras-viewer-url">{getCameraSnapshotProxyPath(selectedCamera.id)}</p>
-                </>
-              )}
-            </section>
+                          {user.linked_to_agent ? 'Com agente' : 'Sem agente'}
+                        </span>
+                      </td>
+                      <td>{user.agents_count || 0}</td>
+                      <td>
+                        <strong className={user.cameras_active > 0 ? 'cameras-active-count' : ''}>
+                          {user.cameras_active || 0}
+                        </strong>
+                        <span className="cameras-total-count">
+                          {' '}
+                          / {user.cameras_total || 0}
+                        </span>
+                      </td>
+                      <td>
+                        {user.linked_to_agent ? (
+                          <div className="cameras-agent-details">
+                            {(user.agents || []).map((agent) => (
+                              <div key={`${user.id}-${agent.stream_api}`} className="cameras-agent-line">
+                                <span className="cameras-agent-url">{agent.stream_api}</span>
+                                <span className="cameras-agent-meta">
+                                  {agent.cameras_active}/{agent.cameras_total} ativas
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="cameras-muted">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

@@ -21,8 +21,9 @@ import PatientVideoCallScreen from '../screens/Patient/PatientVideoCallScreen';
 import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
 import WatchAudiosScreen from '../screens/Groups/WatchAudiosScreen';
 import SmartwatchLocationScreen from '../screens/Groups/SmartwatchLocationScreen';
-import CamerasListScreen from '../screens/Groups/CamerasListScreen';
-import CameraPlayerScreen from '../screens/Groups/CameraPlayerScreen';
+import CamerasListScreen from '../screens/Cameras/CamerasListScreen';
+import CameraPlayerScreen from '../screens/Cameras/CameraPlayerScreen';
+import ScanCameraQrScreen from '../screens/Cameras/ScanCameraQrScreen';
 import GroupChatScreen from '../screens/Groups/GroupChatScreen';
 import PrescriptionsScreen from '../screens/Prescriptions/PrescriptionsScreen';
 import PrescriptionDetailsScreen from '../screens/Prescriptions/PrescriptionDetailsScreen';
@@ -320,6 +321,13 @@ const PatientNavigator = () => {
       <Stack.Screen 
         name="CameraPlayer" 
         component={CameraPlayerScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="ScanCameraQr" 
+        component={ScanCameraQrScreen}
         options={{ 
           headerShown: false 
         }}

@@ -361,7 +361,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
       id: 'cameras',
       featureKey: 'cameras',
       title: 'Câmeras',
-      subtitle: 'Visualizar câmeras da rede local',
+      subtitle: 'Vincular agente de câmeras e assistir ao vivo',
       icon: 'videocam',
       IconComponent: CameraIcon,
       color: '#2563EB',

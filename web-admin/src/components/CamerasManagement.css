@@ -78,6 +78,180 @@
   animation: cameras-spin 0.8s linear infinite;
 }
 
+.cameras-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.cameras-stat-card {
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+
+.cameras-stat-label {
+  display: block;
+  color: var(--vt-c-text-light-2);
+  font-size: 0.875rem;
+  margin-bottom: 0.35rem;
+}
+
+.cameras-stat-card strong {
+  font-size: 1.5rem;
+  color: var(--color-heading);
+}
+
+.cameras-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.cameras-search {
+  flex: 1 1 280px;
+  max-width: 420px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.95rem;
+}
+
+.cameras-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cameras-filter-btn {
+  border: 1px solid var(--color-border);
+  background: #fff;
+  color: var(--color-heading);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.cameras-filter-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.cameras-table-wrap {
+  overflow-x: auto;
+}
+
+.cameras-users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cameras-users-table th,
+.cameras-users-table td {
+  padding: 0.85rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cameras-users-table th {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--vt-c-text-light-2);
+}
+
+.cameras-table-empty {
+  text-align: center;
+  color: var(--vt-c-text-light-2);
+  padding: 2rem 1rem !important;
+}
+
+.cameras-signal {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.cameras-signal.active {
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
+}
+
+.cameras-user-name {
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+.cameras-user-profile {
+  font-size: 0.8rem;
+  color: var(--vt-c-text-light-2);
+  margin-top: 0.15rem;
+}
+
+.cameras-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.cameras-badge.linked {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.cameras-badge.unlinked {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.cameras-active-count {
+  color: #15803d;
+}
+
+.cameras-total-count {
+  color: var(--vt-c-text-light-2);
+  font-size: 0.9rem;
+}
+
+.cameras-agent-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cameras-agent-line {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.cameras-agent-url {
+  font-size: 0.8rem;
+  color: var(--color-heading);
+  word-break: break-all;
+}
+
+.cameras-agent-meta {
+  font-size: 0.75rem;
+  color: var(--vt-c-text-light-2);
+}
+
+.cameras-muted {
+  color: #94a3b8;
+}
+
 @keyframes cameras-spin {
   to {
     transform: rotate(360deg);
