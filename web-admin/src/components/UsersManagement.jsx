@@ -176,6 +176,18 @@ const UsersManagement = ({ currentUser, onLogout }) => {
     }
   };
 
+  const getDisplayName = useCallback((user) => {
+    const name = String(user?.name || '').trim();
+    const email = String(user?.email || '').trim();
+    if (!name) {
+      return 'Sem nome';
+    }
+    if (email && name.toLowerCase() === email.toLowerCase()) {
+      return 'Sem nome';
+    }
+    return name;
+  }, []);
+
   const getProfileLabel = useCallback((profile) => {
     // Se profile for null, undefined ou string vazia, retornar "Não definido"
     if (!profile || profile === null || profile === undefined || profile.trim() === '') {
@@ -506,7 +518,7 @@ const UsersManagement = ({ currentUser, onLogout }) => {
                   <td>{user.id}</td>
                   <td>
                     <div className="user-info">
-                      <strong>{user.name || 'Sem nome'}</strong>
+                      <strong>{getDisplayName(user)}</strong>
                     </div>
                   </td>
                   <td className="user-groups-cell">
