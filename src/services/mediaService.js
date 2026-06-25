@@ -85,25 +85,41 @@ class MediaService {
       console.log('📤 MediaService - Postando mídia no grupo:', groupId);
       
       const formData = new FormData();
-      
-      // Adicionar arquivo (imagem ou vídeo)
-      if (mediaData.uri) {
-        const uriParts = mediaData.uri.split('.');
-        const fileType = uriParts[uriParts.length - 1];
-        const mediaType = mediaData.type || 'image';
-        
-        formData.append('file', {
-          uri: mediaData.uri,
-          type: mediaType === 'video' ? `video/${fileType}` : `image/${fileType}`,
-          name: `media.${fileType}`,
-        });
-        
-        formData.append('type', mediaType);
-      }
-      
-      // Adicionar descrição se houver
+
+      const mediaType = mediaData.type || 'image';
+
+      // IMPORTANTE: campos de texto ANTES do arquivo para evitar bug do React Native
+      // com FormData em uploads grandes (campos após arquivo grande são perdidos)
+      formData.append('type', mediaType);
       if (mediaData.description) {
         formData.append('description', mediaData.description);
+      }
+
+      // Arquivo por último
+      if (mediaData.uri) {
+        const uriParts = mediaData.uri.split('.');
+        const rawExt = uriParts[uriParts.length - 1]?.toLowerCase() || 'mp4';
+        // Normalizar extensão para MIME type correto
+        const mimeMap = {
+          mov: 'video/quicktime',
+          mp4: 'video/mp4',
+          m4v: 'video/x-m4v',
+          avi: 'video/x-msvideo',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          png: 'image/png',
+          gif: 'image/gif',
+          heic: 'image/heic',
+          heif: 'image/heif',
+          webp: 'image/webp',
+        };
+        const mimeType = mimeMap[rawExt] || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
+
+        formData.append('file', {
+          uri: mediaData.uri,
+          type: mimeType,
+          name: `media.${rawExt}`,
+        });
       }
 
       // Calcular timeout baseado no tamanho do arquivo

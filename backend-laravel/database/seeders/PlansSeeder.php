@@ -21,9 +21,9 @@ class PlansSeeder extends Seeder
             'name' => 'Básico',
             'slug' => 'basico',
             'is_default' => 1,
-            'features' => '{"loja":false,"agenda":true,"midias":false,"cameras":false,"medicos":true,"arquivos":true,"receitas":true,"remedios":true,"historico":false,"smartwatch":false,"sensorQuedas":false,"sinaisVitais":true,"teleconsulta":true,"configuracoes":true,"grupoCuidados":true,"buscarCuidadores":true,"audiosRelogio":true,"localizacaoRelogio":true}',
+            'features' => '{"loja":false,"agenda":true,"midias":true,"cameras":false,"medicos":true,"arquivos":true,"receitas":true,"remedios":true,"historico":false,"smartwatch":false,"sensorQuedas":false,"sinaisVitais":true,"teleconsulta":true,"configuracoes":true,"grupoCuidados":true,"buscarCuidadores":true,"audiosRelogio":true,"localizacaoRelogio":true}',
             'created_at' => '2026-01-22 03:33:31',
-            'updated_at' => '2026-05-09 00:56:15',
+            'updated_at' => '2026-06-25 00:00:00',
           ),
           1 => 
           array (

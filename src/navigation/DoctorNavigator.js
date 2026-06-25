@@ -428,6 +428,13 @@ const HomeStack = () => {
             headerShown: false 
           }}
         />
+        <Stack.Screen 
+          name="GroupMedia" 
+          component={MediaScreen}
+          options={{ 
+            headerShown: false 
+          }}
+        />
     </Stack.Navigator>
   );
 };

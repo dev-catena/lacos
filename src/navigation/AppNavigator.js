@@ -11,6 +11,7 @@ import CustomTabBar from '../components/CustomTabBar';
 import ExpandableFAB from '../components/ExpandableFAB';
 import { useAuth } from '../contexts/AuthContext';
 import groupService from '../services/groupService';
+import planService from '../services/planService';
 
 // Importa as telas principais
 import HomeScreen from '../screens/Home/HomeScreen';
@@ -462,6 +463,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="CaregiverChat" 
         component={CaregiverChatScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="GroupMedia" 
+        component={MediaScreen}
         options={{ 
           headerShown: false 
         }}
@@ -956,6 +964,16 @@ const StoreStack = () => {
 
 // Tab Navigator Principal - CUIDADOR (iOS)
 const CaregiverTabNavigator = () => {
+  const [showCaregivers, setShowCaregivers] = useState(true);
+
+  useEffect(() => {
+    planService.getUserPlan().then(result => {
+      if (result.success && result.plan) {
+        setShowCaregivers(planService.isFeatureEnabled(result.plan, 'buscarCuidadores'));
+      }
+    }).catch(() => {});
+  }, []);
+
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -982,6 +1000,7 @@ const CaregiverTabNavigator = () => {
         options={{ 
           tabBarLabel: 'Cuidadores',
           tabBarTestID: 'tab-caregivers',
+          tabBarButton: showCaregivers ? undefined : () => null,
         }}
       />
       <Tab.Screen 
@@ -999,9 +1018,18 @@ const CaregiverTabNavigator = () => {
 // Navigator para Android - TAB NAVIGATOR com CustomTabBar + SafeArea
 const CaregiverAndroidNavigator = () => {
   const Tab = createBottomTabNavigator();
-  
+  const [showCaregivers, setShowCaregivers] = useState(true);
+
   console.log('🤖 ANDROID NAVIGATOR - CustomTabBar COM SafeArea (acima da barra do Android)');
-  
+
+  useEffect(() => {
+    planService.getUserPlan().then(result => {
+      if (result.success && result.plan) {
+        setShowCaregivers(planService.isFeatureEnabled(result.plan, 'buscarCuidadores'));
+      }
+    }).catch(() => {});
+  }, []);
+
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -1028,6 +1056,7 @@ const CaregiverAndroidNavigator = () => {
         options={{ 
           tabBarLabel: 'Cuidadores',
           tabBarTestID: 'tab-caregivers',
+          tabBarButton: showCaregivers ? undefined : () => null,
         }}
       />
       <Tab.Screen 

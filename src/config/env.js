@@ -16,7 +16,7 @@ const PRODUCTION_API_BASE_URL = 'https://gateway.lacosapp.com/api';
 
 // --- Só usados quando EXPO_USE_LOCAL_LARAVEL && __DEV__ ---
 const NGROK_URL = null; // ex.: 'https://abc123.ngrok-free.app'
-const LOCAL_BACKEND_HOST = '192.168.100.10';
+const LOCAL_BACKEND_HOST = '10.100.0.39';
 const LOCAL_BACKEND_PORT = '8000';
 
 function resolveApiBaseUrl() {

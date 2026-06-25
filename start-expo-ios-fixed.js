@@ -17,12 +17,13 @@ try {
 }
 
 // IP correto
-const EXPO_IP = '192.168.100.10';
+const EXPO_IP = '10.100.0.39';
 const EXPO_PORT = '8081';
 
 // Configurar TODAS as variáveis de ambiente ANTES de iniciar
 process.env.EXPO_NO_DOTENV = '1';
 process.env.EXPO_USE_METRO_WORKSPACE_ROOT = '1';
+// Forçar o IP — funciona no Expo SDK 50+
 process.env.REACT_NATIVE_PACKAGER_HOSTNAME = EXPO_IP;
 process.env.EXPO_PACKAGER_HOSTNAME = EXPO_IP;
 process.env.PACKAGER_HOSTNAME = EXPO_IP;
@@ -31,6 +32,8 @@ process.env.EXPO_PACKAGER_PORT = EXPO_PORT;
 process.env.HOST = EXPO_IP;
 process.env.PORT = EXPO_PORT;
 process.env.METRO_HOST = EXPO_IP;
+// Expo SDK 54: variável que substitui detecção automática de LAN
+process.env.EXPO_PACKAGER_PROXY_URL = `http://${EXPO_IP}:${EXPO_PORT}`;
 process.env.EXPO_DEVTOOLS_LISTEN_ADDRESS = '0.0.0.0';
 process.env.EXPO_DEVTOOLS_LISTEN_PORT = EXPO_PORT;
 // CRÍTICO: Forçar que NÃO use localhost
@@ -38,8 +41,8 @@ process.env.EXPO_NO_LOCALHOST = '1';
 process.env.EXPO_USE_LOCALHOST = '0';
 process.env.EXPO_USE_FAST_RESOLVER = '1';
 // Evitar autenticação do Expo em modo não-interativo
-process.env.CI = 'false'; // Não é CI, permite modo interativo
-process.env.EXPO_OFFLINE = '1'; // Usar modo offline para evitar autenticação
+process.env.CI = 'false';
+process.env.EXPO_OFFLINE = '1';
 
 console.log(`🔧 Forçando IP: ${EXPO_IP}:${EXPO_PORT}`);
 console.log(`🚫 localhost está BLOQUEADO`);
@@ -119,12 +122,7 @@ if (hasClear) {
   expoArgs.push('--clear');
 }
 if (!hasTunnel) {
-  // Se não for tunnel, forçar --lan para garantir IP da rede
-  if (!hasLan) {
-    expoArgs.push('--lan');
-  }
-  // NÃO usar --offline aqui, pois pode bloquear conexões
-  // O EXPO_OFFLINE=1 nas variáveis de ambiente já evita autenticação
+  expoArgs.push('--lan');
 } else {
   expoArgs.push('--tunnel');
 }
@@ -139,10 +137,10 @@ console.log(`🚀 Executando: npx ${expoArgs.join(' ')}`);
 console.log('');
 
 // Iniciar processo
-// IMPORTANTE: stdio: 'inherit' permite interação com o terminal
-// Isso evita o erro de "non-interactive mode" do Expo
+// stdin: 'inherit' → usuário pode digitar 'r', 'a', 'i', etc.
+// stdout/stderr: 'pipe' → interceptamos para substituir localhost pelo IP
 const expo = spawn('npx', expoArgs, {
-  stdio: 'inherit', // Usar 'inherit' para permitir interação
+  stdio: ['inherit', 'pipe', 'pipe'],
   env: process.env,
   shell: true,
 });

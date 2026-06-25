@@ -178,6 +178,12 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
         <View style={styles.tabBar}>
           {state.routes.map((route, index) => {
             const { options } = descriptors[route.key];
+
+            // Respeitar tabBarButton: () => null (ocultar aba)
+            if (typeof options.tabBarButton === 'function' && options.tabBarButton({}) === null) {
+              return null;
+            }
+
             const label = options.tabBarLabel || route.name;
             const isFocused = state.index === index;
             const showNotificationsBadge = route.name === 'Notifications' && unreadCount > 0;

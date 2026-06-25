@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  RefreshControl,
   TouchableOpacity,
   Alert,
   Image,
@@ -108,6 +109,7 @@ const HomeScreen = ({ navigation }) => {
   const [selectedTab, setSelectedTab] = useState('myGroups');
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [userPlan, setUserPlan] = useState(null);
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
@@ -147,6 +149,15 @@ const HomeScreen = ({ navigation }) => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [signed, user?.id])
   );
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([loadUserPlan(), loadGroups(), loadActivities()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const loadUserPlan = async () => {
     try {
@@ -433,8 +444,8 @@ const HomeScreen = ({ navigation }) => {
     );
   }
 
-  // Loading state
-  if (loading) {
+  // Loading state — só mostra tela cheia na primeira carga, não durante o pull-to-refresh
+  if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
         <StatusBar style="dark" />
@@ -476,7 +487,17 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      >
         {/* Loja - Se a feature estiver habilitada no plano */}
         {(() => {
           // Se o plano ainda não foi carregado, não mostrar (evita flash)

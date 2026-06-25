@@ -105,11 +105,11 @@ class MediaController extends Controller
             
             if ($type === 'image') {
                 $validator = Validator::make(['file' => $file], [
-                    'file' => 'mimes:jpg,jpeg,png,gif|max:51200' // 50MB
+                    'file' => 'mimes:jpg,jpeg,png,gif,webp,heic,heif|max:51200' // 50MB
                 ]);
             } else { // video
                 $validator = Validator::make(['file' => $file], [
-                    'file' => 'mimes:mp4,mov,avi|max:102400' // 100MB
+                    'file' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/x-m4v,video/mpeg,video/webm,video/hevc,video/3gpp|max:153600' // 150MB
                 ]);
             }
 
