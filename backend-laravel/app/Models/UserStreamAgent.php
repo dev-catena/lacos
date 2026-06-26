@@ -9,16 +9,21 @@ class UserStreamAgent extends Model
 {
     protected $fillable = [
         'user_id',
+        'agent_uuid',
+        'agent_token_hash',
+        'nome',
         'stream_api',
         'auth_user',
         'auth_pass',
         'cameras',
         'linked_at',
+        'last_seen_at',
     ];
 
     protected $casts = [
-        'cameras' => 'array',
-        'linked_at' => 'datetime',
+        'cameras'      => 'array',
+        'linked_at'    => 'datetime',
+        'last_seen_at' => 'datetime',
     ];
 
     protected $hidden = [

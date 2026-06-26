@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\AdminRtmpCameraController;
 use App\Http\Controllers\Api\AdminStreamCameraController;
 use App\Http\Controllers\Api\UserStreamAgentController;
+use App\Http\Controllers\Api\StreamAgentController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MediaController;
@@ -45,6 +46,13 @@ use Illuminate\Support\Facades\Route;
 
 // Gateway Status - Rota pública
 Route::get('/gateway/status', [GatewayController::class, 'status']);
+
+// ─── Pareamento de agente SegCond (sem autenticação de usuário) ───────────────
+Route::post('/stream-agents/pairing/start', [StreamAgentController::class, 'pairingStart']);
+Route::get('/stream-agents/pairing/{pairing_id}/status', [StreamAgentController::class, 'pairingStatus']);
+// Sync e heartbeat usam token do próprio agente (Bearer agent_token)
+Route::post('/stream-agents/heartbeat', [StreamAgentController::class, 'heartbeat']);
+Route::post('/stream-agents/sync', [StreamAgentController::class, 'sync']);
 
 // Player de câmera (URL assinada — HTTPS para iOS ATS)
 Route::get('/groups/{groupId}/cameras/{cameraId}/player', [GroupCameraController::class, 'player'])
@@ -355,10 +363,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/plans/{id}', [PlanController::class, 'destroy']);
     Route::get('/user/plan', [PlanController::class, 'getUserPlan']);
 
-    // Agentes de câmera vinculados pelo app (QR)
+    // Agentes de câmera vinculados pelo app (QR legado lacos_cameras)
     Route::get('/user/stream-agents', [UserStreamAgentController::class, 'index']);
     Route::post('/user/stream-agents', [UserStreamAgentController::class, 'store']);
     Route::delete('/user/stream-agents', [UserStreamAgentController::class, 'destroy']);
+
+    // Pareamento guard_agent_pair (app aceita o QR do agente SegCond)
+    Route::post('/stream-agents/pairing/{pairing_id}/claim', [StreamAgentController::class, 'pairingClaim']);
     
     // Botão de Pânico - Emergência
     Route::post('/panic/trigger', [PanicController::class, 'trigger']);

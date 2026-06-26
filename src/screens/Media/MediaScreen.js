@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import SafeIcon from '../../components/SafeIcon';
 import { Video } from 'expo-av';
 import { useFocusEffect } from '@react-navigation/native';
@@ -191,7 +192,28 @@ const MediaScreen = ({ navigation, route }) => {
 
       // Processar resultado
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
+        let asset = result.assets[0];
+
+        // Converter imagens HEIC/HEIF para JPEG (não suportadas pelo React Native Image)
+        if (type === 'image') {
+          const uri = asset.uri || '';
+          const isHeic = uri.toLowerCase().endsWith('.heic') || uri.toLowerCase().endsWith('.heif');
+          if (isHeic) {
+            try {
+              console.log('🔄 MediaScreen - Convertendo HEIC para JPEG...');
+              const converted = await ImageManipulator.manipulateAsync(
+                uri,
+                [],
+                { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+              );
+              asset = { ...asset, uri: converted.uri, fileSize: undefined };
+              console.log('✅ MediaScreen - Convertido para JPEG:', converted.uri);
+            } catch (convErr) {
+              console.warn('⚠️ MediaScreen - Falha ao converter HEIC, tentando upload original:', convErr);
+            }
+          }
+        }
+
         await uploadMedia(asset, type);
       }
     } catch (error) {

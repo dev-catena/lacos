@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import apiService from './apiService';
 
 const LEGACY_STORAGE_KEY = '@lacos:streamAgents';
 const USER_STORAGE_PREFIX = '@lacos:streamAgents:';
@@ -189,7 +190,31 @@ export function parseQrPayload(text) {
     throw new Error('QR inválido');
   }
 
-  if (data?.v !== 1 || data?.type !== 'lacos_cameras') {
+  if (data?.v !== 1) {
+    throw new Error('QR inválido');
+  }
+
+  // ── Formato novo: agente SegCond ──────────────────────────────────────────
+  if (data.type === 'guard_agent_pair') {
+    const guardApi = String(data.guard_api || '').trim().replace(/\/$/, '');
+    const pairingId = String(data.pairing_id || '').trim();
+    const code = String(data.code || '').trim();
+
+    if (!guardApi || !pairingId || !code) {
+      throw new Error('QR inválido');
+    }
+
+    return {
+      v: 1,
+      type: 'guard_agent_pair',
+      guard_api: guardApi,
+      pairing_id: pairingId,
+      code,
+    };
+  }
+
+  // ── Formato legado: lacos_cameras ─────────────────────────────────────────
+  if (data.type !== 'lacos_cameras') {
     throw new Error('QR inválido');
   }
 
@@ -210,20 +235,88 @@ export function parseQrPayload(text) {
   };
 }
 
+/**
+ * Aceita um pareamento guard_agent_pair via API Guard.
+ * Retorna {success, agent_uuid, nome} quando vinculado.
+ */
+export async function claimGuardPairing(guardApi, pairingId, code) {
+  const response = await apiService.request(
+    `/stream-agents/pairing/${pairingId}/claim`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.success) {
+    throw new Error(response.message || 'Erro ao vincular agente.');
+  }
+
+  return response;
+}
+
+/**
+ * Aguarda o agente sincronizar câmeras após o claim (até maxWaitMs).
+ * Retorna o primeiro agente com câmeras ou null.
+ */
+export async function waitForAgentSync(maxWaitMs = 15000, intervalMs = 2000) {
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    try {
+      const response = await apiService.request('/user/stream-agents');
+      const agents = response?.agents ?? [];
+      const ready = agents.find((a) => Array.isArray(a.cameras) && a.cameras.length > 0);
+      if (ready) return ready;
+    } catch {
+      // continua tentando
+    }
+  }
+  return null;
+}
+
 export async function listAgents() {
+  // Agentes locais (formato legado lacos_cameras)
+  let localAgents = [];
   try {
     const storageKey = await getStorageKey();
     await migrateLegacyStorageIfNeeded(storageKey);
     const raw = await AsyncStorage.getItem(storageKey);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    if (error?.message?.includes('Faça login')) {
-      return [];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      localAgents = Array.isArray(parsed) ? parsed : [];
     }
-    return [];
+  } catch (error) {
+    if (error?.message?.includes('Faça login')) return [];
   }
+
+  // Agentes do backend (formato guard_agent_pair, com câmeras sincronizadas)
+  let backendAgents = [];
+  try {
+    const response = await apiService.request('/user/stream-agents');
+    const raw = response?.agents ?? [];
+    backendAgents = raw
+      .filter((a) => a.agent_uuid && Array.isArray(a.cameras) && a.cameras.length > 0)
+      .map((a) => ({
+        stream_api: a.stream_api || '',
+        nome: a.nome || 'Agente SegCond',
+        agent_uuid: a.agent_uuid,
+        cameras: (a.cameras || []).map((c) => ({ id: c.id ?? c.stream_id, nome: c.nome })),
+        auth: null,
+        type: 'guard',
+      }));
+  } catch {
+    // sem rede ou não autenticado — usa só agentes locais
+  }
+
+  // Mescla: evita duplicar agentes que também estejam no AsyncStorage
+  const localStreamApis = new Set(localAgents.map((a) => normalizeStreamApi(a.stream_api)));
+  const uniqueBackend = backendAgents.filter(
+    (a) => !a.stream_api || !localStreamApis.has(normalizeStreamApi(a.stream_api))
+  );
+
+  return [...localAgents, ...uniqueBackend];
 }
 
 async function persistAgents(agents) {

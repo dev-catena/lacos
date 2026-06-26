@@ -13,7 +13,10 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import { ArrowBackIcon } from '../../components/CustomIcons';
-import streamCamerasService from '../../services/streamCamerasService';
+import streamCamerasService, {
+  claimGuardPairing,
+  waitForAgentSync,
+} from '../../services/streamCamerasService';
 
 const ScanCameraQrScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params || {};
@@ -30,6 +33,26 @@ const ScanCameraQrScreen = ({ route, navigation }) => {
 
       try {
         const payload = streamCamerasService.parseQrPayload(data);
+
+        // ── Formato novo: agente SegCond (guard_agent_pair) ──────────────────
+        if (payload.type === 'guard_agent_pair') {
+          await claimGuardPairing(payload.guard_api, payload.pairing_id, payload.code);
+
+          Alert.alert(
+            'Agente vinculado!',
+            'Aguarde alguns instantes enquanto as câmeras são sincronizadas automaticamente.',
+            [
+              {
+                text: 'Ver câmeras',
+                onPress: () =>
+                  navigation.replace('Cameras', { groupId, groupName }),
+              },
+            ]
+          );
+          return;
+        }
+
+        // ── Formato legado: lacos_cameras ─────────────────────────────────────
         const result = await streamCamerasService.saveAgent(payload);
 
         if (result.duplicate) {
@@ -40,10 +63,7 @@ const ScanCameraQrScreen = ({ route, navigation }) => {
               {
                 text: 'Ver câmeras',
                 onPress: () =>
-                  navigation.replace('Cameras', {
-                    groupId,
-                    groupName,
-                  }),
+                  navigation.replace('Cameras', { groupId, groupName }),
               },
             ]
           );
@@ -59,10 +79,7 @@ const ScanCameraQrScreen = ({ route, navigation }) => {
           {
             text: 'Ver câmeras',
             onPress: () =>
-              navigation.replace('Cameras', {
-                groupId,
-                groupName,
-              }),
+              navigation.replace('Cameras', { groupId, groupName }),
           },
         ]);
       } catch (error) {
