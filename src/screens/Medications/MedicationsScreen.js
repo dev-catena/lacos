@@ -198,7 +198,7 @@ const MedicationsScreen = ({ route, navigation }) => {
           <View style={styles.headerLeft}>
             <LacosIcon size={36} />
             <View>
-              <Text style={styles.title}>Remédios</Text>
+              <Text style={styles.title}>Remedios em uso</Text>
               <Text style={styles.subtitle}>{groupName}</Text>
             </View>
           </View>
@@ -448,13 +448,13 @@ const MedicationsScreen = ({ route, navigation }) => {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Botão Flutuante */}
+      {/* Botão adicionar sem receita */}
       <TouchableOpacity
-        style={styles.fab}
+        style={styles.addButton}
         onPress={handleAddMedication}
         activeOpacity={0.8}
       >
-        <SafeIcon name="add" size={28} color={colors.textWhite} />
+        <Text style={styles.addButtonText}>+ sem receita</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -705,13 +705,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  fab: {
+  addButton: {
     position: 'absolute',
     right: 20,
     bottom: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 24,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -720,6 +720,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  addButtonText: {
+    color: colors.textWhite,
+    fontSize: 15,
+    fontWeight: '600',
   },
   menuOverlay: {
     flex: 1,

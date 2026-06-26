@@ -170,7 +170,7 @@ const PrescriptionsScreen = ({ route, navigation }) => {
           <SafeIcon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Receitas</Text>
+          <Text style={styles.headerTitle}>Cadastro de receitas</Text>
           <Text style={styles.headerSubtitle}>{groupName}</Text>
         </View>
         <View style={styles.placeholder} />

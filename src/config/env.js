@@ -1,22 +1,21 @@
 // src/config/env.js
 //
-// Expo local (`npx expo start`): bundler/UI no teu PC; a API pode ser produção ou LAN.
+// TestFlight + OTA (fluxo principal):
+//   • Build iOS: eas build --platform ios --profile production
+//   • Updates JS: eas update --channel production
+//   • Release (__DEV__ = false) SEMPRE usa PRODUCTION_API_BASE_URL abaixo.
 //
-// Cenário atual — desenvolvimento local:
-//   • Expo corre localmente
-//   • API no Laravel da tua máquina (LAN ou ngrok)
-//
-// Para usar produção (gateway) durante o dev:
-//   mude EXPO_USE_LOCAL_LARAVEL para false.
+// Metro local (opcional):
+//   • Mude EXPO_USE_LOCAL_LARAVEL para true e ajuste LOCAL_BACKEND_HOST.
 
-/** false = API de produção (gateway). true = Laravel local (LAN ou ngrok). */
-const EXPO_USE_LOCAL_LARAVEL = true;
+/** false = gateway produção (TestFlight/OTA). true = Laravel local (só com Metro). */
+const EXPO_USE_LOCAL_LARAVEL = false;
 
 const PRODUCTION_API_BASE_URL = 'https://gateway.lacosapp.com/api';
 
 // --- Só usados quando EXPO_USE_LOCAL_LARAVEL && __DEV__ ---
 const NGROK_URL = null; // ex.: 'https://abc123.ngrok-free.app'
-const LOCAL_BACKEND_HOST = '10.100.0.39';
+const LOCAL_BACKEND_HOST = '192.168.100.10';
 const LOCAL_BACKEND_PORT = '8000';
 
 function resolveApiBaseUrl() {

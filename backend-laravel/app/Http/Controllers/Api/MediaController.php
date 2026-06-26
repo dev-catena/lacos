@@ -74,14 +74,12 @@ class MediaController extends Controller
     public function store(Request $request, $groupId)
     {
         try {
-            // Verificar se usuário é admin do grupo
-            $group = Auth::user()->groups()
-                ->wherePivot('role', 'admin')
-                ->find($groupId);
-            
+            // Verificar se usuário pertence ao grupo (cuidador/amigo/admin)
+            $group = Auth::user()->groups()->find($groupId);
+
             if (!$group) {
                 return response()->json([
-                    'message' => 'Você precisa ser administrador do grupo para postar mídias'
+                    'message' => 'Grupo não encontrado ou você não tem acesso'
                 ], 403);
             }
 
@@ -99,24 +97,15 @@ class MediaController extends Controller
                 ], 422);
             }
 
-            // Validar tamanho e tipo específico
+            // Validar tamanho e tipo específico (extensão/MIME — evita falha com HEIC no Linux)
             $file = $request->file('file');
             $type = $request->input('type');
-            
-            if ($type === 'image') {
-                $validator = Validator::make(['file' => $file], [
-                    'file' => 'mimes:jpg,jpeg,png,gif,webp,heic,heif|max:51200' // 50MB
-                ]);
-            } else { // video
-                $validator = Validator::make(['file' => $file], [
-                    'file' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/x-m4v,video/mpeg,video/webm,video/hevc,video/3gpp|max:153600' // 150MB
-                ]);
-            }
 
-            if ($validator->fails()) {
+            $fileErrors = $this->validateUploadedMediaFile($file, $type);
+            if (!empty($fileErrors)) {
                 return response()->json([
                     'message' => 'Arquivo inválido',
-                    'errors' => $validator->errors()
+                    'errors' => $fileErrors,
                 ], 422);
             }
 
@@ -281,6 +270,53 @@ class MediaController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Valida arquivo de mídia por extensão/MIME (mais confiável que mimes:heic no Linux).
+     */
+    private function validateUploadedMediaFile($file, string $type): array
+    {
+        if (!$file || !$file->isValid()) {
+            return ['file' => ['Arquivo inválido ou corrompido.']];
+        }
+
+        $maxBytes = $type === 'video' ? 153600 * 1024 : 51200 * 1024;
+        if ($file->getSize() > $maxBytes) {
+            $maxMb = $type === 'video' ? 150 : 50;
+            return ['file' => ["O arquivo excede o limite de {$maxMb}MB."]];
+        }
+
+        $ext = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: '');
+        $mime = strtolower($file->getMimeType() ?: '');
+
+        if ($type === 'image') {
+            $allowedExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'];
+            $ok = in_array($ext, $allowedExt, true)
+                || str_starts_with($mime, 'image/')
+                || in_array($mime, ['application/octet-stream', 'binary/octet-stream'], true);
+
+            if (!$ok) {
+                return ['file' => ['Formato de imagem não suportado.']];
+            }
+
+            return [];
+        }
+
+        $allowedVideoExt = ['mp4', 'mov', 'm4v', 'avi', 'mpeg', 'mpg', 'webm', '3gp', 'hevc'];
+        $allowedVideoMime = [
+            'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-m4v',
+            'video/mpeg', 'video/webm', 'video/hevc', 'video/3gpp', 'application/octet-stream',
+        ];
+        $ok = in_array($ext, $allowedVideoExt, true)
+            || str_starts_with($mime, 'video/')
+            || in_array($mime, $allowedVideoMime, true);
+
+        if (!$ok) {
+            return ['file' => ['Formato de vídeo não suportado.']];
+        }
+
+        return [];
     }
 }
 

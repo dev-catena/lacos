@@ -322,6 +322,20 @@ class CompressionService {
     const threshold = type === 'image' ? 2 * 1024 * 1024 : 10 * 1024 * 1024;
     return fileSize > threshold;
   }
+
+  /**
+   * Imagens: sempre JPEG antes do upload (HEIC falha no servidor Linux).
+   * Vídeos: comprimir quando possível (react-native-compressor) para caber no limite do nginx.
+   */
+  shouldPrepareForUpload(type) {
+    if (type === 'image') {
+      return true;
+    }
+    if (type === 'video' && VideoCompressor) {
+      return true;
+    }
+    return false;
+  }
 }
 
 export default new CompressionService();

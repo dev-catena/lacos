@@ -6,7 +6,19 @@ Erro 413 (Payload Too Large) ao fazer upload de arquivos, mesmo arquivos pequeno
 ## 🔍 Causa
 O servidor web (nginx/apache) ou PHP tem um limite de upload menor que o configurado no Laravel.
 
-## ✅ Solução
+## ✅ Solução rápida (servidor de produção)
+
+No servidor `gateway.lacosapp.com` (193.203.182.22):
+
+```bash
+cd /var/www/lacos
+sudo git pull   # ou copie scripts/fix-upload-limits.sh
+sudo bash scripts/fix-upload-limits.sh
+```
+
+O script define **160M** no Nginx e PHP. O limite padrão do Nginx é **1M** — por isso vídeos de ~6MB falham com HTTP 413.
+
+## ✅ Solução manual
 
 ### 1. **Configurar PHP (php.ini)**
 

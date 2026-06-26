@@ -1,4 +1,44 @@
 import apiService from './apiService';
+import API_CONFIG from '../config/api';
+
+/** Converte URL relativa (/storage/...) em URL absoluta para exibir no app. */
+export function resolveMediaUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return null;
+  }
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  const baseUrl = API_CONFIG.BASE_URL.replace(/\/api\/?$/, '');
+  if (trimmed.startsWith('/storage/')) {
+    return `${baseUrl}${trimmed}`;
+  }
+  if (trimmed.startsWith('storage/')) {
+    return `${baseUrl}/${trimmed}`;
+  }
+  return trimmed.startsWith('/') ? `${baseUrl}${trimmed}` : `${baseUrl}/${trimmed}`;
+}
+
+function normalizeMediaItem(item) {
+  if (!item || typeof item !== 'object') {
+    return item;
+  }
+  const primaryUrl = resolveMediaUrl(item.url || item.media_url || item.file_url);
+  const thumbUrl = resolveMediaUrl(item.thumbnail_url) || primaryUrl;
+
+  return {
+    ...item,
+    type: item.type || item.media_type || 'image',
+    url: primaryUrl,
+    media_url: primaryUrl,
+    file_url: primaryUrl,
+    thumbnail_url: thumbUrl,
+  };
+}
 
 class MediaService {
   /**
@@ -16,13 +56,13 @@ class MediaService {
         console.log(`✅ MediaService - ${response.length} mídia(s) encontrada(s)`);
         return {
           success: true,
-          data: response,
+          data: response.map(normalizeMediaItem),
         };
       } else if (response && response.data) {
         console.log(`✅ MediaService - ${response.data.length} mídia(s) encontrada(s)`);
         return {
           success: true,
-          data: response.data,
+          data: response.data.map(normalizeMediaItem),
         };
       }
 
@@ -98,8 +138,13 @@ class MediaService {
       // Arquivo por último
       if (mediaData.uri) {
         const uriParts = mediaData.uri.split('.');
-        const rawExt = uriParts[uriParts.length - 1]?.toLowerCase() || 'mp4';
-        // Normalizar extensão para MIME type correto
+        let rawExt = uriParts[uriParts.length - 1]?.toLowerCase()?.split('?')[0] || '';
+        if (!rawExt || rawExt.length > 5) {
+          rawExt = mediaType === 'video' ? 'mp4' : 'jpg';
+        }
+        if (mediaType === 'image' && ['heic', 'heif'].includes(rawExt)) {
+          rawExt = 'jpg';
+        }
         const mimeMap = {
           mov: 'video/quicktime',
           mp4: 'video/mp4',
@@ -113,7 +158,9 @@ class MediaService {
           heif: 'image/heif',
           webp: 'image/webp',
         };
-        const mimeType = mimeMap[rawExt] || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
+        const mimeType = mediaData.mimeType
+          || mimeMap[rawExt]
+          || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
 
         formData.append('file', {
           uri: mediaData.uri,
@@ -156,10 +203,13 @@ class MediaService {
         console.log('✅ MediaService - Mídia postada com sucesso');
         return {
           success: true,
-          data: response,
+          data: normalizeMediaItem(response),
         };
       } else if (response && response.success) {
-        return response;
+        return {
+          ...response,
+          data: response.data ? normalizeMediaItem(response.data) : response.data,
+        };
       }
 
       return {
@@ -181,27 +231,22 @@ class MediaService {
         console.error('❌ MediaService - Erro 413 (Payload Too Large)');
         const fileSizeMB = mediaData.fileSize ? (mediaData.fileSize / 1024 / 1024).toFixed(2) : 'desconhecido';
         const maxSizeMB = mediaData.type === 'video' ? 100 : 50;
-        
-        // Verificar se o arquivo realmente excede o limite
         const fileSize = mediaData.fileSize || 0;
         const fileSizeInMB = fileSize / 1024 / 1024;
-        const maxSizeInMB = mediaData.type === 'video' ? 30 : 10;
-        
-        if (fileSize > 0 && fileSizeInMB > maxSizeInMB) {
-          // Arquivo realmente excede o limite
+
+        if (fileSize > 0 && fileSizeInMB > maxSizeMB) {
           return {
             success: false,
             error: `Arquivo muito grande (${fileSizeMB}MB). O tamanho máximo permitido é ${maxSizeMB}MB para ${mediaData.type === 'video' ? 'vídeos' : 'imagens'}.`,
             status: 413,
           };
-        } else {
-          // Arquivo está dentro do limite, mas servidor rejeitou - problema de configuração
-          return {
-            success: false,
-            error: `O servidor rejeitou o arquivo (${fileSizeMB}MB). O limite de upload do servidor está muito baixo. Por favor, entre em contato com o administrador do sistema para aumentar os limites de upload no servidor.`,
-            status: 413,
-          };
         }
+
+        return {
+          success: false,
+          error: `O servidor rejeitou o arquivo (${fileSizeMB}MB). Verifique o limite de upload do nginx/PHP no servidor.`,
+          status: 413,
+        };
       }
       
       console.error('❌ MediaService - Erro ao postar mídia:', error);

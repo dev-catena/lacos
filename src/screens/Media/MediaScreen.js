@@ -22,12 +22,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import { useAuth } from '../../contexts/AuthContext';
-import mediaService from '../../services/mediaService';
+import mediaService, { resolveMediaUrl } from '../../services/mediaService';
 import compressionService from '../../services/compressionService';
 import websocketService from '../../services/websocketService';
 import moment from 'moment';
-import API_CONFIG from '../../config/api';
 import VideoPlayerModal from '../../components/VideoPlayerModal';
+import ImageViewerModal from '../../components/ImageViewerModal';
 
 const MediaScreen = ({ navigation, route }) => {
   const { user } = useAuth();
@@ -40,6 +40,8 @@ const MediaScreen = ({ navigation, route }) => {
   const [pendingMediaType, setPendingMediaType] = useState(null);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [showImageViewer, setShowImageViewer] = useState(false);
   const [videoErrors, setVideoErrors] = useState({}); // Rastrear vídeos com erro
 
   useFocusEffect(
@@ -225,22 +227,27 @@ const MediaScreen = ({ navigation, route }) => {
     
     setUploading(true);
     
-    // Mostrar toast de compressão se necessário
-    let shouldCompress = compressionService.shouldCompress(originalFileSize, type);
-    if (shouldCompress) {
+    const shouldCompress = compressionService.shouldCompress(originalFileSize, type);
+    const shouldPrepare = compressionService.shouldPrepareForUpload(type);
+    const willProcessBeforeUpload = shouldCompress || shouldPrepare;
+
+    if (willProcessBeforeUpload) {
       Toast.show({
         type: 'info',
-        text1: 'Comprimindo...',
-        text2: `${type === 'video' ? 'Vídeo' : 'Foto'} está sendo comprimida para reduzir o tamanho`,
+        text1: type === 'video' ? 'Preparando vídeo...' : 'Preparando foto...',
+        text2: type === 'video'
+          ? 'Comprimindo para envio mais rápido'
+          : 'Convertendo para formato compatível',
         visibilityTime: 2000,
       });
     }
     
     try {
-      // Comprimir mídia se necessário (similar ao WhatsApp)
+      // Imagens: sempre converter para JPEG (HEIC do iPhone falha no servidor).
+      // Vídeos: comprimir apenas se acima do limiar.
       let finalAsset = asset;
-      if (shouldCompress) {
-        console.log('🗜️ MediaScreen - Comprimindo mídia antes do upload...');
+      if (willProcessBeforeUpload) {
+        console.log('🗜️ MediaScreen - Preparando mídia antes do upload...');
         try {
           finalAsset = await compressionService.compressMedia(asset, type);
           
@@ -288,8 +295,9 @@ const MediaScreen = ({ navigation, route }) => {
       const mediaData = {
         uri: finalAsset.uri,
         type: type,
-        description: '', // TODO: Adicionar campo de descrição
-        fileSize: finalFileSize, // Incluir tamanho do arquivo para cálculo de timeout
+        mimeType: type === 'image' ? 'image/jpeg' : (finalAsset.mimeType || null),
+        description: '',
+        fileSize: finalFileSize,
       };
 
       console.log('📤 MediaScreen - Enviando para mediaService.postMedia...');
@@ -304,24 +312,10 @@ const MediaScreen = ({ navigation, route }) => {
       if (result.success && result.data) {
         console.log('✅ MediaScreen - Upload bem-sucedido!');
         console.log('📦 MediaScreen - Dados retornados:', JSON.stringify(result.data, null, 2));
-        
-        // Construir URL completa se necessário
-        let mediaUrl = result.data.url || result.data.media_url;
-        if (mediaUrl && !mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
-          const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
-          mediaUrl = mediaUrl.startsWith('/') ? `${baseUrl}${mediaUrl}` : `${baseUrl}/${mediaUrl}`;
-        }
-        
-        // Adicionar mídia imediatamente à lista (otimista)
+
         const newMedia = {
-          id: result.data.id,
+          ...result.data,
           group_id: result.data.group_id || groupId,
-          type: result.data.type || type,
-          url: mediaUrl,
-          media_url: mediaUrl,
-          thumbnail_url: result.data.thumbnail_url,
-          description: result.data.description || '',
-          posted_by_user_id: result.data.posted_by_user_id,
           posted_by_name: result.data.posted_by_name || user?.name || 'Você',
           created_at: result.data.created_at || new Date().toISOString(),
           updated_at: result.data.updated_at || new Date().toISOString(),
@@ -415,30 +409,9 @@ const MediaScreen = ({ navigation, route }) => {
 
   const renderMediaItem = ({ item }) => {
     const isVideo = item.type === 'video' || item.media_type === 'video';
-    let mediaUrl = item.url || item.media_url || item.file_url;
-    
-    // Construir URL completa se for relativa
-    if (mediaUrl && !mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
-      // Extrair o domínio base da API (remover /api do final)
-      const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
-      
-      // Se começar com /storage, adicionar o domínio do servidor
-      if (mediaUrl.startsWith('/storage/')) {
-        mediaUrl = `${baseUrl}${mediaUrl}`;
-      } else if (mediaUrl.startsWith('storage/')) {
-        mediaUrl = `${baseUrl}/${mediaUrl}`;
-      } else {
-        // Tentar construir URL completa
-        mediaUrl = mediaUrl.startsWith('/') ? `${baseUrl}${mediaUrl}` : `${baseUrl}/${mediaUrl}`;
-      }
-    }
-    
-    console.log('🖼️ MediaScreen - Renderizando item:', { 
-      id: item.id, 
-      type: item.type, 
-      url: mediaUrl,
-      originalUrl: item.url || item.media_url 
-    });
+    const mediaUrl = resolveMediaUrl(item.url || item.media_url || item.file_url);
+    const thumbnailUrl = resolveMediaUrl(item.thumbnail_url) || mediaUrl;
+    const displayUrl = isVideo ? (thumbnailUrl || mediaUrl) : mediaUrl;
     
     // Calcular tempo restante
     const createdAt = moment(item.created_at);
@@ -447,8 +420,12 @@ const MediaScreen = ({ navigation, route }) => {
     const isExpired = hoursLeft <= 0;
 
     const handleMediaPress = () => {
-      if (isVideo && mediaUrl) {
-        // Se o vídeo teve erro de codec, tentar abrir mesmo assim (pode funcionar no player)
+      if (!mediaUrl) {
+        Alert.alert('Indisponível', 'Não foi possível abrir esta mídia.');
+        return;
+      }
+
+      if (isVideo) {
         if (videoErrors[item.id]) {
           console.log('⚠️ MediaScreen - Tentando reproduzir vídeo que teve erro de codec');
         }
@@ -458,7 +435,16 @@ const MediaScreen = ({ navigation, route }) => {
           title: item.description || 'Vídeo',
         });
         setShowVideoPlayer(true);
+        return;
       }
+
+      console.log('🖼️ MediaScreen - Abrindo imagem:', mediaUrl);
+      setSelectedImage({
+        uri: mediaUrl,
+        title: item.description || 'Imagem',
+        description: item.description || null,
+      });
+      setShowImageViewer(true);
     };
 
     return (
@@ -468,7 +454,7 @@ const MediaScreen = ({ navigation, route }) => {
         onLongPress={() => handleDeleteMedia(item.id)}
         activeOpacity={0.8}
       >
-        {mediaUrl ? (
+        {displayUrl ? (
           isVideo ? (
             videoErrors[item.id] ? (
               // Fallback quando vídeo não pode ser carregado
@@ -484,7 +470,7 @@ const MediaScreen = ({ navigation, route }) => {
             ) : (
               <View style={styles.videoContainer} pointerEvents="box-none">
                 <Video
-                  source={{ uri: mediaUrl }}
+                  source={{ uri: displayUrl }}
                   style={styles.mediaThumbnail}
                   resizeMode="cover"
                   shouldPlay={false}
@@ -517,7 +503,7 @@ const MediaScreen = ({ navigation, route }) => {
             )
           ) : (
             <Image
-              source={{ uri: mediaUrl }}
+              source={{ uri: displayUrl }}
               style={styles.mediaThumbnail}
               resizeMode="cover"
               onError={(error) => {
@@ -544,6 +530,7 @@ const MediaScreen = ({ navigation, route }) => {
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => handleDeleteMedia(item.id)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <SafeIcon name="trash-outline" size={20} color="#FF6B6B" />
         </TouchableOpacity>
@@ -712,6 +699,17 @@ const MediaScreen = ({ navigation, route }) => {
         onClose={() => {
           setShowVideoPlayer(false);
           setSelectedVideo(null);
+        }}
+      />
+
+      <ImageViewerModal
+        visible={showImageViewer}
+        imageUri={selectedImage?.uri}
+        imageTitle={selectedImage?.title}
+        imageDescription={selectedImage?.description}
+        onClose={() => {
+          setShowImageViewer(false);
+          setSelectedImage(null);
         }}
       />
     </SafeAreaView>

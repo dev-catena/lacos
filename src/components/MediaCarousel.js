@@ -13,7 +13,7 @@ import { Video } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../constants/colors';
 import moment from 'moment';
-import API_CONFIG from '../config/api';
+import { resolveMediaUrl } from '../services/mediaService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.7;
@@ -51,23 +51,7 @@ const MediaCarousel = ({ media = [], onMediaPress }) => {
 
   const renderMediaCard = (item, index) => {
     const isVideo = item.type === 'video' || item.media_type === 'video';
-    let mediaUrl = item.url || item.media_url || item.file_url;
-    
-    // Construir URL completa se for relativa
-    if (mediaUrl && !mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
-      // Extrair o domínio base da API (remover /api do final)
-      const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
-      
-      // Se começar com /storage, adicionar o domínio do servidor
-      if (mediaUrl.startsWith('/storage/')) {
-        mediaUrl = `${baseUrl}${mediaUrl}`;
-      } else if (mediaUrl.startsWith('storage/')) {
-        mediaUrl = `${baseUrl}/${mediaUrl}`;
-      } else {
-        // Tentar construir URL completa
-        mediaUrl = mediaUrl.startsWith('/') ? `${baseUrl}${mediaUrl}` : `${baseUrl}/${mediaUrl}`;
-      }
-    }
+    const mediaUrl = resolveMediaUrl(item.url || item.media_url || item.file_url);
     
     // Calcular tempo restante até expirar
     const createdAt = moment(item.created_at);

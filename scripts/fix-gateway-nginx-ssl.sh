@@ -111,6 +111,9 @@ server {
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
 
+    client_max_body_size 160M;
+    client_body_timeout 600s;
+
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
@@ -118,6 +121,7 @@ server {
     location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:${PHP_SOCK};
+        fastcgi_read_timeout 600;
     }
 
     location ~ /\.(?!well-known).* {

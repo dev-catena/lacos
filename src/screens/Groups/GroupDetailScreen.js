@@ -261,7 +261,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     {
       id: 'medications',
       featureKey: 'remedios',
-      title: 'Remédios',
+      title: 'Remedios em uso',
       subtitle: 'Gerenciar medicamentos e horários',
       icon: 'medical',
       IconComponent: MedicationIcon,
@@ -275,7 +275,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     {
       id: 'prescriptions',
       featureKey: 'receitas',
-      title: 'Receitas',
+      title: 'Cadastro de receitas',
       subtitle: 'Receitas médicas e prescrições',
       icon: 'document-text',
       IconComponent: DocumentIcon,
