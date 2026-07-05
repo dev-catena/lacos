@@ -128,7 +128,7 @@ class DocumentController extends Controller
             $validator = Validator::make($request->all(), [
                 'file' => 'required|file|max:51200', // 50MB
                 'group_id' => 'required|exists:groups,id',
-                'type' => 'required|in:exam_lab,exam_image,prescription,report,other',
+                'type' => 'required|in:exam_lab,exam_image,prescription,medical_leave,medical_certificate,report,other',
                 'title' => 'required|string|max:200',
                 'document_date' => 'nullable|date',
                 'doctor_id' => 'nullable|integer',
@@ -414,7 +414,7 @@ class DocumentController extends Controller
 
             // Validação
             $validator = Validator::make($request->all(), [
-                'type' => 'sometimes|in:exam_lab,exam_image,prescription,report,other',
+                'type' => 'sometimes|in:exam_lab,exam_image,prescription,medical_leave,medical_certificate,report,other',
                 'title' => 'sometimes|string|max:200',
                 'document_date' => 'sometimes|date',
                 'doctor_id' => 'nullable|exists:doctors,id',

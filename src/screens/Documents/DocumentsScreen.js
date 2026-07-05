@@ -30,7 +30,6 @@ const DocumentsScreen = ({ route, navigation }) => {
     { id: 'exam_image', label: 'Imagem', icon: 'image' },
     { id: 'prescription', label: 'Receita', icon: 'receipt' },
     { id: 'medical_leave', label: 'Afastamento', icon: 'calendar' },
-    { id: 'medical_certificate', label: 'Afastamento', icon: 'calendar' },
     { id: 'report', label: 'Atestado', icon: 'document-text' },
     { id: 'other', label: 'Outro', icon: 'document' },
   ];
@@ -151,7 +150,9 @@ const DocumentsScreen = ({ route, navigation }) => {
 
   const filteredDocuments = filterType === 'all'
     ? documents
-    : documents.filter(doc => doc.type === filterType);
+    : filterType === 'medical_leave'
+      ? documents.filter(doc => doc.type === 'medical_leave' || doc.type === 'medical_certificate')
+      : documents.filter(doc => doc.type === filterType);
 
   const renderDocumentCard = ({ item }) => (
     <TouchableOpacity
@@ -203,13 +204,7 @@ const DocumentsScreen = ({ route, navigation }) => {
         </View>
       </View>
 
-      <View style={styles.docFileType}>
-        {item.file_type === 'pdf' ? (
-          <SafeIcon name="document-text" size={20} color={colors.gray400} />
-        ) : (
-          <SafeIcon name="image" size={20} color={colors.gray400} />
-        )}
-      </View>
+      <SafeIcon name="chevron-forward" size={20} color={colors.gray400} />
     </TouchableOpacity>
   );
 
@@ -450,9 +445,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.gray600,
     marginLeft: 4,
-  },
-  docFileType: {
-    marginLeft: 8,
   },
   fab: {
     position: 'absolute',

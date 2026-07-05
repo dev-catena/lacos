@@ -14,11 +14,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('notifications', function (Blueprint $table) {
-            $table->foreignId('group_id')
-                ->nullable()
-                ->after('user_id')
-                ->constrained('groups')
-                ->nullOnDelete();
+            if (!Schema::hasColumn('notifications', 'group_id')) {
+                $table->foreignId('group_id')
+                    ->nullable()
+                    ->after('user_id')
+                    ->constrained('groups')
+                    ->nullOnDelete();
+            }
         });
     }
 

@@ -67,8 +67,12 @@ return new class extends Migration
             }
             
             // Índices (appointment_date existe na tabela appointments)
-            $table->index('payment_status', 'idx_payment_status');
-            $table->index('appointment_date', 'idx_appointment_date');
+            if (empty(\DB::select("SHOW INDEX FROM appointments WHERE Key_name = 'idx_payment_status'"))) {
+                $table->index('payment_status', 'idx_payment_status');
+            }
+            if (empty(\DB::select("SHOW INDEX FROM appointments WHERE Key_name = 'idx_appointment_date'"))) {
+                $table->index('appointment_date', 'idx_appointment_date');
+            }
         });
     }
 

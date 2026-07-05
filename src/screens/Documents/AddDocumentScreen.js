@@ -31,10 +31,11 @@ const AddDocumentScreen = ({ route, navigation }) => {
   const [showConsultationModal, setShowConsultationModal] = useState(false);
 
   const documentTypes = [
-    { id: 'exam_lab', label: 'Exame Laboratorial', icon: 'flask' },
-    { id: 'exam_image', label: 'Exame de Imagem', icon: 'image' },
+    { id: 'exam_lab', label: 'Exame Lab', icon: 'flask' },
+    { id: 'exam_image', label: 'Imagem', icon: 'image' },
     { id: 'prescription', label: 'Receita', icon: 'document-text' },
-    { id: 'report', label: 'Laudo', icon: 'document' },
+    { id: 'medical_leave', label: 'Afastamento', icon: 'calendar' },
+    { id: 'report', label: 'Atestado', icon: 'document' },
     { id: 'other', label: 'Outro', icon: 'document-attach' },
   ];
 
