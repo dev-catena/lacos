@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
 import {
   PersonOutlineIcon,
   MedicalOutlineIcon,
@@ -493,7 +494,7 @@ const ProfileScreen = ({ navigation }) => {
             Desenvolvido com 💙 para cuidar de quem amamos
           </Text>
           <Text style={styles.footerVersion}>
-            v{Constants.expoConfig?.version ?? '1.0.0'} ({Constants.nativeBuildVersion ?? '—'})
+            v{Constants.expoConfig?.version ?? '1.0.0'} · build {Constants.nativeBuildVersion ?? '—'}{Updates.updateId ? ` · OTA ${Updates.updateId.slice(0, 8)}` : ''}
           </Text>
         </View>
       </ScrollView>
