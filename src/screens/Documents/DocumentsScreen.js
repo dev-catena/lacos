@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
@@ -154,10 +156,35 @@ const DocumentsScreen = ({ route, navigation }) => {
       ? documents.filter(doc => doc.type === 'medical_leave' || doc.type === 'medical_certificate')
       : documents.filter(doc => doc.type === filterType);
 
+  const handleLongPress = (item) => {
+    Alert.alert(
+      'Excluir documento',
+      `Deseja excluir "${item.title}"? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await documentService.deleteDocument(item.id);
+              setDocuments(prev => prev.filter(d => d.id !== item.id));
+              Toast.show({ type: 'success', text1: 'Documento excluído' });
+            } catch (error) {
+              Toast.show({ type: 'error', text1: 'Erro ao excluir', text2: 'Tente novamente.' });
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderDocumentCard = ({ item }) => (
     <TouchableOpacity
       style={styles.documentCard}
       onPress={() => navigation.navigate('DocumentDetails', { document: item, groupId })}
+      onLongPress={() => handleLongPress(item)}
+      delayLongPress={500}
     >
       <View style={[styles.docIcon, { backgroundColor: getDocumentColor(item.type) + '20' }]}>
         <SafeIcon 
