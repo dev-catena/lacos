@@ -4,38 +4,30 @@ import { Video, ResizeMode } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FIRST_OPEN_KEY = '@lacos:first_open_done';
-const SHORT_DURATION_MS = 3000; // 3 segundos para aberturas subsequentes
+const VIDEO_TOTAL_MS = 8000;   // duração total do vídeo
+const SHORT_DURATION_MS = 3000; // exibir apenas os últimos 3 segundos
+const START_POSITION_MS = VIDEO_TOTAL_MS - SHORT_DURATION_MS; // = 5000ms
 
 const VideoSplash = ({ onFinish }) => {
   const videoRef = useRef(null);
-  const timerRef = useRef(null);
-  const [isFirstOpen, setIsFirstOpen] = useState(null); // null = ainda verificando
+  const [isFirstOpen, setIsFirstOpen] = useState(null);
 
   useEffect(() => {
     const checkFirstOpen = async () => {
       try {
         const done = await AsyncStorage.getItem(FIRST_OPEN_KEY);
         if (done) {
-          // Não é a primeira vez — limitar a 3 segundos
           setIsFirstOpen(false);
-          timerRef.current = setTimeout(() => {
-            onFinish();
-          }, SHORT_DURATION_MS);
         } else {
-          // Primeira vez — deixar vídeo completo e marcar
           setIsFirstOpen(true);
           await AsyncStorage.setItem(FIRST_OPEN_KEY, 'true');
         }
       } catch {
-        setIsFirstOpen(true); // fallback: mostrar completo
+        setIsFirstOpen(true);
       }
     };
 
     checkFirstOpen();
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
   }, []);
 
   const handlePlaybackStatusUpdate = useCallback((status) => {
@@ -48,7 +40,13 @@ const VideoSplash = ({ onFinish }) => {
     onFinish();
   }, [onFinish]);
 
-  // Aguardar verificação do AsyncStorage antes de renderizar
+  const handleReadyForDisplay = useCallback(async () => {
+    // Se não é a primeira abertura, pular para os últimos 3 segundos
+    if (!isFirstOpen && videoRef.current) {
+      await videoRef.current.setPositionAsync(START_POSITION_MS);
+    }
+  }, [isFirstOpen]);
+
   if (isFirstOpen === null) return null;
 
   return (
@@ -63,6 +61,7 @@ const VideoSplash = ({ onFinish }) => {
         isLooping={false}
         isMuted={false}
         onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+        onReadyForDisplay={handleReadyForDisplay}
         onError={handleError}
       />
     </View>
