@@ -348,8 +348,8 @@ const GroupDetailScreen = ({ route, navigation }) => {
       featureKey: 'midias',
       title: 'Mídias',
       subtitle: 'Fotos e vídeos do grupo',
-      icon: 'images',
-      IconComponent: ImagesIcon,
+      icon: 'film-outline',
+      IconComponent: ({ size = 32, color = '#FF6F00' }) => <Ionicons name="film-outline" size={size} color={color} />,
       color: '#FF6F00',
       backgroundColor: '#FF6F0020',
       onPress: () => navigation.navigate('GroupMedia', { 
