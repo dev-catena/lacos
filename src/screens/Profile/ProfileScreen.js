@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import Constants from 'expo-constants';
 import {
   PersonOutlineIcon,
   MedicalOutlineIcon,
@@ -491,6 +492,9 @@ const ProfileScreen = ({ navigation }) => {
           <Text style={styles.footerText}>
             Desenvolvido com 💙 para cuidar de quem amamos
           </Text>
+          <Text style={styles.footerVersion}>
+            v{Constants.expoConfig?.version ?? '1.0.0'} ({Constants.nativeBuildVersion ?? '—'})
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -685,6 +689,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textLight,
     textAlign: 'center',
+  },
+  footerVersion: {
+    fontSize: 11,
+    color: colors.textLight,
+    opacity: 0.5,
+    textAlign: 'center',
+    marginTop: 4,
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
