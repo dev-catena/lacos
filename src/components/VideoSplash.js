@@ -4,13 +4,14 @@ import { Video, ResizeMode } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FIRST_OPEN_KEY = '@lacos:first_open_done';
-const VIDEO_TOTAL_MS = 8000;   // duração total do vídeo
-const SHORT_DURATION_MS = 3000; // exibir apenas os últimos 3 segundos
-const START_POSITION_MS = VIDEO_TOTAL_MS - SHORT_DURATION_MS; // = 5000ms
+const VIDEO_TOTAL_MS = 8000;
+const SHORT_DURATION_MS = 3000;
+const START_POSITION_MS = VIDEO_TOTAL_MS - SHORT_DURATION_MS; // 5000ms
 
 const VideoSplash = ({ onFinish }) => {
   const videoRef = useRef(null);
   const [isFirstOpen, setIsFirstOpen] = useState(null);
+  const seekDone = useRef(false);
 
   useEffect(() => {
     const checkFirstOpen = async () => {
@@ -26,26 +27,37 @@ const VideoSplash = ({ onFinish }) => {
         setIsFirstOpen(true);
       }
     };
-
     checkFirstOpen();
   }, []);
 
+  // Quando isFirstOpen é resolvido e não é a primeira vez,
+  // aguarda o vídeo montar e faz o seek para o segundo 5
+  useEffect(() => {
+    if (isFirstOpen === false) {
+      const timer = setTimeout(async () => {
+        if (videoRef.current && !seekDone.current) {
+          seekDone.current = true;
+          await videoRef.current.setPositionAsync(START_POSITION_MS);
+        }
+      }, 200); // aguarda 200ms para o vídeo estar carregado
+      return () => clearTimeout(timer);
+    }
+  }, [isFirstOpen]);
+
   const handlePlaybackStatusUpdate = useCallback((status) => {
+    // Para aberturas subsequentes: se ainda não fez o seek e já passou de 200ms,
+    // monitora a posição para garantir que o seek foi aplicado
+    if (status.isLoaded && !isFirstOpen && !seekDone.current && status.positionMillis < START_POSITION_MS) {
+      return; // ainda buscando posição correta
+    }
     if (status.didJustFinish) {
       onFinish();
     }
-  }, [onFinish]);
+  }, [onFinish, isFirstOpen]);
 
   const handleError = useCallback(() => {
     onFinish();
   }, [onFinish]);
-
-  const handleReadyForDisplay = useCallback(async () => {
-    // Se não é a primeira abertura, pular para os últimos 3 segundos
-    if (!isFirstOpen && videoRef.current) {
-      await videoRef.current.setPositionAsync(START_POSITION_MS);
-    }
-  }, [isFirstOpen]);
 
   if (isFirstOpen === null) return null;
 
@@ -61,7 +73,6 @@ const VideoSplash = ({ onFinish }) => {
         isLooping={false}
         isMuted={false}
         onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-        onReadyForDisplay={handleReadyForDisplay}
         onError={handleError}
       />
     </View>
