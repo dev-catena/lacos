@@ -3,6 +3,7 @@ import 'react-native-gesture-handler';
 // import './src/config/pusher-init'; // Comentado temporariamente para evitar erro de protocol
 import React, { useEffect, useState } from 'react';
 import { Linking, Platform, View, ActivityIndicator, Text } from 'react-native';
+import VideoSplash from './src/components/VideoSplash';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -241,24 +242,24 @@ const DeepLinkHandler = () => {
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [fontError, setFontError] = useState(null);
+  const [videoSplashDone, setVideoSplashDone] = useState(false);
 
   // Carregar fontes de ícones (crítico para Android)
   useEffect(() => {
     async function loadFonts() {
       try {
         console.log('🔤 Carregando fontes de ícones...');
-        // Carregar fontes do Ionicons
         await Font.loadAsync({
           ...Ionicons.font,
         });
         console.log('✅ Fontes de ícones carregadas com sucesso');
         setFontsLoaded(true);
-        // Esconder splash screen quando fontes carregarem
+        // Esconder splash nativo imediatamente — o vídeo assume
         await SplashScreen.hideAsync();
       } catch (error) {
         console.error('❌ Erro ao carregar fontes de ícones:', error);
         setFontError(error);
-        setFontsLoaded(true); // Continuar mesmo com erro
+        setFontsLoaded(true);
         await SplashScreen.hideAsync();
       }
     }
@@ -275,9 +276,14 @@ export default function App() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: 16, color: colors.text }}>Carregando fontes...</Text>
+        <Text style={{ marginTop: 16, color: colors.text }}>Carregando...</Text>
       </View>
     );
+  }
+
+  // Mostrar vídeo splash antes do app
+  if (!videoSplashDone) {
+    return <VideoSplash onFinish={() => setVideoSplashDone(true)} />;
   }
 
   // Se houver erro ao carregar fontes, logar mas continuar (pode funcionar mesmo assim)
