@@ -1,9 +1,42 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, StatusBar } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const FIRST_OPEN_KEY = '@lacos:first_open_done';
+const SHORT_DURATION_MS = 3000; // 3 segundos para aberturas subsequentes
 
 const VideoSplash = ({ onFinish }) => {
   const videoRef = useRef(null);
+  const timerRef = useRef(null);
+  const [isFirstOpen, setIsFirstOpen] = useState(null); // null = ainda verificando
+
+  useEffect(() => {
+    const checkFirstOpen = async () => {
+      try {
+        const done = await AsyncStorage.getItem(FIRST_OPEN_KEY);
+        if (done) {
+          // Não é a primeira vez — limitar a 3 segundos
+          setIsFirstOpen(false);
+          timerRef.current = setTimeout(() => {
+            onFinish();
+          }, SHORT_DURATION_MS);
+        } else {
+          // Primeira vez — deixar vídeo completo e marcar
+          setIsFirstOpen(true);
+          await AsyncStorage.setItem(FIRST_OPEN_KEY, 'true');
+        }
+      } catch {
+        setIsFirstOpen(true); // fallback: mostrar completo
+      }
+    };
+
+    checkFirstOpen();
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const handlePlaybackStatusUpdate = useCallback((status) => {
     if (status.didJustFinish) {
@@ -12,9 +45,11 @@ const VideoSplash = ({ onFinish }) => {
   }, [onFinish]);
 
   const handleError = useCallback(() => {
-    // Se o vídeo falhar por qualquer motivo, pula direto para o app
     onFinish();
   }, [onFinish]);
+
+  // Aguardar verificação do AsyncStorage antes de renderizar
+  if (isFirstOpen === null) return null;
 
   return (
     <View style={styles.container}>
