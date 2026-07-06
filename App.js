@@ -3,7 +3,6 @@ import 'react-native-gesture-handler';
 // import './src/config/pusher-init'; // Comentado temporariamente para evitar erro de protocol
 import React, { useEffect, useState } from 'react';
 import { Linking, Platform, View, ActivityIndicator, Text } from 'react-native';
-import VideoSplash from './src/components/VideoSplash';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -242,8 +241,6 @@ const DeepLinkHandler = () => {
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [fontError, setFontError] = useState(null);
-  const [videoSplashDone, setVideoSplashDone] = useState(false);
-
   // Carregar fontes de ícones (crítico para Android)
   useEffect(() => {
     async function loadFonts() {
@@ -254,7 +251,6 @@ export default function App() {
         });
         console.log('✅ Fontes de ícones carregadas com sucesso');
         setFontsLoaded(true);
-        // Esconder splash nativo imediatamente — o vídeo assume
         await SplashScreen.hideAsync();
       } catch (error) {
         console.error('❌ Erro ao carregar fontes de ícones:', error);
@@ -279,11 +275,6 @@ export default function App() {
         <Text style={{ marginTop: 16, color: colors.text }}>Carregando...</Text>
       </View>
     );
-  }
-
-  // Mostrar vídeo splash antes do app
-  if (!videoSplashDone) {
-    return <VideoSplash onFinish={() => setVideoSplashDone(true)} />;
   }
 
   // Se houver erro ao carregar fontes, logar mas continuar (pode funcionar mesmo assim)
