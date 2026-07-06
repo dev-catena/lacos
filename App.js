@@ -2,6 +2,7 @@ import 'react-native-gesture-handler';
 // IMPORTANTE: Pusher será inicializado de forma lazy para evitar erros durante a inicialização
 // import './src/config/pusher-init'; // Comentado temporariamente para evitar erro de protocol
 import React, { useEffect, useState } from 'react';
+import VideoSplash from './src/components/VideoSplash';
 import { Linking, Platform, View, ActivityIndicator, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -241,6 +242,8 @@ const DeepLinkHandler = () => {
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [fontError, setFontError] = useState(null);
+  const [videoSplashDone, setVideoSplashDone] = useState(false);
+
   // Carregar fontes de ícones (crítico para Android)
   useEffect(() => {
     async function loadFonts() {
@@ -275,6 +278,11 @@ export default function App() {
         <Text style={{ marginTop: 16, color: colors.text }}>Carregando...</Text>
       </View>
     );
+  }
+
+  // Mostrar vídeo splash antes do app
+  if (!videoSplashDone) {
+    return <VideoSplash onFinish={() => setVideoSplashDone(true)} />;
   }
 
   // Se houver erro ao carregar fontes, logar mas continuar (pode funcionar mesmo assim)
