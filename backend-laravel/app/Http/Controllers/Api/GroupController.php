@@ -920,10 +920,21 @@ class GroupController extends Controller
 
             // Campos do perfil Kids
             $kidsFields = ['mother_name', 'birth_time', 'birth_weight', 'birth_height', 'blood_type', 'allergies'];
+            Log::info('GroupController::update - kidsFields debug', [
+                'request_keys' => array_keys($request->all()),
+                'validated_keys' => array_keys($validated),
+                'kids_in_request' => array_intersect($kidsFields, array_keys($request->all())),
+                'kids_in_validated' => array_intersect($kidsFields, array_keys($validated)),
+                'birth_weight_raw' => $request->input('birth_weight'),
+                'blood_type_raw' => $request->input('blood_type'),
+            ]);
             foreach ($kidsFields as $field) {
-                if (array_key_exists($field, $validated) && Schema::hasColumn('groups', $field)) {
+                $inValidated = array_key_exists($field, $validated);
+                $hasCol = Schema::hasColumn('groups', $field);
+                if ($inValidated && $hasCol) {
                     $data[$field] = $validated[$field] ?: null;
                 }
+                Log::info("GroupController::update - field '$field': inValidated=$inValidated, hasCol=$hasCol, value=" . json_encode($validated[$field] ?? 'NOT_PRESENT'));
             }
             if (isset($validated['accompanied_gender'])) {
                 $data['accompanied_gender'] = $validated['accompanied_gender'];
