@@ -103,7 +103,7 @@ const WelcomeScreen = ({ navigation }) => {
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton]}
-            onPress={() => navigation.navigate('Register')}
+            onPress={() => navigation.navigate('RegisterChooseProfile')}
             activeOpacity={0.8}
           >
             <Text style={styles.primaryButtonText}>Criar Conta</Text>

@@ -45,8 +45,26 @@ const parseReaisInput = (text) => {
   return cleaned;
 };
 
-const RegisterScreen = ({ navigation }) => {
+const PROFILE_LABELS = {
+  caregiver: 'Amigo / Cuidador',
+  kids: 'Kids (responsável)',
+  accompanied: 'Paciente',
+  professional_caregiver: 'Cuidador Profissional',
+  doctor: 'Médico',
+};
+
+const PROFILE_COLORS = {
+  caregiver: '#6366f1',
+  kids: '#f59e0b',
+  accompanied: '#ec4899',
+  professional_caregiver: '#22c55e',
+  doctor: '#4A90E2',
+};
+
+const RegisterScreen = ({ route, navigation }) => {
   const { signUp, clearRegistering, savedFormData, getSavedFormData, isRegistering } = useAuth();
+  // Perfil pré-selecionado vindo da tela de escolha de perfil
+  const selectedProfileParam = route?.params?.selectedProfile || 'caregiver';
   const scrollViewRef = React.useRef(null);
   const emailInputRef = React.useRef(null);
   const cpfInputRef = React.useRef(null);
@@ -58,7 +76,8 @@ const RegisterScreen = ({ navigation }) => {
     phone: '+55', // Inicializar com +55
     password: '',
     confirmPassword: '',
-    profile: 'caregiver', // Padrão: Cuidador
+    // "kids" é tratado como "caregiver" no backend; aqui guardamos como "kids" para controlar UX
+    profile: selectedProfileParam,
     // Campos específicos de cuidador profissional
     gender: '',
     city: '',
@@ -453,6 +472,10 @@ const RegisterScreen = ({ navigation }) => {
     
     // Enviar para o backend o campo `crm` no formato UF-NÚMERO (ex: MG-123456)
     const signUpPayload = { ...formData };
+    // "kids" não existe no backend — responsável é cadastrado como "caregiver"
+    if (signUpPayload.profile === 'kids') {
+      signUpPayload.profile = 'caregiver';
+    }
     if (formData.profile === 'doctor') {
       signUpPayload.crm = formatCrmValue(formData.crmUf, formData.crmNumber);
       // Enviar CPF sem formatação
@@ -728,7 +751,9 @@ const RegisterScreen = ({ navigation }) => {
             </View>
             <Text style={styles.title}>Criar Conta</Text>
             <Text style={styles.subtitle}>
-              Junte-se a nós e cuide de quem você ama
+              {formData.profile === 'kids'
+                ? 'Dados do responsável pela criança'
+                : 'Junte-se a nós e cuide de quem você ama'}
             </Text>
           </View>
 
@@ -826,7 +851,21 @@ const RegisterScreen = ({ navigation }) => {
               </Text>
             </View>
 
-            {/* Seletor de Perfil */}
+            {/* Seletor de Perfil — oculto quando o perfil foi escolhido na tela anterior */}
+            {selectedProfileParam ? (
+              <View style={[styles.inputContainer, { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: (PROFILE_COLORS[formData.profile] || '#6366f1') + '15', borderRadius: 12, padding: 14 }]}>
+                <Ionicons name="person-circle-outline" size={24} color={PROFILE_COLORS[formData.profile] || '#6366f1'} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>Perfil selecionado</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: PROFILE_COLORS[formData.profile] || '#6366f1' }}>
+                    {PROFILE_LABELS[formData.profile] || formData.profile}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
+                  <Text style={{ fontSize: 12, color: '#64748b', textDecorationLine: 'underline' }}>Alterar</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Qual é o seu perfil? *</Text>
               <View style={styles.profileSelector}>
@@ -1014,8 +1053,9 @@ const RegisterScreen = ({ navigation }) => {
                 </View>
               </View>
             </View>
+            )}
 
-            {/* Campos específicos para Cuidador Profissional e Médico */}
+            {/* Campos específicos para Cuidador Profissional e Médico (não exibir para Kids) */}
             {(formData.profile === 'professional_caregiver' || formData.profile === 'doctor') && (
               <>
                 <View style={styles.inputContainer}>
