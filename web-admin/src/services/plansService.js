@@ -233,7 +233,7 @@ class PlansService {
       { key: 'agenda', label: 'Agenda', description: 'Agendamento de compromissos' },
       { key: 'medicos', label: 'Médicos', description: 'Cadastro e gerenciamento de médicos' },
       { key: 'arquivos', label: 'Arquivos', description: 'Armazenamento e acesso a arquivos' },
-      { key: 'vacinacao', label: 'Vacinação', description: 'Calendário vacinal PNI e registro de doses aplicadas' },
+      { key: 'vacinacao', label: 'Vacinação infantil', description: 'Calendário vacinal PNI e registro de doses aplicadas' },
       { key: 'midias', label: 'Mídias', description: 'Gerenciamento de fotos e vídeos' },
       { key: 'sinaisVitais', label: 'Sinais vitais', description: 'Registro e acompanhamento de sinais vitais' },
       { key: 'configuracoes', label: 'Configurações', description: 'Acesso às configurações do sistema' },
