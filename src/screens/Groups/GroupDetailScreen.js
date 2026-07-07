@@ -344,6 +344,17 @@ const GroupDetailScreen = ({ route, navigation }) => {
       }),
     },
     {
+      id: 'vaccination',
+      featureKey: 'vacinacao',
+      title: 'Vacinação',
+      subtitle: 'Calendário PNI e registro de vacinas',
+      icon: 'medkit-outline',
+      IconComponent: ({ size = 32, color: c = '#16a34a' }) => (
+        <Ionicons name="medkit-outline" size={size} color={c} />
+      ),
+      onPress: () => navigation.navigate('Vaccination', { groupId, groupName }),
+    },
+    {
       id: 'media',
       featureKey: 'midias',
       title: 'Mídias',

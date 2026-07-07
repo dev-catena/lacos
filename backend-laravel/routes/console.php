@@ -14,6 +14,11 @@ Schedule::command('appointments:check-teleconsultation-no-shows')
     ->everyFifteenMinutes()
     ->withoutOverlapping(10);
 
+// Alertas de vacinação: vacinas próximas (7 dias) e atrasadas
+Schedule::command('vaccinations:check-alerts')
+    ->dailyAt('08:00')
+    ->withoutOverlapping(5);
+
 // Lembretes de compromissos (24h, 3h, 1h, 15min — conforme reminder_times do agendamento)
 Schedule::command('notifications:check-appointments')
     ->everyMinute()

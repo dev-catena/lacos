@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\ExternalGroupController;
+use App\Http\Controllers\Api\VaccinationController;
 use App\Http\Controllers\Api\PanicController;
 use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\EmergencyContactController;
@@ -387,6 +388,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/panic', [PanicController::class, 'index']);
     Route::get('/panic/config/{groupId}', [PanicController::class, 'checkConfig']);
     
+    // Vacinação - Calendário PNI e registros de vacinas
+    Route::get('/groups/{groupId}/vaccination-schedule', [VaccinationController::class, 'schedule']);
+    Route::get('/groups/{groupId}/vaccinations', [VaccinationController::class, 'index']);
+    Route::post('/groups/{groupId}/vaccinations', [VaccinationController::class, 'store']);
+    Route::get('/groups/{groupId}/vaccinations/{id}', [VaccinationController::class, 'show']);
+    Route::delete('/groups/{groupId}/vaccinations/{id}', [VaccinationController::class, 'destroy']);
+
     // Sinais Vitais - Gestão de Sinais Vitais do Grupo
     Route::get('/vital-signs', [VitalSignController::class, 'index']);
     Route::post('/vital-signs', [VitalSignController::class, 'store']);

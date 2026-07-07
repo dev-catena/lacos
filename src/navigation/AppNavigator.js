@@ -83,6 +83,11 @@ import DocumentsScreen from '../screens/Documents/DocumentsScreen';
 import AddDocumentScreen from '../screens/Documents/AddDocumentScreen';
 import DocumentDetailsScreen from '../screens/Documents/DocumentDetailsScreen';
 
+// Importa as telas de Vacinação
+import VaccinationScreen from '../screens/Vaccination/VaccinationScreen';
+import AddVaccinationScreen from '../screens/Vaccination/AddVaccinationScreen';
+import VaccinationDetailsScreen from '../screens/Vaccination/VaccinationDetailsScreen';
+
 // Importa as telas de Mídias
 import MediaScreen from '../screens/Media/MediaScreen';
 
@@ -432,6 +437,9 @@ const HomeStack = () => {
           headerShown: false 
         }}
       />
+      <Stack.Screen name="Vaccination"        component={VaccinationScreen}        options={{ headerShown: false }} />
+      <Stack.Screen name="AddVaccination"     component={AddVaccinationScreen}     options={{ headerShown: false }} />
+      <Stack.Screen name="VaccinationDetails" component={VaccinationDetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen 
         name="Security" 
         component={SecurityScreen}
@@ -815,6 +823,9 @@ const GroupsStack = () => {
           headerShown: false 
         }}
       />
+      <Stack.Screen name="Vaccination"        component={VaccinationScreen}        options={{ headerShown: false }} />
+      <Stack.Screen name="AddVaccination"     component={AddVaccinationScreen}     options={{ headerShown: false }} />
+      <Stack.Screen name="VaccinationDetails" component={VaccinationDetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen 
         name="Security" 
         component={SecurityScreen}
@@ -858,6 +869,9 @@ const ProfileStack = () => {
           headerShown: false 
         }}
       />
+      <Stack.Screen name="Vaccination"        component={VaccinationScreen}        options={{ headerShown: false }} />
+      <Stack.Screen name="AddVaccination"     component={AddVaccinationScreen}     options={{ headerShown: false }} />
+      <Stack.Screen name="VaccinationDetails" component={VaccinationDetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen 
         name="Security" 
         component={SecurityScreen}

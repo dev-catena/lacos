@@ -31,6 +31,9 @@ import NewPrescriptionScreen from '../screens/Prescriptions/NewPrescriptionScree
 import AddPrescriptionScreen from '../screens/Prescriptions/AddPrescriptionScreen';
 import AddMedicationScreen from '../screens/Medications/AddMedicationScreen';
 import SelectDoctorScreen from '../screens/Medications/SelectDoctorScreen';
+import VaccinationScreen from '../screens/Vaccination/VaccinationScreen';
+import AddVaccinationScreen from '../screens/Vaccination/AddVaccinationScreen';
+import VaccinationDetailsScreen from '../screens/Vaccination/VaccinationDetailsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -290,11 +293,14 @@ const PatientNavigator = () => {
         name="RecordingScreen" 
         component={RecordingScreen} 
       />
-      <Stack.Screen 
-        name="GroupDetail" 
+      <Stack.Screen name="Vaccination"        component={VaccinationScreen}        options={{ headerShown: false }} />
+      <Stack.Screen name="AddVaccination"     component={AddVaccinationScreen}     options={{ headerShown: false }} />
+      <Stack.Screen name="VaccinationDetails" component={VaccinationDetailsScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="GroupDetail"
         component={GroupDetailScreen}
-        options={{ 
-          headerShown: false 
+        options={{
+          headerShown: false
         }}
       />
       <Stack.Screen 

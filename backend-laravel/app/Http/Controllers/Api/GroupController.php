@@ -334,6 +334,7 @@ class GroupController extends Controller
                         'accompanied_access_schedule' => (bool)($group->accompanied_access_schedule ?? true),
                         'accompanied_access_chat' => (bool)($group->accompanied_access_chat ?? false),
                         'module_watch_audios' => (bool)($group->module_watch_audios ?? false),
+                        'module_vaccination' => (bool)($group->module_vaccination ?? false),
                     ];
 
                         return $groupData;
@@ -752,6 +753,7 @@ class GroupController extends Controller
                 'accompanied_access_schedule' => (bool)($group->accompanied_access_schedule ?? true),
                 'accompanied_access_chat' => (bool)($group->accompanied_access_chat ?? false),
                 'module_watch_audios' => (bool)($group->module_watch_audios ?? false),
+                'module_vaccination' => (bool)($group->module_vaccination ?? false),
             ];
 
             return response()->json($groupData);
@@ -860,6 +862,7 @@ class GroupController extends Controller
                 'accompanied_access_schedule' => 'sometimes',
                 'accompanied_access_chat' => 'sometimes',
                 'module_watch_audios' => 'sometimes',
+                'module_vaccination' => 'sometimes',
                 'remove_photo' => 'sometimes',
             ];
 
@@ -944,6 +947,9 @@ class GroupController extends Controller
             }
             if (isset($validated['module_watch_audios'])) {
                 $data['module_watch_audios'] = $toBool($validated['module_watch_audios']);
+            }
+            if (isset($validated['module_vaccination'])) {
+                $data['module_vaccination'] = $toBool($validated['module_vaccination']);
             }
 
             // Remover foto do grupo (flag enviada pelo app)
