@@ -31,6 +31,34 @@ class PlanController extends Controller
     }
 
     /**
+     * Retorna as features do plano Kids (público, sem autenticação).
+     * Usado pelo app mobile para configurar dinamicamente os módulos de grupos Kids.
+     * GET /api/plans/public/kids
+     */
+    public function kidsFeatures()
+    {
+        try {
+            $plan = Plan::where('slug', 'kids')->first();
+
+            if (!$plan) {
+                return response()->json(['error' => 'Plano Kids não encontrado'], 404);
+            }
+
+            $features = is_string($plan->features)
+                ? json_decode($plan->features, true)
+                : ($plan->features ?? []);
+
+            return response()->json([
+                'plan_id'  => $plan->id,
+                'name'     => $plan->name,
+                'features' => $features,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Obter um plano específico
      * GET /api/plans/{id}
      */

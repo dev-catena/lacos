@@ -49,6 +49,9 @@ use Illuminate\Support\Facades\Route;
 // Gateway Status - Rota pública
 Route::get('/gateway/status', [GatewayController::class, 'status']);
 
+// Features do plano Kids (público — app mobile usa para configurar grupos Kids dinamicamente)
+Route::get('/plans/public/kids', [PlanController::class, 'kidsFeatures']);
+
 // ─── API Externa (apps parceiros, ex: maternidade) ───────────────────────────
 Route::middleware(\App\Http\Middleware\ValidateExternalApiKey::class)
     ->prefix('external')

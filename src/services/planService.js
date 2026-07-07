@@ -35,6 +35,30 @@ class PlanService {
   }
 
   /**
+   * Obter as features do plano Kids (endpoint público, sem autenticação).
+   * Usado por grupos do tipo Kids para renderizar dinamicamente os módulos.
+   */
+  async getKidsPlan() {
+    try {
+      console.log('👶 PlanService - Buscando plano Kids');
+      const response = await apiService.request('/plans/public/kids', {
+        method: 'GET',
+        requiresAuth: false,
+      });
+
+      if (response && response.features) {
+        console.log('✅ PlanService - Plano Kids obtido');
+        return { success: true, plan: response };
+      }
+
+      return { success: false, error: 'Plano Kids não encontrado' };
+    } catch (error) {
+      console.error('❌ PlanService - Erro ao buscar plano Kids:', error);
+      return { success: false, error: error.message || 'Erro ao buscar plano Kids' };
+    }
+  }
+
+  /**
    * Verificar se uma feature está disponível no plano
    */
   isFeatureEnabled(plan, featureKey) {

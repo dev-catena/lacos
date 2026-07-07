@@ -43,8 +43,8 @@ import planService from '../../services/planService';
 import KidsBackground from '../../components/KidsBackground';
 import { setCurrentGroupType } from '../../stores/currentGroupStore';
 
-// Features disponíveis para grupos do tipo Kids (independente do plano do usuário)
-const KIDS_FEATURES = {
+// Fallback das features Kids (usado enquanto a API não responde ou em caso de erro)
+const KIDS_FEATURES_FALLBACK = {
   grupoCuidados: true,
   historico: true,
   remedios: true,
@@ -73,6 +73,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userPlan, setUserPlan] = useState(null);
+  const [kidsPlan, setKidsPlan] = useState(null);
   const [groupType, setGroupType] = useState('care');
   const [groupCode, setGroupCode] = useState(null);
   const [codeModalVisible, setCodeModalVisible] = useState(false);
@@ -80,6 +81,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
   useEffect(() => {
     checkAdminStatus();
     loadUserPlan();
+    loadKidsPlan();
   }, [groupId, user?.id]); // Adicionar user?.id como dependência
 
   // Usar ref para rastrear se já navegou para evitar navegações duplicadas
@@ -259,6 +261,20 @@ const GroupDetailScreen = ({ route, navigation }) => {
       }
     } catch (error) {
       console.error('❌ GroupDetail - Erro ao carregar plano:', error);
+    }
+  };
+
+  const loadKidsPlan = async () => {
+    try {
+      const result = await planService.getKidsPlan();
+      if (result.success && result.plan) {
+        setKidsPlan(result.plan);
+        console.log('👶 GroupDetail - Plano Kids carregado da API');
+      } else {
+        console.warn('⚠️ GroupDetail - Usando fallback do plano Kids');
+      }
+    } catch (error) {
+      console.error('❌ GroupDetail - Erro ao carregar plano Kids:', error);
     }
   };
 
@@ -540,10 +556,11 @@ const GroupDetailScreen = ({ route, navigation }) => {
       return false;
     }
 
-    // Grupos Kids: usar features fixas do plano Kids (vacinação habilitada, etc.)
+    // Grupos Kids: usar features do plano Kids (vindas da API ou do fallback)
     if (groupType === 'kids') {
-      const enabled = KIDS_FEATURES[item.featureKey] === true;
-      console.log('👶 GroupDetail Kids - feature:', item.featureKey, '→', enabled);
+      const kidsFeatures = kidsPlan?.features ?? KIDS_FEATURES_FALLBACK;
+      const enabled = planService.isFeatureEnabled({ features: kidsFeatures }, item.featureKey);
+      console.log('👶 GroupDetail Kids - feature:', item.featureKey, '→', enabled, kidsPlan ? '(API)' : '(fallback)');
       return enabled;
     }
 
