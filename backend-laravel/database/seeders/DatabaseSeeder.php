@@ -52,5 +52,6 @@ class DatabaseSeeder extends Seeder
         $this->call(SupplierCategoriesSeeder::class);
         $this->call(SupplierProductsSeeder::class);
         $this->call(VitalSignsSeeder::class);
+        $this->call(VaccineScheduleSeeder::class);
     }
 }
