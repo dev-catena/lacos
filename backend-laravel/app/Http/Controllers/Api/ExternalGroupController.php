@@ -37,6 +37,10 @@ class ExternalGroupController extends Controller
             'identity_card'  => 'nullable|string|max:50',
             'baby_photo'     => 'nullable|image|mimes:jpeg,png,jpg|max:4096',
             'group_name'     => 'nullable|string|max:255',
+            'birth_date'     => 'nullable|date',
+            'blood_type'     => 'nullable|string|max:10',
+            'birth_weight'   => 'nullable|integer|min:200|max:8000',
+            'birth_length'   => 'nullable|integer|min:20|max:80',
         ]);
 
         $motherEmail = strtolower(trim($validated['mother_email']));
@@ -119,23 +123,26 @@ class ExternalGroupController extends Controller
                 'updated_at' => now(),
             ]);
 
-            // 6. Enviar e-mail para a mãe com as credenciais (somente se for usuária nova)
-            if ($isNewUser && $tempPassword) {
-                try {
-                    Mail::send('emails.external-birth-group', [
-                        'motherName'   => $validated['mother_name'],
-                        'babyName'     => $validated['baby_name'],
-                        'email'        => $motherEmail,
-                        'tempPassword' => $tempPassword,
-                        'groupName'    => $groupName,
-                        'groupCode'    => $code,
-                    ], function ($msg) use ($motherEmail, $validated) {
-                        $msg->to($motherEmail, $validated['mother_name'])
-                            ->subject('Seu grupo no Lacos foi criado!');
-                    });
-                } catch (\Exception $e) {
-                    \Log::warning('ExternalGroupController: falha ao enviar e-mail para ' . $motherEmail . ': ' . $e->getMessage());
-                }
+            // 6. Enviar e-mail sempre — credenciais se for nova, notificação de grupo se já existia
+            try {
+                Mail::send('emails.external-birth-group', [
+                    'motherName'   => $validated['mother_name'],
+                    'babyName'     => $validated['baby_name'],
+                    'email'        => $motherEmail,
+                    'tempPassword' => $tempPassword,   // null se usuária já existia
+                    'isNewUser'    => $isNewUser,
+                    'groupName'    => $groupName,
+                    'groupCode'    => $code,
+                    'birthDate'    => $validated['birth_date'] ?? null,
+                    'bloodType'    => $validated['blood_type'] ?? null,
+                    'birthWeight'  => $validated['birth_weight'] ?? null,
+                    'birthLength'  => $validated['birth_length'] ?? null,
+                ], function ($msg) use ($motherEmail, $validated) {
+                    $msg->to($motherEmail, $validated['mother_name'])
+                        ->subject('Seu bebê agora tem um grupo no Laços! 🍼');
+                });
+            } catch (\Exception $e) {
+                \Log::warning('ExternalGroupController: falha ao enviar e-mail para ' . $motherEmail . ': ' . $e->getMessage());
             }
 
             $response = [
