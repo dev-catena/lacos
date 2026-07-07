@@ -53,6 +53,7 @@ const KIDS_FEATURES = {
   medicos: true,
   arquivos: true,
   vacinacao: true,
+  crescimento: true,
   midias: true,
   teleconsulta: false,
   loja: false,
