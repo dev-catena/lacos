@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\ExternalGroupController;
 use App\Http\Controllers\Api\PanicController;
 use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\EmergencyContactController;
@@ -46,6 +47,13 @@ use Illuminate\Support\Facades\Route;
 
 // Gateway Status - Rota pública
 Route::get('/gateway/status', [GatewayController::class, 'status']);
+
+// ─── API Externa (apps parceiros, ex: maternidade) ───────────────────────────
+Route::middleware(\App\Http\Middleware\ValidateExternalApiKey::class)
+    ->prefix('external')
+    ->group(function () {
+        Route::post('/create-birth-group', [ExternalGroupController::class, 'createBirthGroup']);
+    });
 
 // ─── Pareamento de agente SegCond (sem autenticação de usuário) ───────────────
 Route::post('/stream-agents/pairing/start', [StreamAgentController::class, 'pairingStart']);
