@@ -20,6 +20,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lacos.app",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -62,12 +65,12 @@
     },
     "extra": {
       "eas": {
-        "projectId": "51c90380-5f5d-44ca-8416-e0dfaa4d3f34"
+        "projectId": "521128f7-fb8a-4cd1-8fcb-4ffaaa5c0563"
       }
     },
     "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/51c90380-5f5d-44ca-8416-e0dfaa4d3f34"
+      "url": "https://u.expo.dev/521128f7-fb8a-4cd1-8fcb-4ffaaa5c0563"
     },
     "plugins": [
       "expo-asset",
@@ -106,6 +109,6 @@
       ]
     ],
     "scheme": "lacos",
-    "owner": "darley"
+    "owner": "zontec"
   }
 }
