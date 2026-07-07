@@ -33,6 +33,10 @@ class VaccinationController extends Controller
             return response()->json(['message' => 'Acesso negado.'], 403);
         }
 
+        if (!Schema::hasTable('vaccine_schedules')) {
+            return response()->json(['birth_date' => null, 'schedule' => []]);
+        }
+
         $birthDate = $this->getBirthDate($groupId);
 
         $schedules = DB::table('vaccine_schedules')
@@ -40,10 +44,12 @@ class VaccinationController extends Controller
             ->orderBy('age_months')
             ->get();
 
-        $records = DB::table('vaccination_records')
-            ->where('group_id', $groupId)
-            ->whereNotNull('vaccine_schedule_id')
-            ->pluck('applied_at', 'vaccine_schedule_id');
+        $records = Schema::hasTable('vaccination_records')
+            ? DB::table('vaccination_records')
+                ->where('group_id', $groupId)
+                ->whereNotNull('vaccine_schedule_id')
+                ->pluck('applied_at', 'vaccine_schedule_id')
+            : collect([]);
 
         $result = $schedules->map(function ($item) use ($birthDate, $records) {
             $dueDate = null;
@@ -92,6 +98,10 @@ class VaccinationController extends Controller
 
         if (!$this->isMember($user->id, $groupId)) {
             return response()->json(['message' => 'Acesso negado.'], 403);
+        }
+
+        if (!Schema::hasTable('vaccination_records')) {
+            return response()->json([]);
         }
 
         $records = DB::table('vaccination_records as vr')

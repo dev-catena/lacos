@@ -7,8 +7,19 @@ const vaccinationService = {
       const response = await apiService.get(`/groups/${groupId}/vaccination-schedule`);
       return response.data || response;
     } catch (error) {
-      const errorText = error.response?.data?.error || error.message || '';
-      if (errorText.includes("doesn't exist") || errorText.includes('Table')) {
+      const status = error.response?.status;
+      const errorText = error.response?.data?.error
+        || error.response?.data?.message
+        || error.message
+        || '';
+      // Tabela ainda não migrada ou endpoint indisponível → retornar vazio sem crashar
+      if (
+        errorText.includes("doesn't exist") ||
+        errorText.includes('Table') ||
+        status === 500 ||
+        status === 404
+      ) {
+        console.warn('VaccinationService.getSchedule - retornando vazio (tabela ou rota indisponível):', errorText);
         return { birth_date: null, schedule: [] };
       }
       throw error;
@@ -21,8 +32,17 @@ const vaccinationService = {
       const response = await apiService.get(`/groups/${groupId}/vaccinations`);
       return response.data || response;
     } catch (error) {
-      const errorText = error.response?.data?.error || error.message || '';
-      if (errorText.includes("doesn't exist") || errorText.includes('Table')) {
+      const status = error.response?.status;
+      const errorText = error.response?.data?.error
+        || error.response?.data?.message
+        || error.message
+        || '';
+      if (
+        errorText.includes("doesn't exist") ||
+        errorText.includes('Table') ||
+        status === 500 ||
+        status === 404
+      ) {
         return [];
       }
       throw error;
