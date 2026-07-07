@@ -385,6 +385,19 @@ const GroupDetailScreen = ({ route, navigation }) => {
       onPress: () => navigation.navigate('Vaccination', { groupId, groupName }),
     },
     {
+      id: 'growth',
+      featureKey: 'crescimento',
+      title: 'Crescimento',
+      subtitle: 'Peso, altura e PC com curvas OMS',
+      icon: 'trending-up-outline',
+      IconComponent: ({ size = 32, color: c = '#16a34a' }) => (
+        <Ionicons name="trending-up-outline" size={size} color={c} />
+      ),
+      color: '#16a34a',
+      backgroundColor: '#16a34a20',
+      onPress: () => navigation.navigate('Growth', { groupId, groupName }),
+    },
+    {
       id: 'media',
       featureKey: 'midias',
       title: 'Mídias',

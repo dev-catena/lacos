@@ -354,16 +354,28 @@ const GroupsScreen = ({ navigation, route }) => {
                   <Text style={styles.actionButtonText}>Agenda</Text>
                 </TouchableOpacity>
                 {group.group_type === 'kids' ? (
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => navigation.navigate('Vaccination', {
-                      groupId: group.id,
-                      groupName: group.name,
-                    })}
-                  >
-                    <Ionicons name="medkit-outline" size={18} color={KIDS_GREEN} />
-                    <Text style={[styles.actionButtonText, { color: KIDS_GREEN }]}>Vacinas</Text>
-                  </TouchableOpacity>
+                  <>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => navigation.navigate('Vaccination', {
+                        groupId: group.id,
+                        groupName: group.name,
+                      })}
+                    >
+                      <Ionicons name="medkit-outline" size={18} color={KIDS_GREEN} />
+                      <Text style={[styles.actionButtonText, { color: KIDS_GREEN }]}>Vacinas</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => navigation.navigate('Growth', {
+                        groupId: group.id,
+                        groupName: group.name,
+                      })}
+                    >
+                      <Ionicons name="trending-up-outline" size={18} color={KIDS_GREEN} />
+                      <Text style={[styles.actionButtonText, { color: KIDS_GREEN }]}>Crescimento</Text>
+                    </TouchableOpacity>
+                  </>
                 ) : (
                   <TouchableOpacity 
                     style={styles.actionButton}
@@ -502,16 +514,28 @@ const GroupsScreen = ({ navigation, route }) => {
                     <Text style={styles.actionButtonText}>Agenda</Text>
                   </TouchableOpacity>
                   {group.group_type === 'kids' ? (
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => navigation.navigate('Vaccination', {
-                        groupId: group.id,
-                        groupName: group.name,
-                      })}
-                    >
-                      <Ionicons name="medkit-outline" size={18} color={KIDS_GREEN} />
-                      <Text style={[styles.actionButtonText, { color: KIDS_GREEN }]}>Vacinas</Text>
-                    </TouchableOpacity>
+                    <>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => navigation.navigate('Vaccination', {
+                          groupId: group.id,
+                          groupName: group.name,
+                        })}
+                      >
+                        <Ionicons name="medkit-outline" size={18} color={KIDS_GREEN} />
+                        <Text style={[styles.actionButtonText, { color: KIDS_GREEN }]}>Vacinas</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => navigation.navigate('Growth', {
+                          groupId: group.id,
+                          groupName: group.name,
+                        })}
+                      >
+                        <Ionicons name="trending-up-outline" size={18} color={KIDS_GREEN} />
+                        <Text style={[styles.actionButtonText, { color: KIDS_GREEN }]}>Crescimento</Text>
+                      </TouchableOpacity>
+                    </>
                   ) : (
                     <TouchableOpacity 
                       style={styles.actionButton}
