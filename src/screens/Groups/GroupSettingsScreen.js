@@ -40,6 +40,12 @@ import {
   AppointmentIcon,
   MessagesIcon,
 } from '../../components/CustomIcons';
+import {
+  formatDateInputBR,
+  formatDateToBR,
+  isValidBirthDateBR,
+  birthDateBRToISO,
+} from '../../utils/dateInputMask';
 
 const normalizeImageMimeType = (filename) => {
   const ext = filename?.split('.').pop()?.toLowerCase();
@@ -92,6 +98,9 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // Data de nascimento do acompanhado (para grupos Kids)
+  const [accompaniedBirthDate, setAccompaniedBirthDate] = useState('');
 
   // Sinais Vitais
   const [vitalSigns, setVitalSigns] = useState({
@@ -230,6 +239,13 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         setGroupData(data);
         setEditedGroupName(data.name || '');
         setEditedDescription(data.description || '');
+        
+        // Carregar data de nascimento do acompanhado
+        if (data.accompanied_birth_date) {
+          setAccompaniedBirthDate(formatDateToBR(data.accompanied_birth_date));
+        } else {
+          setAccompaniedBirthDate('');
+        }
         
         // Carregar configurações de sinais vitais
         if (data) {
@@ -1369,6 +1385,18 @@ const GroupSettingsScreen = ({ route, navigation }) => {
         ...vitalSigns,
         ...permissions,
       };
+
+      // Incluir data de nascimento do acompanhado se preenchida
+      if (accompaniedBirthDate) {
+        if (!isValidBirthDateBR(accompaniedBirthDate)) {
+          Alert.alert('Data inválida', 'Informe a data de nascimento no formato DD/MM/AAAA');
+          setSaving(false);
+          return;
+        }
+        updateData.accompanied_birth_date = birthDateBRToISO(accompaniedBirthDate);
+      } else {
+        updateData.accompanied_birth_date = null;
+      }
       
       console.log('💾 GroupSettings.handleSave - Dados para enviar:', updateData);
       console.log('💾 GroupSettings.handleSave - Chamando groupService.updateGroup...');
@@ -1620,6 +1648,30 @@ const GroupSettingsScreen = ({ route, navigation }) => {
               editable={isAdmin}
             />
           </View>
+
+          {groupData?.group_type === 'kids' && (
+            <View style={styles.inputGroup}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <SafeIcon name="calendar" size={16} color="#16a34a" style={{ marginRight: 6 }} />
+                <Text style={[styles.label, { marginBottom: 0, color: '#16a34a' }]}>
+                  Data de Nascimento da Criança
+                </Text>
+              </View>
+              <TextInput
+                style={styles.input}
+                value={accompaniedBirthDate}
+                onChangeText={(text) => setAccompaniedBirthDate(formatDateInputBR(text))}
+                placeholder="DD/MM/AAAA"
+                placeholderTextColor={colors.gray400}
+                keyboardType="numeric"
+                maxLength={10}
+                editable={isAdmin}
+              />
+              <Text style={{ fontSize: 12, color: colors.gray400, marginTop: 4 }}>
+                Usada para calcular o calendário vacinal
+              </Text>
+            </View>
+          )}
 
           {(() => {
             const hasChanges = editedGroupName !== groupData?.name || editedDescription !== (groupData?.description || '') || newGroupPhoto;

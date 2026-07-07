@@ -302,6 +302,7 @@ class GroupController extends Controller
                         'description' => $group->description,
                         'accompanied_name' => $group->accompanied_name ?? null,
                         'accompanied_age' => $group->accompanied_age ?? null,
+                        'accompanied_birth_date' => $group->accompanied_birth_date ?? null,
                         'accompanied_gender' => $group->accompanied_gender ?? null,
                         'accompanied_photo' => $group->accompanied_photo ?? null,
                         'health_info' => isset($group->health_info) && $group->health_info ? json_decode($group->health_info, true) : null,
@@ -731,6 +732,7 @@ class GroupController extends Controller
                 'description' => $group->description ?? null,
                 'accompanied_name' => $group->accompanied_name ?? null,
                 'accompanied_age' => $group->accompanied_age ?? null,
+                'accompanied_birth_date' => $group->accompanied_birth_date ?? null,
                 'accompanied_gender' => $group->accompanied_gender ?? null,
                 'accompanied_photo' => $group->accompanied_photo ?? null,
                 'health_info' => isset($group->health_info) && $group->health_info ? json_decode($group->health_info, true) : null,
@@ -853,6 +855,7 @@ class GroupController extends Controller
                 'description' => 'sometimes|nullable|string',
                 'accompanied_name' => 'sometimes|nullable|string|max:255',
                 'accompanied_age' => 'sometimes|nullable|integer',
+                'accompanied_birth_date' => 'sometimes|nullable|date',
                 'accompanied_gender' => 'sometimes|nullable|in:male,female,other',
                 'accompanied_photo' => 'sometimes|nullable|string',
                 'health_info' => 'sometimes|nullable|array',
@@ -896,6 +899,9 @@ class GroupController extends Controller
             }
             if (isset($validated['accompanied_age'])) {
                 $data['accompanied_age'] = $validated['accompanied_age'];
+            }
+            if (array_key_exists('accompanied_birth_date', $validated) && Schema::hasColumn('groups', 'accompanied_birth_date')) {
+                $data['accompanied_birth_date'] = $validated['accompanied_birth_date'] ?: null;
             }
             if (isset($validated['accompanied_gender'])) {
                 $data['accompanied_gender'] = $validated['accompanied_gender'];
@@ -1126,6 +1132,7 @@ class GroupController extends Controller
                 'description' => $updatedGroup->description,
                 'accompanied_name' => $updatedGroup->accompanied_name ?? null,
                 'accompanied_age' => $updatedGroup->accompanied_age ?? null,
+                'accompanied_birth_date' => $updatedGroup->accompanied_birth_date ?? null,
                 'accompanied_gender' => $updatedGroup->accompanied_gender ?? null,
                 'accompanied_photo' => $updatedGroup->accompanied_photo ?? null,
                 'health_info' => isset($updatedGroup->health_info) && $updatedGroup->health_info ? json_decode($updatedGroup->health_info, true) : null,

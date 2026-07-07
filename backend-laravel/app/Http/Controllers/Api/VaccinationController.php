@@ -293,12 +293,23 @@ class VaccinationController extends Controller
 
     private function getBirthDate(int $groupId): ?string
     {
-        // Prioridade 1: accompanied_people.birth_date
-        $accompanied = DB::table('accompanied_people')
-            ->where('group_id', $groupId)
-            ->value('birth_date');
+        // Prioridade 0: groups.accompanied_birth_date (campo direto no grupo, usado por grupos Kids)
+        if (Schema::hasColumn('groups', 'accompanied_birth_date')) {
+            $groupBirthDate = DB::table('groups')
+                ->where('id', $groupId)
+                ->value('accompanied_birth_date');
 
-        if ($accompanied) return $accompanied;
+            if ($groupBirthDate) return $groupBirthDate;
+        }
+
+        // Prioridade 1: accompanied_people.birth_date
+        if (Schema::hasTable('accompanied_people')) {
+            $accompanied = DB::table('accompanied_people')
+                ->where('group_id', $groupId)
+                ->value('birth_date');
+
+            if ($accompanied) return $accompanied;
+        }
 
         // Prioridade 2: usuário com role priority_contact/patient
         $patientUserId = DB::table('group_members')
