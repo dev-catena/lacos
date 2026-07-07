@@ -32,6 +32,8 @@ import { BACKEND_HOST, BACKEND_PORT } from '../../config/env';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../contexts/AuthContext';
 
+const KIDS_GREEN = '#16a34a';
+
 const GroupsScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const [searchText, setSearchText] = useState('');
@@ -238,7 +240,10 @@ const GroupsScreen = ({ navigation, route }) => {
             myGroups.map((group) => (
               <TouchableOpacity 
                 key={group.id} 
-                style={styles.groupCard}
+                style={[
+                  styles.groupCard,
+                  group.group_type === 'kids' && styles.groupCardKids,
+                ]}
                 onPress={() => navigation.navigate('GroupDetail', {
                   groupId: group.id,
                   groupName: group.name,
@@ -249,6 +254,7 @@ const GroupsScreen = ({ navigation, route }) => {
             <View style={styles.groupHeader}>
               {(() => {
                 const photoUrl = group.photo || group.photo_url;
+                const isKids = group.group_type === 'kids';
                 
                 if (photoUrl) {
                   // Construir URL completa (path "groups/xxx.png" precisa de /storage/)
@@ -272,10 +278,16 @@ const GroupsScreen = ({ navigation, route }) => {
                   );
                 }
                 
-                // Se não há foto, mostrar ícone
+                // Se não há foto, mostrar ícone (diferente para Kids)
                 return (
-                  <View style={styles.groupIconContainer}>
-                    <PersonIcon size={28} color={colors.primary} />
+                  <View style={[
+                    styles.groupIconContainer,
+                    isKids && styles.groupIconContainerKids,
+                  ]}>
+                    {isKids
+                      ? <Ionicons name="happy-outline" size={30} color={KIDS_GREEN} />
+                      : <PersonIcon size={28} color={colors.primary} />
+                    }
                   </View>
                 );
               })()}
@@ -292,15 +304,22 @@ const GroupsScreen = ({ navigation, route }) => {
                           <Text style={styles.memberName}>Você (Admin)</Text>
                         </View>
                         <View style={styles.memberItem}>
-                          <Ionicons name="heart" size={12} color={colors.secondary} />
+                          <Ionicons name={group.group_type === 'kids' ? 'happy' : 'heart'} size={12} color={group.group_type === 'kids' ? KIDS_GREEN : colors.secondary} />
                           <Text style={styles.memberName}>{group.accompanied_name}</Text>
                         </View>
                       </View>
                     )}
               </View>
-              <View style={styles.adminBadge}>
-                <Text style={styles.adminBadgeText}>Admin</Text>
-              </View>
+              {group.group_type === 'kids' ? (
+                <View style={styles.kidsBadge}>
+                  <Ionicons name="happy" size={13} color="#fff" />
+                  <Text style={styles.kidsBadgeText}>Kids</Text>
+                </View>
+              ) : (
+                <View style={styles.adminBadge}>
+                  <Text style={styles.adminBadgeText}>Admin</Text>
+                </View>
+              )}
             </View>
             <View style={styles.groupFooter}>
               <View style={styles.groupStats}>
@@ -334,17 +353,30 @@ const GroupsScreen = ({ navigation, route }) => {
                   <CalendarIcon size={18} color={colors.warning} />
                   <Text style={styles.actionButtonText}>Agenda</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={() => navigation.navigate('AddVitalSigns', { 
-                        groupId: group.id, 
-                        groupName: group.name,
-                        accompaniedPersonId: group.id
-                  })}
-                >
-                  <PulseIcon size={18} color={colors.success} />
-                  <Text style={styles.actionButtonText}>Sinais</Text>
-                </TouchableOpacity>
+                {group.group_type === 'kids' ? (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('Vaccination', {
+                      groupId: group.id,
+                      groupName: group.name,
+                    })}
+                  >
+                    <Ionicons name="medkit-outline" size={18} color={KIDS_GREEN} />
+                    <Text style={[styles.actionButtonText, { color: KIDS_GREEN }]}>Vacinas</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('AddVitalSigns', { 
+                          groupId: group.id, 
+                          groupName: group.name,
+                          accompaniedPersonId: group.id
+                    })}
+                  >
+                    <PulseIcon size={18} color={colors.success} />
+                    <Text style={styles.actionButtonText}>Sinais</Text>
+                  </TouchableOpacity>
+                )}
                 {isAdminOfGroup(group) && (
                   <TouchableOpacity 
                     style={styles.actionButton}
@@ -380,7 +412,10 @@ const GroupsScreen = ({ navigation, route }) => {
             participatingGroups.map((group) => (
               <TouchableOpacity
                 key={group.id}
-                style={styles.groupCard}
+                style={[
+                  styles.groupCard,
+                  group.group_type === 'kids' && styles.groupCardKids,
+                ]}
                 onPress={() => navigation.navigate('GroupDetail', {
                   groupId: group.id,
                   groupName: group.name,
@@ -391,6 +426,7 @@ const GroupsScreen = ({ navigation, route }) => {
                 <View style={styles.groupCardHeader}>
                   {(() => {
                     const photoUrl = group.photo || group.photo_url;
+                    const isKids = group.group_type === 'kids';
                     
                     if (photoUrl) {
                       // Construir URL completa (path "groups/xxx.png" precisa de /storage/)
@@ -414,15 +450,28 @@ const GroupsScreen = ({ navigation, route }) => {
                       );
                     }
                     
-                    // Se não há foto, mostrar ícone
+                    // Ícone diferente para Kids
                     return (
-                      <View style={styles.groupIconContainer}>
-                        <PersonIcon size={24} color={colors.primary} />
+                      <View style={[
+                        styles.groupIconContainer,
+                        isKids && styles.groupIconContainerKids,
+                      ]}>
+                        {isKids
+                          ? <Ionicons name="happy-outline" size={26} color={KIDS_GREEN} />
+                          : <PersonIcon size={24} color={colors.primary} />
+                        }
                       </View>
                     );
                   })()}
                   <View style={styles.groupInfo}>
-                    <Text style={styles.groupName}>{group.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.groupName}>{group.name}</Text>
+                      {group.group_type === 'kids' && (
+                        <View style={styles.kidsBadgeSmall}>
+                          <Text style={styles.kidsBadgeSmallText}>Kids</Text>
+                        </View>
+                      )}
+                    </View>
                     {group.accompanied_name && (
                       <Text style={styles.groupSubtitle}>Paciente: {group.accompanied_name}</Text>
                     )}
@@ -452,17 +501,30 @@ const GroupsScreen = ({ navigation, route }) => {
                     <CalendarIcon size={18} color={colors.warning} />
                     <Text style={styles.actionButtonText}>Agenda</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.actionButton}
-                    onPress={() => navigation.navigate('AddVitalSigns', { 
-                      groupId: group.id, 
-                      groupName: group.name,
-                      accompaniedPersonId: group.id
-                    })}
-                  >
-                    <PulseIcon size={18} color={colors.success} />
-                    <Text style={styles.actionButtonText}>Sinais</Text>
-                  </TouchableOpacity>
+                  {group.group_type === 'kids' ? (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => navigation.navigate('Vaccination', {
+                        groupId: group.id,
+                        groupName: group.name,
+                      })}
+                    >
+                      <Ionicons name="medkit-outline" size={18} color={KIDS_GREEN} />
+                      <Text style={[styles.actionButtonText, { color: KIDS_GREEN }]}>Vacinas</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => navigation.navigate('AddVitalSigns', { 
+                        groupId: group.id, 
+                        groupName: group.name,
+                        accompaniedPersonId: group.id
+                      })}
+                    >
+                      <PulseIcon size={18} color={colors.success} />
+                      <Text style={styles.actionButtonText}>Sinais</Text>
+                    </TouchableOpacity>
+                  )}
                   {isAdminOfGroup(group) && (
                     <TouchableOpacity 
                       style={styles.actionButton}
@@ -641,6 +703,40 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  groupCardKids: {
+    borderLeftWidth: 4,
+    borderLeftColor: KIDS_GREEN,
+    borderColor: KIDS_GREEN + '40',
+    backgroundColor: '#f0fdf4',
+  },
+  groupIconContainerKids: {
+    backgroundColor: KIDS_GREEN + '20',
+  },
+  kidsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: KIDS_GREEN,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  kidsBadgeText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '700',
+  },
+  kidsBadgeSmall: {
+    backgroundColor: KIDS_GREEN + '20',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  kidsBadgeSmallText: {
+    fontSize: 11,
+    color: KIDS_GREEN,
+    fontWeight: '700',
   },
   groupHeader: {
     flexDirection: 'row',
