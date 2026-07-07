@@ -47,7 +47,6 @@ const parseReaisInput = (text) => {
 
 const PROFILE_LABELS = {
   caregiver: 'Amigo / Cuidador',
-  kids: 'Kids (responsável)',
   accompanied: 'Paciente',
   professional_caregiver: 'Cuidador Profissional',
   doctor: 'Médico',
@@ -55,7 +54,6 @@ const PROFILE_LABELS = {
 
 const PROFILE_COLORS = {
   caregiver: '#6366f1',
-  kids: '#f59e0b',
   accompanied: '#ec4899',
   professional_caregiver: '#22c55e',
   doctor: '#4A90E2',
@@ -76,7 +74,6 @@ const RegisterScreen = ({ route, navigation }) => {
     phone: '+55', // Inicializar com +55
     password: '',
     confirmPassword: '',
-    // "kids" é tratado como "caregiver" no backend; aqui guardamos como "kids" para controlar UX
     profile: selectedProfileParam,
     // Campos específicos de cuidador profissional
     gender: '',
@@ -472,10 +469,6 @@ const RegisterScreen = ({ route, navigation }) => {
     
     // Enviar para o backend o campo `crm` no formato UF-NÚMERO (ex: MG-123456)
     const signUpPayload = { ...formData };
-    // "kids" não existe no backend — responsável é cadastrado como "caregiver"
-    if (signUpPayload.profile === 'kids') {
-      signUpPayload.profile = 'caregiver';
-    }
     if (formData.profile === 'doctor') {
       signUpPayload.crm = formatCrmValue(formData.crmUf, formData.crmNumber);
       // Enviar CPF sem formatação
@@ -751,9 +744,7 @@ const RegisterScreen = ({ route, navigation }) => {
             </View>
             <Text style={styles.title}>Criar Conta</Text>
             <Text style={styles.subtitle}>
-              {formData.profile === 'kids'
-                ? 'Dados do responsável pela criança'
-                : 'Junte-se a nós e cuide de quem você ama'}
+              Junte-se a nós e cuide de quem você ama
             </Text>
           </View>
 
