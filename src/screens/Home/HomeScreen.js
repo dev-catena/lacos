@@ -72,23 +72,26 @@ function formatActivitySlotLabel(metadata, actionType) {
 }
 
 /** Foto do grupo com fallback para ícone quando falha (timeout, 404, etc.) */
+const KIDS_GREEN = '#16a34a';
+
 const GroupPhoto = ({ group, photoUrl, style, iconColor }) => {
   const [hasError, setHasError] = useState(false);
+  const isKids = group?.group_type === 'kids';
   const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
   let fullPhotoUrl = photoUrl;
   if (photoUrl && !photoUrl.startsWith('http')) {
-    // Path do backend: "groups/group_X_xxx.png" → precisa de /storage/ na URL
     const path = photoUrl.replace(/^\//, '');
     fullPhotoUrl = path.startsWith('storage/') ? `${baseUrl}/${path}` : `${baseUrl}/storage/${path}`;
   }
-  if (!photoUrl || hasError) {
-    return (
-      <View style={[styles.groupIcon, style]}>
-        <PeopleIcon size={32} color={iconColor || colors.primary} />
-      </View>
-    );
-  }
-  return (
+
+  const photoEl = (!photoUrl || hasError) ? (
+    <View style={[styles.groupIcon, style, isKids && { backgroundColor: KIDS_GREEN + '20' }]}>
+      {isKids
+        ? <Ionicons name="happy-outline" size={32} color={KIDS_GREEN} />
+        : <PeopleIcon size={32} color={iconColor || colors.primary} />
+      }
+    </View>
+  ) : (
     <Image
       source={{ uri: fullPhotoUrl }}
       style={[styles.groupPhoto, style]}
@@ -99,6 +102,18 @@ const GroupPhoto = ({ group, photoUrl, style, iconColor }) => {
       }}
       resizeMode="cover"
     />
+  );
+
+  if (!isKids) return photoEl;
+
+  // Kids: envolver com container para adicionar badge de bolinha verde
+  return (
+    <View style={{ position: 'relative' }}>
+      {photoEl}
+      <View style={styles.kidsPhotoBadge}>
+        <Ionicons name="happy" size={11} color="#fff" />
+      </View>
+    </View>
   );
 };
 
@@ -595,7 +610,7 @@ const HomeScreen = ({ navigation }) => {
               myGroups.map((group) => (
                 <TouchableOpacity 
                   key={group.id}
-                  style={styles.groupCard}
+                  style={[styles.groupCard, group.group_type === 'kids' && styles.groupCardKids]}
                   onPress={() => navigation.navigate('GroupDetail', {
                     groupId: group.id,
                     groupName: group.name,
@@ -609,12 +624,20 @@ const HomeScreen = ({ navigation }) => {
                     iconColor={colors.primary}
                   />
                   <View style={styles.groupInfo}>
-                    <Text style={styles.groupName}>{group.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={styles.groupName}>{group.name}</Text>
+                      {group.group_type === 'kids' && (
+                        <View style={styles.kidsTag}>
+                          <Ionicons name="happy" size={10} color={KIDS_GREEN} />
+                          <Text style={styles.kidsTagText}>Kids</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.groupDescription}>
                       {group.accompanied_name ? `Acompanhando ${group.accompanied_name}` : 'Grupo de cuidados'}
                     </Text>
                   </View>
-                  <ChevronForwardIcon size={24} color={colors.gray400} />
+                  <ChevronForwardIcon size={24} color={group.group_type === 'kids' ? KIDS_GREEN : colors.gray400} />
                 </TouchableOpacity>
               ))
             ) : (
@@ -648,7 +671,7 @@ const HomeScreen = ({ navigation }) => {
               participatingGroups.map((group) => (
                 <TouchableOpacity 
                   key={group.id}
-                  style={styles.groupCard}
+                  style={[styles.groupCard, group.group_type === 'kids' && styles.groupCardKids]}
                   onPress={() => navigation.navigate('GroupDetail', {
                     groupId: group.id,
                     groupName: group.name,
@@ -662,12 +685,20 @@ const HomeScreen = ({ navigation }) => {
                     iconColor={colors.secondary}
                   />
                   <View style={styles.groupInfo}>
-                    <Text style={styles.groupName}>{group.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={styles.groupName}>{group.name}</Text>
+                      {group.group_type === 'kids' && (
+                        <View style={styles.kidsTag}>
+                          <Ionicons name="happy" size={10} color={KIDS_GREEN} />
+                          <Text style={styles.kidsTagText}>Kids</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.groupDescription}>
                       {group.accompanied_name ? `Acompanhando ${group.accompanied_name}` : 'Membro do grupo'}
                     </Text>
                   </View>
-                  <ChevronForwardIcon size={24} color={colors.gray400} />
+                  <ChevronForwardIcon size={24} color={group.group_type === 'kids' ? KIDS_GREEN : colors.gray400} />
                 </TouchableOpacity>
               ))
             ) : (
@@ -1211,6 +1242,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 12,
+  },
+  groupCardKids: {
+    borderLeftWidth: 4,
+    borderLeftColor: KIDS_GREEN,
+    borderColor: KIDS_GREEN + '40',
+    backgroundColor: '#f0fdf4',
+  },
+  kidsTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: KIDS_GREEN + '18',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  kidsTagText: {
+    fontSize: 11,
+    color: KIDS_GREEN,
+    fontWeight: '700',
+  },
+  kidsPhotoBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: KIDS_GREEN,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
   },
   groupIcon: {
     width: 56,
