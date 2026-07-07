@@ -40,6 +40,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import planService from '../../services/planService';
+import KidsBackground from '../../components/KidsBackground';
 
 // Features disponíveis para grupos do tipo Kids (independente do plano do usuário)
 const KIDS_FEATURES = {
@@ -568,6 +569,9 @@ const GroupDetailScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
+
+      {/* Fundo temático para grupos Kids */}
+      {groupType === 'kids' && <KidsBackground />}
       
       {/* Header */}
       <View style={[styles.header, { paddingTop: Platform.OS === 'android' ? insets.top + 16 : 16 }]}>
