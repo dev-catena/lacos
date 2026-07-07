@@ -48,8 +48,8 @@ class PlansSeeder extends Seeder
           3 => 
           array (
             'id' => 4,
-            'name' => 'Pleno',
-            'slug' => 'pleno',
+            'name' => 'Kids',
+            'slug' => 'kids',
             'is_default' => 0,
             'features' => '{"agenda": false, "midias": false, "cameras": false, "medicos": false, "arquivos": false, "remedios": false, "historico": false, "smartwatch": false, "sensorQuedas": false, "sinaisVitais": false, "configuracoes": false, "grupoCuidados": false}',
             'created_at' => '2026-01-22 03:33:31',
