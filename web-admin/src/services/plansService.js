@@ -196,8 +196,8 @@ class PlansService {
       },
       {
         id: 4,
-        name: 'Pleno',
-        slug: 'pleno',
+        name: 'Kids',
+        slug: 'kids',
         features: {
           grupoCuidados: false,
           historico: false,

@@ -37,6 +37,7 @@ const PlanCard = ({ plan, isEditing, onEdit, onSave, onCancel }) => {
       intermediário: '#10b981',
       avançado: '#f59e0b',
       pleno: '#8b5cf6',
+      kids: '#8b5cf6',
     };
     return colors[planName.toLowerCase()] || '#6366f1';
   };
