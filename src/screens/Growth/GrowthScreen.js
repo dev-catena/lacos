@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Line, Polyline, Circle, Text as SvgText, Defs, LinearGradient, Stop, Path } from 'react-native-svg';
+import Svg, { Line, Polyline, Circle, Text as SvgText } from 'react-native-svg';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import growthService from '../../services/growthService';
@@ -255,7 +255,7 @@ function renderAxes(minAge, maxAge, minVal, maxVal, ref) {
 const LegendItem = ({ color, dash, label }) => (
   <View style={styles.legendItem}>
     <View style={[styles.legendLine, { backgroundColor: dash ? 'transparent' : color,
-      borderColor: color, borderWidth: dash ? 1, borderStyle: dash ? 'dashed' : 'solid' }]} />
+      borderColor: color, borderWidth: dash ? 1 : 0, borderStyle: dash ? 'dashed' : 'solid' }]} />
     <Text style={styles.legendText}>{label}</Text>
   </View>
 );
