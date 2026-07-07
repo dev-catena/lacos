@@ -373,7 +373,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     {
       id: 'vaccination',
       featureKey: 'vacinacao',
-      title: 'Vacinação',
+      title: 'Vacinação infantil',
       subtitle: 'Calendário PNI e registro de vacinas',
       icon: 'medkit-outline',
       IconComponent: ({ size = 32, color: c = '#16a34a' }) => (
