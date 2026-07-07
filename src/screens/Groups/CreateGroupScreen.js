@@ -20,11 +20,31 @@ import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
 import groupService from '../../services/groupService';
 
+const GROUP_TYPES = [
+  {
+    value: 'care',
+    label: 'Cuidado',
+    icon: 'heart',
+    description: 'Para acompanhamento de adultos e idosos',
+    color: '#2563EB',
+    bg: '#2563EB15',
+  },
+  {
+    value: 'kids',
+    label: 'Kids',
+    icon: 'happy',
+    description: 'Para acompanhamento de crianças (PNI e vacinas)',
+    color: '#16a34a',
+    bg: '#16a34a15',
+  },
+];
+
 const CreateGroupScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [description, setDescription] = useState('');
   const [groupPhoto, setGroupPhoto] = useState(null);
+  const [groupType, setGroupType] = useState('care');
 
   const pickImage = async () => {
     try {
@@ -71,6 +91,7 @@ const CreateGroupScreen = ({ navigation }) => {
       // Preparar dados para envio
       const formData = new FormData();
       formData.append('name', groupName.trim());
+      formData.append('group_type', groupType);
       
       if (description.trim()) {
         formData.append('description', description.trim());
@@ -190,6 +211,38 @@ const CreateGroupScreen = ({ navigation }) => {
                 <Text style={styles.addPhotoText}>Adicionar Foto</Text>
               </TouchableOpacity>
             )}
+          </View>
+
+          {/* Tipo do Grupo */}
+          <View style={styles.inputSection}>
+            <Text style={styles.label}>Tipo do Grupo *</Text>
+            <View style={styles.typeRow}>
+              {GROUP_TYPES.map((t) => {
+                const selected = groupType === t.value;
+                return (
+                  <TouchableOpacity
+                    key={t.value}
+                    style={[
+                      styles.typeCard,
+                      { borderColor: selected ? t.color : colors.border, backgroundColor: selected ? t.bg : colors.backgroundLight },
+                    ]}
+                    onPress={() => setGroupType(t.value)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.typeIconWrap, { backgroundColor: t.color + '20' }]}>
+                      <Ionicons name={t.icon} size={26} color={t.color} />
+                    </View>
+                    <Text style={[styles.typeLabel, { color: selected ? t.color : colors.text }]}>{t.label}</Text>
+                    <Text style={styles.typeDesc}>{t.description}</Text>
+                    {selected && (
+                      <View style={[styles.typeCheck, { backgroundColor: t.color }]}>
+                        <Ionicons name="checkmark" size={12} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
           {/* Nome do Grupo */}
@@ -405,6 +458,47 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.textWhite,
+  },
+  typeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  typeCard: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 14,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  typeIconWrap: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  typeLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  typeDesc: {
+    fontSize: 11,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 15,
+  },
+  typeCheck: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

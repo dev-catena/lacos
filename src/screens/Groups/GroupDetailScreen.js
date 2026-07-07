@@ -41,6 +41,28 @@ import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import planService from '../../services/planService';
 
+// Features disponíveis para grupos do tipo Kids (independente do plano do usuário)
+const KIDS_FEATURES = {
+  grupoCuidados: true,
+  historico: true,
+  remedios: true,
+  receitas: true,
+  agenda: true,
+  medicos: true,
+  arquivos: true,
+  vacinacao: true,
+  midias: true,
+  teleconsulta: false,
+  loja: false,
+  buscarCuidadores: false,
+  sinaisVitais: false,
+  smartwatch: false,
+  sensorQuedas: false,
+  cameras: false,
+  audiosRelogio: false,
+  localizacaoRelogio: false,
+};
+
 const GroupDetailScreen = ({ route, navigation }) => {
   const { groupId, groupName, accompaniedName, openCard } = route.params || {};
   const { user } = useAuth();
@@ -48,6 +70,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userPlan, setUserPlan] = useState(null);
+  const [groupType, setGroupType] = useState('care');
   const [groupCode, setGroupCode] = useState(null);
   const [codeModalVisible, setCodeModalVisible] = useState(false);
 
@@ -196,6 +219,9 @@ const GroupDetailScreen = ({ route, navigation }) => {
           });
         }
         
+        // Salvar tipo do grupo
+        setGroupType(group.group_type || 'care');
+
         // Código do grupo: só carregar/exibir para administradores
         if (finalIsAdmin) {
           const code = group.code || group.access_code || group.patient_code;
@@ -478,30 +504,36 @@ const GroupDetailScreen = ({ route, navigation }) => {
     },
   ];
 
-  // Filtrar menuItems baseado no plano do usuário e permissões de admin
+  // Filtrar menuItems baseado no plano do usuário/tipo do grupo e permissões de admin
   const filteredItems = menuItems.filter(item => {
     // Configurações só aparece se for admin (sempre habilitada para admins)
     if (item.id === 'settings') {
       console.log('🔐 GroupDetail - Verificando se deve mostrar configurações:', {
         isAdmin,
         isAdminType: typeof isAdmin,
-        userPlan: userPlan ? userPlan.name : 'não carregado'
+        userPlan: userPlan ? userPlan.name : 'não carregado',
+        groupType,
       });
-      return isAdmin; // Sempre mostrar para admins, independente do plano
+      return isAdmin;
     }
     
     // "Encontrar Cuidador Profissional" não aparece para cuidador profissional participante
-    // (ele É o cuidador, não precisa buscar outro)
     if (item.id === 'caregivers' && user?.profile === 'professional_caregiver' && !isAdmin) {
       return false;
     }
 
-    // Se o plano ainda não foi carregado, não mostrar outros itens
+    // Grupos Kids: usar features fixas do plano Kids (vacinação habilitada, etc.)
+    if (groupType === 'kids') {
+      const enabled = KIDS_FEATURES[item.featureKey] === true;
+      console.log('👶 GroupDetail Kids - feature:', item.featureKey, '→', enabled);
+      return enabled;
+    }
+
+    // Grupo normal: aguardar plano e verificar features
     if (!userPlan) {
-      return false; // Não mostrar funcionalidades enquanto carrega o plano
+      return false;
     }
     
-    // Outros itens aparecem se a feature estiver habilitada no plano
     return planService.isFeatureEnabled(userPlan, item.featureKey);
   });
   
@@ -546,7 +578,15 @@ const GroupDetailScreen = ({ route, navigation }) => {
           <ArrowBackIcon size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>{groupName}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.headerTitle}>{groupName}</Text>
+            {groupType === 'kids' && (
+              <View style={styles.kidsBadge}>
+                <Ionicons name="happy" size={12} color="#fff" />
+                <Text style={styles.kidsBadgeText}>Kids</Text>
+              </View>
+            )}
+          </View>
           {accompaniedName && (
             <Text style={styles.headerSubtitle}>{accompaniedName}</Text>
           )}
@@ -730,6 +770,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textLight,
     marginTop: 2,
+  },
+  kidsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#16a34a',
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    gap: 3,
+  },
+  kidsBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#fff',
   },
   placeholder: {
     width: 40,

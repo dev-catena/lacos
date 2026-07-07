@@ -335,6 +335,7 @@ class GroupController extends Controller
                         'accompanied_access_chat' => (bool)($group->accompanied_access_chat ?? false),
                         'module_watch_audios' => (bool)($group->module_watch_audios ?? false),
                         'module_vaccination' => (bool)($group->module_vaccination ?? false),
+                        'group_type' => $group->group_type ?? 'care',
                     ];
 
                         return $groupData;
@@ -423,6 +424,7 @@ class GroupController extends Controller
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'accompanied_name' => 'nullable|string|max:255',
+                'group_type' => 'nullable|in:care,kids',
             ];
 
             // Adicionar validação de foto se coluna existir
@@ -449,6 +451,11 @@ class GroupController extends Controller
             // Adicionar type se a coluna existir
             if (Schema::hasColumn('groups', 'type')) {
                 $data['type'] = 'care';
+            }
+
+            // Adicionar group_type se a coluna existir
+            if (Schema::hasColumn('groups', 'group_type')) {
+                $data['group_type'] = $validated['group_type'] ?? 'care';
             }
 
             // Gerar código de acesso se coluna existir
@@ -511,6 +518,7 @@ class GroupController extends Controller
                 'admin_user_id' => $group->admin_user_id ?? null,
                 'created_by' => $createdBy, // Usar created_by se existir, senão admin_user_id
                 'type' => $group->type ?? null,
+                'group_type' => $group->group_type ?? 'care',
                 'is_active' => $group->is_active ?? true,
                 'created_at' => $group->created_at,
                 'updated_at' => $group->updated_at,
@@ -754,6 +762,7 @@ class GroupController extends Controller
                 'accompanied_access_chat' => (bool)($group->accompanied_access_chat ?? false),
                 'module_watch_audios' => (bool)($group->module_watch_audios ?? false),
                 'module_vaccination' => (bool)($group->module_vaccination ?? false),
+                'group_type' => $group->group_type ?? 'care',
             ];
 
             return response()->json($groupData);
@@ -863,6 +872,7 @@ class GroupController extends Controller
                 'accompanied_access_chat' => 'sometimes',
                 'module_watch_audios' => 'sometimes',
                 'module_vaccination' => 'sometimes',
+                'group_type' => 'sometimes|nullable|in:care,kids',
                 'remove_photo' => 'sometimes',
             ];
 
@@ -950,6 +960,9 @@ class GroupController extends Controller
             }
             if (isset($validated['module_vaccination'])) {
                 $data['module_vaccination'] = $toBool($validated['module_vaccination']);
+            }
+            if (isset($validated['group_type']) && Schema::hasColumn('groups', 'group_type')) {
+                $data['group_type'] = $validated['group_type'];
             }
 
             // Remover foto do grupo (flag enviada pelo app)
@@ -1126,6 +1139,7 @@ class GroupController extends Controller
                 'updated_at' => $updatedGroup->updated_at,
                 'is_creator' => $isCreator,
                 'is_admin' => $isAdmin,
+                'group_type' => $updatedGroup->group_type ?? 'care',
             ];
 
             return response()->json($response);
