@@ -267,21 +267,14 @@ class VaccinationController extends Controller
         $group = DB::table('groups')->where('id', $groupId)->first();
         if (!$group) return false;
 
-        // Comparação loose para evitar problemas de tipo int vs string
-        if ((int)($group->created_by ?? 0) === $userId) return true;
+        // Criador do grupo sempre tem acesso
+        if ((int) ($group->created_by ?? $group->admin_user_id ?? 0) === $userId) return true;
 
-        $query = DB::table('group_members')
+        // Qualquer membro na tabela group_members (sem filtro de is_active)
+        return DB::table('group_members')
             ->where('user_id', $userId)
-            ->where('group_id', $groupId);
-
-        // Respeitar is_active apenas se a coluna existir e tiver valor
-        if (Schema::hasColumn('group_members', 'is_active')) {
-            $query->where(function ($q) {
-                $q->where('is_active', true)->orWhereNull('is_active');
-            });
-        }
-
-        return $query->exists();
+            ->where('group_id', $groupId)
+            ->exists();
     }
 
     private function isAdminOrCreator(int $userId, int $groupId): bool
@@ -289,20 +282,13 @@ class VaccinationController extends Controller
         $group = DB::table('groups')->where('id', $groupId)->first();
         if (!$group) return false;
 
-        if ((int)($group->created_by ?? 0) === $userId) return true;
+        if ((int) ($group->created_by ?? $group->admin_user_id ?? 0) === $userId) return true;
 
-        $query = DB::table('group_members')
+        return DB::table('group_members')
             ->where('user_id', $userId)
             ->where('group_id', $groupId)
-            ->whereIn('role', ['admin']);
-
-        if (Schema::hasColumn('group_members', 'is_active')) {
-            $query->where(function ($q) {
-                $q->where('is_active', true)->orWhereNull('is_active');
-            });
-        }
-
-        return $query->exists();
+            ->whereIn('role', ['admin'])
+            ->exists();
     }
 
     private function getBirthDate(int $groupId): ?string
