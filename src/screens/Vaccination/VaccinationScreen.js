@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from 'react';
+import KidsBackground from '../../components/KidsBackground';
+import { isKidsGroup } from '../../stores/currentGroupStore';
 import {
   View,
   Text,
@@ -205,6 +207,7 @@ const VaccinationScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
 
       {/* Header */}
       <View style={styles.header}>

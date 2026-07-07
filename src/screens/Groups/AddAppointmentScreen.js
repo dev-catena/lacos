@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import KidsBackground from '../../components/KidsBackground';
+import { isKidsGroup } from '../../stores/currentGroupStore';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -1291,6 +1293,7 @@ const AddAppointmentScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}

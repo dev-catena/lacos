@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import KidsBackground from '../../components/KidsBackground';
+import { isKidsGroup } from '../../stores/currentGroupStore';
 import {
   View,
   Text,
@@ -334,6 +336,7 @@ const AddDocumentScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
       
       {/* Header */}
       <View style={styles.header}>

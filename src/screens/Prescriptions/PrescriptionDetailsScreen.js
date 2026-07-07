@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import KidsBackground from '../../components/KidsBackground';
+import { isKidsGroup } from '../../stores/currentGroupStore';
 import {
   View,
   Text,
@@ -64,6 +66,7 @@ const PrescriptionDetailsScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
         <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -113,6 +116,7 @@ const PrescriptionDetailsScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>

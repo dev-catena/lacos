@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import KidsBackground from '../../components/KidsBackground';
+import { isKidsGroup } from '../../stores/currentGroupStore';
 import {
   View,
   Text,
@@ -793,6 +795,7 @@ const AgendaScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
 
       {/* Topo fixo: título + abas (não participa do flex vertical da lista) */}
       <View style={styles.topSection}>

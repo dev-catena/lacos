@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import KidsBackground from '../../components/KidsBackground';
+import { isKidsGroup } from '../../stores/currentGroupStore';
 import {
   View,
   Text,
@@ -71,6 +73,7 @@ const VaccinationDetailsScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -88,6 +91,7 @@ const VaccinationDetailsScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -106,6 +110,7 @@ const VaccinationDetailsScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
 
       {/* Header */}
       <View style={styles.header}>

@@ -41,6 +41,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import groupService from '../../services/groupService';
 import planService from '../../services/planService';
 import KidsBackground from '../../components/KidsBackground';
+import { setCurrentGroupType } from '../../stores/currentGroupStore';
 
 // Features disponíveis para grupos do tipo Kids (independente do plano do usuário)
 const KIDS_FEATURES = {
@@ -220,8 +221,10 @@ const GroupDetailScreen = ({ route, navigation }) => {
           });
         }
         
-        // Salvar tipo do grupo
-        setGroupType(group.group_type || 'care');
+        // Salvar tipo do grupo (estado local + store global p/ telas filhas)
+        const gType = group.group_type || 'care';
+        setGroupType(gType);
+        setCurrentGroupType(gType);
 
         // Código do grupo: só carregar/exibir para administradores
         if (finalIsAdmin) {

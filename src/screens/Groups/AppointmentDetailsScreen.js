@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import KidsBackground from '../../components/KidsBackground';
+import { isKidsGroup } from '../../stores/currentGroupStore';
 import {
   View,
   Text,
@@ -472,6 +474,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Carregando...</Text>
@@ -484,6 +487,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
           <Text style={styles.errorText}>Compromisso não encontrado</Text>
@@ -517,6 +521,7 @@ const AppointmentDetailsScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar style="dark" />
+      {isKidsGroup() && <KidsBackground />}
 
       {/* Header */}
       <View style={styles.header}>
