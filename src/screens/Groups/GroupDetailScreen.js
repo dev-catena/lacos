@@ -625,9 +625,22 @@ const GroupDetailScreen = ({ route, navigation }) => {
               </View>
             )}
           </View>
-          {accompaniedName && (
+          {accompaniedName && groupType === 'kids' ? (
+            <TouchableOpacity
+              style={styles.headerSubtitleLink}
+              onPress={() => navigation.navigate('KidsBabyProfile', {
+                groupId,
+                groupName,
+                isAdmin,
+              })}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.headerSubtitleLinkText}>{accompaniedName}</Text>
+              <Ionicons name="chevron-forward" size={13} color="#16a34a" />
+            </TouchableOpacity>
+          ) : accompaniedName ? (
             <Text style={styles.headerSubtitle}>{accompaniedName}</Text>
-          )}
+          ) : null}
         </View>
         {groupCode && (
           <TouchableOpacity
@@ -808,6 +821,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textLight,
     marginTop: 2,
+  },
+  headerSubtitleLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 2,
+  },
+  headerSubtitleLinkText: {
+    fontSize: 13,
+    color: '#16a34a',
+    fontWeight: '600',
   },
   kidsBadge: {
     flexDirection: 'row',

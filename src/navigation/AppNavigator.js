@@ -89,6 +89,7 @@ import AddVaccinationScreen from '../screens/Vaccination/AddVaccinationScreen';
 import VaccinationDetailsScreen from '../screens/Vaccination/VaccinationDetailsScreen';
 import GrowthScreen from '../screens/Growth/GrowthScreen';
 import AddGrowthRecordScreen from '../screens/Growth/AddGrowthRecordScreen';
+import KidsBabyProfileScreen from '../screens/Growth/KidsBabyProfileScreen';
 
 // Importa as telas de Mídias
 import MediaScreen from '../screens/Media/MediaScreen';
@@ -444,6 +445,7 @@ const HomeStack = () => {
       <Stack.Screen name="VaccinationDetails" component={VaccinationDetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Growth"             component={GrowthScreen}             options={{ headerShown: false }} />
       <Stack.Screen name="AddGrowth"          component={AddGrowthRecordScreen}    options={{ headerShown: false }} />
+      <Stack.Screen name="KidsBabyProfile"    component={KidsBabyProfileScreen}    options={{ headerShown: false }} />
       <Stack.Screen 
         name="Security" 
         component={SecurityScreen}
@@ -832,6 +834,7 @@ const GroupsStack = () => {
       <Stack.Screen name="VaccinationDetails" component={VaccinationDetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Growth"             component={GrowthScreen}             options={{ headerShown: false }} />
       <Stack.Screen name="AddGrowth"          component={AddGrowthRecordScreen}    options={{ headerShown: false }} />
+      <Stack.Screen name="KidsBabyProfile"    component={KidsBabyProfileScreen}    options={{ headerShown: false }} />
       <Stack.Screen 
         name="Security" 
         component={SecurityScreen}
@@ -880,6 +883,7 @@ const ProfileStack = () => {
       <Stack.Screen name="VaccinationDetails" component={VaccinationDetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Growth"             component={GrowthScreen}             options={{ headerShown: false }} />
       <Stack.Screen name="AddGrowth"          component={AddGrowthRecordScreen}    options={{ headerShown: false }} />
+      <Stack.Screen name="KidsBabyProfile"    component={KidsBabyProfileScreen}    options={{ headerShown: false }} />
       <Stack.Screen 
         name="Security" 
         component={SecurityScreen}
