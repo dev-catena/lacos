@@ -11,14 +11,25 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import Toast from 'react-native-toast-message';
 import colors from '../../constants/colors';
+import API_CONFIG from '../../config/api';
 import groupService from '../../services/groupService';
 import KidsBackground from '../../components/KidsBackground';
+
+function buildPhotoUrl(path) {
+  if (!path) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  const base = API_CONFIG.BASE_URL.replace(/\/api$/, '');
+  const clean = path.replace(/^\//, '');
+  return clean.startsWith('storage/') ? `${base}/${clean}` : `${base}/storage/${clean}`;
+}
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -48,6 +59,8 @@ export default function KidsProfileScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [fields, setFields] = useState({
     accompanied_name: '',
@@ -69,6 +82,7 @@ export default function KidsProfileScreen({ route, navigation }) {
       const result = await groupService.getGroup(groupId);
       if (result.success && result.data) {
         const g = result.data;
+        setPhotoUrl(buildPhotoUrl(g.accompanied_photo || null));
         const data = {
           accompanied_name: g.accompanied_name || '',
           mother_name: g.mother_name || '',
@@ -140,6 +154,44 @@ export default function KidsProfileScreen({ route, navigation }) {
     }
   };
 
+  const handlePhotoChange = async () => {
+    if (!isAdmin) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão necessária', 'Permita o acesso à galeria para trocar a foto.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('accompanied_photo', {
+        uri: asset.uri,
+        name: `baby_${groupId}.jpg`,
+        type: 'image/jpeg',
+      });
+      const res = await groupService.updateGroup(groupId, formData);
+      if (res.success) {
+        const newUrl = buildPhotoUrl(res.data?.accompanied_photo || asset.uri);
+        setPhotoUrl(newUrl.startsWith('http') ? newUrl : asset.uri);
+        Toast.show({ type: 'success', text1: 'Foto atualizada!' });
+      } else {
+        Toast.show({ type: 'error', text1: 'Erro ao salvar foto' });
+      }
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Erro ao enviar foto' });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const set = (key, value) => setFields(prev => ({ ...prev, [key]: value }));
 
   if (loading) {
@@ -190,11 +242,36 @@ export default function KidsProfileScreen({ route, navigation }) {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Avatar / ícone */}
+          {/* Avatar / foto */}
           <View style={styles.avatarSection}>
-            <View style={styles.avatarCircle}>
-              <Ionicons name="happy" size={52} color="#a78bfa" />
-            </View>
+            <TouchableOpacity
+              style={styles.avatarWrapper}
+              onPress={isAdmin ? handlePhotoChange : undefined}
+              activeOpacity={isAdmin ? 0.75 : 1}
+              disabled={uploadingPhoto}
+            >
+              {photoUrl ? (
+                <Image
+                  source={{ uri: photoUrl }}
+                  style={styles.avatarPhoto}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.avatarCircle}>
+                  <Ionicons name="happy" size={52} color="#a78bfa" />
+                </View>
+              )}
+              {uploadingPhoto && (
+                <View style={styles.avatarOverlay}>
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              )}
+              {isAdmin && !uploadingPhoto && (
+                <View style={styles.avatarEditBadge}>
+                  <Ionicons name="camera" size={12} color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
             <Text style={styles.childName}>
               {fields.accompanied_name || 'Nome da criança'}
             </Text>
@@ -441,19 +518,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  avatarCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: '#ede9fe',
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatarWrapper: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     marginBottom: 10,
     shadowColor: '#a78bfa',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 5,
+  },
+  avatarPhoto: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: '#ede9fe',
+  },
+  avatarCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#ede9fe',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarOverlay: {
+    position: 'absolute',
+    inset: 0,
+    borderRadius: 48,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   childName: {
     fontSize: 20,
