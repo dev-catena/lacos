@@ -30,16 +30,22 @@ class VaccinationController extends Controller
         try {
             $user = Auth::user();
 
-            if (!$this->isMember($user->id, $groupId)) {
-                // Retorna vazio em vez de 403 para não quebrar o app
+            $isMember = $this->isMember($user->id, $groupId);
+            Log::info("VaccinationController::schedule groupId={$groupId} userId={$user->id} isMember=" . ($isMember ? 'true' : 'false'));
+
+            if (!$isMember) {
                 return response()->json(['birth_date' => null, 'schedule' => []]);
             }
 
-            if (!Schema::hasTable('vaccine_schedules')) {
+            $tableExists = Schema::hasTable('vaccine_schedules');
+            Log::info("VaccinationController::schedule vaccine_schedules exists=" . ($tableExists ? 'true' : 'false'));
+
+            if (!$tableExists) {
                 return response()->json(['birth_date' => null, 'schedule' => []]);
             }
 
             $birthDate = $this->getBirthDate($groupId);
+            Log::info("VaccinationController::schedule birthDate={$birthDate}");
 
             $schedules = DB::table('vaccine_schedules')
                 ->orderBy('order')
@@ -84,6 +90,9 @@ class VaccinationController extends Controller
                     'status'       => $status,
                 ];
             });
+
+            $scheduleCount = $schedules->count();
+            Log::info("VaccinationController::schedule schedules_count={$scheduleCount} result_count=" . count($result->toArray()));
 
             return response()->json([
                 'birth_date' => $birthDate,
