@@ -19,6 +19,7 @@ import NoGroupsScreen from '../screens/Groups/NoGroupsScreen';
 import GroupsScreen from '../screens/Groups/GroupsScreen';
 import CreateGroupScreen from '../screens/Groups/CreateGroupScreen';
 import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
+import KidsProfileScreen from '../screens/Groups/KidsProfileScreen';
 import GroupChatScreen from '../screens/Groups/GroupChatScreen';
 import GroupSettingsScreen from '../screens/Groups/GroupSettingsScreen';
 import GroupMembersScreen from '../screens/Groups/GroupMembersScreen';
@@ -155,6 +156,11 @@ const HomeStack = () => {
         options={{ 
           headerShown: false 
         }}
+      />
+      <Stack.Screen
+        name="KidsProfile"
+        component={KidsProfileScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="EditPatientData" 
@@ -530,6 +536,11 @@ const GroupsStack = () => {
         options={{ 
           headerShown: false 
         }}
+      />
+      <Stack.Screen
+        name="KidsProfile"
+        component={KidsProfileScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="GroupMedia" 

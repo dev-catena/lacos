@@ -224,6 +224,15 @@ class GroupService {
       if (groupData.module_watch_audios !== undefined) data.module_watch_audios = groupData.module_watch_audios;
       if (groupData.remove_photo !== undefined) data.remove_photo = groupData.remove_photo;
 
+      // Campos do perfil Kids
+      if (groupData.mother_name !== undefined) data.mother_name = groupData.mother_name;
+      if (groupData.birth_time !== undefined) data.birth_time = groupData.birth_time;
+      if (groupData.birth_weight !== undefined) data.birth_weight = groupData.birth_weight;
+      if (groupData.birth_height !== undefined) data.birth_height = groupData.birth_height;
+      if (groupData.blood_type !== undefined) data.blood_type = groupData.blood_type;
+      if (groupData.allergies !== undefined) data.allergies = groupData.allergies;
+      if (groupData.group_type !== undefined) data.group_type = groupData.group_type;
+
       console.log('📤 GroupService.updateGroup - Enviando dados JSON:', data);
       console.log('📤 GroupService.updateGroup - Endpoint:', endpoint);
       const response = await apiService.put(endpoint, data);

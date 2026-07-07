@@ -887,7 +887,7 @@ class GroupController extends Controller
                 // Campos do perfil Kids
                 'mother_name' => 'sometimes|nullable|string|max:150',
                 'birth_time' => 'sometimes|nullable|date_format:H:i,H:i:s',
-                'birth_weight' => 'sometimes|nullable|numeric|min:0|max:9999',
+                'birth_weight' => 'sometimes|nullable|numeric|min:0|max:99999',
                 'birth_height' => 'sometimes|nullable|numeric|min:0|max:999',
                 'blood_type' => 'sometimes|nullable|string|max:10',
                 'allergies' => 'sometimes|nullable|string',
