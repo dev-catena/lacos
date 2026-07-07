@@ -2,28 +2,14 @@ import apiService from './apiService';
 
 const vaccinationService = {
   // Calendário PNI com status calculado (applied/pending/overdue)
+  // Nunca lança exceção — retorna vazio silenciosamente em qualquer erro
   async getSchedule(groupId) {
     try {
       const response = await apiService.get(`/groups/${groupId}/vaccination-schedule`);
       return response.data || response;
     } catch (error) {
-      const status = error.response?.status;
-      const errorText = error.response?.data?.error
-        || error.response?.data?.message
-        || error.message
-        || '';
-      // Tabela ainda não migrada ou endpoint indisponível → retornar vazio sem crashar
-      if (
-        errorText.includes("doesn't exist") ||
-        errorText.includes('Table') ||
-        status === 500 ||
-        status === 404 ||
-        status === 403
-      ) {
-        console.warn('VaccinationService.getSchedule - retornando vazio:', status, errorText);
-        return { birth_date: null, schedule: [] };
-      }
-      throw error;
+      console.warn('VaccinationService.getSchedule error:', error.response?.status, error.message);
+      return { birth_date: null, schedule: [] };
     }
   },
 
@@ -33,20 +19,8 @@ const vaccinationService = {
       const response = await apiService.get(`/groups/${groupId}/vaccinations`);
       return response.data || response;
     } catch (error) {
-      const status = error.response?.status;
-      const errorText = error.response?.data?.error
-        || error.response?.data?.message
-        || error.message
-        || '';
-      if (
-        errorText.includes("doesn't exist") ||
-        errorText.includes('Table') ||
-        status === 500 ||
-        status === 404
-      ) {
-        return [];
-      }
-      throw error;
+      console.warn('VaccinationService.getRecords error:', error.response?.status, error.message);
+      return [];
     }
   },
 

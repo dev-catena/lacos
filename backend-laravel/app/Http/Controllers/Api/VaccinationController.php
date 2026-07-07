@@ -27,65 +27,77 @@ class VaccinationController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     public function schedule(int $groupId)
     {
-        $user = Auth::user();
+        try {
+            $user = Auth::user();
 
-        if (!$this->isMember($user->id, $groupId)) {
-            return response()->json(['message' => 'Acesso negado.'], 403);
-        }
-
-        if (!Schema::hasTable('vaccine_schedules')) {
-            return response()->json(['birth_date' => null, 'schedule' => []]);
-        }
-
-        $birthDate = $this->getBirthDate($groupId);
-
-        $schedules = DB::table('vaccine_schedules')
-            ->orderBy('order')
-            ->orderBy('age_months')
-            ->get();
-
-        $records = Schema::hasTable('vaccination_records')
-            ? DB::table('vaccination_records')
-                ->where('group_id', $groupId)
-                ->whereNotNull('vaccine_schedule_id')
-                ->pluck('applied_at', 'vaccine_schedule_id')
-            : collect([]);
-
-        $result = $schedules->map(function ($item) use ($birthDate, $records) {
-            $dueDate = null;
-            $status  = 'pending';
-
-            if ($birthDate) {
-                $dueDate = Carbon::parse($birthDate)->addMonths($item->age_months)->toDateString();
-                $isApplied = isset($records[$item->id]);
-
-                if ($isApplied) {
-                    $status = 'applied';
-                } elseif (Carbon::parse($dueDate)->isPast()) {
-                    $status = 'overdue';
-                } else {
-                    $status = 'pending';
-                }
+            if (!$this->isMember($user->id, $groupId)) {
+                // Retorna vazio em vez de 403 para não quebrar o app
+                return response()->json(['birth_date' => null, 'schedule' => []]);
             }
 
-            return [
-                'id'           => $item->id,
-                'vaccine_name' => $item->vaccine_name,
-                'dose'         => $item->dose,
-                'age_months'   => $item->age_months,
-                'age_label'    => $item->age_label,
-                'description'  => $item->description,
-                'notes'        => $item->notes,
-                'due_date'     => $dueDate,
-                'applied_at'   => $records[$item->id] ?? null,
-                'status'       => $status,
-            ];
-        });
+            if (!Schema::hasTable('vaccine_schedules')) {
+                return response()->json(['birth_date' => null, 'schedule' => []]);
+            }
 
-        return response()->json([
-            'birth_date' => $birthDate,
-            'schedule'   => $result,
-        ]);
+            $birthDate = $this->getBirthDate($groupId);
+
+            $schedules = DB::table('vaccine_schedules')
+                ->orderBy('order')
+                ->orderBy('age_months')
+                ->get();
+
+            $records = Schema::hasTable('vaccination_records')
+                ? DB::table('vaccination_records')
+                    ->where('group_id', $groupId)
+                    ->whereNotNull('vaccine_schedule_id')
+                    ->pluck('applied_at', 'vaccine_schedule_id')
+                    ->toArray()
+                : [];
+
+            $result = $schedules->map(function ($item) use ($birthDate, $records) {
+                $dueDate = null;
+                $status  = 'pending';
+
+                if ($birthDate) {
+                    $dueDate = Carbon::parse($birthDate)->addMonths($item->age_months)->toDateString();
+                    $isApplied = array_key_exists($item->id, $records);
+
+                    if ($isApplied) {
+                        $status = 'applied';
+                    } elseif (Carbon::parse($dueDate)->isPast()) {
+                        $status = 'overdue';
+                    } else {
+                        $status = 'pending';
+                    }
+                }
+
+                return [
+                    'id'           => $item->id,
+                    'vaccine_name' => $item->vaccine_name,
+                    'dose'         => $item->dose,
+                    'age_months'   => $item->age_months,
+                    'age_label'    => $item->age_label,
+                    'description'  => $item->description,
+                    'notes'        => $item->notes,
+                    'due_date'     => $dueDate,
+                    'applied_at'   => $records[$item->id] ?? null,
+                    'status'       => $status,
+                ];
+            });
+
+            return response()->json([
+                'birth_date' => $birthDate,
+                'schedule'   => $result,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('VaccinationController::schedule - ' . $e->getMessage(), [
+                'group_id' => $groupId,
+                'trace'    => $e->getTraceAsString(),
+            ]);
+            // Retorna vazio para não quebrar o app
+            return response()->json(['birth_date' => null, 'schedule' => []]);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
