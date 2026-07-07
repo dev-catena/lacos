@@ -9,8 +9,10 @@ class VaccineScheduleSeeder extends Seeder
 {
     public function run(): void
     {
-        // Limpa para permitir re-seed sem duplicar
+        // Limpa para permitir re-seed sem duplicar (desabilita FK temporariamente)
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         DB::table('vaccine_schedules')->truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         $schedules = [
             // ── Ao nascer ─────────────────────────────────────────────────────
