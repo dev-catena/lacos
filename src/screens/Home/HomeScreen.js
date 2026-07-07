@@ -1244,8 +1244,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   groupCardKids: {
-    borderLeftWidth: 4,
-    borderLeftColor: KIDS_GREEN,
     borderColor: KIDS_GREEN + '40',
     backgroundColor: '#f0fdf4',
   },
