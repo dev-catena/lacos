@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\ExternalGroupController;
+use App\Http\Controllers\Api\ExternalMailController;
 use App\Http\Controllers\Api\VaccinationController;
 use App\Http\Controllers\Api\PanicController;
 use App\Http\Controllers\Api\AlertController;
@@ -56,7 +57,8 @@ Route::get('/plans/public/kids', [PlanController::class, 'kidsFeatures']);
 Route::middleware(\App\Http\Middleware\ValidateExternalApiKey::class)
     ->prefix('external')
     ->group(function () {
-        Route::post('/create-birth-group', [ExternalGroupController::class, 'createBirthGroup']);
+        Route::post('/create-birth-group',  [ExternalGroupController::class, 'createBirthGroup']);
+        Route::post('/send-invite-email',   [ExternalMailController::class,  'sendInviteEmail']);
     });
 
 // ─── Pareamento de agente SegCond (sem autenticação de usuário) ───────────────
