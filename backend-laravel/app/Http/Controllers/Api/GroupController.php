@@ -765,6 +765,13 @@ class GroupController extends Controller
                 'module_watch_audios' => (bool)($group->module_watch_audios ?? false),
                 'module_vaccination' => (bool)($group->module_vaccination ?? false),
                 'group_type' => $group->group_type ?? 'care',
+                // Campos do perfil Kids
+                'mother_name' => $group->mother_name ?? null,
+                'birth_time' => $group->birth_time ?? null,
+                'birth_weight' => $group->birth_weight ?? null,
+                'birth_height' => $group->birth_height ?? null,
+                'blood_type' => $group->blood_type ?? null,
+                'allergies' => $group->allergies ?? null,
             ];
 
             return response()->json($groupData);
@@ -877,6 +884,13 @@ class GroupController extends Controller
                 'module_vaccination' => 'sometimes',
                 'group_type' => 'sometimes|nullable|in:care,kids',
                 'remove_photo' => 'sometimes',
+                // Campos do perfil Kids
+                'mother_name' => 'sometimes|nullable|string|max:150',
+                'birth_time' => 'sometimes|nullable|date_format:H:i,H:i:s',
+                'birth_weight' => 'sometimes|nullable|numeric|min:0|max:9999',
+                'birth_height' => 'sometimes|nullable|numeric|min:0|max:999',
+                'blood_type' => 'sometimes|nullable|string|max:10',
+                'allergies' => 'sometimes|nullable|string',
             ];
 
             if ($hasPhotoColumn) {
@@ -902,6 +916,14 @@ class GroupController extends Controller
             }
             if (array_key_exists('accompanied_birth_date', $validated) && Schema::hasColumn('groups', 'accompanied_birth_date')) {
                 $data['accompanied_birth_date'] = $validated['accompanied_birth_date'] ?: null;
+            }
+
+            // Campos do perfil Kids
+            $kidsFields = ['mother_name', 'birth_time', 'birth_weight', 'birth_height', 'blood_type', 'allergies'];
+            foreach ($kidsFields as $field) {
+                if (array_key_exists($field, $validated) && Schema::hasColumn('groups', $field)) {
+                    $data[$field] = $validated[$field] ?: null;
+                }
             }
             if (isset($validated['accompanied_gender'])) {
                 $data['accompanied_gender'] = $validated['accompanied_gender'];
@@ -1147,6 +1169,12 @@ class GroupController extends Controller
                 'is_creator' => $isCreator,
                 'is_admin' => $isAdmin,
                 'group_type' => $updatedGroup->group_type ?? 'care',
+                'mother_name' => $updatedGroup->mother_name ?? null,
+                'birth_time' => $updatedGroup->birth_time ?? null,
+                'birth_weight' => $updatedGroup->birth_weight ?? null,
+                'birth_height' => $updatedGroup->birth_height ?? null,
+                'blood_type' => $updatedGroup->blood_type ?? null,
+                'allergies' => $updatedGroup->allergies ?? null,
             ];
 
             return response()->json($response);
