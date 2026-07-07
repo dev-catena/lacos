@@ -17,9 +17,10 @@ const vaccinationService = {
         errorText.includes("doesn't exist") ||
         errorText.includes('Table') ||
         status === 500 ||
-        status === 404
+        status === 404 ||
+        status === 403
       ) {
-        console.warn('VaccinationService.getSchedule - retornando vazio (tabela ou rota indisponível):', errorText);
+        console.warn('VaccinationService.getSchedule - retornando vazio:', status, errorText);
         return { birth_date: null, schedule: [] };
       }
       throw error;

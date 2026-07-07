@@ -254,27 +254,43 @@ class VaccinationController extends Controller
     {
         $group = DB::table('groups')->where('id', $groupId)->first();
         if (!$group) return false;
-        if ($group->created_by === $userId) return true;
 
-        return DB::table('group_members')
+        // Comparação loose para evitar problemas de tipo int vs string
+        if ((int)($group->created_by ?? 0) === $userId) return true;
+
+        $query = DB::table('group_members')
             ->where('user_id', $userId)
-            ->where('group_id', $groupId)
-            ->where('is_active', true)
-            ->exists();
+            ->where('group_id', $groupId);
+
+        // Respeitar is_active apenas se a coluna existir e tiver valor
+        if (Schema::hasColumn('group_members', 'is_active')) {
+            $query->where(function ($q) {
+                $q->where('is_active', true)->orWhereNull('is_active');
+            });
+        }
+
+        return $query->exists();
     }
 
     private function isAdminOrCreator(int $userId, int $groupId): bool
     {
         $group = DB::table('groups')->where('id', $groupId)->first();
         if (!$group) return false;
-        if ($group->created_by === $userId) return true;
 
-        return DB::table('group_members')
+        if ((int)($group->created_by ?? 0) === $userId) return true;
+
+        $query = DB::table('group_members')
             ->where('user_id', $userId)
             ->where('group_id', $groupId)
-            ->whereIn('role', ['admin'])
-            ->where('is_active', true)
-            ->exists();
+            ->whereIn('role', ['admin']);
+
+        if (Schema::hasColumn('group_members', 'is_active')) {
+            $query->where(function ($q) {
+                $q->where('is_active', true)->orWhereNull('is_active');
+            });
+        }
+
+        return $query->exists();
     }
 
     private function getBirthDate(int $groupId): ?string
