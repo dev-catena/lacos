@@ -6,6 +6,7 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
+  Pressable,
   ScrollView,
   ActivityIndicator,
   Platform,
@@ -626,18 +627,19 @@ const GroupDetailScreen = ({ route, navigation }) => {
             )}
           </View>
           {accompaniedName && groupType === 'kids' ? (
-            <TouchableOpacity
-              style={styles.headerSubtitleLink}
+            <Pressable
+              style={({ pressed }) => [styles.headerSubtitleLink, pressed && { opacity: 0.6 }]}
               onPress={() => navigation.navigate('KidsBabyProfile', {
                 groupId,
                 groupName,
                 isAdmin,
               })}
-              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+              android_ripple={{ color: 'rgba(22,163,74,0.15)', borderless: true }}
             >
               <Text style={styles.headerSubtitleLinkText}>{accompaniedName}</Text>
               <Ionicons name="chevron-forward" size={13} color="#16a34a" />
-            </TouchableOpacity>
+            </Pressable>
           ) : accompaniedName ? (
             <Text style={styles.headerSubtitle}>{accompaniedName}</Text>
           ) : null}
