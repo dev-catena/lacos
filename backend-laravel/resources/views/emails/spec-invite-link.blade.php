@@ -36,7 +36,7 @@
         </p>
         <div class="cta-box">
             <p>Clique no botao abaixo para criar sua conta e acessar o grupo. Voce escolhera sua propria senha — leva menos de 1 minuto.</p>
-            <a href="{{ $inviteUrl }}" class="cta-btn">Criar minha conta &rarr;</a>
+            <a href="{{ $inviteUrl }}" class="cta-btn" style="display:inline-block;background:#7c3aed;color:#ffffff !important;text-decoration:none;padding:14px 32px;border-radius:12px;font-size:16px;font-weight:700;">Criar minha conta &rarr;</a>
             <p class="expiry">Este link expira em {{ $expiresAt }}</p>
         </div>
         <div class="security">
