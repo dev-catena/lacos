@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\ExternalGroupController;
 use App\Http\Controllers\Api\ExternalMailController;
 use App\Http\Controllers\Api\VaccinationController;
+use App\Http\Controllers\Api\GrowthRecordController;
 use App\Http\Controllers\Api\PanicController;
 use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\EmergencyContactController;
@@ -393,6 +394,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/panic', [PanicController::class, 'index']);
     Route::get('/panic/config/{groupId}', [PanicController::class, 'checkConfig']);
     
+    // Crescimento - Registros de crescimento (peso, altura, PC)
+    Route::get('/groups/{groupId}/growth-records',      [GrowthRecordController::class, 'index']);
+    Route::post('/groups/{groupId}/growth-records',     [GrowthRecordController::class, 'store']);
+    Route::delete('/groups/{groupId}/growth-records/{id}', [GrowthRecordController::class, 'destroy']);
+
     // Vacinação - Calendário PNI e registros de vacinas
     Route::get('/groups/{groupId}/vaccination-schedule', [VaccinationController::class, 'schedule']);
     Route::get('/groups/{groupId}/vaccinations', [VaccinationController::class, 'index']);
