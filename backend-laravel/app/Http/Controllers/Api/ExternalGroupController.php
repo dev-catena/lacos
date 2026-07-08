@@ -43,7 +43,7 @@ class ExternalGroupController extends Controller
             'identity_card'  => 'nullable|string|max:50',
             'baby_photo'     => 'nullable|image|mimes:jpeg,png,jpg|max:4096',
             'group_name'     => 'nullable|string|max:255',
-            'password'       => 'nullable|string|min:8|max:255',
+            'password'       => 'nullable|string|min:6|max:255',
             'birth_date'     => 'nullable|date',
             'blood_type'     => 'nullable|string|max:10',
             'birth_weight'   => 'nullable|numeric|min:200|max:8000',
@@ -61,8 +61,8 @@ class ExternalGroupController extends Controller
             $mother = DB::table('users')->where('email', $motherEmail)->first();
 
             if (!$mother) {
+                // Conta nova: cria com a senha fornecida ou gera uma aleatória
                 $isNewUser = true;
-                // Usar senha fornecida pelo spec/formulário ou gerar uma aleatória
                 $usedPassword = $validated['password'] ?? Str::random(10);
 
                 $motherId = DB::table('users')->insertGetId([
@@ -78,6 +78,26 @@ class ExternalGroupController extends Controller
 
                 $mother = DB::table('users')->where('id', $motherId)->first();
             } else {
+                // Conta já existe — exige verificação da senha existente
+                $providedPassword = $validated['password'] ?? null;
+
+                if (!$providedPassword) {
+                    // Nenhuma senha enviada: avisa que conta já existe
+                    return response()->json([
+                        'error'   => 'account_exists',
+                        'message' => 'Este e-mail já possui uma conta no Laços. Digite sua senha do Laços para entrar no grupo.',
+                    ], 409);
+                }
+
+                if (!Hash::check($providedPassword, $mother->password)) {
+                    // Senha errada
+                    return response()->json([
+                        'error'   => 'wrong_password',
+                        'message' => 'Senha incorreta para esta conta. Se não lembrar a senha, peça à maternidade para usar um e-mail diferente.',
+                    ], 409);
+                }
+
+                // Senha correta: usa a conta existente
                 $motherId = $mother->id;
             }
 
