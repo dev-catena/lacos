@@ -111,13 +111,29 @@ class ExternalGroupController extends Controller
                 Storage::disk('public')->put($babyPhotoPath, file_get_contents($photo->getRealPath()));
             }
 
+            $groupName = $validated['group_name'] ?? 'Grupo de ' . $validated['baby_name'];
+
+            // Verifica se já existe grupo com o mesmo nome criado por esta mãe
+            $existingGroup = DB::table('groups')
+                ->where('created_by', $motherId)
+                ->where('name', $groupName)
+                ->first();
+
+            if ($existingGroup) {
+                return response()->json([
+                    'error'      => 'group_exists',
+                    'message'    => "Já existe um grupo chamado "{$groupName}" para esta mãe. Acesse o app Laços para visualizá-lo.",
+                    'group_id'   => $existingGroup->id,
+                    'group_name' => $existingGroup->name,
+                    'group_code' => $existingGroup->code,
+                ], 409);
+            }
+
             // 3. Gerar código único do grupo
             do {
                 $code = strtoupper(Str::random(8));
-                $exists = DB::table('groups')->where('code', $code)->exists();
-            } while ($exists);
-
-            $groupName = $validated['group_name'] ?? 'Grupo de ' . $validated['baby_name'];
+                $codeExists = DB::table('groups')->where('code', $code)->exists();
+            } while ($codeExists);
 
             // 4. Criar o grupo
             $groupData = [
