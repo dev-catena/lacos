@@ -122,7 +122,7 @@ class ExternalGroupController extends Controller
             if ($existingGroup) {
                 return response()->json([
                     'error'      => 'group_exists',
-                    'message'    => "Já existe um grupo chamado "{$groupName}" para esta mãe. Acesse o app Laços para visualizá-lo.",
+                    'message'    => "Já existe um grupo chamado \"{$groupName}\" para esta mãe. Acesse o app Laços para visualizá-lo.",
                     'group_id'   => $existingGroup->id,
                     'group_name' => $existingGroup->name,
                     'group_code' => $existingGroup->code,
