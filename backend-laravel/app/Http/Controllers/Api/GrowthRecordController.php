@@ -75,18 +75,25 @@ class GrowthRecordController extends Controller
         $validated = $request->validate([
             'date'               => 'required|date',
             'age_months'         => 'sometimes|nullable|integer|min:0',
-            'weight'             => 'sometimes|nullable|numeric|min:0|max:300',
+            'weight'             => 'sometimes|nullable|numeric|min:0|max:99999',
             'height'             => 'sometimes|nullable|numeric|min:0|max:250',
             'head_circumference' => 'sometimes|nullable|numeric|min:0|max:100',
             'notes'              => 'sometimes|nullable|string|max:1000',
         ]);
+
+        // Converte peso de gramas para kg se o valor for > 30
+        // (nenhuma criança de 0-5 anos pesa mais de 30 kg; valores acima indicam entrada em gramas)
+        $weight = isset($validated['weight']) ? (float) $validated['weight'] : null;
+        if ($weight !== null && $weight > 30) {
+            $weight = round($weight / 1000, 3);
+        }
 
         $id = DB::table('growth_records')->insertGetId([
             'group_id'           => $groupId,
             'recorded_by'        => Auth::id(),
             'date'               => $validated['date'],
             'age_months'         => $validated['age_months'] ?? null,
-            'weight'             => $validated['weight'] ?? null,
+            'weight'             => $weight,
             'height'             => $validated['height'] ?? null,
             'head_circumference' => $validated['head_circumference'] ?? null,
             'notes'              => $validated['notes'] ?? null,
