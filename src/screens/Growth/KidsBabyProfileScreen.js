@@ -8,6 +8,8 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Image,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -32,10 +34,11 @@ const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const KidsBabyProfileScreen = ({ route, navigation }) => {
   const { groupId, groupName, isAdmin = false } = route.params || {};
 
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [editing, setEditing]   = useState(false);
-  const [groupData, setGroupData] = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [saving, setSaving]           = useState(false);
+  const [editing, setEditing]         = useState(false);
+  const [groupData, setGroupData]     = useState(null);
+  const [photoExpanded, setPhotoExpanded] = useState(false);
 
   const [form, setForm] = useState({
     accompanied_name:       '',
@@ -151,15 +154,47 @@ const KidsBabyProfileScreen = ({ route, navigation }) => {
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
-          {/* Avatar placeholder */}
+          {/* Avatar / foto do bebê */}
           <View style={styles.avatarSection}>
-            <View style={styles.avatar}>
-              <Ionicons name="happy" size={48} color={KIDS_GREEN} />
-            </View>
+            <TouchableOpacity
+              activeOpacity={groupData?.accompanied_photo_url ? 0.8 : 1}
+              onPress={() => groupData?.accompanied_photo_url && setPhotoExpanded(true)}
+              style={styles.avatar}
+            >
+              {groupData?.accompanied_photo_url ? (
+                <>
+                  <Image
+                    source={{ uri: groupData.accompanied_photo_url }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.photoZoomHint}>
+                    <Ionicons name="expand-outline" size={14} color="#fff" />
+                  </View>
+                </>
+              ) : (
+                <Ionicons name="happy" size={48} color={KIDS_GREEN} />
+              )}
+            </TouchableOpacity>
             {!editing && (
               <Text style={styles.babyName}>{form.accompanied_name || '—'}</Text>
             )}
           </View>
+
+          {/* Modal de foto ampliada */}
+          <Modal visible={photoExpanded} transparent animationType="fade" onRequestClose={() => setPhotoExpanded(false)}>
+            <TouchableOpacity
+              style={styles.photoModalOverlay}
+              activeOpacity={1}
+              onPress={() => setPhotoExpanded(false)}
+            >
+              <Image
+                source={{ uri: groupData?.accompanied_photo_url }}
+                style={styles.photoModalImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </Modal>
 
           {editing ? (
             /* ── Modo edição ── */
@@ -288,7 +323,11 @@ const styles = StyleSheet.create({
   scroll:           { padding: 16, paddingBottom: 40 },
 
   avatarSection:    { alignItems: 'center', marginBottom: 20 },
-  avatar:           { width: 88, height: 88, borderRadius: 44, backgroundColor: KIDS_GREEN + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  avatar:           { width: 88, height: 88, borderRadius: 44, backgroundColor: KIDS_GREEN + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 10, overflow: 'hidden' },
+  avatarImage:      { width: 88, height: 88, borderRadius: 44 },
+  photoZoomHint:    { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 8, padding: 2 },
+  photoModalOverlay:{ flex: 1, backgroundColor: 'rgba(0,0,0,0.88)', justifyContent: 'center', alignItems: 'center' },
+  photoModalImage:  { width: '90%', height: '70%' },
   babyName:         { fontSize: 22, fontWeight: '800', color: colors.text },
 
   card:             { backgroundColor: colors.backgroundLight, borderRadius: 16, padding: 18, elevation: 1, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
