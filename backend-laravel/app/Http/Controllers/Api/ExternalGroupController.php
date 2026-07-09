@@ -39,6 +39,21 @@ class ExternalGroupController extends Controller
      */
     public function createBirthGroup(Request $request)
     {
+        try {
+            return $this->handleCreateBirthGroup($request);
+        } catch (\Throwable $e) {
+            \Log::error('ExternalGroupController@createBirthGroup: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'error'   => 'server_error',
+                'message' => 'Erro interno: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function handleCreateBirthGroup(Request $request)
+    {
         $validated = $request->validate([
             'baby_name'      => 'required|string|max:255',
             'mother_name'    => 'required|string|max:255',
