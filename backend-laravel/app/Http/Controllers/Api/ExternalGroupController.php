@@ -141,7 +141,7 @@ class ExternalGroupController extends Controller
             $existingGroup = DB::table('groups')
                 ->where('created_by', $motherId)
                 ->where('name', $groupName)
-                ->whereNull('deleted_at')
+                ->when(Schema::hasColumn('groups', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
                 ->lockForUpdate()
                 ->first();
 
