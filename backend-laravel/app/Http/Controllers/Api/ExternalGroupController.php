@@ -23,10 +23,14 @@ class ExternalGroupController extends Controller
      *   - mother_phone      string, optional
      *   - identity_card     string, optional (RG/CPF/matrícula)
      *   - baby_photo        file (image), optional
+     *   - baby_photo_url    string (URL da foto), optional — alternativa ao upload de arquivo;
+     *                       o backend faz o download e armazena localmente
      *   - group_name        string, optional (padrão: "Grupo de {baby_name}")
      *   - password          string, optional (min:8) — se informada, usada como senha da mãe
      *                       em vez de senha aleatória; ignorada se a mãe já for usuária
      *   - birth_date        date, optional
+     *   - birth_time        string, optional (HH:MM ou HH:MM:SS)
+     *   - baby_sex          string, optional (male|female)
      *   - blood_type        string, optional
      *   - birth_weight      numeric, optional (gramas)
      *   - birth_length      numeric, optional (cm)
@@ -42,9 +46,12 @@ class ExternalGroupController extends Controller
             'mother_phone'   => 'nullable|string|max:30',
             'identity_card'  => 'nullable|string|max:50',
             'baby_photo'     => 'nullable|image|mimes:jpeg,png,jpg|max:4096',
+            'baby_photo_url' => 'nullable|url|max:2048',
             'group_name'     => 'nullable|string|max:255',
             'password'       => 'nullable|string|min:6|max:255',
             'birth_date'     => 'nullable|date',
+            'birth_time'     => 'nullable|regex:/^\d{1,2}:\d{2}(:\d{2})?$/',
+            'baby_sex'       => 'nullable|in:male,female',
             'blood_type'     => 'nullable|string|max:10',
             'birth_weight'   => 'nullable|numeric|min:200|max:8000',
             'birth_length'   => 'nullable|numeric|min:20|max:80',
@@ -101,7 +108,7 @@ class ExternalGroupController extends Controller
                 $motherId = $mother->id;
             }
 
-            // 2. Upload da foto do bebê (opcional)
+            // 2. Upload da foto do bebê (opcional — arquivo OU URL)
             $babyPhotoPath = null;
             if ($request->hasFile('baby_photo')) {
                 $photo = $request->file('baby_photo');
@@ -109,14 +116,33 @@ class ExternalGroupController extends Controller
                 $name = 'baby_' . uniqid('', true) . '.' . $ext;
                 $babyPhotoPath = 'groups/' . $name;
                 Storage::disk('public')->put($babyPhotoPath, file_get_contents($photo->getRealPath()));
+            } elseif (!empty($validated['baby_photo_url'])) {
+                // Tenta baixar a foto a partir da URL enviada pelo app externo
+                try {
+                    $imageContent = @file_get_contents($validated['baby_photo_url']);
+                    if ($imageContent !== false) {
+                        // Detectar extensão pela URL; fallback para jpg
+                        $urlPath = parse_url($validated['baby_photo_url'], PHP_URL_PATH);
+                        $urlExt  = $urlPath ? strtolower(pathinfo($urlPath, PATHINFO_EXTENSION)) : '';
+                        $ext     = in_array($urlExt, ['jpg', 'jpeg', 'png']) ? $urlExt : 'jpg';
+                        $name    = 'baby_' . uniqid('', true) . '.' . $ext;
+                        $babyPhotoPath = 'groups/' . $name;
+                        Storage::disk('public')->put($babyPhotoPath, $imageContent);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('ExternalGroupController: falha ao baixar foto de URL "' . $validated['baby_photo_url'] . '": ' . $e->getMessage());
+                }
             }
 
             $groupName = $validated['group_name'] ?? 'Grupo de ' . $validated['baby_name'];
 
-            // Verifica se já existe grupo com o mesmo nome criado por esta mãe
+            // lockForUpdate() impede que duas requisições simultâneas passem
+            // pela verificação ao mesmo tempo (evita race condition / duplicata).
             $existingGroup = DB::table('groups')
                 ->where('created_by', $motherId)
                 ->where('name', $groupName)
+                ->whereNull('deleted_at')
+                ->lockForUpdate()
                 ->first();
 
             if ($existingGroup) {
@@ -171,6 +197,14 @@ class ExternalGroupController extends Controller
                 $groupData['birth_height'] = $validated['birth_length'];
             }
 
+            if (!empty($validated['birth_time']) && Schema::hasColumn('groups', 'birth_time')) {
+                $groupData['birth_time'] = $validated['birth_time'];
+            }
+
+            if (!empty($validated['baby_sex']) && Schema::hasColumn('groups', 'accompanied_gender')) {
+                $groupData['accompanied_gender'] = $validated['baby_sex'];
+            }
+
             if ($babyPhotoPath && Schema::hasColumn('groups', 'accompanied_photo')) {
                 $groupData['accompanied_photo'] = $babyPhotoPath;
             }
@@ -198,6 +232,8 @@ class ExternalGroupController extends Controller
                     'groupName'    => $groupName,
                     'groupCode'    => $code,
                     'birthDate'    => $validated['birth_date'] ?? null,
+                    'birthTime'    => $validated['birth_time'] ?? null,
+                    'babySex'      => $validated['baby_sex'] ?? null,
                     'bloodType'    => $validated['blood_type'] ?? null,
                     'birthWeight'  => $validated['birth_weight'] ?? null,
                     'birthLength'  => $validated['birth_length'] ?? null,
@@ -216,6 +252,8 @@ class ExternalGroupController extends Controller
                 'group_code'         => $code,
                 'group_type'         => 'kids',
                 'baby_name'          => $validated['baby_name'],
+                'baby_sex'           => $validated['baby_sex'] ?? null,
+                'birth_time'         => $validated['birth_time'] ?? null,
                 'mother_email'       => $motherEmail,
                 'mother_is_new_user' => $isNewUser,
             ];
