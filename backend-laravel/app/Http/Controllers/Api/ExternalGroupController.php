@@ -224,6 +224,11 @@ class ExternalGroupController extends Controller
                 $groupData['accompanied_photo'] = $babyPhotoPath;
             }
 
+            // Usa a foto do bebê também como foto do grupo (exibida no card)
+            if ($babyPhotoPath && Schema::hasColumn('groups', 'photo')) {
+                $groupData['photo'] = $babyPhotoPath;
+            }
+
             $groupId = DB::table('groups')->insertGetId($groupData);
 
             // 5. Adicionar a mãe como admin do grupo
