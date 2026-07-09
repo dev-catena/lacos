@@ -136,13 +136,13 @@ class ExternalGroupController extends Controller
 
             $groupName = $validated['group_name'] ?? 'Grupo de ' . $validated['baby_name'];
 
-            // lockForUpdate() impede que duas requisições simultâneas passem
-            // pela verificação ao mesmo tempo (evita race condition / duplicata).
+            // Verifica se já existe um grupo com o mesmo nome criado por esta mãe.
+            // Não usamos lockForUpdate() para evitar lock wait timeout; a janela de
+            // race condition é mínima e o frontend já desabilita o botão após 1 clique.
             $existingGroup = DB::table('groups')
                 ->where('created_by', $motherId)
                 ->where('name', $groupName)
                 ->when(Schema::hasColumn('groups', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
-                ->lockForUpdate()
                 ->first();
 
             if ($existingGroup) {
