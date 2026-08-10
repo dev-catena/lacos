@@ -26,6 +26,7 @@ const AddVitalSignModal = ({ visible, onClose, onSuccess, groupId, groupName }) 
     blood_glucose: '',
     temperature: '',
     respiratory_rate: '',
+    sleep: '',
   });
 
   const indicatorsConfig = [
@@ -79,6 +80,14 @@ const AddVitalSignModal = ({ visible, onClose, onSuccess, groupId, groupName }) 
       color: colors.primary,
       unit: 'ipm',
       fields: [{ key: 'respiratory_rate', label: 'Frequência', placeholder: 'Ex: 16' }],
+    },
+    {
+      key: 'sleep',
+      label: 'Sono',
+      icon: 'moon',
+      color: '#6366f1',
+      unit: 'h',
+      fields: [{ key: 'sleep', label: 'Duração (horas)', placeholder: 'Ex: 7.5' }],
     },
   ];
 
@@ -142,6 +151,7 @@ const AddVitalSignModal = ({ visible, onClose, onSuccess, groupId, groupName }) 
         blood_glucose: '',
         temperature: '',
         respiratory_rate: '',
+        sleep: '',
       });
     } catch (error) {
       console.error('Erro ao salvar sinais vitais:', error);

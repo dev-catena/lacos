@@ -213,6 +213,7 @@ class GroupService {
       if (groupData.monitor_blood_glucose !== undefined) data.monitor_blood_glucose = groupData.monitor_blood_glucose;
       if (groupData.monitor_temperature !== undefined) data.monitor_temperature = groupData.monitor_temperature;
       if (groupData.monitor_respiratory_rate !== undefined) data.monitor_respiratory_rate = groupData.monitor_respiratory_rate;
+      if (groupData.monitor_sleep !== undefined) data.monitor_sleep = groupData.monitor_sleep;
       
       // Permissões
       if (groupData.accompanied_notify_medication !== undefined) data.accompanied_notify_medication = groupData.accompanied_notify_medication;

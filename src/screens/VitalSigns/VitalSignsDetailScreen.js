@@ -22,6 +22,7 @@ import deviceService from '../../services/deviceService';
 import VitalSignsLineChart from '../../components/VitalSignsLineChart';
 import moment from 'moment';
 import AddVitalSignModal from './AddVitalSignModal';
+import PulseiraVitalPanel from './components/PulseiraVitalPanel';
 import { buildWatchVitalData, getWatchVitalsSnapshot } from '../../utils/thalamusHealthAdapter';
 import Toast from 'react-native-toast-message';
 
@@ -173,6 +174,14 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
       color: colors.primary,
       unit: 'ipm',
       enabledKey: 'monitor_respiratory_rate',
+    },
+    {
+      key: 'sleep',
+      label: 'Sono',
+      icon: 'moon',
+      color: '#6366f1',
+      unit: 'h',
+      enabledKey: 'monitor_sleep',
     },
   ];
 
@@ -604,6 +613,13 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
           <Text style={[styles.tabText, activeTab === 'watch' && styles.tabTextActive]}>Relógio</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={[styles.tab, activeTab === 'pulseira' && styles.tabActive]}
+          onPress={() => setActiveTab('pulseira')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === 'pulseira' && styles.tabTextActive]}>Pulseira</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'manual' && styles.tabActive]}
           onPress={() => setActiveTab('manual')}
           activeOpacity={0.7}
@@ -611,6 +627,15 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
           <Text style={[styles.tabText, activeTab === 'manual' && styles.tabTextActive]}>Manual</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Mantém a pulseira montada (BLE + auto-save 30min) ao trocar de aba nesta tela */}
+      <PulseiraVitalPanel
+        groupId={groupId}
+        active={activeTab === 'pulseira'}
+        onSaved={() => {
+          vitalSignService.getVitalSigns(groupId).then(applyVitalSignsResult);
+        }}
+      />
 
       {activeTab === 'watch' ? (
         <ScrollView
@@ -851,7 +876,7 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
             </>
           )}
         </ScrollView>
-      ) : (
+      ) : activeTab === 'manual' ? (
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -907,7 +932,7 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
             })
           )}
         </ScrollView>
-      )}
+      ) : null}
 
       {/* Modal de Detalhes */}
       <Modal
@@ -1152,7 +1177,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   tabText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.textLight,
   },

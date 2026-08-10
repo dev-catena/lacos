@@ -110,6 +110,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
     monitor_blood_glucose: false,
     monitor_temperature: false,
     monitor_respiratory_rate: false,
+    monitor_sleep: false,
   });
 
   // Permissões do Acompanhado
@@ -256,6 +257,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             monitor_blood_glucose: data.monitor_blood_glucose || false,
             monitor_temperature: data.monitor_temperature || false,
             monitor_respiratory_rate: data.monitor_respiratory_rate || false,
+            monitor_sleep: data.monitor_sleep || false,
           });
           
           // Carregar permissões do acompanhado
@@ -1477,6 +1479,13 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       icon: 'leaf',
       description: 'Alerta: >25 ou <12 ipm',
       color: colors.primary,
+    },
+    {
+      key: 'monitor_sleep',
+      label: 'Sono',
+      icon: 'moon',
+      description: 'Duração do sono (horas) via pulseira ou manual',
+      color: '#6366f1',
     },
   ];
 

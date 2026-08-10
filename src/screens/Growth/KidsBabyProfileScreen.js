@@ -31,6 +31,10 @@ const KIDS_GREEN = '#16a34a';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
+const GENDER_LABELS = { male: 'Masculino', female: 'Feminino' };
+const GENDER_ICONS  = { male: 'male',      female: 'female' };
+const GENDER_COLORS = { male: '#2563eb',   female: '#db2777' };
+
 const KidsBabyProfileScreen = ({ route, navigation }) => {
   const { groupId, groupName, isAdmin = false } = route.params || {};
 
@@ -43,6 +47,7 @@ const KidsBabyProfileScreen = ({ route, navigation }) => {
   const [form, setForm] = useState({
     accompanied_name:       '',
     accompanied_birth_date: '',
+    accompanied_gender:     '',
     birth_time:             '',
     birth_weight:           '',
     birth_height:           '',
@@ -67,6 +72,7 @@ const KidsBabyProfileScreen = ({ route, navigation }) => {
         setForm({
           accompanied_name:       g.accompanied_name        || g.name || '',
           accompanied_birth_date: g.accompanied_birth_date ? formatDateToBR(g.accompanied_birth_date) : '',
+          accompanied_gender:     g.accompanied_gender      || '',
           birth_time:             g.birth_time              || '',
           birth_weight:           g.birth_weight            ? String(g.birth_weight)  : '',
           birth_height:           g.birth_height            ? String(g.birth_height)  : '',
@@ -101,6 +107,7 @@ const KidsBabyProfileScreen = ({ route, navigation }) => {
         accompanied_birth_date: form.accompanied_birth_date
           ? birthDateBRToISO(form.accompanied_birth_date)
           : null,
+        accompanied_gender: form.accompanied_gender || null,
         birth_time:   form.birth_time   || null,
         birth_weight: form.birth_weight ? parseFloat(form.birth_weight) : null,
         birth_height: form.birth_height ? parseFloat(form.birth_height) : null,
@@ -218,6 +225,19 @@ const KidsBabyProfileScreen = ({ route, navigation }) => {
                   placeholder="HH:MM" placeholderTextColor={colors.placeholder} keyboardType="numbers-and-punctuation" maxLength={5} />
               </Field>
 
+              <Field label="Sexo">
+                <View style={styles.bloodTypeRow}>
+                  {[{val:'male',label:'Masculino'},{val:'female',label:'Feminino'}].map(({val,label}) => (
+                    <TouchableOpacity key={val}
+                      style={[styles.bloodTypeBtn, form.accompanied_gender === val && { borderColor: GENDER_COLORS[val], backgroundColor: GENDER_COLORS[val] + '18' }]}
+                      onPress={() => setField('accompanied_gender', form.accompanied_gender === val ? '' : val)}>
+                      <Ionicons name={GENDER_ICONS[val]} size={14} color={form.accompanied_gender === val ? GENDER_COLORS[val] : colors.textLight} style={{ marginRight: 4 }} />
+                      <Text style={[styles.bloodTypeBtnText, form.accompanied_gender === val && { color: GENDER_COLORS[val] }]}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </Field>
+
               <Field label="Peso ao nascer (g)">
                 <TextInput style={styles.input} value={form.birth_weight}
                   onChangeText={v => setField('birth_weight', v)}
@@ -272,6 +292,12 @@ const KidsBabyProfileScreen = ({ route, navigation }) => {
 
               <InfoRow icon="calendar-outline"     color={KIDS_GREEN}   label="Data de nascimento" value={form.accompanied_birth_date || '—'} />
               <InfoRow icon="time-outline"          color={KIDS_GREEN}   label="Hora de nascimento" value={form.birth_time     ? formatTime(form.birth_time) : '—'} />
+              <InfoRow
+                icon={form.accompanied_gender ? GENDER_ICONS[form.accompanied_gender] : 'male-female-outline'}
+                color={form.accompanied_gender ? GENDER_COLORS[form.accompanied_gender] : KIDS_GREEN}
+                label="Sexo"
+                value={form.accompanied_gender ? GENDER_LABELS[form.accompanied_gender] : '—'}
+              />
               <InfoRow icon="barbell-outline"       color={colors.primary} label="Peso ao nascer"   value={form.birth_weight  ? `${form.birth_weight} g`  : '—'} />
               <InfoRow icon="resize-outline"        color="#7c3aed"      label="Comprimento"        value={form.birth_height  ? `${form.birth_height} cm` : '—'} />
               <InfoRow icon="water-outline"         color="#0891b2"      label="Tipo sanguíneo"     value={form.blood_type    || '—'} />
@@ -345,7 +371,7 @@ const styles = StyleSheet.create({
   textArea:         { minHeight: 80, paddingTop: 12, textAlignVertical: 'top' },
 
   bloodTypeRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  bloodTypeBtn:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.backgroundLight },
+  bloodTypeBtn:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.backgroundLight, flexDirection: 'row', alignItems: 'center' },
   bloodTypeBtnActive: { borderColor: KIDS_GREEN, backgroundColor: KIDS_GREEN + '15' },
   bloodTypeBtnText: { fontSize: 13, fontWeight: '600', color: colors.textLight },
   bloodTypeBtnTextActive: { color: KIDS_GREEN },
