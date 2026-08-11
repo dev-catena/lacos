@@ -38,6 +38,8 @@ function statusLabel(uiState) {
       return 'Medindo oxigenação…';
     case 'measuringBP':
       return 'Medindo pressão arterial…';
+    case 'measuringEcg':
+      return 'Medindo ECG…';
     case 'error':
       return 'Erro';
     default:
@@ -69,13 +71,15 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
     ble.uiState === 'connected' ||
     ble.uiState === 'measuring' ||
     ble.uiState === 'measuringSpo2' ||
-    ble.uiState === 'measuringBP';
+    ble.uiState === 'measuringBP' ||
+    ble.uiState === 'measuringEcg';
   const isBusy =
     ble.uiState === 'connecting' ||
     ble.uiState === 'scanning' ||
     ble.uiState === 'measuring' ||
     ble.uiState === 'measuringSpo2' ||
-    ble.uiState === 'measuringBP';
+    ble.uiState === 'measuringBP' ||
+    ble.uiState === 'measuringEcg';
 
   useEffect(() => {
     let cancelled = false;
@@ -108,6 +112,7 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
           bloodPressure: current.bloodPressure,
           temperatureC: current.temperatureC,
           sleepSession: current.sleepSession,
+          ecgResult: current.ecgResult,
           deviceName: current.connectedName || current.pairedDevice?.name,
           auto,
         });
@@ -144,7 +149,8 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
       current.spo2 == null &&
       !current.bloodPressure &&
       current.temperatureC == null &&
-      !current.sleepSession
+      !current.sleepSession &&
+      !current.ecgResult
     ) {
       Toast.show({
         type: 'info',
@@ -316,6 +322,39 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
         </View>
       </View>
 
+      <View style={styles.readingsRow}>
+        <View style={[styles.readingCard, { flex: 1 }]}>
+          <Text style={styles.readingLabel}>ECG</Text>
+          <Text style={[styles.readingValue, { color: '#0f766e', fontSize: 18 }]}>
+            {ble.uiState === 'measuringEcg'
+              ? ble.ecgSampleCount
+              : ble.ecgResult?.heartRate != null
+                ? ble.ecgResult.heartRate
+                : ble.ecgResult?.samples != null
+                  ? ble.ecgResult.samples
+                  : '—'}
+          </Text>
+          <Text style={styles.readingUnit}>
+            {ble.uiState === 'measuringEcg'
+              ? 'amostras'
+              : ble.ecgResult?.heartRate != null
+                ? 'bpm'
+                : ble.ecgResult?.samples
+                  ? 'amostras'
+                  : '—'}
+          </Text>
+        </View>
+        {ble.ecgResult?.hrv != null || ble.ecgResult?.stress != null ? (
+          <View style={[styles.readingCard, { flex: 1 }]}>
+            <Text style={styles.readingLabel}>HRV / Stress</Text>
+            <Text style={[styles.readingValue, { color: '#0f766e', fontSize: 16 }]}>
+              {ble.ecgResult?.hrv ?? '—'} / {ble.ecgResult?.stress ?? '—'}
+            </Text>
+            <Text style={styles.readingUnit}>ECG</Text>
+          </View>
+        ) : null}
+      </View>
+
       {!isConnected ? (
         <View style={styles.section}>
           {ble.pairedDevice ? (
@@ -462,6 +501,25 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={[
+              styles.measureBtn,
+              styles.measureBtnEcg,
+              ble.uiState === 'measuringEcg' && styles.measureBtnActive,
+            ]}
+            onPress={
+              ble.uiState === 'measuringEcg'
+                ? ble.stopEcgMeasurement
+                : ble.startEcgMeasurement
+            }
+            activeOpacity={0.85}
+          >
+            <SafeIcon name="pulse" size={20} color={colors.textWhite} />
+            <Text style={styles.measureBtnText}>
+              {ble.uiState === 'measuringEcg' ? 'Parar ECG' : 'Medir ECG (~50s)'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.saveBtn, saving && styles.btnDisabled]}
             onPress={handleSave}
             disabled={saving}
@@ -604,6 +662,7 @@ const styles = StyleSheet.create({
   measureBtnBp: { backgroundColor: colors.primaryDark },
   measureBtnTemp: { backgroundColor: colors.success },
   measureBtnSleep: { backgroundColor: '#6366f1' },
+  measureBtnEcg: { backgroundColor: '#0f766e' },
   measureBtnActive: { opacity: 0.85 },
   measureBtnText: { color: colors.textWhite, fontSize: 15, fontWeight: '700' },
   saveBtn: {

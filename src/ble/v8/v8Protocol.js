@@ -21,6 +21,8 @@ export const CMD = {
   getSleepData: 0x53,
   /** Histórico de temperatura */
   temperatureHistory: 0x62,
+  /** Stream ECG/PPG em tempo real */
+  ppg: 0x07,
 };
 
 /** Estágios de sono (SDK V8 / iOS docs) */
@@ -36,6 +38,7 @@ export const MEASURE_TYPE = {
   hrv: 0x01,
   heartRate: 0x02,
   spo2: 0x03,
+  ecg: 0x04,
 };
 
 /** Android AutoMode no comando 0x2A byte[9] */
@@ -100,6 +103,41 @@ export function cmdStartHrv(seconds = 60) {
 }
 export function cmdStopHrv(seconds = 60) {
   return cmdManualMeasurement(MEASURE_TYPE.hrv, seconds, false);
+}
+
+/**
+ * ECG: no SDK Android a duração é em milissegundos e byte[6]=0x01.
+ * Demo: 50_000 ms (~50s).
+ */
+export function cmdStartEcg(durationMs = 50_000) {
+  const ms = Math.max(30_000, Math.trunc(durationMs));
+  return buildPacket([
+    CMD.measurementWithType,
+    MEASURE_TYPE.ecg,
+    1,
+    0,
+    ms & 0xff,
+    (ms >> 8) & 0xff,
+    0x01,
+  ]);
+}
+
+export function cmdStopEcg(durationMs = 50_000) {
+  const ms = Math.max(30_000, Math.trunc(durationMs));
+  return buildPacket([
+    CMD.measurementWithType,
+    MEASURE_TYPE.ecg,
+    0,
+    0,
+    ms & 0xff,
+    (ms >> 8) & 0xff,
+    0x01,
+  ]);
+}
+
+/** Liga/desliga transmissão realtime de ECG (PPG 0x07). */
+export function cmdEcgStream(enable) {
+  return buildPacket([CMD.ppg, enable ? 1 : 0]);
 }
 
 export function cmdSetAutomatic(autoType, intervalMinutes = 5) {
@@ -409,6 +447,28 @@ export function parseSpo2History(value) {
     if (isPlausibleSpo2(v)) return v;
   }
   return null;
+}
+
+/**
+ * Pacotes PPG/ECG raw (cmd 0x07, length > 16).
+ * Cada amostra = 3 bytes little-endian.
+ */
+export function parseEcgRaw(value) {
+  if (!value?.length || value[0] !== CMD.ppg || value.length <= 16) return null;
+  const packetID = value[1] & 0xff;
+  const samples = [];
+  const count = Math.floor((value.length - 2) / 3);
+  for (let i = 0; i < count; i++) {
+    const index = 2 + 3 * i;
+    if (index + 2 >= value.length) break;
+    const sample =
+      (value[index] & 0xff) |
+      ((value[index + 1] & 0xff) << 8) |
+      ((value[index + 2] & 0xff) << 16);
+    samples.push(sample);
+  }
+  if (samples.length === 0) return null;
+  return { packetID, samples };
 }
 
 export function parseBattery(value) {

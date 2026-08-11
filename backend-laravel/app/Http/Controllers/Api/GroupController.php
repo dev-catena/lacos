@@ -329,6 +329,7 @@ class GroupController extends Controller
                         'monitor_temperature' => (bool)($group->monitor_temperature ?? false),
                         'monitor_respiratory_rate' => (bool)($group->monitor_respiratory_rate ?? false),
                         'monitor_sleep' => (bool)($group->monitor_sleep ?? false),
+                        'monitor_ecg' => (bool)($group->monitor_ecg ?? false),
                         // Permissões do acompanhado
                         'accompanied_notify_medication' => (bool)($group->accompanied_notify_medication ?? true),
                         'accompanied_notify_appointment' => (bool)($group->accompanied_notify_appointment ?? true),
@@ -759,6 +760,7 @@ class GroupController extends Controller
                 'monitor_temperature' => (bool)($group->monitor_temperature ?? false),
                 'monitor_respiratory_rate' => (bool)($group->monitor_respiratory_rate ?? false),
                 'monitor_sleep' => (bool)($group->monitor_sleep ?? false),
+                'monitor_ecg' => (bool)($group->monitor_ecg ?? false),
                 // Permissões do acompanhado
                 'accompanied_notify_medication' => (bool)($group->accompanied_notify_medication ?? true),
                 'accompanied_notify_appointment' => (bool)($group->accompanied_notify_appointment ?? true),
@@ -878,6 +880,7 @@ class GroupController extends Controller
                 'monitor_temperature' => 'sometimes',
                 'monitor_respiratory_rate' => 'sometimes',
                 'monitor_sleep' => 'sometimes',
+                'monitor_ecg' => 'sometimes',
                 // Permissões do acompanhado (aceitar boolean ou string '1'/'0' do FormData)
                 'accompanied_notify_medication' => 'sometimes',
                 'accompanied_notify_appointment' => 'sometimes',
@@ -981,6 +984,9 @@ class GroupController extends Controller
             }
             if (isset($validated['monitor_sleep'])) {
                 $data['monitor_sleep'] = $toBool($validated['monitor_sleep']);
+            }
+            if (isset($validated['monitor_ecg'])) {
+                $data['monitor_ecg'] = $toBool($validated['monitor_ecg']);
             }
             
             // Permissões do acompanhado

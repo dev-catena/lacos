@@ -14,18 +14,23 @@ import {
   cmdGetTemperatureHistory,
   cmdRealTimeStep,
   cmdRealtimeTemperature,
+  cmdEcgStream,
   cmdSetAutomatic,
   cmdSetDeviceTime,
+  cmdStartEcg,
   cmdStartHeartRate,
   cmdStartHrv,
   cmdStartSpo2,
+  cmdStopEcg,
   cmdStopHeartRate,
   cmdStopHrv,
   cmdStopSpo2,
   isPlausibleBloodPressure,
   isPlausibleSpo2,
   isPlausibleTemperatureC,
+  MEASURE_TYPE,
   parseBattery,
+  parseEcgRaw,
   parseHrvHistory,
   parseMeasurement,
   parseRealtimeActivity,
@@ -87,7 +92,10 @@ export function useV8Ble() {
   const [bloodPressure, setBloodPressure] = useState(null);
   const [temperatureC, setTemperatureC] = useState(null);
   const [sleepSession, setSleepSession] = useState(null);
+  const [ecgResult, setEcgResult] = useState(null);
+  const [ecgSampleCount, setEcgSampleCount] = useState(0);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const ecgSamplesRef = useRef([]);
 
   const updateUiState = useCallback((next) => {
     uiStateRef.current = next;
@@ -185,6 +193,18 @@ export function useV8Ble() {
         return;
       }
 
+      const ecgRaw = parseEcgRaw(bytes);
+      if (ecgRaw && uiStateRef.current === 'measuringEcg') {
+        ecgSamplesRef.current.push(...ecgRaw.samples);
+        const total = ecgSamplesRef.current.length;
+        setEcgSampleCount(total);
+        setLastUpdate(new Date());
+        if (total % 50 < ecgRaw.samples.length) {
+          setStatusDetail(`ECG — ${total} amostras…`);
+        }
+        return;
+      }
+
       const measurement = parseMeasurement(bytes);
       if (measurement) {
         if (!measurement.isStopAck) {
@@ -192,6 +212,22 @@ export function useV8Ble() {
           if (measurement.spo2 > 0) applySpo2(measurement.spo2);
           applyBloodPressure(measurement.systolicBP, measurement.diastolicBP);
           setLastUpdate(new Date());
+
+          if (uiStateRef.current === 'measuringEcg' && measurement.type === MEASURE_TYPE.ecg) {
+            const next = {
+              heartRate: measurement.heartRate || null,
+              hrv: measurement.hrv || null,
+              stress: measurement.stress || null,
+              systolicBP: measurement.systolicBP || null,
+              diastolicBP: measurement.diastolicBP || null,
+              samples: ecgSamplesRef.current.length,
+              measuredAt: new Date().toISOString(),
+            };
+            setEcgResult(next);
+            if (measurement.heartRate > 0) {
+              setStatusDetail(`ECG FC ${measurement.heartRate} — medindo…`);
+            }
+          }
 
           if (uiStateRef.current === 'measuringSpo2' && isPlausibleSpo2(measurement.spo2)) {
             setStatusDetail(`SpO₂ ${measurement.spo2}% — medindo…`);
@@ -264,6 +300,9 @@ export function useV8Ble() {
       setBloodPressure(null);
       setTemperatureC(null);
       setSleepSession(null);
+      setEcgResult(null);
+      setEcgSampleCount(0);
+      ecgSamplesRef.current = [];
 
       try {
         if (deviceRef.current) {
@@ -359,7 +398,8 @@ export function useV8Ble() {
       uiStateRef.current === 'connecting' ||
       uiStateRef.current === 'measuring' ||
       uiStateRef.current === 'measuringBP' ||
-      uiStateRef.current === 'measuringSpo2'
+      uiStateRef.current === 'measuringSpo2' ||
+      uiStateRef.current === 'measuringEcg'
     ) {
       return;
     }
@@ -447,6 +487,7 @@ export function useV8Ble() {
         uiStateRef.current === 'measuring' ||
         uiStateRef.current === 'measuringBP' ||
         uiStateRef.current === 'measuringSpo2' ||
+        uiStateRef.current === 'measuringEcg' ||
         uiStateRef.current === 'scanning'
       ) {
         return;
@@ -464,6 +505,8 @@ export function useV8Ble() {
           await write(cmdStopSpo2());
           await write(cmdStopHeartRate());
           await write(cmdStopHrv());
+          await write(cmdStopEcg());
+          await write(cmdEcgStream(false));
           await write(cmdRealTimeStep(false));
         } catch {
           // ignore
@@ -707,6 +750,81 @@ export function useV8Ble() {
     }
   }, [write]);
 
+  const startEcgMeasurement = useCallback(async () => {
+    try {
+      setError(null);
+      clearMeasureTimers();
+      ecgSamplesRef.current = [];
+      setEcgSampleCount(0);
+      setEcgResult(null);
+      setStatusDetail('Iniciando ECG…');
+      updateUiState('measuringEcg');
+
+      await write(cmdStopHeartRate());
+      await write(cmdStopSpo2());
+      await write(cmdStopHrv());
+      await write(cmdStartEcg(50_000));
+      await write(cmdEcgStream(true));
+      setStatusDetail('Medindo ECG (~50s) — mantenha o dedo/pulso firme');
+
+      measureTimeoutRef.current = setTimeout(async () => {
+        try {
+          await write(cmdStopEcg(50_000));
+          await write(cmdEcgStream(false));
+          await write(cmdRealTimeStep(true, true));
+        } catch {
+          // ignore
+        } finally {
+          if (uiStateRef.current === 'measuringEcg') {
+            const samples = ecgSamplesRef.current.length;
+            setEcgResult((prev) => ({
+              heartRate: prev?.heartRate || null,
+              hrv: prev?.hrv || null,
+              stress: prev?.stress || null,
+              systolicBP: prev?.systolicBP || null,
+              diastolicBP: prev?.diastolicBP || null,
+              samples,
+              measuredAt: new Date().toISOString(),
+            }));
+            updateUiState('connected');
+            setStatusDetail(
+              samples > 0
+                ? `ECG concluído — ${samples} amostras`
+                : 'ECG: sem amostras. Confira contato na pele e tente de novo.',
+            );
+          }
+          measureTimeoutRef.current = null;
+        }
+      }, 50_000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      updateUiState('connected');
+    }
+  }, [clearMeasureTimers, updateUiState, write]);
+
+  const stopEcgMeasurement = useCallback(async () => {
+    try {
+      clearMeasureTimers();
+      await write(cmdStopEcg(50_000));
+      await write(cmdEcgStream(false));
+      await write(cmdRealTimeStep(true, true));
+      const samples = ecgSamplesRef.current.length;
+      setEcgResult((prev) => ({
+        heartRate: prev?.heartRate || null,
+        hrv: prev?.hrv || null,
+        stress: prev?.stress || null,
+        systolicBP: prev?.systolicBP || null,
+        diastolicBP: prev?.diastolicBP || null,
+        samples,
+        measuredAt: new Date().toISOString(),
+      }));
+      updateUiState('connected');
+      setStatusDetail(samples > 0 ? `ECG parado — ${samples} amostras` : null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [clearMeasureTimers, updateUiState, write]);
+
   return {
     uiState,
     error,
@@ -723,6 +841,8 @@ export function useV8Ble() {
     bloodPressure,
     temperatureC,
     sleepSession,
+    ecgResult,
+    ecgSampleCount,
     lastUpdate,
     startScan,
     stopScan,
@@ -738,5 +858,7 @@ export function useV8Ble() {
     stopBpMeasurement,
     refreshTemperature,
     refreshSleep,
+    startEcgMeasurement,
+    stopEcgMeasurement,
   };
 }

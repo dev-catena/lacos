@@ -53,6 +53,7 @@ export async function persistBraceletVitalSigns({
   bloodPressure,
   temperatureC,
   sleepSession,
+  ecgResult,
   deviceName,
   auto = false,
 }) {
@@ -71,8 +72,13 @@ export async function persistBraceletVitalSigns({
     sleepSession &&
     sleepSession.totalHours != null &&
     sleepSession.totalHours > 0;
+  const hasEcg =
+    !auto &&
+    ecgResult &&
+    ((ecgResult.samples != null && ecgResult.samples > 0) ||
+      (ecgResult.heartRate != null && ecgResult.heartRate > 0));
 
-  if (!hasHr && !hasSpo2 && !hasBp && !hasTemp && !hasSleep) {
+  if (!hasHr && !hasSpo2 && !hasBp && !hasTemp && !hasSleep && !hasEcg) {
     return { success: false, error: 'Sem leituras para gravar', saved: 0, results: [] };
   }
 
@@ -128,6 +134,28 @@ export async function persistBraceletVitalSigns({
         value: temperatureC,
         unit: '°C',
         measuredAt,
+        notes,
+      }),
+    );
+  }
+  if (hasEcg) {
+    const ecgValue = {
+      heart_rate: ecgResult.heartRate || null,
+      hrv: ecgResult.hrv || null,
+      stress: ecgResult.stress || null,
+      samples: ecgResult.samples || 0,
+    };
+    if (ecgResult.systolicBP && ecgResult.diastolicBP) {
+      ecgValue.systolic = ecgResult.systolicBP;
+      ecgValue.diastolic = ecgResult.diastolicBP;
+    }
+    results.push(
+      await vitalSignService.createVitalSign({
+        groupId,
+        type: 'ecg',
+        value: ecgValue,
+        unit: 'ecg',
+        measuredAt: ecgResult.measuredAt || measuredAt,
         notes,
       }),
     );

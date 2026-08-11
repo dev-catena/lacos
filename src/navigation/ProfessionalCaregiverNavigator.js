@@ -21,6 +21,7 @@ import EditPatientDataScreen from '../screens/Groups/EditPatientDataScreen';
 import PanicSettingsScreen from '../screens/Groups/PanicSettingsScreen';
 import AddVitalSignsScreen from '../screens/Groups/AddVitalSignsScreen';
 import VitalSignsDetailScreen from '../screens/VitalSigns/VitalSignsDetailScreen';
+import PairV8GatewayScreen from '../screens/Groups/PairV8GatewayScreen';
 import WatchAudiosScreen from '../screens/Groups/WatchAudiosScreen';
 import SmartwatchLocationScreen from '../screens/Groups/SmartwatchLocationScreen';
 import CamerasListScreen from '../screens/Cameras/CamerasListScreen';
@@ -166,6 +167,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="VitalSignsDetail" 
         component={VitalSignsDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PairV8Gateway" 
+        component={PairV8GatewayScreen}
         options={{ 
           headerShown: false 
         }}
@@ -503,6 +511,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="VitalSignsDetail" 
         component={VitalSignsDetailScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="PairV8Gateway" 
+        component={PairV8GatewayScreen}
         options={{ 
           headerShown: false 
         }}

@@ -27,6 +27,7 @@ const AddVitalSignModal = ({ visible, onClose, onSuccess, groupId, groupName }) 
     temperature: '',
     respiratory_rate: '',
     sleep: '',
+    ecg_hr: '',
   });
 
   const indicatorsConfig = [
@@ -89,6 +90,14 @@ const AddVitalSignModal = ({ visible, onClose, onSuccess, groupId, groupName }) 
       unit: 'h',
       fields: [{ key: 'sleep', label: 'Duração (horas)', placeholder: 'Ex: 7.5' }],
     },
+    {
+      key: 'ecg',
+      label: 'ECG',
+      icon: 'pulse',
+      color: '#0f766e',
+      unit: 'bpm',
+      fields: [{ key: 'ecg_hr', label: 'FC no ECG', placeholder: 'Ex: 72' }],
+    },
   ];
 
   const handleSave = async () => {
@@ -109,6 +118,19 @@ const AddVitalSignModal = ({ visible, onClose, onSuccess, groupId, groupName }) 
                   systolic: parseFloat(vitalSigns.systolic),
                   diastolic: parseFloat(vitalSigns.diastolic),
                 },
+                unit: indicator.unit,
+                measuredAt: new Date().toISOString(),
+              })
+            );
+          }
+        } else if (indicator.key === 'ecg') {
+          const value = vitalSigns.ecg_hr;
+          if (value && value.trim()) {
+            promises.push(
+              vitalSignService.createVitalSign({
+                groupId,
+                type: 'ecg',
+                value: { heart_rate: parseFloat(value), samples: 0 },
                 unit: indicator.unit,
                 measuredAt: new Date().toISOString(),
               })
@@ -152,6 +174,7 @@ const AddVitalSignModal = ({ visible, onClose, onSuccess, groupId, groupName }) 
         temperature: '',
         respiratory_rate: '',
         sleep: '',
+        ecg_hr: '',
       });
     } catch (error) {
       console.error('Erro ao salvar sinais vitais:', error);

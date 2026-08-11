@@ -111,6 +111,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
     monitor_temperature: false,
     monitor_respiratory_rate: false,
     monitor_sleep: false,
+    monitor_ecg: false,
   });
 
   // Permissões do Acompanhado
@@ -258,6 +259,7 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             monitor_temperature: data.monitor_temperature || false,
             monitor_respiratory_rate: data.monitor_respiratory_rate || false,
             monitor_sleep: data.monitor_sleep || false,
+            monitor_ecg: data.monitor_ecg || false,
           });
           
           // Carregar permissões do acompanhado
@@ -1486,6 +1488,13 @@ const GroupSettingsScreen = ({ route, navigation }) => {
       icon: 'moon',
       description: 'Duração do sono (horas) via pulseira ou manual',
       color: '#6366f1',
+    },
+    {
+      key: 'monitor_ecg',
+      label: 'ECG',
+      icon: 'pulse',
+      description: 'Eletrocardiograma via pulseira (~50s)',
+      color: '#0f766e',
     },
   ];
 

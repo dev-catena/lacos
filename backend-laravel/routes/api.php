@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\AdminRtmpCameraController;
 use App\Http\Controllers\Api\AdminStreamCameraController;
 use App\Http\Controllers\Api\UserStreamAgentController;
 use App\Http\Controllers\Api\StreamAgentController;
+use App\Http\Controllers\Api\V8GatewayController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MediaController;
@@ -68,6 +69,12 @@ Route::get('/stream-agents/pairing/{pairing_id}/status', [StreamAgentController:
 // Sync e heartbeat usam token do próprio agente (Bearer agent_token)
 Route::post('/stream-agents/heartbeat', [StreamAgentController::class, 'heartbeat']);
 Route::post('/stream-agents/sync', [StreamAgentController::class, 'sync']);
+
+// ─── Gateway ESP32 pulseira V8 (sem login de usuário) ─────────────────────────
+Route::post('/v8-gateways/pairing/start', [V8GatewayController::class, 'pairingStart']);
+Route::get('/v8-gateways/pairing/{pairing_id}/status', [V8GatewayController::class, 'pairingStatus']);
+Route::post('/v8-gateways/ingest', [V8GatewayController::class, 'ingest']);
+Route::post('/v8-gateways/heartbeat', [V8GatewayController::class, 'heartbeat']);
 
 // Player de câmera (URL assinada — HTTPS para iOS ATS)
 Route::get('/groups/{groupId}/cameras/{cameraId}/player', [GroupCameraController::class, 'player'])
@@ -385,6 +392,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Pareamento guard_agent_pair (app aceita o QR do agente SegCond)
     Route::post('/stream-agents/pairing/{pairing_id}/claim', [StreamAgentController::class, 'pairingClaim']);
+
+    // Gateway V8 — app vincula código ao grupo
+    Route::post('/v8-gateways/pairing/claim', [V8GatewayController::class, 'pairingClaimByCode']);
+    Route::post('/v8-gateways/pairing/{pairing_id}/claim', [V8GatewayController::class, 'pairingClaim']);
+    Route::get('/groups/{groupId}/v8-gateways', [V8GatewayController::class, 'indexForGroup']);
+    Route::delete('/groups/{groupId}/v8-gateways/{gatewayId}', [V8GatewayController::class, 'unpair']);
     
     // Botão de Pânico - Emergência
     Route::post('/panic/trigger', [PanicController::class, 'trigger']);

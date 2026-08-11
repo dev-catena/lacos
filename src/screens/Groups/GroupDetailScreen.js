@@ -459,6 +459,22 @@ const GroupDetailScreen = ({ route, navigation }) => {
       }),
     },
     {
+      id: 'v8Gateway',
+      featureKey: 'sinaisVitais',
+      title: 'Gateway V8',
+      subtitle: 'Parear ESP32 da pulseira (sem celular)',
+      icon: 'hardware-chip',
+      IconComponent: ({ size = 32, color: c = '#0EA5E9' }) => (
+        <Ionicons name="hardware-chip-outline" size={size} color={c} />
+      ),
+      color: '#0EA5E9',
+      backgroundColor: '#0EA5E920',
+      onPress: () => navigation.navigate('PairV8Gateway', {
+        groupId,
+        groupName,
+      }),
+    },
+    {
       id: 'watchAudios',
       featureKey: 'audiosRelogio',
       title: 'Áudios do relógio',

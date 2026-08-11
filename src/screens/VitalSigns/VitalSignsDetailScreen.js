@@ -86,6 +86,9 @@ function formatWatchDisplayValue(rawValue) {
     if (value.systolic != null && value.diastolic != null) {
       return `${value.systolic}/${value.diastolic}`;
     }
+    if (value.heart_rate != null) {
+      return String(value.heart_rate);
+    }
   }
   const n = parseFloat(value);
   if (!Number.isNaN(n)) return n.toFixed(1);
@@ -182,6 +185,14 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
       color: '#6366f1',
       unit: 'h',
       enabledKey: 'monitor_sleep',
+    },
+    {
+      key: 'ecg',
+      label: 'ECG',
+      icon: 'pulse',
+      color: '#0f766e',
+      unit: 'bpm',
+      enabledKey: 'monitor_ecg',
     },
   ];
 

@@ -42,6 +42,9 @@ const VitalSignsLineChart = ({
     }
     
     if (typeof rawValue === 'object' && rawValue !== null && !Array.isArray(rawValue)) {
+      if (rawValue.heart_rate != null) {
+        return parseFloat(rawValue.heart_rate) || 0;
+      }
       // Para pressão arterial, usar média de sistólica e diastólica
       if (rawValue.systolic && rawValue.diastolic) {
         return (rawValue.systolic + rawValue.diastolic) / 2;
@@ -73,8 +76,9 @@ const VitalSignsLineChart = ({
     }
     
     if (typeof rawValue === 'object' && rawValue !== null && !Array.isArray(rawValue)) {
-      // Objeto com systolic/diastolic
-      if (rawValue.systolic && rawValue.diastolic) {
+      if (rawValue.heart_rate != null) {
+        value = parseFloat(rawValue.heart_rate) || 0;
+      } else if (rawValue.systolic && rawValue.diastolic) {
         value = (rawValue.systolic + rawValue.diastolic) / 2;
       } else if (Array.isArray(rawValue) && rawValue.length > 0) {
         value = parseFloat(rawValue[0]) || 0;
@@ -105,6 +109,8 @@ const VitalSignsLineChart = ({
     if (typeof rawValue === 'object' && rawValue !== null && !Array.isArray(rawValue)) {
       if (rawValue.systolic && rawValue.diastolic) {
         lastValueDisplay = `${rawValue.systolic}/${rawValue.diastolic}`;
+      } else if (rawValue.heart_rate != null) {
+        lastValueDisplay = String(rawValue.heart_rate);
       } else {
         lastValueDisplay = parseFloat(rawValue || 0).toFixed(1);
       }
