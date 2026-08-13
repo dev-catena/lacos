@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, PermissionsAndroid, Platform } from 'react-native';
-import { BleManager, State } from 'react-native-ble-plx';
 import { clearPairedDevice, loadPairedDevice, savePairedDevice } from './pairedStorage';
+import {
+  clearConnectBreadcrumb,
+  loadConnectBreadcrumb,
+  saveConnectBreadcrumb,
+} from './connectBreadcrumb';
+import { elapsedMs, v8Error, v8Log, v8Warn } from './v8BleLog';
 import {
   AUTO_TYPE,
   V8_UUID,
@@ -41,6 +46,22 @@ import {
   toHex,
 } from './v8Protocol';
 
+/** MTU alto (512) derruba GATT em vários Androids; 247 é o máximo útil comum. */
+const V8_PREFERRED_MTU = 247;
+
+const BLE_UNAVAILABLE_MSG =
+  'Bluetooth nativo indisponível. Recompile o app (não use só OTA) após instalar react-native-ble-plx.';
+
+let BleManager;
+let State;
+try {
+  const bleModule = require('react-native-ble-plx');
+  BleManager = bleModule.BleManager;
+  State = bleModule.State;
+} catch (e) {
+  console.error('[V8 BLE] Falha ao carregar react-native-ble-plx:', e);
+}
+
 async function requestBlePermissions() {
   if (Platform.OS !== 'android') return true;
   if (Platform.Version >= 31) {
@@ -64,7 +85,14 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function useV8Ble() {
+function createBleManagerSafe() {
+  if (!BleManager) {
+    throw new Error(BLE_UNAVAILABLE_MSG);
+  }
+  return new BleManager();
+}
+
+export function useV8Ble(groupId) {
   const managerRef = useRef(null);
   const notifySubRef = useRef(null);
   const disconnectSubRef = useRef(null);
@@ -85,6 +113,7 @@ export function useV8Ble() {
   const [pairedDevice, setPairedDevice] = useState(null);
   const [pairReady, setPairReady] = useState(false);
   const [connectedName, setConnectedName] = useState(null);
+  const [lastBreadcrumb, setLastBreadcrumb] = useState(null);
   const [heartRate, setHeartRate] = useState(null);
   const [spo2, setSpo2] = useState(null);
   const [steps, setSteps] = useState(null);
@@ -120,14 +149,18 @@ export function useV8Ble() {
           V8_UUID.write,
           payload,
         );
-      } catch {
+      } catch (withoutErr) {
+        v8Warn('write', 'withoutResponse falhou, tentando withResponse', {
+          msg: withoutErr?.message || String(withoutErr),
+        });
         await device.writeCharacteristicWithResponseForService(
           V8_UUID.service,
           V8_UUID.write,
           payload,
         );
       }
-      await sleep(120);
+      // Android: intervalo maior reduz UndeliverableException no RxJava do ble-plx
+      await sleep(Platform.OS === 'android' ? 180 : 120);
     };
     const next = writeChainRef.current.then(run, run);
     writeChainRef.current = next.catch(() => undefined);
@@ -160,105 +193,110 @@ export function useV8Ble() {
 
   const handleNotify = useCallback(
     (base64) => {
-      const bytes = base64ToBytes(base64);
-      setLastRx(`RX ${toHex(bytes)} (${bytes.length}b)`);
+      try {
+        const bytes = base64ToBytes(base64);
+        setLastRx(`RX ${toHex(bytes)} (${bytes.length}b)`);
 
-      const activity = parseRealtimeActivity(bytes);
-      if (activity) {
-        if (activity.heartRate > 0) setHeartRate(activity.heartRate);
-        if (activity.spo2 > 0) applySpo2(activity.spo2);
-        if (activity.temperatureC > 0) applyTemperature(activity.temperatureC);
-        setSteps(activity.step);
-        setLastUpdate(new Date());
-        return;
-      }
-
-      const rtTemp = parseRealtimeTemperature(bytes);
-      if (rtTemp) {
-        applyTemperature(rtTemp.temperatureC);
-        return;
-      }
-
-      const tempHist = parseTemperatureHistory(bytes);
-      if (tempHist) {
-        applyTemperature(tempHist.temperatureC);
-        return;
-      }
-
-      const sleep = parseSleepData(bytes);
-      if (sleep?.latest) {
-        setSleepSession(sleep.latest);
-        setLastUpdate(new Date());
-        setStatusDetail(`Sono ${sleep.latest.totalHours} h`);
-        return;
-      }
-
-      const ecgRaw = parseEcgRaw(bytes);
-      if (ecgRaw && uiStateRef.current === 'measuringEcg') {
-        ecgSamplesRef.current.push(...ecgRaw.samples);
-        const total = ecgSamplesRef.current.length;
-        setEcgSampleCount(total);
-        setLastUpdate(new Date());
-        if (total % 50 < ecgRaw.samples.length) {
-          setStatusDetail(`ECG — ${total} amostras…`);
-        }
-        return;
-      }
-
-      const measurement = parseMeasurement(bytes);
-      if (measurement) {
-        if (!measurement.isStopAck) {
-          if (measurement.heartRate > 0) setHeartRate(measurement.heartRate);
-          if (measurement.spo2 > 0) applySpo2(measurement.spo2);
-          applyBloodPressure(measurement.systolicBP, measurement.diastolicBP);
+        const activity = parseRealtimeActivity(bytes);
+        if (activity) {
+          if (activity.heartRate > 0) setHeartRate(activity.heartRate);
+          if (activity.spo2 > 0) applySpo2(activity.spo2);
+          if (activity.temperatureC > 0) applyTemperature(activity.temperatureC);
+          setSteps(activity.step);
           setLastUpdate(new Date());
+          return;
+        }
 
-          if (uiStateRef.current === 'measuringEcg' && measurement.type === MEASURE_TYPE.ecg) {
-            const next = {
-              heartRate: measurement.heartRate || null,
-              hrv: measurement.hrv || null,
-              stress: measurement.stress || null,
-              systolicBP: measurement.systolicBP || null,
-              diastolicBP: measurement.diastolicBP || null,
-              samples: ecgSamplesRef.current.length,
-              measuredAt: new Date().toISOString(),
-            };
-            setEcgResult(next);
-            if (measurement.heartRate > 0) {
-              setStatusDetail(`ECG FC ${measurement.heartRate} — medindo…`);
+        const rtTemp = parseRealtimeTemperature(bytes);
+        if (rtTemp) {
+          applyTemperature(rtTemp.temperatureC);
+          return;
+        }
+
+        const tempHist = parseTemperatureHistory(bytes);
+        if (tempHist) {
+          applyTemperature(tempHist.temperatureC);
+          return;
+        }
+
+        const sleepParsed = parseSleepData(bytes);
+        if (sleepParsed?.latest) {
+          setSleepSession(sleepParsed.latest);
+          setLastUpdate(new Date());
+          setStatusDetail(`Sono ${sleepParsed.latest.totalHours} h`);
+          return;
+        }
+
+        const ecgRaw = parseEcgRaw(bytes);
+        if (ecgRaw && uiStateRef.current === 'measuringEcg') {
+          ecgSamplesRef.current.push(...ecgRaw.samples);
+          const total = ecgSamplesRef.current.length;
+          setEcgSampleCount(total);
+          setLastUpdate(new Date());
+          if (total % 50 < ecgRaw.samples.length) {
+            setStatusDetail(`ECG — ${total} amostras…`);
+          }
+          return;
+        }
+
+        const measurement = parseMeasurement(bytes);
+        if (measurement) {
+          if (!measurement.isStopAck) {
+            if (measurement.heartRate > 0) setHeartRate(measurement.heartRate);
+            if (measurement.spo2 > 0) applySpo2(measurement.spo2);
+            applyBloodPressure(measurement.systolicBP, measurement.diastolicBP);
+            setLastUpdate(new Date());
+
+            if (uiStateRef.current === 'measuringEcg' && measurement.type === MEASURE_TYPE.ecg) {
+              const next = {
+                heartRate: measurement.heartRate || null,
+                hrv: measurement.hrv || null,
+                stress: measurement.stress || null,
+                systolicBP: measurement.systolicBP || null,
+                diastolicBP: measurement.diastolicBP || null,
+                samples: ecgSamplesRef.current.length,
+                measuredAt: new Date().toISOString(),
+              };
+              setEcgResult(next);
+              if (measurement.heartRate > 0) {
+                setStatusDetail(`ECG FC ${measurement.heartRate} — medindo…`);
+              }
+            }
+
+            if (uiStateRef.current === 'measuringSpo2' && isPlausibleSpo2(measurement.spo2)) {
+              setStatusDetail(`SpO₂ ${measurement.spo2}% — medindo…`);
+            }
+            if (
+              uiStateRef.current === 'measuringBP' &&
+              isPlausibleBloodPressure(measurement.systolicBP, measurement.diastolicBP)
+            ) {
+              setStatusDetail(
+                `PA ${measurement.systolicBP}/${measurement.diastolicBP} — medindo…`,
+              );
             }
           }
-
-          if (uiStateRef.current === 'measuringSpo2' && isPlausibleSpo2(measurement.spo2)) {
-            setStatusDetail(`SpO₂ ${measurement.spo2}% — medindo…`);
-          }
-          if (
-            uiStateRef.current === 'measuringBP' &&
-            isPlausibleBloodPressure(measurement.systolicBP, measurement.diastolicBP)
-          ) {
-            setStatusDetail(
-              `PA ${measurement.systolicBP}/${measurement.diastolicBP} — medindo…`,
-            );
-          }
+          return;
         }
-        return;
-      }
 
-      const hrv = parseHrvHistory(bytes);
-      if (hrv) {
-        applyBloodPressure(hrv.systolic, hrv.diastolic);
-        if (hrv.heartRate > 0) setHeartRate(hrv.heartRate);
-        return;
-      }
+        const hrv = parseHrvHistory(bytes);
+        if (hrv) {
+          applyBloodPressure(hrv.systolic, hrv.diastolic);
+          if (hrv.heartRate > 0) setHeartRate(hrv.heartRate);
+          return;
+        }
 
-      const spo2Hist = parseSpo2History(bytes);
-      if (spo2Hist != null) {
-        applySpo2(spo2Hist);
-        return;
-      }
+        const spo2Hist = parseSpo2History(bytes);
+        if (spo2Hist != null) {
+          applySpo2(spo2Hist);
+          return;
+        }
 
-      const bat = parseBattery(bytes);
-      if (bat != null) setBattery(bat);
+        const bat = parseBattery(bytes);
+        if (bat != null) setBattery(bat);
+      } catch (e) {
+        console.warn('[V8 BLE] Erro ao processar notify:', e);
+        v8Warn('notify:parse', e?.message || String(e));
+      }
     },
     [applyBloodPressure, applySpo2, applyTemperature],
   );
@@ -281,16 +319,74 @@ export function useV8Ble() {
     managerRef.current?.stopDeviceScan();
   }, []);
 
+  const safeWrite = useCallback(
+    async (packet, label, t0) => {
+      const tWrite = performance.now();
+      v8Log('write:start', label, { ms: elapsedMs(t0) });
+      try {
+        await write(packet);
+        v8Log('write:ok', label, { ms: elapsedMs(t0), tookMs: elapsedMs(tWrite) });
+      } catch (e) {
+        v8Warn('write:fail', label, {
+          ms: elapsedMs(t0),
+          msg: e?.message || String(e),
+        });
+      }
+    },
+    [write],
+  );
+
   const connect = useCallback(
     async (deviceId, displayName, options) => {
       const manager = managerRef.current;
-      if (!manager || connectingRef.current) return;
+      if (!manager) {
+        v8Error('connect:abort', 'manager ausente');
+        return;
+      }
+      if (connectingRef.current) {
+        v8Warn('connect:abort', 'já conectando', { deviceId });
+        return;
+      }
+
+      const t0 = performance.now();
+      const shortId = deviceId?.slice?.(-8) || deviceId;
+      let step = 'init';
+      const mark = async (nextStep, detail) => {
+        step = nextStep;
+        v8Log(nextStep, detail || displayName || shortId, {
+          id: shortId,
+          ms: elapsedMs(t0),
+          os: Platform.OS,
+          api: Platform.Version,
+        });
+        setStatusDetail(`Etapa: ${nextStep}`);
+        // Persiste ANTES da próxima chamada nativa — sobrevive a crash em build EAS
+        const crumb = await saveConnectBreadcrumb(nextStep, {
+          deviceId: shortId,
+          name: displayName || null,
+          ms: elapsedMs(t0),
+          os: Platform.OS,
+          api: Platform.Version,
+        });
+        if (crumb) setLastBreadcrumb(crumb);
+      };
+
+      await mark('connect:begin', displayName);
+
+      await mark('connect:permissions');
+      const okPerms = await requestBlePermissions();
+      if (!okPerms) {
+        v8Error('connect:permissions', 'negadas');
+        setError('Permissão de Bluetooth/localização negada.');
+        updateUiState('error');
+        return;
+      }
+      v8Log('connect:permissions', 'ok', { ms: elapsedMs(t0) });
 
       const persist = options?.persist !== false;
       connectingRef.current = true;
       stopScan();
       setError(null);
-      setStatusDetail(null);
       setLastRx(null);
       updateUiState('connecting');
       setHeartRate(null);
@@ -306,30 +402,65 @@ export function useV8Ble() {
 
       try {
         if (deviceRef.current) {
+          await mark('connect:cancel-previous');
           try {
             await deviceRef.current.cancelConnection();
-          } catch {
-            // ignore
+          } catch (cancelErr) {
+            v8Warn('connect:cancel-previous', cancelErr?.message || String(cancelErr));
           }
           cleanupConnection();
         }
 
+        // Sem requestMTU no connect: em vários Androids isso derruba o processo via RxJava.
+        await mark('connect:gatt');
         const device = await manager.connectToDevice(deviceId, {
           autoConnect: false,
           timeout: 15000,
-          requestMTU: 512,
         });
+        v8Log('connect:gatt', 'conectado', {
+          id: shortId,
+          ms: elapsedMs(t0),
+          mtu: device.mtu,
+        });
+
+        await mark('connect:discover');
         await device.discoverAllServicesAndCharacteristics();
         try {
-          await device.requestMTU(512);
+          const services = await device.services();
+          v8Log('connect:discover', 'ok', {
+            ms: elapsedMs(t0),
+            services: services?.map((s) => s.uuid) || [],
+          });
         } catch {
-          // iOS gerencia sozinho
+          v8Log('connect:discover', 'ok (sem listar services)', { ms: elapsedMs(t0) });
+        }
+
+        if (Platform.OS === 'android') {
+          await mark('connect:mtu');
+          try {
+            const mtuDevice = await device.requestMTU(V8_PREFERRED_MTU);
+            v8Log('connect:mtu', 'ok', {
+              requested: V8_PREFERRED_MTU,
+              got: mtuDevice?.mtu,
+              ms: elapsedMs(t0),
+            });
+          } catch (mtuErr) {
+            v8Warn('connect:mtu', 'ignorado', {
+              msg: mtuErr?.message || String(mtuErr),
+              ms: elapsedMs(t0),
+            });
+          }
         }
 
         deviceRef.current = device;
         setConnectedName(displayName);
 
-        disconnectSubRef.current = device.onDisconnected(() => {
+        await mark('connect:onDisconnected');
+        disconnectSubRef.current = device.onDisconnected((_err, _dev) => {
+          v8Warn('disconnect', 'GATT desconectado', {
+            id: shortId,
+            err: _err?.message || null,
+          });
           cleanupConnection();
           updateUiState('idle');
           setError(
@@ -337,63 +468,112 @@ export function useV8Ble() {
           );
         });
 
+        await mark('connect:monitor');
         notifySubRef.current = device.monitorCharacteristicForService(
           V8_UUID.service,
           V8_UUID.notify,
           (err, characteristic) => {
             if (err) {
-              if (!err.message?.includes('cancelled')) setError(err.message);
+              const msg = err?.message || String(err);
+              if (!msg.includes('cancelled') && !msg.includes('disconnected')) {
+                v8Warn('notify:err', msg);
+                setError(msg);
+              } else {
+                v8Log('notify:err', msg);
+              }
               return;
             }
-            if (characteristic?.value) handleNotifyRef.current(characteristic.value);
+            if (characteristic?.value) {
+              try {
+                handleNotifyRef.current(characteristic.value);
+              } catch (notifyErr) {
+                v8Warn('notify:parse', notifyErr?.message || String(notifyErr));
+              }
+            }
           },
         );
+        v8Log('connect:monitor', 'inscrito FFF7', { ms: elapsedMs(t0) });
 
-        await sleep(300);
-        await write(cmdSetDeviceTime());
-        await write(cmdGetBattery());
-        // Realtime com temperatura ligada (tempEnable=true)
-        await write(cmdRealTimeStep(true, true));
-        await write(cmdSetAutomatic(AUTO_TYPE.spo2, 5));
-        await write(cmdSetAutomatic(AUTO_TYPE.hrv, 5));
-        await write(cmdSetAutomatic(AUTO_TYPE.temp, 5));
-        await write(cmdGetSpo2History(0));
-        await write(cmdGetHrvData(0));
-        await write(cmdRealtimeTemperature());
-        await write(cmdGetTemperatureHistory(0));
-        await write(cmdGetSleepData(0));
+        // Espaça writes pós-connect para evitar storm GATT / undeliverable Rx no Android
+        await mark('connect:settle');
+        await sleep(400);
+
+        const postWrites = [
+          ['setTime', () => cmdSetDeviceTime()],
+          ['battery', () => cmdGetBattery()],
+          ['realtime', () => cmdRealTimeStep(true, true)],
+          ['autoSpo2', () => cmdSetAutomatic(AUTO_TYPE.spo2, 5)],
+          ['autoHrv', () => cmdSetAutomatic(AUTO_TYPE.hrv, 5)],
+          ['autoTemp', () => cmdSetAutomatic(AUTO_TYPE.temp, 5)],
+          ['spo2Hist', () => cmdGetSpo2History(0)],
+          ['hrvHist', () => cmdGetHrvData(0)],
+          ['rtTemp', () => cmdRealtimeTemperature()],
+          ['tempHist', () => cmdGetTemperatureHistory(0)],
+          ['sleep', () => cmdGetSleepData(0)],
+        ];
+        for (const [label, build] of postWrites) {
+          await mark(`connect:write:${label}`);
+          await safeWrite(build(), label, t0);
+        }
 
         if (persist) {
+          await mark('connect:persist');
           const paired = { id: deviceId, name: displayName };
           pairedRef.current = paired;
           setPairedDevice(paired);
-          await savePairedDevice(paired);
+          await savePairedDevice(paired, groupId);
         }
 
+        await mark('connect:done');
+        await clearConnectBreadcrumb();
+        setLastBreadcrumb(null);
         updateUiState('connected');
         setError(null);
         setStatusDetail('Conectada — use os botões de medição');
+        v8Log('connect:done', 'sucesso', { id: shortId, totalMs: elapsedMs(t0) });
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
+        v8Error('connect:fail', `falhou em ${step}: ${message}`, e);
+        await saveConnectBreadcrumb(`FAIL:${step}`, {
+          deviceId: shortId,
+          message,
+          ms: elapsedMs(t0),
+        }).then((crumb) => {
+          if (crumb) setLastBreadcrumb(crumb);
+        });
         setError(
           pairedRef.current
-            ? `Falha ao reconectar: ${message}`
-            : `Falha ao conectar: ${message}`,
+            ? `Falha ao reconectar (${step}): ${message}`
+            : `Falha ao conectar (${step}): ${message}`,
         );
+        try {
+          await manager.cancelDeviceConnection(deviceId);
+        } catch {
+          // ignore
+        }
         cleanupConnection();
         updateUiState(pairedRef.current ? 'idle' : 'error');
       } finally {
         connectingRef.current = false;
+        v8Log('connect:finally', step, { ms: elapsedMs(t0) });
       }
     },
-    [cleanupConnection, stopScan, updateUiState, write],
+    [cleanupConnection, groupId, safeWrite, stopScan, updateUiState],
   );
 
   const tryAutoConnect = useCallback(async () => {
     const paired = pairedRef.current;
     const manager = managerRef.current;
-    if (!paired || !manager || connectingRef.current) return;
+    if (!paired || !manager || connectingRef.current) {
+      v8Log('auto:skip', 'precondição', {
+        paired: !!paired,
+        manager: !!manager,
+        connecting: connectingRef.current,
+      });
+      return;
+    }
     if (
+      uiStateRef.current === 'unavailable' ||
       uiStateRef.current === 'connected' ||
       uiStateRef.current === 'connecting' ||
       uiStateRef.current === 'measuring' ||
@@ -401,56 +581,96 @@ export function useV8Ble() {
       uiStateRef.current === 'measuringSpo2' ||
       uiStateRef.current === 'measuringEcg'
     ) {
+      v8Log('auto:skip', uiStateRef.current);
       return;
     }
-    const state = await manager.state();
-    if (state !== State.PoweredOn) return;
+    try {
+      const state = await manager.state();
+      if (!State || state !== State.PoweredOn) {
+        v8Log('auto:skip', `bt state=${state}`);
+        return;
+      }
+    } catch (e) {
+      v8Warn('auto:state', e?.message || String(e));
+      return;
+    }
     const ok = await requestBlePermissions();
     if (!ok) {
+      v8Error('auto:permissions', 'negadas');
       setError('Permissão de Bluetooth/localização negada.');
       return;
     }
+    v8Log('auto:start', paired.name || paired.id);
     await connect(paired.id, paired.name, { persist: true });
   }, [connect]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const paired = await loadPairedDevice();
+      const [paired, crumb] = await Promise.all([
+        loadPairedDevice(groupId),
+        loadConnectBreadcrumb(),
+      ]);
       if (cancelled) return;
       pairedRef.current = paired;
       setPairedDevice(paired);
+      if (crumb?.step && crumb.step !== 'connect:done') {
+        setLastBreadcrumb(crumb);
+        v8Log('breadcrumb:restored', crumb.step, crumb);
+      }
       setPairReady(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [groupId]);
 
   useEffect(() => {
-    const manager = new BleManager();
-    managerRef.current = manager;
-    const sub = manager.onStateChange((state) => {
-      if (state === State.PoweredOff) {
-        updateUiState('poweredOff');
-        setError('Bluetooth desligado. Ative o Bluetooth do celular.');
-      } else if (state === State.PoweredOn) {
-        setUiState((prev) => {
-          const next = prev === 'poweredOff' ? 'idle' : prev;
-          uiStateRef.current = next;
-          return next;
-        });
-        setError((prev) =>
-          prev === 'Bluetooth desligado. Ative o Bluetooth do celular.' ? null : prev,
-        );
-      }
-    }, true);
+    let manager;
+    let sub;
+    try {
+      v8Log('init', 'criando BleManager');
+      manager = createBleManagerSafe();
+      managerRef.current = manager;
+      sub = manager.onStateChange((state) => {
+        v8Log('bt:state', String(state));
+        if (!State) return;
+        if (state === State.PoweredOff) {
+          updateUiState('poweredOff');
+          setError('Bluetooth desligado. Ative o Bluetooth do celular.');
+        } else if (state === State.PoweredOn) {
+          setUiState((prev) => {
+            const next = prev === 'poweredOff' ? 'idle' : prev;
+            uiStateRef.current = next;
+            return next;
+          });
+          setError((prev) =>
+            prev === 'Bluetooth desligado. Ative o Bluetooth do celular.' ? null : prev,
+          );
+        }
+      }, true);
+      v8Log('init', 'BleManager ok');
+    } catch (e) {
+      v8Error('init', 'BleManager falhou', e);
+      managerRef.current = null;
+      updateUiState('unavailable');
+      setError(e instanceof Error ? e.message : BLE_UNAVAILABLE_MSG);
+    }
     return () => {
+      v8Log('init', 'destroy BleManager');
       clearMeasureTimers();
       notifySubRef.current?.remove();
       disconnectSubRef.current?.remove();
-      sub.remove();
-      manager.destroy();
+      try {
+        sub?.remove();
+      } catch {
+        // ignore
+      }
+      try {
+        manager?.destroy();
+      } catch {
+        // ignore
+      }
       managerRef.current = null;
     };
   }, [clearMeasureTimers, updateUiState]);
@@ -458,18 +678,23 @@ export function useV8Ble() {
   useEffect(() => {
     if (!pairReady || !pairedDevice) return;
     if (autoConnectAttemptedRef.current) return;
+    if (uiStateRef.current === 'unavailable') return;
     let cancelled = false;
     (async () => {
       const manager = managerRef.current;
-      if (!manager) return;
+      if (!manager || !State) return;
       for (let i = 0; i < 20 && !cancelled; i++) {
-        const state = await manager.state();
-        if (state === State.PoweredOn) {
-          autoConnectAttemptedRef.current = true;
-          await tryAutoConnect();
+        try {
+          const state = await manager.state();
+          if (state === State.PoweredOn) {
+            autoConnectAttemptedRef.current = true;
+            await tryAutoConnect();
+            return;
+          }
+          if (state === State.PoweredOff) return;
+        } catch {
           return;
         }
-        if (state === State.PoweredOff) return;
         await sleep(250);
       }
     })();
@@ -524,13 +749,13 @@ export function useV8Ble() {
     await disconnect();
     pairedRef.current = null;
     setPairedDevice(null);
-    await clearPairedDevice();
+    await clearPairedDevice(groupId);
     autoConnectAttemptedRef.current = false;
     setDevices([]);
     setError(null);
     setStatusDetail(null);
     updateUiState('idle');
-  }, [disconnect, updateUiState]);
+  }, [disconnect, groupId, updateUiState]);
 
   const reconnectPaired = useCallback(async () => {
     autoConnectAttemptedRef.current = true;
@@ -539,24 +764,35 @@ export function useV8Ble() {
 
   const startScan = useCallback(async () => {
     const manager = managerRef.current;
-    if (!manager) return;
+    if (!manager || !State) {
+      v8Error('scan', 'manager indisponível');
+      setError(BLE_UNAVAILABLE_MSG);
+      updateUiState('unavailable');
+      return;
+    }
     setError(null);
+    v8Log('scan:begin', 'permissoes');
     const ok = await requestBlePermissions();
     if (!ok) {
+      v8Error('scan:permissions', 'negadas');
       setError('Permissão de Bluetooth/localização negada.');
       updateUiState('error');
       return;
     }
     const state = await manager.state();
     if (state !== State.PoweredOn) {
+      v8Warn('scan', `bt state=${state}`);
       updateUiState('poweredOff');
       setError('Bluetooth desligado.');
       return;
     }
     setDevices([]);
     updateUiState('scanning');
+    v8Log('scan:start', 'startDeviceScan');
+    const seen = new Set();
     manager.startDeviceScan(null, { allowDuplicates: false }, (err, device) => {
       if (err) {
+        v8Error('scan:err', err.message || String(err), err);
         setError(err.message);
         updateUiState('error');
         manager.stopDeviceScan();
@@ -570,6 +806,10 @@ export function useV8Ble() {
           ? `V8 ${device.id.slice(-5)}`
           : null);
       if (!name) return;
+      if (!seen.has(device.id)) {
+        seen.add(device.id);
+        v8Log('scan:found', name, { id: device.id.slice(-8), rssi: device.rssi });
+      }
       setDevices((prev) => {
         if (prev.some((d) => d.id === device.id)) {
           return prev.map((d) =>
@@ -586,6 +826,7 @@ export function useV8Ble() {
       setUiState((prev) => {
         if (prev !== 'scanning') return prev;
         uiStateRef.current = 'idle';
+        v8Log('scan:timeout', '15s');
         return 'idle';
       });
     }, 15000);
@@ -825,6 +1066,11 @@ export function useV8Ble() {
     }
   }, [clearMeasureTimers, updateUiState, write]);
 
+  const clearLastBreadcrumb = useCallback(async () => {
+    await clearConnectBreadcrumb();
+    setLastBreadcrumb(null);
+  }, []);
+
   return {
     uiState,
     error,
@@ -834,6 +1080,8 @@ export function useV8Ble() {
     pairedDevice,
     pairReady,
     connectedName,
+    lastBreadcrumb,
+    clearLastBreadcrumb,
     heartRate,
     spo2,
     steps,

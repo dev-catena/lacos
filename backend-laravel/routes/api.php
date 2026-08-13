@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\AdminStreamCameraController;
 use App\Http\Controllers\Api\UserStreamAgentController;
 use App\Http\Controllers\Api\StreamAgentController;
 use App\Http\Controllers\Api\V8GatewayController;
+use App\Http\Controllers\Api\GroupV8BlePairingController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MediaController;
@@ -398,6 +399,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/v8-gateways/pairing/{pairing_id}/claim', [V8GatewayController::class, 'pairingClaim']);
     Route::get('/groups/{groupId}/v8-gateways', [V8GatewayController::class, 'indexForGroup']);
     Route::delete('/groups/{groupId}/v8-gateways/{gatewayId}', [V8GatewayController::class, 'unpair']);
+
+    // Pulseira V8 BLE no celular — um vínculo por grupo (dono conecta, demais só veem)
+    Route::get('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'show']);
+    Route::put('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'upsert']);
+    Route::delete('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'destroy']);
     
     // Botão de Pânico - Emergência
     Route::post('/panic/trigger', [PanicController::class, 'trigger']);

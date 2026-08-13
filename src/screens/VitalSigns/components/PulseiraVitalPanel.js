@@ -7,12 +7,16 @@ import {
   ActivityIndicator,
   ScrollView,
   AppState,
+  Platform,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import moment from 'moment';
 import colors from '../../../constants/colors';
 import SafeIcon from '../../../components/SafeIcon';
 import { useV8Ble } from '../../../ble/v8/useV8Ble';
+import { loadPairedDevice } from '../../../ble/v8/pairedStorage';
 import {
   V8_AUTO_RECORD_INTERVAL_MS,
   getLastV8AutoSaveAt,
@@ -21,9 +25,16 @@ import {
   persistBraceletVitalSigns,
   setLastV8AutoSaveAt,
 } from '../../../services/v8VitalAutoRecord';
+import {
+  claimV8BlePairing,
+  getV8BlePairing,
+  unpairV8BlePairing,
+} from '../../../services/v8BlePairingService';
 
 function statusLabel(uiState) {
   switch (uiState) {
+    case 'unavailable':
+      return 'Bluetooth indisponível';
     case 'poweredOff':
       return 'Bluetooth desligado';
     case 'scanning':
@@ -54,12 +65,114 @@ function formatCountdown(ms) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function readingNumber(reading) {
+  if (reading == null) return null;
+  const v = reading.value;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function ReadingsGrid({
+  heartRate,
+  spo2,
+  bloodPressure,
+  temperatureC,
+  sleepSession,
+  ecgResult,
+  ecgSampleCount,
+  measuringEcg = false,
+}) {
+  return (
+    <>
+      <View style={styles.readingsRow}>
+        <View style={styles.readingCard}>
+          <Text style={styles.readingLabel}>FC</Text>
+          <Text style={[styles.readingValue, { color: colors.error }]}>
+            {heartRate != null ? heartRate : '—'}
+          </Text>
+          <Text style={styles.readingUnit}>bpm</Text>
+        </View>
+        <View style={styles.readingCard}>
+          <Text style={styles.readingLabel}>SpO₂</Text>
+          <Text style={[styles.readingValue, { color: colors.info }]}>
+            {spo2 != null ? spo2 : '—'}
+          </Text>
+          <Text style={styles.readingUnit}>%</Text>
+        </View>
+        <View style={styles.readingCard}>
+          <Text style={styles.readingLabel}>PA</Text>
+          <Text style={[styles.readingValue, { color: colors.primary }]}>
+            {bloodPressure
+              ? `${bloodPressure.systolic}/${bloodPressure.diastolic}`
+              : '—'}
+          </Text>
+          <Text style={styles.readingUnit}>mmHg</Text>
+        </View>
+      </View>
+
+      <View style={styles.readingsRow}>
+        <View style={styles.readingCard}>
+          <Text style={styles.readingLabel}>Temp.</Text>
+          <Text style={[styles.readingValue, { color: colors.success }]}>
+            {temperatureC != null ? Number(temperatureC).toFixed(1) : '—'}
+          </Text>
+          <Text style={styles.readingUnit}>°C</Text>
+        </View>
+        <View style={[styles.readingCard, { flex: 2 }]}>
+          <Text style={styles.readingLabel}>Sono</Text>
+          <Text style={[styles.readingValue, { color: colors.primaryDark }]}>
+            {sleepSession?.totalHours != null ? sleepSession.totalHours : '—'}
+          </Text>
+          <Text style={styles.readingUnit}>
+            {sleepSession?.startAt
+              ? `h · ${moment(sleepSession.startAt).format('DD/MM HH:mm')}`
+              : 'h'}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.readingsRow}>
+        <View style={[styles.readingCard, { flex: 1 }]}>
+          <Text style={styles.readingLabel}>ECG</Text>
+          <Text style={[styles.readingValue, { color: '#0f766e', fontSize: 18 }]}>
+            {measuringEcg
+              ? ecgSampleCount
+              : ecgResult?.heartRate != null
+                ? ecgResult.heartRate
+                : ecgResult?.samples != null
+                  ? ecgResult.samples
+                  : '—'}
+          </Text>
+          <Text style={styles.readingUnit}>
+            {measuringEcg
+              ? 'amostras'
+              : ecgResult?.heartRate != null
+                ? 'bpm'
+                : ecgResult?.samples
+                  ? 'amostras'
+                  : '—'}
+          </Text>
+        </View>
+        {ecgResult?.hrv != null || ecgResult?.stress != null ? (
+          <View style={[styles.readingCard, { flex: 1 }]}>
+            <Text style={styles.readingLabel}>HRV / Stress</Text>
+            <Text style={[styles.readingValue, { color: '#0f766e', fontSize: 16 }]}>
+              {ecgResult?.hrv ?? '—'} / {ecgResult?.stress ?? '—'}
+            </Text>
+            <Text style={styles.readingUnit}>ECG</Text>
+          </View>
+        ) : null}
+      </View>
+    </>
+  );
+}
+
 /**
- * Painel BLE da pulseira V8.
- * Grava FC/SpO₂/PA em vital_signs (API) manualmente e a cada 30 minutos enquanto conectada.
+ * Dono da conexão BLE: conecta, mede e grava no grupo.
  */
-export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) {
-  const ble = useV8Ble();
+function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged }) {
+  const ble = useV8Ble(groupId);
   const [saving, setSaving] = useState(false);
   const [lastAutoSaveAt, setLastAutoSaveAtState] = useState(null);
   const [nowTick, setNowTick] = useState(Date.now());
@@ -74,6 +187,7 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
     ble.uiState === 'measuringBP' ||
     ble.uiState === 'measuringEcg';
   const isBusy =
+    ble.uiState === 'unavailable' ||
     ble.uiState === 'connecting' ||
     ble.uiState === 'scanning' ||
     ble.uiState === 'measuring' ||
@@ -91,6 +205,38 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
       cancelled = true;
     };
   }, [groupId]);
+
+  useEffect(() => {
+    if (!groupId || !ble.pairedDevice?.id) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        await claimV8BlePairing(groupId, ble.pairedDevice.id, ble.pairedDevice.name);
+      } catch (e) {
+        if (e?.status === 409) {
+          Toast.show({
+            type: 'info',
+            text1: 'Pulseira já vinculada',
+            text2: e.message || 'Outro membro já conectou a pulseira deste grupo.',
+          });
+          onPairingChanged?.();
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, ble.pairedDevice?.id, ble.pairedDevice?.name, onPairingChanged]);
+
+  const handleChangeBracelet = useCallback(async () => {
+    try {
+      await unpairV8BlePairing(groupId);
+    } catch {
+      // segue o unpair local mesmo se a API falhar
+    }
+    await ble.changeBracelet();
+    onPairingChanged?.();
+  }, [ble, groupId, onPairingChanged]);
 
   // Tick a cada 30s para atualizar countdown na UI
   useEffect(() => {
@@ -126,6 +272,10 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
               text2: `${result.saved} sinal(is) salvos no grupo.`,
               visibilityTime: 2500,
             });
+          }
+          const paired = current.pairedDevice;
+          if (paired?.id) {
+            claimV8BlePairing(groupId, paired.id, paired.name).catch(() => {});
           }
           onSaved?.();
         }
@@ -258,6 +408,26 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
           ) : null}
         </View>
         {ble.error ? <Text style={styles.errorText}>{ble.error}</Text> : null}
+        {ble.lastBreadcrumb?.step && ble.lastBreadcrumb.step !== 'connect:done' ? (
+          <View style={styles.breadcrumbBox}>
+            <Text style={styles.breadcrumbTitle}>Última etapa antes de falha/crash</Text>
+            <Text style={styles.breadcrumbStep} selectable>
+              {ble.lastBreadcrumb.step}
+            </Text>
+            <Text style={styles.breadcrumbMeta} selectable>
+              {ble.lastBreadcrumb.at
+                ? moment(ble.lastBreadcrumb.at).format('DD/MM HH:mm:ss')
+                : ''}
+              {ble.lastBreadcrumb.message ? ` · ${ble.lastBreadcrumb.message}` : ''}
+            </Text>
+            <Text style={styles.breadcrumbHint}>
+              Copie essa etapa e envie no chat (build EAS, sem USB).
+            </Text>
+            <TouchableOpacity onPress={ble.clearLastBreadcrumb} hitSlop={8}>
+              <Text style={styles.breadcrumbClear}>Limpar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         {ble.lastUpdate ? (
           <Text style={styles.updatedAt}>
             Atualizado {moment(ble.lastUpdate).format('DD/MM HH:mm:ss')}
@@ -275,85 +445,16 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
         ) : null}
       </View>
 
-      <View style={styles.readingsRow}>
-        <View style={styles.readingCard}>
-          <Text style={styles.readingLabel}>FC</Text>
-          <Text style={[styles.readingValue, { color: colors.error }]}>
-            {ble.heartRate != null ? ble.heartRate : '—'}
-          </Text>
-          <Text style={styles.readingUnit}>bpm</Text>
-        </View>
-        <View style={styles.readingCard}>
-          <Text style={styles.readingLabel}>SpO₂</Text>
-          <Text style={[styles.readingValue, { color: colors.info }]}>
-            {ble.spo2 != null ? ble.spo2 : '—'}
-          </Text>
-          <Text style={styles.readingUnit}>%</Text>
-        </View>
-        <View style={styles.readingCard}>
-          <Text style={styles.readingLabel}>PA</Text>
-          <Text style={[styles.readingValue, { color: colors.primary }]}>
-            {ble.bloodPressure
-              ? `${ble.bloodPressure.systolic}/${ble.bloodPressure.diastolic}`
-              : '—'}
-          </Text>
-          <Text style={styles.readingUnit}>mmHg</Text>
-        </View>
-      </View>
-
-      <View style={styles.readingsRow}>
-        <View style={styles.readingCard}>
-          <Text style={styles.readingLabel}>Temp.</Text>
-          <Text style={[styles.readingValue, { color: colors.success }]}>
-            {ble.temperatureC != null ? ble.temperatureC.toFixed(1) : '—'}
-          </Text>
-          <Text style={styles.readingUnit}>°C</Text>
-        </View>
-        <View style={[styles.readingCard, { flex: 2 }]}>
-          <Text style={styles.readingLabel}>Sono</Text>
-          <Text style={[styles.readingValue, { color: colors.primaryDark }]}>
-            {ble.sleepSession?.totalHours != null ? ble.sleepSession.totalHours : '—'}
-          </Text>
-          <Text style={styles.readingUnit}>
-            {ble.sleepSession?.startIso
-              ? `h · ${moment(ble.sleepSession.startAt).format('DD/MM HH:mm')}`
-              : 'h'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.readingsRow}>
-        <View style={[styles.readingCard, { flex: 1 }]}>
-          <Text style={styles.readingLabel}>ECG</Text>
-          <Text style={[styles.readingValue, { color: '#0f766e', fontSize: 18 }]}>
-            {ble.uiState === 'measuringEcg'
-              ? ble.ecgSampleCount
-              : ble.ecgResult?.heartRate != null
-                ? ble.ecgResult.heartRate
-                : ble.ecgResult?.samples != null
-                  ? ble.ecgResult.samples
-                  : '—'}
-          </Text>
-          <Text style={styles.readingUnit}>
-            {ble.uiState === 'measuringEcg'
-              ? 'amostras'
-              : ble.ecgResult?.heartRate != null
-                ? 'bpm'
-                : ble.ecgResult?.samples
-                  ? 'amostras'
-                  : '—'}
-          </Text>
-        </View>
-        {ble.ecgResult?.hrv != null || ble.ecgResult?.stress != null ? (
-          <View style={[styles.readingCard, { flex: 1 }]}>
-            <Text style={styles.readingLabel}>HRV / Stress</Text>
-            <Text style={[styles.readingValue, { color: '#0f766e', fontSize: 16 }]}>
-              {ble.ecgResult?.hrv ?? '—'} / {ble.ecgResult?.stress ?? '—'}
-            </Text>
-            <Text style={styles.readingUnit}>ECG</Text>
-          </View>
-        ) : null}
-      </View>
+      <ReadingsGrid
+        heartRate={ble.heartRate}
+        spo2={ble.spo2}
+        bloodPressure={ble.bloodPressure}
+        temperatureC={ble.temperatureC}
+        sleepSession={ble.sleepSession}
+        ecgResult={ble.ecgResult}
+        ecgSampleCount={ble.ecgSampleCount}
+        measuringEcg={ble.uiState === 'measuringEcg'}
+      />
 
       {!isConnected ? (
         <View style={styles.section}>
@@ -374,7 +475,7 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.secondaryBtn}
-                onPress={ble.changeBracelet}
+                onPress={handleChangeBracelet}
                 disabled={isBusy}
                 activeOpacity={0.85}
               >
@@ -542,7 +643,7 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.linkBtn}
-            onPress={ble.changeBracelet}
+            onPress={handleChangeBracelet}
             activeOpacity={0.7}
           >
             <Text style={styles.linkBtnText}>Trocar pulseira</Text>
@@ -557,10 +658,236 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
   );
 }
 
+function PulseiraViewerPanel({
+  active = true,
+  pairing,
+  latest,
+  canUnpair,
+  onRefresh,
+  refreshing,
+  onUnpair,
+  loadError,
+}) {
+  const ownerName = pairing?.paired_by_name;
+  const braceletName = pairing?.bracelet_name;
+  const measuredAt =
+    latest?.heart_rate?.measured_at ||
+    latest?.oxygen_saturation?.measured_at ||
+    latest?.blood_pressure?.measured_at ||
+    latest?.temperature?.measured_at ||
+    latest?.sleep?.measured_at ||
+    latest?.ecg?.measured_at ||
+    pairing?.last_seen_at;
+
+  const bp =
+    latest?.blood_pressure?.systolic != null
+      ? {
+          systolic: latest.blood_pressure.systolic,
+          diastolic: latest.blood_pressure.diastolic,
+        }
+      : null;
+
+  const sleepHours = readingNumber(latest?.sleep);
+  const temp = readingNumber(latest?.temperature);
+  const hr = readingNumber(latest?.heart_rate);
+  const spo2 = readingNumber(latest?.oxygen_saturation);
+  const ecg = latest?.ecg
+    ? {
+        heartRate: latest.ecg.heart_rate ?? readingNumber(latest.ecg),
+        hrv: latest.ecg.hrv ?? null,
+        stress: latest.ecg.stress ?? null,
+        samples: latest.ecg.samples ?? null,
+      }
+    : null;
+
+  const hasAny =
+    hr != null || spo2 != null || bp || temp != null || sleepHours != null || ecg;
+
+  return (
+    <ScrollView
+      style={[styles.scroll, !active && styles.hidden]}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      pointerEvents={active ? 'auto' : 'none'}
+      refreshControl={
+        <RefreshControl
+          refreshing={!!refreshing}
+          onRefresh={onRefresh}
+          colors={[colors.primary]}
+        />
+      }
+    >
+      <View style={styles.statusCard}>
+        <View style={styles.statusRow}>
+          <SafeIcon
+            name="watch"
+            size={22}
+            color={hasAny ? colors.success : colors.primary}
+          />
+          <View style={styles.statusTextWrap}>
+            <Text style={styles.statusTitle}>
+              {hasAny ? 'Dados da pulseira do grupo' : 'Aguardando leituras'}
+            </Text>
+            <Text style={styles.statusSubtitle} numberOfLines={3}>
+              {ownerName
+                ? `Conectada por ${ownerName}${braceletName ? ` · ${braceletName}` : ''}`
+                : braceletName
+                  ? `Pulseira ${braceletName} vinculada ao grupo`
+                  : 'A pulseira do paciente já está vinculada. Você só visualiza os sinais gravados.'}
+            </Text>
+          </View>
+        </View>
+        {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
+        {measuredAt ? (
+          <Text style={styles.updatedAt}>
+            Último registro {moment(measuredAt).format('DD/MM HH:mm:ss')}
+          </Text>
+        ) : null}
+        <Text style={styles.viewerHint}>
+          Quem conectou a pulseira no celular do cuidador envia os sinais para o grupo.
+          Puxe para atualizar.
+        </Text>
+      </View>
+
+      <ReadingsGrid
+        heartRate={hr}
+        spo2={spo2}
+        bloodPressure={bp}
+        temperatureC={temp}
+        sleepSession={sleepHours != null ? { totalHours: sleepHours, startAt: latest?.sleep?.measured_at } : null}
+        ecgResult={ecg}
+      />
+
+      {canUnpair ? (
+        <TouchableOpacity
+          style={styles.secondaryBtn}
+          onPress={onUnpair}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.secondaryBtnText}>Desvincular pulseira do grupo</Text>
+        </TouchableOpacity>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+/**
+ * Painel da pulseira V8 no grupo: o membro que conecta controla o BLE;
+ * os demais só veem os sinais gravados no backend.
+ */
+export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) {
+  const [loading, setLoading] = useState(true);
+  const [canConnect, setCanConnect] = useState(false);
+  const [canUnpair, setCanUnpair] = useState(false);
+  const [pairing, setPairing] = useState(null);
+  const [latest, setLatest] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+
+  const refresh = useCallback(async ({ silent } = {}) => {
+    if (!groupId) return;
+    if (!silent) setRefreshing(true);
+    try {
+      const data = await getV8BlePairing(groupId);
+      setPairing(data.pairing);
+      setLatest(data.latest);
+      setCanConnect(!!data.canConnect);
+      setCanUnpair(!!data.canUnpair && !data.canConnect);
+      setLoadError(null);
+    } catch (e) {
+      const local = await loadPairedDevice(groupId);
+      setCanConnect(!!local);
+      setCanUnpair(false);
+      setLoadError(e?.message || 'Falha ao carregar vínculo da pulseira');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    setLoading(true);
+    void refresh({ silent: true });
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!groupId || canConnect) return undefined;
+    const id = setInterval(() => {
+      void refresh({ silent: true });
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [groupId, canConnect, refresh]);
+
+  const handleUnpair = useCallback(() => {
+    Alert.alert(
+      'Desvincular pulseira',
+      'Os membros deixarão de ver esta pulseira como vinculada. Quem conectou poderá parear de novo.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Desvincular',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await unpairV8BlePairing(groupId);
+              await refresh();
+            } catch (e) {
+              Toast.show({
+                type: 'error',
+                text1: 'Não foi possível desvincular',
+                text2: e?.message || 'Tente novamente',
+              });
+            }
+          },
+        },
+      ],
+    );
+  }, [groupId, refresh]);
+
+  if (loading) {
+    return (
+      <View style={[styles.scroll, !active && styles.hidden, styles.loadingBox]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (canConnect) {
+    return (
+      <PulseiraOwnerPanel
+        groupId={groupId}
+        onSaved={onSaved}
+        active={active}
+        onPairingChanged={refresh}
+      />
+    );
+  }
+
+  return (
+    <PulseiraViewerPanel
+      active={active}
+      pairing={pairing}
+      latest={latest}
+      canUnpair={canUnpair}
+      refreshing={refreshing}
+      onRefresh={refresh}
+      onUnpair={handleUnpair}
+      loadError={loadError}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   hidden: { display: 'none' },
+  loadingBox: { alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
   content: { padding: 16, paddingBottom: 40 },
+  viewerHint: {
+    marginTop: 10,
+    fontSize: 12,
+    color: colors.textLight,
+    lineHeight: 17,
+  },
   statusCard: {
     backgroundColor: colors.backgroundLight,
     borderRadius: 12,
@@ -575,6 +902,30 @@ const styles = StyleSheet.create({
   statusSubtitle: { fontSize: 13, color: colors.textLight, marginTop: 2 },
   battery: { fontSize: 14, fontWeight: '600', color: colors.primary },
   errorText: { marginTop: 8, fontSize: 13, color: colors.error },
+  breadcrumbBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  breadcrumbTitle: { fontSize: 12, fontWeight: '700', color: '#92400E' },
+  breadcrumbStep: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#78350F',
+    fontFamily: Platform?.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  breadcrumbMeta: { marginTop: 4, fontSize: 11, color: '#92400E' },
+  breadcrumbHint: { marginTop: 6, fontSize: 11, color: '#A16207' },
+  breadcrumbClear: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
+  },
   updatedAt: { marginTop: 8, fontSize: 12, color: colors.gray400 },
   autoSaveBox: {
     marginTop: 12,
