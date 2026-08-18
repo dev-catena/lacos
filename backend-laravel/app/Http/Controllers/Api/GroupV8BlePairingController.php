@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\VitalSign;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class GroupV8BlePairingController extends Controller
 {
@@ -20,9 +21,12 @@ class GroupV8BlePairingController extends Controller
     {
         $group = $this->assertGroupMember($groupId);
         $userId = (int) Auth::id();
-        $pairing = GroupV8BlePairing::with('pairedByUser')
-            ->where('group_id', $groupId)
-            ->first();
+        $pairing = null;
+        if (Schema::hasTable('group_v8_ble_pairings')) {
+            $pairing = GroupV8BlePairing::with('pairedByUser')
+                ->where('group_id', $groupId)
+                ->first();
+        }
 
         $latest = $this->latestV8Readings($groupId);
         $inferredOwnerId = $latest['recorded_by'] ?? null;
@@ -35,18 +39,19 @@ class GroupV8BlePairingController extends Controller
             $isOwner = (int) $inferredOwnerId === $userId;
         }
 
-        if ($pairing) {
-            $canConnect = $isOwner;
-        } else {
-            $canConnect = ! $inferredOwnerId || $isOwner || $isAdmin;
-        }
+        // Com vínculo existente: SÓ o dono controla BLE (mesmo se outro membro for admin).
+        // Sem vínculo: só admin pode conectar pela primeira vez.
+        // Assim amigo (mesmo com role errada) não vê Reconectar/Trocar depois do vínculo.
+        $hasLink = $pairing !== null || $inferredOwnerId !== null;
+        $canConnect = $isOwner || ($isAdmin && ! $hasLink);
 
         $pairingPayload = $pairing ? $this->serializePairing($pairing) : null;
         if (! $pairingPayload && $inferredOwnerId) {
             $inferredUser = User::find($inferredOwnerId);
             $pairingPayload = [
                 'bracelet_id' => null,
-                'bracelet_name' => 'Pulseira V8',
+                'bracelet_name' => 'Pulseira',
+                'bracelet_model' => $this->inferModelFromNotes($latest['notes'] ?? null),
                 'paired_by' => $inferredOwnerId,
                 'paired_by_name' => $inferredUser?->name,
                 'paired_at' => null,
@@ -69,13 +74,26 @@ class GroupV8BlePairingController extends Controller
      */
     public function upsert(Request $request, int $groupId)
     {
+        if (! Schema::hasTable('group_v8_ble_pairings')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tabela de vínculo da pulseira ainda não existe. Rode as migrations.',
+            ], 503);
+        }
+
         $this->assertGroupMember($groupId);
         $userId = (int) Auth::id();
 
         $validated = $request->validate([
             'bracelet_id' => 'required|string|max:80',
             'bracelet_name' => 'nullable|string|max:200',
+            'bracelet_model' => 'nullable|string|in:v5,v8',
         ]);
+
+        $model = strtolower((string) ($validated['bracelet_model'] ?? 'v8'));
+        if (! in_array($model, ['v5', 'v8'], true)) {
+            $model = 'v8';
+        }
 
         $pairing = GroupV8BlePairing::where('group_id', $groupId)->first();
         if ($pairing && (int) $pairing->paired_by !== $userId) {
@@ -85,15 +103,20 @@ class GroupV8BlePairingController extends Controller
             ], 409);
         }
 
+        $payload = [
+            'paired_by' => $userId,
+            'bracelet_id' => $validated['bracelet_id'],
+            'bracelet_name' => $validated['bracelet_name'] ?: ($model === 'v5' ? 'Pulseira V5' : 'Pulseira V8'),
+            'paired_at' => $pairing?->paired_at ?: now(),
+            'last_seen_at' => now(),
+        ];
+        if (Schema::hasColumn('group_v8_ble_pairings', 'bracelet_model')) {
+            $payload['bracelet_model'] = $model;
+        }
+
         $pairing = GroupV8BlePairing::updateOrCreate(
             ['group_id' => $groupId],
-            [
-                'paired_by' => $userId,
-                'bracelet_id' => $validated['bracelet_id'],
-                'bracelet_name' => $validated['bracelet_name'] ?: 'Pulseira V8',
-                'paired_at' => $pairing?->paired_at ?: now(),
-                'last_seen_at' => now(),
-            ]
+            $payload
         );
         $pairing->load('pairedByUser');
 
@@ -112,6 +135,13 @@ class GroupV8BlePairingController extends Controller
      */
     public function destroy(int $groupId)
     {
+        if (! Schema::hasTable('group_v8_ble_pairings')) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Nenhuma pulseira vinculada.',
+            ]);
+        }
+
         $group = $this->assertGroupMember($groupId);
         $userId = (int) Auth::id();
         $pairing = GroupV8BlePairing::where('group_id', $groupId)->first();
@@ -143,9 +173,18 @@ class GroupV8BlePairingController extends Controller
     {
         $user = $pairing->pairedByUser;
 
+        $model = 'v8';
+        if (Schema::hasColumn('group_v8_ble_pairings', 'bracelet_model')) {
+            $raw = strtolower((string) ($pairing->bracelet_model ?: ''));
+            if (in_array($raw, ['v5', 'v8'], true)) {
+                $model = $raw;
+            }
+        }
+
         return [
             'bracelet_id' => $pairing->bracelet_id,
             'bracelet_name' => $pairing->bracelet_name,
+            'bracelet_model' => $model,
             'paired_by' => (int) $pairing->paired_by,
             'paired_by_name' => $user?->name,
             'paired_at' => optional($pairing->paired_at)->toIso8601String(),
@@ -156,9 +195,15 @@ class GroupV8BlePairingController extends Controller
     private function latestV8Readings(int $groupId): array
     {
         $rows = VitalSign::where('group_id', $groupId)
-            ->where('notes', 'like', '%wearable%V8%')
+            ->where(function ($q) {
+                $q->where('notes', 'like', '%wearable%')
+                    ->orWhere('notes', 'like', '%V8%')
+                    ->orWhere('notes', 'like', '%v8%')
+                    ->orWhere('notes', 'like', '%V5%')
+                    ->orWhere('notes', 'like', '%v5%');
+            })
             ->orderByDesc('measured_at')
-            ->limit(80)
+            ->limit(120)
             ->get();
 
         $readings = [
@@ -171,6 +216,7 @@ class GroupV8BlePairingController extends Controller
         ];
         $recordedBy = null;
         $lastMeasuredAt = null;
+        $notes = null;
 
         foreach ($rows as $row) {
             if ($recordedBy === null && $row->recorded_by) {
@@ -178,6 +224,9 @@ class GroupV8BlePairingController extends Controller
             }
             if ($lastMeasuredAt === null && $row->measured_at) {
                 $lastMeasuredAt = $row->measured_at->toIso8601String();
+            }
+            if ($notes === null && $row->notes) {
+                $notes = (string) $row->notes;
             }
             $type = $row->type;
             if (! array_key_exists($type, $readings) || $readings[$type] !== null) {
@@ -190,6 +239,7 @@ class GroupV8BlePairingController extends Controller
             'readings' => $readings,
             'recorded_by' => $recordedBy,
             'last_measured_at' => $lastMeasuredAt,
+            'notes' => $notes,
         ];
     }
 
@@ -262,5 +312,14 @@ class GroupV8BlePairingController extends Controller
         $isCreator = isset($group->created_by) && (int) $group->created_by === $userId;
 
         return $isAdmin || $isCreator;
+    }
+
+    private function inferModelFromNotes(?string $notes): string
+    {
+        if (is_string($notes) && preg_match('/\bV5\b/i', $notes)) {
+            return 'v5';
+        }
+
+        return 'v8';
     }
 }

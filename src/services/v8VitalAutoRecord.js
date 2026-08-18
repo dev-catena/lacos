@@ -55,6 +55,7 @@ export async function persistBraceletVitalSigns({
   sleepSession,
   ecgResult,
   deviceName,
+  braceletModel,
   auto = false,
 }) {
   if (!groupId) {
@@ -83,10 +84,11 @@ export async function persistBraceletVitalSigns({
   }
 
   const measuredAt = new Date().toISOString();
+  const modelTag = String(braceletModel || '').toLowerCase() === 'v5' ? 'V5' : 'V8';
   const namePart = deviceName ? ` (${deviceName})` : '';
   const notes = auto
-    ? `wearable: V8${namePart} | auto:30min`
-    : `wearable: V8${namePart}`;
+    ? `wearable: ${modelTag}${namePart} | auto:30min`
+    : `wearable: ${modelTag}${namePart}`;
 
   const results = [];
 

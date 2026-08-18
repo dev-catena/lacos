@@ -10,16 +10,28 @@ function parseDevice(raw) {
   if (!raw) return null;
   const parsed = JSON.parse(raw);
   if (!parsed?.id || !parsed?.name) return null;
+  const model = String(parsed.model || '').toLowerCase();
+  parsed.model = model === 'v5' || model === 'v8' ? model : 'v8';
   return parsed;
 }
 
-export async function loadPairedDevice(groupId) {
+export async function loadPairedDevice(groupId, { currentUserId } = {}) {
   try {
+    let device = null;
     if (groupId) {
-      const scoped = parseDevice(await AsyncStorage.getItem(scopedKey(groupId)));
-      if (scoped) return scoped;
+      device = parseDevice(await AsyncStorage.getItem(scopedKey(groupId)));
     }
-    return parseDevice(await AsyncStorage.getItem(KEY));
+    if (!device) {
+      device = parseDevice(await AsyncStorage.getItem(KEY));
+    }
+    if (
+      device?.ownerUserId != null &&
+      currentUserId != null &&
+      Number(device.ownerUserId) !== Number(currentUserId)
+    ) {
+      return null;
+    }
+    return device;
   } catch {
     return null;
   }

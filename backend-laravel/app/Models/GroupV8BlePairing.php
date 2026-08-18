@@ -13,6 +13,7 @@ class GroupV8BlePairing extends Model
         'paired_by',
         'bracelet_id',
         'bracelet_name',
+        'bracelet_model',
         'paired_at',
         'last_seen_at',
     ];

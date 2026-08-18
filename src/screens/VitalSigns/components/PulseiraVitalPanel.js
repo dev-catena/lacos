@@ -16,7 +16,13 @@ import moment from 'moment';
 import colors from '../../../constants/colors';
 import SafeIcon from '../../../components/SafeIcon';
 import { useV8Ble } from '../../../ble/v8/useV8Ble';
-import { loadPairedDevice } from '../../../ble/v8/pairedStorage';
+import { latestFromVitalRows } from '../../../ble/v8/v8LatestFromVitals';
+import {
+  BRACELET_MODEL,
+  braceletModelLabel,
+} from '../../../ble/braceletModels';
+import { useAuth } from '../../../contexts/AuthContext';
+import vitalSignService from '../../../services/vitalSignService';
 import {
   V8_AUTO_RECORD_INTERVAL_MS,
   getLastV8AutoSaveAt,
@@ -30,6 +36,54 @@ import {
   getV8BlePairing,
   unpairV8BlePairing,
 } from '../../../services/v8BlePairingService';
+import { describeCurrentOta, getOtaInfo } from '../../../services/otaUpdateService';
+
+function ModelPicker({ selected, onSelect, disabled }) {
+  const options = [
+    {
+      id: BRACELET_MODEL.v5,
+      title: 'V5',
+      subtitle: 'FC, SpO₂, temp., sono e ECG via PPG',
+    },
+    {
+      id: BRACELET_MODEL.v8,
+      title: 'V8',
+      subtitle: 'FC, SpO₂, PA, temp., sono e ECG',
+    },
+  ];
+  return (
+    <View style={styles.modelPicker}>
+      <Text style={styles.sectionTitle}>Qual pulseira o paciente usa?</Text>
+      <Text style={styles.sectionHint}>
+        Escolha o modelo antes de procurar. Só um fica vinculado a este paciente.
+      </Text>
+      <View style={styles.modelRow}>
+        {options.map((opt) => {
+          const active = selected === opt.id;
+          return (
+            <TouchableOpacity
+              key={opt.id}
+              style={[styles.modelCard, active && styles.modelCardActive]}
+              onPress={() => onSelect(opt.id)}
+              disabled={disabled}
+              activeOpacity={0.85}
+            >
+              <SafeIcon
+                name="watch"
+                size={22}
+                color={active ? colors.primary : colors.gray400}
+              />
+              <Text style={[styles.modelCardTitle, active && styles.modelCardTitleActive]}>
+                {opt.title}
+              </Text>
+              <Text style={styles.modelCardSub}>{opt.subtitle}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 function statusLabel(uiState) {
   switch (uiState) {
@@ -172,7 +226,8 @@ function ReadingsGrid({
  * Dono da conexão BLE: conecta, mede e grava no grupo.
  */
 function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged }) {
-  const ble = useV8Ble(groupId);
+  const { user } = useAuth();
+  const ble = useV8Ble(groupId, user?.id);
   const [saving, setSaving] = useState(false);
   const [lastAutoSaveAt, setLastAutoSaveAtState] = useState(null);
   const [nowTick, setNowTick] = useState(Date.now());
@@ -211,7 +266,12 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
     let cancelled = false;
     (async () => {
       try {
-        await claimV8BlePairing(groupId, ble.pairedDevice.id, ble.pairedDevice.name);
+        await claimV8BlePairing(
+          groupId,
+          ble.pairedDevice.id,
+          ble.pairedDevice.name,
+          ble.pairedDevice.model || ble.braceletModel,
+        );
       } catch (e) {
         if (e?.status === 409) {
           Toast.show({
@@ -226,7 +286,7 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
     return () => {
       cancelled = true;
     };
-  }, [groupId, ble.pairedDevice?.id, ble.pairedDevice?.name, onPairingChanged]);
+  }, [groupId, ble.pairedDevice?.id, ble.pairedDevice?.name, ble.pairedDevice?.model, ble.braceletModel, onPairingChanged]);
 
   const handleChangeBracelet = useCallback(async () => {
     try {
@@ -260,6 +320,7 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
           sleepSession: current.sleepSession,
           ecgResult: current.ecgResult,
           deviceName: current.connectedName || current.pairedDevice?.name,
+          braceletModel: current.pairedDevice?.model || current.braceletModel,
           auto,
         });
         if (result.success) {
@@ -275,7 +336,12 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
           }
           const paired = current.pairedDevice;
           if (paired?.id) {
-            claimV8BlePairing(groupId, paired.id, paired.name).catch(() => {});
+            claimV8BlePairing(
+              groupId,
+              paired.id,
+              paired.name,
+              paired.model || current.braceletModel,
+            ).catch(() => {});
           }
           onSaved?.();
         }
@@ -380,6 +446,9 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
   // nowTick força re-render do countdown
   void nowTick;
 
+  const activeModel = ble.pairedDevice?.model || ble.braceletModel;
+  const modelLabel = activeModel ? braceletModelLabel(activeModel) : null;
+
   return (
     <ScrollView
       style={[styles.scroll, !active && styles.hidden]}
@@ -399,8 +468,8 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
             <Text style={styles.statusSubtitle} numberOfLines={2}>
               {ble.statusDetail ||
                 (ble.pairedDevice
-                  ? `Pareada: ${ble.pairedDevice.name}`
-                  : 'Procure e conecte a pulseira V8')}
+                  ? `Pareada (${modelLabel || 'V8'}): ${ble.pairedDevice.name}`
+                  : 'Escolha V5 ou V8 e conecte a pulseira do paciente')}
             </Text>
           </View>
           {ble.battery != null ? (
@@ -483,21 +552,33 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity
-              style={[styles.primaryBtn, isBusy && styles.btnDisabled]}
-              onPress={ble.startScan}
-              disabled={isBusy}
-              activeOpacity={0.85}
-            >
+            <>
+              <ModelPicker
+                selected={ble.braceletModel}
+                onSelect={ble.selectBraceletModel}
+                disabled={isBusy}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.primaryBtn,
+                  (isBusy || !ble.braceletModel) && styles.btnDisabled,
+                ]}
+                onPress={ble.startScan}
+                disabled={isBusy || !ble.braceletModel}
+                activeOpacity={0.85}
+              >
               {ble.uiState === 'scanning' ? (
                 <ActivityIndicator color={colors.textWhite} />
               ) : (
                 <SafeIcon name="bluetooth" size={20} color={colors.textWhite} />
               )}
               <Text style={styles.primaryBtnText}>
-                {ble.uiState === 'scanning' ? 'Procurando…' : 'Procurar pulseira'}
+                {ble.uiState === 'scanning'
+                  ? 'Procurando…'
+                  : `Procurar pulseira ${ble.braceletModel ? ble.braceletModel.toUpperCase() : ''}`}
               </Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </>
           )}
 
           {ble.devices.length > 0 ? (
@@ -670,6 +751,9 @@ function PulseiraViewerPanel({
 }) {
   const ownerName = pairing?.paired_by_name;
   const braceletName = pairing?.bracelet_name;
+  const modelLabel = pairing?.bracelet_model
+    ? braceletModelLabel(pairing.bracelet_model)
+    : null;
   const measuredAt =
     latest?.heart_rate?.measured_at ||
     latest?.oxygen_saturation?.measured_at ||
@@ -728,12 +812,12 @@ function PulseiraViewerPanel({
             <Text style={styles.statusTitle}>
               {hasAny ? 'Dados da pulseira do grupo' : 'Aguardando leituras'}
             </Text>
-            <Text style={styles.statusSubtitle} numberOfLines={3}>
+            <Text style={styles.statusSubtitle} numberOfLines={4}>
               {ownerName
-                ? `Conectada por ${ownerName}${braceletName ? ` · ${braceletName}` : ''}`
-                : braceletName
-                  ? `Pulseira ${braceletName} vinculada ao grupo`
-                  : 'A pulseira do paciente já está vinculada. Você só visualiza os sinais gravados.'}
+                ? `Conectada por ${ownerName}${braceletName ? ` · ${braceletName}` : ''}${
+                    modelLabel ? ` · ${modelLabel}` : ''
+                  }. Você só visualiza — sem reconectar.`
+                : 'Participante: só visualização. Reconectar/Trocar ficam com o admin ou quem vinculou a pulseira.'}
             </Text>
           </View>
         </View>
@@ -772,10 +856,27 @@ function PulseiraViewerPanel({
 }
 
 /**
- * Painel da pulseira V8 no grupo: o membro que conecta controla o BLE;
+ * Painel da pulseira (V5 ou V8) no grupo: o membro que conecta controla o BLE;
  * os demais só veem os sinais gravados no backend.
  */
+function ModeDebugBanner({ mode, canConnectServer, email, pairingError }) {
+  const ota = getOtaInfo();
+  const shortOta = ota.updateId ? String(ota.updateId).slice(0, 13) : 'embedded';
+  return (
+    <View style={styles.modeDebug}>
+      <Text style={styles.modeDebugText}>
+        modo={mode} · can_connect={canConnectServer == null ? '?' : canConnectServer ? '1' : '0'} ·{' '}
+        ota={shortOta} · {email || '?—'}
+        {pairingError ? ` · api:${pairingError}` : ''}
+      </Text>
+      <Text style={styles.modeDebugSub}>{describeCurrentOta()}</Text>
+    </View>
+  );
+}
+
 export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) {
+  const { user } = useAuth();
+  const myId = user?.id != null ? Number(user.id) : null;
   const [loading, setLoading] = useState(true);
   const [canConnect, setCanConnect] = useState(false);
   const [canUnpair, setCanUnpair] = useState(false);
@@ -783,27 +884,95 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
   const [latest, setLatest] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(null);
+  const [debugMeta, setDebugMeta] = useState({
+    canConnectServer: null,
+    pairingError: null,
+  });
 
   const refresh = useCallback(async ({ silent } = {}) => {
     if (!groupId) return;
     if (!silent) setRefreshing(true);
     try {
-      const data = await getV8BlePairing(groupId);
-      setPairing(data.pairing);
-      setLatest(data.latest);
-      setCanConnect(!!data.canConnect);
-      setCanUnpair(!!data.canUnpair && !data.canConnect);
+      const vitalsRes = await vitalSignService.getVitalSigns(groupId);
+      const fromVitals = latestFromVitalRows(vitalsRes?.data);
+
+      // Fonte única: API can_connect. Se falhar → viewer (nunca dono).
+      let pairingData = null;
+      let pairingError = null;
+      try {
+        pairingData = await getV8BlePairing(groupId);
+      } catch (e) {
+        pairingData = null;
+        pairingError = e?.message || 'pairing_fail';
+      }
+
+      const ownerFromPairing =
+        pairingData?.pairing?.paired_by != null
+          ? Number(pairingData.pairing.paired_by)
+          : null;
+      const ownerFromVitals =
+        fromVitals.recordedBy != null ? Number(fromVitals.recordedBy) : null;
+      const linkedOwnerId = ownerFromPairing || ownerFromVitals;
+      const isLinkedOwner =
+        myId != null && linkedOwnerId != null && Number(linkedOwnerId) === myId;
+
+      // Só o servidor decide. Sem resposta → false (amigo nunca herda BLE local).
+      let nextCanConnect = pairingData?.canConnect === true;
+      // Travamento local extra: se já há dono e não sou eu, nunca BLE.
+      if (linkedOwnerId != null && myId != null && linkedOwnerId !== myId) {
+        nextCanConnect = false;
+      }
+
+      const pairingHasData =
+        pairingData?.latest && Object.values(pairingData.latest).some(Boolean);
+      const latestReadings = pairingHasData ? pairingData.latest : fromVitals.latest;
+
+      const pairingPayload =
+        pairingData?.pairing ||
+        (linkedOwnerId
+          ? {
+              bracelet_id: null,
+              bracelet_name: pairingData?.pairing?.bracelet_name || 'Pulseira',
+              bracelet_model: pairingData?.pairing?.bracelet_model || null,
+              paired_by: linkedOwnerId,
+              paired_by_name:
+                pairingData?.pairing?.paired_by_name || fromVitals.recordedByName,
+            }
+          : null);
+
+      const nextCanUnpair =
+        pairingData?.canUnpair === true && !nextCanConnect;
+
+      console.log('[PulseiraVitalPanel] mode', {
+        myId,
+        linkedOwnerId,
+        isLinkedOwner,
+        serverCanConnect: pairingData?.canConnect,
+        nextCanConnect,
+        pairingError,
+        email: user?.email,
+        ota: getOtaInfo().updateId,
+      });
+
+      setDebugMeta({
+        canConnectServer: pairingData ? !!pairingData.canConnect : null,
+        pairingError,
+      });
+      setPairing(pairingPayload);
+      setLatest(latestReadings);
+      setCanConnect(nextCanConnect);
+      setCanUnpair(nextCanUnpair);
       setLoadError(null);
     } catch (e) {
-      const local = await loadPairedDevice(groupId);
-      setCanConnect(!!local);
+      setCanConnect(false);
       setCanUnpair(false);
-      setLoadError(e?.message || 'Falha ao carregar vínculo da pulseira');
+      setDebugMeta({ canConnectServer: null, pairingError: e?.message || 'fail' });
+      setLoadError(e?.message || 'Falha ao carregar dados da pulseira');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [groupId]);
+  }, [groupId, myId, user?.email]);
 
   useEffect(() => {
     setLoading(true);
@@ -852,28 +1021,43 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
     );
   }
 
+  const debugBanner = (
+    <ModeDebugBanner
+      mode={canConnect ? 'owner-ble' : 'viewer'}
+      canConnectServer={debugMeta.canConnectServer}
+      email={user?.email}
+      pairingError={debugMeta.pairingError}
+    />
+  );
+
   if (canConnect) {
     return (
-      <PulseiraOwnerPanel
-        groupId={groupId}
-        onSaved={onSaved}
-        active={active}
-        onPairingChanged={refresh}
-      />
+      <View style={[styles.scroll, !active && styles.hidden]}>
+        {debugBanner}
+        <PulseiraOwnerPanel
+          groupId={groupId}
+          onSaved={onSaved}
+          active={active}
+          onPairingChanged={refresh}
+        />
+      </View>
     );
   }
 
   return (
-    <PulseiraViewerPanel
-      active={active}
-      pairing={pairing}
-      latest={latest}
-      canUnpair={canUnpair}
-      refreshing={refreshing}
-      onRefresh={refresh}
-      onUnpair={handleUnpair}
-      loadError={loadError}
-    />
+    <View style={[styles.scroll, !active && styles.hidden]}>
+      {debugBanner}
+      <PulseiraViewerPanel
+        active={active}
+        pairing={pairing}
+        latest={latest}
+        canUnpair={canUnpair}
+        refreshing={refreshing}
+        onRefresh={refresh}
+        onUnpair={handleUnpair}
+        loadError={loadError}
+      />
+    </View>
   );
 }
 
@@ -881,6 +1065,27 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   hidden: { display: 'none' },
   loadingBox: { alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
+  modeDebug: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFF3CD',
+    borderWidth: 1,
+    borderColor: '#F0D78C',
+  },
+  modeDebugText: {
+    fontSize: 11,
+    color: '#5C4B00',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  modeDebugSub: {
+    marginTop: 2,
+    fontSize: 10,
+    color: '#7A6500',
+  },
   content: { padding: 16, paddingBottom: 40 },
   viewerHint: {
     marginTop: 10,
@@ -952,6 +1157,31 @@ const styles = StyleSheet.create({
   section: { gap: 10 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
   sectionHint: { fontSize: 13, color: colors.textLight, marginBottom: 4 },
+  modelPicker: { gap: 8, marginBottom: 4 },
+  modelRow: { flexDirection: 'row', gap: 10 },
+  modelCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    gap: 6,
+  },
+  modelCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: '#EEF6FF',
+  },
+  modelCardTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+  modelCardTitleActive: { color: colors.primary },
+  modelCardSub: {
+    fontSize: 11,
+    color: colors.textLight,
+    textAlign: 'center',
+    lineHeight: 15,
+  },
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',

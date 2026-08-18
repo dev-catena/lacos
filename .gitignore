@@ -39,3 +39,6 @@ node_modules
 
 # Dumps OBM / SQL grandes (limite GitHub 100 MB)
 portal-obm-*.sql
+
+# SDKs das pulseiras (zips, __MACOSX, .git aninhado — não versionar)
+pulseira/

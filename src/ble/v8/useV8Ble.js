@@ -8,6 +8,10 @@ import {
 } from './connectBreadcrumb';
 import { elapsedMs, v8Error, v8Log, v8Warn } from './v8BleLog';
 import {
+  getBraceletCapabilities,
+  normalizeBraceletModel,
+} from '../braceletModels';
+import {
   AUTO_TYPE,
   V8_UUID,
   base64ToBytes,
@@ -20,6 +24,7 @@ import {
   cmdRealTimeStep,
   cmdRealtimeTemperature,
   cmdEcgStream,
+  cmdPpgMode,
   cmdSetAutomatic,
   cmdSetDeviceTime,
   cmdStartEcg,
@@ -85,6 +90,53 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * No Android, connectToDevice(id) sem o periférico no cache GATT derruba o processo.
+ * Localiza o device por scan/connectedDevices antes do connect.
+ */
+async function locateBleDevice(manager, deviceId, timeoutMs = 10000) {
+  try {
+    const connected = await manager.connectedDevices([V8_UUID.service]);
+    const already = connected?.find((d) => d.id === deviceId);
+    if (already) return already;
+  } catch {
+    // ignore
+  }
+  try {
+    const known = await manager.devices([deviceId]);
+    if (known?.[0]) return known[0];
+  } catch {
+    // ignore
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (device) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        manager.stopDeviceScan();
+      } catch {
+        // ignore
+      }
+      resolve(device);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    try {
+      manager.startDeviceScan(null, { allowDuplicates: false }, (err, device) => {
+        if (err) {
+          finish(null);
+          return;
+        }
+        if (device?.id === deviceId) finish(device);
+      });
+    } catch {
+      finish(null);
+    }
+  });
+}
+
 function createBleManagerSafe() {
   if (!BleManager) {
     throw new Error(BLE_UNAVAILABLE_MSG);
@@ -92,7 +144,7 @@ function createBleManagerSafe() {
   return new BleManager();
 }
 
-export function useV8Ble(groupId) {
+export function useV8Ble(groupId, ownerUserId) {
   const managerRef = useRef(null);
   const notifySubRef = useRef(null);
   const disconnectSubRef = useRef(null);
@@ -111,6 +163,8 @@ export function useV8Ble(groupId) {
   const [lastRx, setLastRx] = useState(null);
   const [devices, setDevices] = useState([]);
   const [pairedDevice, setPairedDevice] = useState(null);
+  const [braceletModel, setBraceletModelState] = useState(null);
+  const braceletModelRef = useRef(null);
   const [pairReady, setPairReady] = useState(false);
   const [connectedName, setConnectedName] = useState(null);
   const [lastBreadcrumb, setLastBreadcrumb] = useState(null);
@@ -130,6 +184,22 @@ export function useV8Ble(groupId) {
     uiStateRef.current = next;
     setUiState(next);
   }, []);
+
+  const applyBraceletModel = useCallback((model) => {
+    const next = normalizeBraceletModel(model);
+    braceletModelRef.current = next;
+    setBraceletModelState(next);
+    return next;
+  }, []);
+
+  const selectBraceletModel = useCallback(
+    (model) => {
+      applyBraceletModel(model);
+    },
+    [applyBraceletModel],
+  );
+
+  const currentCaps = () => getBraceletCapabilities(braceletModelRef.current);
 
   const clearMeasureTimers = useCallback(() => {
     if (measureTimeoutRef.current) {
@@ -411,12 +481,25 @@ export function useV8Ble(groupId) {
           cleanupConnection();
         }
 
-        // Sem requestMTU no connect: em vários Androids isso derruba o processo via RxJava.
-        await mark('connect:gatt');
-        const device = await manager.connectToDevice(deviceId, {
-          autoConnect: false,
-          timeout: 15000,
-        });
+        let device;
+        if (Platform.OS === 'android') {
+          await mark('connect:scan');
+          const located = await locateBleDevice(manager, deviceId);
+          if (!located) {
+            throw new Error(
+              'Pulseira não encontrada no Bluetooth. Aproxime o aparelho e toque em Reconectar.',
+            );
+          }
+          v8Log('connect:scan', 'encontrada', { id: shortId, ms: elapsedMs(t0) });
+          await mark('connect:gatt');
+          device = await located.connect({ autoConnect: false, timeout: 15000 });
+        } else {
+          await mark('connect:gatt');
+          device = await manager.connectToDevice(deviceId, {
+            autoConnect: false,
+            timeout: 15000,
+          });
+        }
         v8Log('connect:gatt', 'conectado', {
           id: shortId,
           ms: elapsedMs(t0),
@@ -518,7 +601,17 @@ export function useV8Ble(groupId) {
 
         if (persist) {
           await mark('connect:persist');
-          const paired = { id: deviceId, name: displayName };
+          const model =
+            normalizeBraceletModel(braceletModelRef.current) ||
+            normalizeBraceletModel(pairedRef.current?.model) ||
+            'v8';
+          applyBraceletModel(model);
+          const paired = {
+            id: deviceId,
+            name: displayName,
+            ownerUserId: ownerUserId ?? null,
+            model,
+          };
           pairedRef.current = paired;
           setPairedDevice(paired);
           await savePairedDevice(paired, groupId);
@@ -546,10 +639,12 @@ export function useV8Ble(groupId) {
             ? `Falha ao reconectar (${step}): ${message}`
             : `Falha ao conectar (${step}): ${message}`,
         );
-        try {
-          await manager.cancelDeviceConnection(deviceId);
-        } catch {
-          // ignore
+        if (Platform.OS !== 'android') {
+          try {
+            await manager.cancelDeviceConnection(deviceId);
+          } catch {
+            // ignore
+          }
         }
         cleanupConnection();
         updateUiState(pairedRef.current ? 'idle' : 'error');
@@ -558,7 +653,7 @@ export function useV8Ble(groupId) {
         v8Log('connect:finally', step, { ms: elapsedMs(t0) });
       }
     },
-    [cleanupConnection, groupId, safeWrite, stopScan, updateUiState],
+    [applyBraceletModel, cleanupConnection, groupId, ownerUserId, safeWrite, stopScan, updateUiState],
   );
 
   const tryAutoConnect = useCallback(async () => {
@@ -600,6 +695,13 @@ export function useV8Ble(groupId) {
       setError('Permissão de Bluetooth/localização negada.');
       return;
     }
+    // Android: auto-connect no GATT derruba o app (crash em connect:gatt).
+    // Quem vinculou reconecta com o botão, depois de um scan.
+    if (Platform.OS === 'android') {
+      v8Log('auto:skip', 'android-manual');
+      setStatusDetail('Toque em Reconectar para ligar a pulseira');
+      return;
+    }
     v8Log('auto:start', paired.name || paired.id);
     await connect(paired.id, paired.name, { persist: true });
   }, [connect]);
@@ -608,12 +710,13 @@ export function useV8Ble(groupId) {
     let cancelled = false;
     (async () => {
       const [paired, crumb] = await Promise.all([
-        loadPairedDevice(groupId),
+        loadPairedDevice(groupId, { currentUserId: ownerUserId }),
         loadConnectBreadcrumb(),
       ]);
       if (cancelled) return;
       pairedRef.current = paired;
       setPairedDevice(paired);
+      if (paired?.model) applyBraceletModel(paired.model);
       if (crumb?.step && crumb.step !== 'connect:done') {
         setLastBreadcrumb(crumb);
         v8Log('breadcrumb:restored', crumb.step, crumb);
@@ -623,7 +726,7 @@ export function useV8Ble(groupId) {
     return () => {
       cancelled = true;
     };
-  }, [groupId]);
+  }, [applyBraceletModel, groupId, ownerUserId]);
 
   useEffect(() => {
     let manager;
@@ -676,6 +779,7 @@ export function useV8Ble(groupId) {
   }, [clearMeasureTimers, updateUiState]);
 
   useEffect(() => {
+    if (Platform.OS === 'android') return;
     if (!pairReady || !pairedDevice) return;
     if (autoConnectAttemptedRef.current) return;
     if (uiStateRef.current === 'unavailable') return;
@@ -705,6 +809,7 @@ export function useV8Ble(groupId) {
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
+      if (Platform.OS === 'android') return;
       if (next !== 'active' || !pairedRef.current) return;
       if (
         uiStateRef.current === 'connected' ||
@@ -729,9 +834,16 @@ export function useV8Ble(groupId) {
         try {
           await write(cmdStopSpo2());
           await write(cmdStopHeartRate());
-          await write(cmdStopHrv());
-          await write(cmdStopEcg());
-          await write(cmdEcgStream(false));
+          if (currentCaps().supportsManualHrv) {
+            await write(cmdStopHrv());
+          }
+          if (currentCaps().supportsManualEcgPacket) {
+            await write(cmdStopEcg());
+            await write(cmdEcgStream(false));
+          } else {
+            await write(cmdPpgMode(3));
+            await write(cmdPpgMode(5));
+          }
           await write(cmdRealTimeStep(false));
         } catch {
           // ignore
@@ -749,13 +861,14 @@ export function useV8Ble(groupId) {
     await disconnect();
     pairedRef.current = null;
     setPairedDevice(null);
+    applyBraceletModel(null);
     await clearPairedDevice(groupId);
     autoConnectAttemptedRef.current = false;
     setDevices([]);
     setError(null);
     setStatusDetail(null);
     updateUiState('idle');
-  }, [disconnect, groupId, updateUiState]);
+  }, [applyBraceletModel, disconnect, groupId, updateUiState]);
 
   const reconnectPaired = useCallback(async () => {
     autoConnectAttemptedRef.current = true;
@@ -768,6 +881,11 @@ export function useV8Ble(groupId) {
       v8Error('scan', 'manager indisponível');
       setError(BLE_UNAVAILABLE_MSG);
       updateUiState('unavailable');
+      return;
+    }
+    if (!normalizeBraceletModel(braceletModelRef.current)) {
+      setError('Escolha o modelo da pulseira (V5 ou V8) antes de procurar.');
+      updateUiState('idle');
       return;
     }
     setError(null);
@@ -799,11 +917,12 @@ export function useV8Ble(groupId) {
         return;
       }
       if (!device) return;
+      const modelTag = (braceletModelRef.current || 'v8').toUpperCase();
       const name =
         device.name ||
         device.localName ||
         (device.serviceUUIDs?.some((u) => u.toUpperCase().includes('FFF0'))
-          ? `V8 ${device.id.slice(-5)}`
+          ? `${modelTag} ${device.id.slice(-5)}`
           : null);
       if (!name) return;
       if (!seen.has(device.id)) {
@@ -840,7 +959,9 @@ export function useV8Ble(groupId) {
       updateUiState('measuring');
 
       await write(cmdStopSpo2());
-      await write(cmdStopHrv());
+      if (currentCaps().supportsManualHrv) {
+        await write(cmdStopHrv());
+      }
       await write(cmdRealTimeStep(true, true));
       await write(cmdStartHeartRate(60));
       setStatusDetail('Medindo batimentos — pulseira firme no pulso');
@@ -871,7 +992,9 @@ export function useV8Ble(groupId) {
       updateUiState('measuringSpo2');
 
       await write(cmdStopHeartRate());
-      await write(cmdStopHrv());
+      if (currentCaps().supportsManualHrv) {
+        await write(cmdStopHrv());
+      }
       await write(cmdRealTimeStep(true, true));
       await write(cmdStartSpo2(60));
       setStatusDetail('Medindo SpO₂ (~60s) — não mexa o braço');
@@ -924,14 +1047,18 @@ export function useV8Ble(groupId) {
       await write(cmdRealTimeStep(true, true));
       await write(cmdSetAutomatic(AUTO_TYPE.hrv, 5));
       await write(cmdStartHeartRate(60));
-      await sleep(200);
-      await write(cmdStartHrv(60));
+      if (currentCaps().supportsManualHrv) {
+        await sleep(200);
+        await write(cmdStartHrv(60));
+      }
       await write(cmdGetHrvData(0));
       setStatusDetail('Medindo PA (~60s) — pulseira firme e parada');
 
       measureTimeoutRef.current = setTimeout(async () => {
         try {
-          await write(cmdStopHrv());
+          if (currentCaps().supportsManualHrv) {
+            await write(cmdStopHrv());
+          }
           await write(cmdStopHeartRate());
           await write(cmdGetHrvData(0));
           await write(cmdGetHrvData(2));
@@ -959,7 +1086,9 @@ export function useV8Ble(groupId) {
   const stopBpMeasurement = useCallback(async () => {
     try {
       clearMeasureTimers();
-      await write(cmdStopHrv());
+      if (currentCaps().supportsManualHrv) {
+        await write(cmdStopHrv());
+      }
       await write(cmdStopHeartRate());
       await write(cmdGetHrvData(0));
       await write(cmdRealTimeStep(true, true));
@@ -1003,15 +1132,26 @@ export function useV8Ble(groupId) {
 
       await write(cmdStopHeartRate());
       await write(cmdStopSpo2());
-      await write(cmdStopHrv());
-      await write(cmdStartEcg(50_000));
-      await write(cmdEcgStream(true));
+      if (currentCaps().supportsManualHrv) {
+        await write(cmdStopHrv());
+      }
+      if (currentCaps().supportsManualEcgPacket) {
+        await write(cmdStartEcg(50_000));
+        await write(cmdEcgStream(true));
+      } else {
+        await write(cmdPpgMode(1));
+      }
       setStatusDetail('Medindo ECG (~50s) — mantenha o dedo/pulso firme');
 
       measureTimeoutRef.current = setTimeout(async () => {
         try {
-          await write(cmdStopEcg(50_000));
-          await write(cmdEcgStream(false));
+          if (currentCaps().supportsManualEcgPacket) {
+            await write(cmdStopEcg(50_000));
+            await write(cmdEcgStream(false));
+          } else {
+            await write(cmdPpgMode(3));
+            await write(cmdPpgMode(5));
+          }
           await write(cmdRealTimeStep(true, true));
         } catch {
           // ignore
@@ -1046,8 +1186,13 @@ export function useV8Ble(groupId) {
   const stopEcgMeasurement = useCallback(async () => {
     try {
       clearMeasureTimers();
-      await write(cmdStopEcg(50_000));
-      await write(cmdEcgStream(false));
+      if (currentCaps().supportsManualEcgPacket) {
+        await write(cmdStopEcg(50_000));
+        await write(cmdEcgStream(false));
+      } else {
+        await write(cmdPpgMode(3));
+        await write(cmdPpgMode(5));
+      }
       await write(cmdRealTimeStep(true, true));
       const samples = ecgSamplesRef.current.length;
       setEcgResult((prev) => ({
@@ -1080,6 +1225,8 @@ export function useV8Ble(groupId) {
     pairedDevice,
     pairReady,
     connectedName,
+    braceletModel,
+    selectBraceletModel,
     lastBreadcrumb,
     clearLastBreadcrumb,
     heartRate,

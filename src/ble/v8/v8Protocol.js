@@ -135,9 +135,18 @@ export function cmdStopEcg(durationMs = 50_000) {
   ]);
 }
 
+/**
+ * PPG/ECG 0x07 — SDK V5/V8.
+ * V5: 1 = iniciar, 2 = resultado, 3 = parar, 4 = progresso, 5 = sair.
+ * V8 stream: 1 = ligar, 0 = desligar.
+ */
+export function cmdPpgMode(mode, status = 0) {
+  return buildPacket([CMD.ppg, mode & 0xff, status & 0xff]);
+}
+
 /** Liga/desliga transmissão realtime de ECG (PPG 0x07). */
 export function cmdEcgStream(enable) {
-  return buildPacket([CMD.ppg, enable ? 1 : 0]);
+  return cmdPpgMode(enable ? 1 : 0);
 }
 
 export function cmdSetAutomatic(autoType, intervalMinutes = 5) {

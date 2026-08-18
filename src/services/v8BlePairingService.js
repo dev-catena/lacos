@@ -1,7 +1,7 @@
 import apiService from './apiService';
 
 /**
- * Vínculo da pulseira V8 BLE ao grupo (um dono; demais membros só visualizam).
+ * Vínculo da pulseira BLE (V5 ou V8) ao grupo (um dono; demais membros só visualizam).
  */
 export async function getV8BlePairing(groupId) {
   const res = await apiService.get(`/groups/${groupId}/v8-ble-pairing`);
@@ -17,11 +17,12 @@ export async function getV8BlePairing(groupId) {
   };
 }
 
-export async function claimV8BlePairing(groupId, braceletId, braceletName) {
+export async function claimV8BlePairing(groupId, braceletId, braceletName, braceletModel) {
   try {
     const res = await apiService.put(`/groups/${groupId}/v8-ble-pairing`, {
       bracelet_id: braceletId,
-      bracelet_name: braceletName || 'Pulseira V8',
+      bracelet_name: braceletName || (braceletModel === 'v5' ? 'Pulseira V5' : 'Pulseira V8'),
+      bracelet_model: braceletModel === 'v5' ? 'v5' : 'v8',
     });
     if (!res?.success) {
       const err = new Error(res?.message || 'Não foi possível vincular a pulseira ao grupo.');
