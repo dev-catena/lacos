@@ -63,11 +63,9 @@ export function latestFromVitalRows(rows) {
     (a, b) => new Date(b.measured_at || 0) - new Date(a.measured_at || 0),
   );
   const wearable = sorted.filter(isWearableVitalRow);
-  const typed = sorted.filter((row) => TYPES.includes(row.type));
 
   const latest = Object.fromEntries(TYPES.map((t) => [t, null]));
   fillLatest(latest, wearable);
-  fillLatest(latest, typed);
 
   const ownerRow = wearable.find((row) => row.recorded_by != null) || null;
 
@@ -76,6 +74,6 @@ export function latestFromVitalRows(rows) {
     recordedBy: ownerRow?.recorded_by != null ? Number(ownerRow.recorded_by) : null,
     recordedByName: ownerRow?.measured_by_name || null,
     hasWearable: wearable.length > 0,
-    hasAny: typed.length > 0,
+    hasAny: wearable.length > 0,
   };
 }

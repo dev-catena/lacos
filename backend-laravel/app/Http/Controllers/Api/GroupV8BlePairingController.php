@@ -39,11 +39,10 @@ class GroupV8BlePairingController extends Controller
             $isOwner = (int) $inferredOwnerId === $userId;
         }
 
-        // Com vínculo existente: SÓ o dono controla BLE (mesmo se outro membro for admin).
-        // Sem vínculo: só admin pode conectar pela primeira vez.
-        // Assim amigo (mesmo com role errada) não vê Reconectar/Trocar depois do vínculo.
+        // Dono da conexão BLE ou admin do grupo podem reconectar/trocar.
+        // Demais membros só visualizam os sinais gravados.
         $hasLink = $pairing !== null || $inferredOwnerId !== null;
-        $canConnect = $isOwner || ($isAdmin && ! $hasLink);
+        $canConnect = $isOwner || $isAdmin;
 
         $pairingPayload = $pairing ? $this->serializePairing($pairing) : null;
         if (! $pairingPayload && $inferredOwnerId) {
@@ -64,7 +63,7 @@ class GroupV8BlePairingController extends Controller
             'pairing' => $pairingPayload,
             'is_owner' => $isOwner,
             'can_connect' => $canConnect,
-            'can_unpair' => ($pairing && ($isOwner || $isAdmin)),
+            'can_unpair' => $hasLink && ($isOwner || $isAdmin),
             'latest' => $latest['readings'],
         ]);
     }
@@ -81,7 +80,7 @@ class GroupV8BlePairingController extends Controller
             ], 503);
         }
 
-        $this->assertGroupMember($groupId);
+        $group = $this->assertGroupMember($groupId);
         $userId = (int) Auth::id();
 
         $validated = $request->validate([
@@ -96,7 +95,7 @@ class GroupV8BlePairingController extends Controller
         }
 
         $pairing = GroupV8BlePairing::where('group_id', $groupId)->first();
-        if ($pairing && (int) $pairing->paired_by !== $userId) {
+        if ($pairing && (int) $pairing->paired_by !== $userId && ! $this->isGroupAdmin($group, $userId)) {
             return response()->json([
                 'success' => false,
                 'message' => 'A pulseira deste grupo já está vinculada por outro membro.',

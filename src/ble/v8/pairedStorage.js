@@ -6,24 +6,30 @@ function scopedKey(groupId) {
   return groupId ? `${KEY}/${groupId}` : KEY;
 }
 
-function parseDevice(raw) {
+function parseDevice(raw, groupId) {
   if (!raw) return null;
   const parsed = JSON.parse(raw);
   if (!parsed?.id || !parsed?.name) return null;
   const model = String(parsed.model || '').toLowerCase();
   parsed.model = model === 'v5' || model === 'v8' ? model : 'v8';
+  if (
+    parsed.groupId != null &&
+    groupId != null &&
+    String(parsed.groupId) !== String(groupId)
+  ) {
+    return null;
+  }
   return parsed;
 }
 
+/**
+ * Pulseira pareada deste grupo apenas.
+ * Não reutiliza o dispositivo de outro grupo (evita misturar Mamãe Sandra com Vovó Rosa).
+ */
 export async function loadPairedDevice(groupId, { currentUserId } = {}) {
   try {
-    let device = null;
-    if (groupId) {
-      device = parseDevice(await AsyncStorage.getItem(scopedKey(groupId)));
-    }
-    if (!device) {
-      device = parseDevice(await AsyncStorage.getItem(KEY));
-    }
+    if (!groupId) return null;
+    const device = parseDevice(await AsyncStorage.getItem(scopedKey(groupId)), groupId);
     if (
       device?.ownerUserId != null &&
       currentUserId != null &&
@@ -38,16 +44,13 @@ export async function loadPairedDevice(groupId, { currentUserId } = {}) {
 }
 
 export async function savePairedDevice(device, groupId) {
-  const payload = JSON.stringify(device);
-  if (groupId) {
-    await AsyncStorage.setItem(scopedKey(groupId), payload);
-  }
-  await AsyncStorage.setItem(KEY, payload);
+  if (!groupId) return;
+  const payload = JSON.stringify({ ...device, groupId });
+  await AsyncStorage.setItem(scopedKey(groupId), payload);
 }
 
 export async function clearPairedDevice(groupId) {
   if (groupId) {
     await AsyncStorage.removeItem(scopedKey(groupId));
   }
-  await AsyncStorage.removeItem(KEY);
 }

@@ -916,12 +916,8 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
       const isLinkedOwner =
         myId != null && linkedOwnerId != null && Number(linkedOwnerId) === myId;
 
-      // Só o servidor decide. Sem resposta → false (amigo nunca herda BLE local).
-      let nextCanConnect = pairingData?.canConnect === true;
-      // Travamento local extra: se já há dono e não sou eu, nunca BLE.
-      if (linkedOwnerId != null && myId != null && linkedOwnerId !== myId) {
-        nextCanConnect = false;
-      }
+      // Só o servidor decide (dono da pulseira ou admin). Sem resposta → false.
+      const nextCanConnect = pairingData?.canConnect === true;
 
       const pairingHasData =
         pairingData?.latest && Object.values(pairingData.latest).some(Boolean);
