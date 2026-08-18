@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\GroupV8BlePairing;
-use App\Models\User;
 use App\Models\VitalSign;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,34 +28,16 @@ class GroupV8BlePairingController extends Controller
         }
 
         $latest = $this->latestV8Readings($groupId);
-        $inferredOwnerId = $latest['recorded_by'] ?? null;
 
         $isAdmin = $this->isGroupAdmin($group, $userId);
-        $isOwner = false;
-        if ($pairing) {
-            $isOwner = (int) $pairing->paired_by === $userId;
-        } elseif ($inferredOwnerId) {
-            $isOwner = (int) $inferredOwnerId === $userId;
-        }
+        $isOwner = $pairing !== null && (int) $pairing->paired_by === $userId;
 
-        // Dono da conexão BLE ou admin do grupo podem reconectar/trocar.
-        // Demais membros só visualizam os sinais gravados.
-        $hasLink = $pairing !== null || $inferredOwnerId !== null;
+        // Só o registro deste group_id conta. Não inferir dono por sinais vitais
+        // (isso misturava a pulseira da Mamãe Sandra na Vovó Rosa).
+        $hasLink = $pairing !== null;
         $canConnect = $isOwner || $isAdmin;
 
         $pairingPayload = $pairing ? $this->serializePairing($pairing) : null;
-        if (! $pairingPayload && $inferredOwnerId) {
-            $inferredUser = User::find($inferredOwnerId);
-            $pairingPayload = [
-                'bracelet_id' => null,
-                'bracelet_name' => 'Pulseira',
-                'bracelet_model' => $this->inferModelFromNotes($latest['notes'] ?? null),
-                'paired_by' => $inferredOwnerId,
-                'paired_by_name' => $inferredUser?->name,
-                'paired_at' => null,
-                'last_seen_at' => $latest['last_measured_at'] ?? null,
-            ];
-        }
 
         return response()->json([
             'success' => true,
@@ -64,7 +45,14 @@ class GroupV8BlePairingController extends Controller
             'is_owner' => $isOwner,
             'can_connect' => $canConnect,
             'can_unpair' => $hasLink && ($isOwner || $isAdmin),
-            'latest' => $latest['readings'],
+            'latest' => $hasLink ? $latest['readings'] : [
+                'heart_rate' => null,
+                'oxygen_saturation' => null,
+                'blood_pressure' => null,
+                'temperature' => null,
+                'sleep' => null,
+                'ecg' => null,
+            ],
         ]);
     }
 
@@ -99,6 +87,16 @@ class GroupV8BlePairingController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'A pulseira deste grupo já está vinculada por outro membro.',
+            ], 409);
+        }
+
+        $alreadyElsewhere = GroupV8BlePairing::where('bracelet_id', $validated['bracelet_id'])
+            ->where('group_id', '!=', $groupId)
+            ->first();
+        if ($alreadyElsewhere) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Esta pulseira já está vinculada a outro grupo.',
             ], 409);
         }
 
@@ -311,14 +309,5 @@ class GroupV8BlePairingController extends Controller
         $isCreator = isset($group->created_by) && (int) $group->created_by === $userId;
 
         return $isAdmin || $isCreator;
-    }
-
-    private function inferModelFromNotes(?string $notes): string
-    {
-        if (is_string($notes) && preg_match('/\bV5\b/i', $notes)) {
-            return 'v5';
-        }
-
-        return 'v8';
     }
 }

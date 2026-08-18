@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -43,6 +43,12 @@ import groupService from '../../services/groupService';
 import planService from '../../services/planService';
 import KidsBackground from '../../components/KidsBackground';
 import { setCurrentGroupType } from '../../stores/currentGroupStore';
+import {
+  checkAndApplyOtaUpdate,
+  describeCurrentOta,
+  formatOtaDate,
+  getOtaInfo,
+} from '../../services/otaUpdateService';
 
 // Fallback das features Kids (usado enquanto a API não responde ou em caso de erro)
 const KIDS_FEATURES_FALLBACK = {
@@ -65,6 +71,7 @@ const KIDS_FEATURES_FALLBACK = {
   cameras: false,
   audiosRelogio: false,
   localizacaoRelogio: false,
+  gatewayV8: false,
 };
 
 const GroupDetailScreen = ({ route, navigation }) => {
@@ -78,6 +85,23 @@ const GroupDetailScreen = ({ route, navigation }) => {
   const [groupType, setGroupType] = useState('care');
   const [groupCode, setGroupCode] = useState(null);
   const [codeModalVisible, setCodeModalVisible] = useState(false);
+  const [checkingOta, setCheckingOta] = useState(false);
+  const otaInfo = getOtaInfo();
+
+  const handleCheckOta = useCallback(async () => {
+    if (checkingOta) return;
+    setCheckingOta(true);
+    try {
+      await checkAndApplyOtaUpdate();
+    } catch (e) {
+      Alert.alert(
+        'Atualização OTA',
+        e?.message || 'Não foi possível buscar a atualização. Tente de novo.',
+      );
+    } finally {
+      setCheckingOta(false);
+    }
+  }, [checkingOta]);
 
   useEffect(() => {
     checkAdminStatus();
@@ -460,7 +484,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     },
     {
       id: 'v8Gateway',
-      featureKey: 'sinaisVitais',
+      featureKey: 'gatewayV8',
       title: 'Gateway V8',
       subtitle: 'Parear ESP32 da pulseira (sem celular)',
       icon: 'hardware-chip',
@@ -741,6 +765,45 @@ const GroupDetailScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             );
           })}
+        </View>
+
+        <TouchableOpacity
+          style={styles.menuCard}
+          onPress={handleCheckOta}
+          disabled={checkingOta}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.menuIconContainer, { backgroundColor: colors.primary + '20' }]}>
+            {checkingOta ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Ionicons name="cloud-download-outline" size={32} color={colors.primary} />
+            )}
+          </View>
+          <View style={styles.menuContent}>
+            <Text style={styles.menuTitle}>
+              {checkingOta ? 'Buscando atualização…' : 'Atualização do app'}
+            </Text>
+            <Text style={styles.menuSubtitle}>
+              Buscar OTA{otaInfo.channel ? ` · canal ${otaInfo.channel}` : ''}
+            </Text>
+          </View>
+          <Ionicons name="refresh" size={22} color={colors.primary} />
+        </TouchableOpacity>
+
+        <View style={styles.otaFooter}>
+          <Text style={styles.otaFooterTitle}>Última atualização OTA</Text>
+          <Text style={styles.otaFooterLine} selectable>
+            {describeCurrentOta()}
+          </Text>
+          <Text style={styles.otaFooterLine}>
+            Data/hora: {formatOtaDate(otaInfo.createdAt)}
+          </Text>
+          {otaInfo.channel ? (
+            <Text style={styles.otaFooterMeta}>Canal: {otaInfo.channel}</Text>
+          ) : (
+            <Text style={styles.otaFooterMeta}>Canal: não identificado neste build</Text>
+          )}
         </View>
 
         {/* Info adicional */}
@@ -1055,6 +1118,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textLight,
     lineHeight: 18,
+  },
+  otaFooter: {
+    marginTop: 20,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  otaFooterTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 6,
+  },
+  otaFooterLine: {
+    fontSize: 12,
+    color: colors.textLight,
+    lineHeight: 18,
+  },
+  otaFooterMeta: {
+    marginTop: 4,
+    fontSize: 11,
+    color: colors.gray400,
   },
 });
 

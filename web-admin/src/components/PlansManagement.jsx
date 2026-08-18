@@ -128,6 +128,10 @@ const PlansManagement = () => {
               home do grupo para quem tiver essa funcionalidade no plano.
             </li>
             <li>
+              <strong>Gateway V8:</strong> o card só aparece no grupo se &quot;Gateway V8&quot; estiver marcado neste plano.
+              Não acompanha Sinais vitais.
+            </li>
+            <li>
               <strong>Smartwatch, Sensor de Quedas e Câmeras:</strong> Estas funcionalidades podem ser selecionadas, mas ainda não possuem cards implementados na aplicação mobile.
             </li>
             <li>

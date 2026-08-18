@@ -262,7 +262,21 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
   }, [groupId]);
 
   useEffect(() => {
-    if (!groupId || !ble.pairedDevice?.id) return undefined;
+    // Só grava o vínculo depois de conectar de verdade neste grupo.
+    // Carregar pulseira de outro grupo no storage não pode parear a Vovó Rosa.
+    const live =
+      ble.uiState === 'connected' ||
+      ble.uiState === 'measuring' ||
+      ble.uiState === 'measuringSpo2' ||
+      ble.uiState === 'measuringBP' ||
+      ble.uiState === 'measuringEcg';
+    if (!groupId || !ble.pairedDevice?.id || !live) return undefined;
+    if (
+      ble.pairedDevice.groupId != null &&
+      String(ble.pairedDevice.groupId) !== String(groupId)
+    ) {
+      return undefined;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -286,7 +300,7 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
     return () => {
       cancelled = true;
     };
-  }, [groupId, ble.pairedDevice?.id, ble.pairedDevice?.name, ble.pairedDevice?.model, ble.braceletModel, onPairingChanged]);
+  }, [groupId, ble.uiState, ble.pairedDevice?.id, ble.pairedDevice?.name, ble.pairedDevice?.model, ble.pairedDevice?.groupId, ble.braceletModel, onPairingChanged]);
 
   const handleChangeBracelet = useCallback(async () => {
     try {
@@ -906,13 +920,10 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
         pairingError = e?.message || 'pairing_fail';
       }
 
+      const officialPairing = pairingData?.pairing || null;
       const ownerFromPairing =
-        pairingData?.pairing?.paired_by != null
-          ? Number(pairingData.pairing.paired_by)
-          : null;
-      const ownerFromVitals =
-        fromVitals.recordedBy != null ? Number(fromVitals.recordedBy) : null;
-      const linkedOwnerId = ownerFromPairing || ownerFromVitals;
+        officialPairing?.paired_by != null ? Number(officialPairing.paired_by) : null;
+      const linkedOwnerId = ownerFromPairing;
       const isLinkedOwner =
         myId != null && linkedOwnerId != null && Number(linkedOwnerId) === myId;
 
@@ -920,21 +931,24 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
       const nextCanConnect = pairingData?.canConnect === true;
 
       const pairingHasData =
-        pairingData?.latest && Object.values(pairingData.latest).some(Boolean);
-      const latestReadings = pairingHasData ? pairingData.latest : fromVitals.latest;
+        officialPairing && pairingData?.latest && Object.values(pairingData.latest).some(Boolean);
+      const emptyLatest = {
+        heart_rate: null,
+        oxygen_saturation: null,
+        blood_pressure: null,
+        temperature: null,
+        sleep: null,
+        ecg: null,
+      };
+      const latestReadings = officialPairing
+        ? pairingHasData
+          ? pairingData.latest
+          : fromVitals.hasWearable
+            ? fromVitals.latest
+            : emptyLatest
+        : emptyLatest;
 
-      const pairingPayload =
-        pairingData?.pairing ||
-        (linkedOwnerId
-          ? {
-              bracelet_id: null,
-              bracelet_name: pairingData?.pairing?.bracelet_name || 'Pulseira',
-              bracelet_model: pairingData?.pairing?.bracelet_model || null,
-              paired_by: linkedOwnerId,
-              paired_by_name:
-                pairingData?.pairing?.paired_by_name || fromVitals.recordedByName,
-            }
-          : null);
+      const pairingPayload = officialPairing;
 
       const nextCanUnpair =
         pairingData?.canUnpair === true && !nextCanConnect;

@@ -138,6 +138,7 @@ class PlansService {
           teleconsulta: false,
           audiosRelogio: false,
           localizacaoRelogio: false,
+          gatewayV8: false,
         },
         isDefault: true,
       },
@@ -166,6 +167,7 @@ class PlansService {
           teleconsulta: false,
           audiosRelogio: false,
           localizacaoRelogio: false,
+          gatewayV8: false,
         },
         isDefault: false,
       },
@@ -194,6 +196,7 @@ class PlansService {
           teleconsulta: false,
           audiosRelogio: false,
           localizacaoRelogio: false,
+          gatewayV8: false,
         },
         isDefault: false,
       },
@@ -222,6 +225,7 @@ class PlansService {
           teleconsulta: false,
           audiosRelogio: false,
           localizacaoRelogio: false,
+          gatewayV8: false,
         },
         isDefault: false,
       },
@@ -257,6 +261,11 @@ class PlansService {
         key: 'localizacaoRelogio',
         label: 'Localização',
         description: 'Mapa com posição do relógio e últimos pontos (API Thalamus health/…/locations)',
+      },
+      {
+        key: 'gatewayV8',
+        label: 'Gateway V8',
+        description: 'Exibe o card para parear o ESP32 da pulseira (sem celular) na home do grupo',
       },
     ];
   }
