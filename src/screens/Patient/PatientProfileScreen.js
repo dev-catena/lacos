@@ -24,6 +24,7 @@ import {
   PersonIcon,
   PeopleIcon,
   ChevronForwardIcon,
+  SettingsIcon,
 } from '../../components/CustomIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -445,6 +446,25 @@ const PatientProfileScreen = ({ navigation }) => {
             )}
           </View>
         )}
+
+        {/* Configuração */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Configuração</Text>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('PatientSettings')}
+          >
+            <View style={styles.menuIcon}>
+              <SettingsIcon size={24} color={colors.primary} />
+            </View>
+            <View style={styles.menuContent}>
+              <Text style={styles.menuTitle}>Pulseira V5 e V8</Text>
+              <Text style={styles.menuSubtitle}>Conectar e escolher o modelo</Text>
+            </View>
+            <ChevronForwardIcon size={20} color={colors.gray400} />
+          </TouchableOpacity>
+        </View>
 
         {/* Help Section */}
         <View style={styles.section}>

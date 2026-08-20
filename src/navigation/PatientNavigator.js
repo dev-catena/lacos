@@ -16,6 +16,7 @@ import PatientProfileScreen from '../screens/Patient/PatientProfileScreen';
 import PatientHowToUseScreen from '../screens/Patient/PatientHowToUseScreen';
 import PatientEmergencyContactsScreen from '../screens/Patient/PatientEmergencyContactsScreen';
 import PatientSettingsScreen from '../screens/Patient/PatientSettingsScreen';
+import PatientBraceletHost from '../screens/Patient/PatientBraceletHost';
 import PatientMessagesScreen from '../screens/Patient/PatientMessagesScreen';
 import PatientJoinGroupScreen from '../screens/Patient/PatientJoinGroupScreen';
 import PatientVideoCallScreen from '../screens/Patient/PatientVideoCallScreen';
@@ -412,6 +413,7 @@ const PatientNavigator = () => {
         options={{ headerShown: false }}
       />
       </Stack.Navigator>
+      <PatientBraceletHost />
       {/* Componente de controle de navegação - renderizado fora do Stack mas com acesso via useNavigation */}
       <NavigationControllerWrapper hasGroup={hasGroup} />
     </>

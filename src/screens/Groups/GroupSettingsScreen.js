@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import KidsBackground from '../../components/KidsBackground';
 import { isKidsGroup } from '../../stores/currentGroupStore';
 import {
@@ -46,6 +46,12 @@ import {
   isValidBirthDateBR,
   birthDateBRToISO,
 } from '../../utils/dateInputMask';
+import {
+  checkAndApplyOtaUpdate,
+  describeCurrentOta,
+  formatOtaDate,
+  getOtaInfo,
+} from '../../services/otaUpdateService';
 
 const normalizeImageMimeType = (filename) => {
   const ext = filename?.split('.').pop()?.toLowerCase();
@@ -98,6 +104,23 @@ const GroupSettingsScreen = ({ route, navigation }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [checkingOta, setCheckingOta] = useState(false);
+  const otaInfo = getOtaInfo();
+
+  const handleCheckOta = useCallback(async () => {
+    if (checkingOta) return;
+    setCheckingOta(true);
+    try {
+      await checkAndApplyOtaUpdate();
+    } catch (e) {
+      Alert.alert(
+        'Atualização OTA',
+        e?.message || 'Não foi possível buscar a atualização. Tente de novo.',
+      );
+    } finally {
+      setCheckingOta(false);
+    }
+  }, [checkingOta]);
 
   // Data de nascimento do acompanhado (para grupos Kids)
   const [accompaniedBirthDate, setAccompaniedBirthDate] = useState('');
@@ -2046,6 +2069,32 @@ const GroupSettingsScreen = ({ route, navigation }) => {
           })}
         </View>
 
+        {/* Atualização OTA do app */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <SafeIcon name="cloud-download-outline" size={24} color={colors.primary} />
+            <Text style={styles.sectionTitle}>Atualização do app</Text>
+          </View>
+          <Text style={styles.sectionDescription}>
+            Busca a versão mais recente publicada via EAS Update (OTA), sem precisar baixar um APK novo.
+          </Text>
+          <TouchableOpacity
+            style={[styles.otaButton, checkingOta && styles.saveButtonDisabled]}
+            onPress={handleCheckOta}
+            disabled={checkingOta}
+            activeOpacity={0.7}
+          >
+            {checkingOta ? (
+              <ActivityIndicator color={colors.textWhite} />
+            ) : (
+              <SafeIcon name="refresh" size={20} color={colors.textWhite} />
+            )}
+            <Text style={styles.saveButtonText}>
+              {checkingOta ? 'Buscando atualização…' : 'Buscar atualização (OTA)'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Botão Salvar */}
         {(() => {
           console.log('🔘 GroupSettings - Renderizando botão "Salvar Configurações"');
@@ -2092,6 +2141,21 @@ const GroupSettingsScreen = ({ route, navigation }) => {
             </TouchableOpacity>
           </View>
         )}
+
+        <View style={styles.otaFooter}>
+          <Text style={styles.otaFooterTitle}>Última atualização OTA</Text>
+          <Text style={styles.otaFooterLine} selectable>
+            {describeCurrentOta()}
+          </Text>
+          <Text style={styles.otaFooterLine}>
+            Data/hora: {formatOtaDate(otaInfo.createdAt)}
+          </Text>
+          {otaInfo.channel ? (
+            <Text style={styles.otaFooterMeta}>Canal: {otaInfo.channel}</Text>
+          ) : (
+            <Text style={styles.otaFooterMeta}>Canal: não identificado neste build</Text>
+          )}
+        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -2806,6 +2870,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.textWhite,
+  },
+  otaButton: {
+    flexDirection: 'row',
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  otaFooter: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  otaFooterTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 6,
+  },
+  otaFooterLine: {
+    fontSize: 12,
+    color: colors.textLight,
+    lineHeight: 18,
+  },
+  otaFooterMeta: {
+    marginTop: 4,
+    fontSize: 11,
+    color: colors.gray400,
   },
   // Estilos do modal de exclusão
   modalOverlay: {

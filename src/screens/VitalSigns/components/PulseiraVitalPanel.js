@@ -266,7 +266,20 @@ function ReadingsGrid({
 /**
  * Dono da conexão BLE: conecta, mede e grava no grupo.
  */
-function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged }) {
+function PulseiraOwnerPanel({
+  groupId,
+  onSaved,
+  active = true,
+  onPairingChanged,
+  /** Paciente: grava vínculo no backend ao conectar. */
+  claimOwnership = false,
+  /** Paciente: envia leituras a cada 5 min. Cuidador: só sob demanda. */
+  enableAutoSave = false,
+  /** Paciente: sem botões "Medir agora". Demais perfis: com botões. */
+  hideManualMeasures = false,
+  /** Últimas leituras do backend (exibidas quando o BLE não está conectado). */
+  serverLatest = null,
+}) {
   const { user } = useAuth();
   const ble = useV8Ble(groupId, user?.id);
   const [saving, setSaving] = useState(false);
@@ -312,6 +325,7 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
       ble.uiState === 'measuringSpo2' ||
       ble.uiState === 'measuringBP' ||
       ble.uiState === 'measuringEcg';
+    if (!claimOwnership) return undefined;
     if (!groupId || !ble.pairedDevice?.id || !live) return undefined;
     if (
       ble.pairedDevice.groupId != null &&
@@ -330,7 +344,13 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
         );
       } catch (e) {
         if (cancelled) return;
-        if (e?.status === 409) {
+        if (e?.status === 403) {
+          Toast.show({
+            type: 'info',
+            text1: 'Pareamento só no app do paciente',
+            text2: e.message || 'Use o celular do acompanhado perto da pulseira.',
+          });
+        } else if (e?.status === 409) {
           Toast.show({
             type: 'info',
             text1: 'Pulseira já vinculada',
@@ -350,17 +370,29 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
     return () => {
       cancelled = true;
     };
-  }, [groupId, ble.uiState, ble.pairedDevice?.id, ble.pairedDevice?.name, ble.pairedDevice?.model, ble.pairedDevice?.groupId, ble.braceletModel, onPairingChanged]);
+  }, [
+    claimOwnership,
+    groupId,
+    ble.uiState,
+    ble.pairedDevice?.id,
+    ble.pairedDevice?.name,
+    ble.pairedDevice?.model,
+    ble.pairedDevice?.groupId,
+    ble.braceletModel,
+    onPairingChanged,
+  ]);
 
   const handleChangeBracelet = useCallback(async () => {
-    try {
-      await unpairV8BlePairing(groupId);
-    } catch {
-      // segue o unpair local mesmo se a API falhar
+    if (claimOwnership) {
+      try {
+        await unpairV8BlePairing(groupId);
+      } catch {
+        // segue o unpair local mesmo se a API falhar
+      }
     }
     await ble.changeBracelet();
     onPairingChanged?.();
-  }, [ble, groupId, onPairingChanged]);
+  }, [ble, claimOwnership, groupId, onPairingChanged]);
 
   // Tick a cada 30s para atualizar countdown na UI
   useEffect(() => {
@@ -399,7 +431,7 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
             });
           }
           const paired = current.pairedDevice;
-          if (paired?.id) {
+          if (claimOwnership && paired?.id) {
             claimV8BlePairing(
               groupId,
               paired.id,
@@ -415,7 +447,7 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
         if (!auto) setSaving(false);
       }
     },
-    [groupId, onSaved],
+    [claimOwnership, groupId, onSaved],
   );
 
   const handleSave = useCallback(async () => {
@@ -452,7 +484,7 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
       return;
     }
 
-    // Manual também conta como checkpoint do intervalo de 30 min
+    // Manual também conta como checkpoint do intervalo de auto-gravação
     const ts = Date.now();
     await setLastV8AutoSaveAt(groupId, ts);
     setLastAutoSaveAtState(ts);
@@ -472,21 +504,34 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
     }
   }, [groupId, runPersist]);
 
-  // Auto-gravação a cada 30 minutos enquanto conectada
+  // Auto-gravação a cada 5 minutos no celular do paciente enquanto conectada
   useEffect(() => {
-    if (!groupId || !isConnected) return undefined;
+    if (!enableAutoSave || !groupId || !isConnected) return undefined;
 
     let cancelled = false;
 
     const tryAutoSave = async () => {
       if (cancelled || AppState.currentState !== 'active') return;
       const current = bleRef.current;
+
+      try {
+        await current.refreshTemperature?.();
+        await current.refreshSleep?.();
+      } catch {
+        // segue com o que já tiver em memória
+      }
+
+      // Pequena espera para notificações BLE de temp/sono chegarem
+      await new Promise((r) => setTimeout(r, 1200));
+      if (cancelled) return;
+
+      const after = bleRef.current;
       const hasData =
-        (current.heartRate != null && current.heartRate > 0) ||
-        (current.spo2 != null && current.spo2 > 0) ||
-        current.bloodPressure ||
-        (current.temperatureC != null && current.temperatureC > 0) ||
-        (current.sleepSession && current.sleepSession.totalHours > 0);
+        (after.heartRate != null && after.heartRate > 0) ||
+        (after.spo2 != null && after.spo2 > 0) ||
+        after.bloodPressure ||
+        (after.temperatureC != null && after.temperatureC > 0) ||
+        (after.sleepSession && after.sleepSession.totalHours > 0);
       if (!hasData) return;
 
       const due = await isV8AutoSaveDue(groupId, V8_AUTO_RECORD_INTERVAL_MS);
@@ -494,7 +539,7 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
       await runPersist({ auto: true });
     };
 
-    // Checa ao conectar / ter leituras; depois a cada 60s (o gate de 30 min evita duplicar)
+    // Checa ao conectar / ter leituras; depois a cada 60s (o gate de 5 min evita duplicar)
     void tryAutoSave();
     const id = setInterval(() => {
       void tryAutoSave();
@@ -504,7 +549,17 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
       cancelled = true;
       clearInterval(id);
     };
-  }, [groupId, isConnected, runPersist, ble.heartRate, ble.spo2, ble.bloodPressure, ble.temperatureC, ble.sleepSession]);
+  }, [
+    enableAutoSave,
+    groupId,
+    isConnected,
+    runPersist,
+    ble.heartRate,
+    ble.spo2,
+    ble.bloodPressure,
+    ble.temperatureC,
+    ble.sleepSession,
+  ]);
 
   const nextInMs = msUntilNextV8AutoSave(lastAutoSaveAt, V8_AUTO_RECORD_INTERVAL_MS);
   // nowTick força re-render do countdown
@@ -512,6 +567,42 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
 
   const activeModel = ble.pairedDevice?.model || ble.braceletModel;
   const modelLabel = activeModel ? braceletModelLabel(activeModel) : null;
+
+  const serverBp =
+    serverLatest?.blood_pressure?.systolic != null
+      ? {
+          systolic: serverLatest.blood_pressure.systolic,
+          diastolic: serverLatest.blood_pressure.diastolic,
+        }
+      : null;
+  const displayHr = isConnected
+    ? ble.heartRate
+    : readingNumber(serverLatest?.heart_rate);
+  const displaySpo2 = isConnected
+    ? ble.spo2
+    : readingNumber(serverLatest?.oxygen_saturation);
+  const displayBp = isConnected ? ble.bloodPressure : serverBp;
+  const displayTemp = isConnected
+    ? ble.temperatureC
+    : readingNumber(serverLatest?.temperature);
+  const displaySleep = isConnected
+    ? ble.sleepSession
+    : (() => {
+        const h = readingNumber(serverLatest?.sleep);
+        return h != null
+          ? { totalHours: h, startAt: serverLatest?.sleep?.measured_at }
+          : null;
+      })();
+  const displayEcg = isConnected
+    ? ble.ecgResult
+    : serverLatest?.ecg
+      ? {
+          heartRate: serverLatest.ecg.heart_rate ?? readingNumber(serverLatest.ecg),
+          hrv: serverLatest.ecg.hrv ?? null,
+          stress: serverLatest.ecg.stress ?? null,
+          samples: serverLatest.ecg.samples ?? null,
+        }
+      : null;
 
   return (
     <ScrollView
@@ -566,26 +657,32 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
             Atualizado {moment(ble.lastUpdate).format('DD/MM HH:mm:ss')}
           </Text>
         ) : null}
-        {isConnected ? (
+        {enableAutoSave && isConnected ? (
           <View style={styles.autoSaveBox}>
-            <Text style={styles.autoSaveTitle}>Gravação automática (30 min)</Text>
+            <Text style={styles.autoSaveTitle}>Gravação automática (5 min)</Text>
             <Text style={styles.autoSaveText}>
               {lastAutoSaveAt
                 ? `Último envio: ${moment(lastAutoSaveAt).format('DD/MM HH:mm')} · próximo em ${formatCountdown(nextInMs)}`
-                : 'Aguardando primeira leitura para gravar em vital_signs'}
+                : 'Aguardando primeira leitura para gravar no grupo a cada 5 minutos'}
             </Text>
           </View>
+        ) : null}
+        {hideManualMeasures && isConnected ? (
+          <Text style={styles.viewerHint}>
+            Medidas sob demanda ficam com os cuidadores. Neste celular a pulseira envia
+            automaticamente para o grupo a cada 5 minutos.
+          </Text>
         ) : null}
       </View>
 
       <ReadingsGrid
-        heartRate={ble.heartRate}
-        spo2={ble.spo2}
-        bloodPressure={ble.bloodPressure}
-        temperatureC={ble.temperatureC}
-        sleepSession={ble.sleepSession}
-        ecgResult={ble.ecgResult}
-        ecgSampleCount={ble.ecgSampleCount}
+        heartRate={displayHr}
+        spo2={displaySpo2}
+        bloodPressure={displayBp}
+        temperatureC={displayTemp}
+        sleepSession={displaySleep}
+        ecgResult={displayEcg}
+        ecgSampleCount={isConnected ? ble.ecgSampleCount : displayEcg?.samples}
         measuringEcg={ble.uiState === 'measuringEcg'}
       />
 
@@ -612,7 +709,9 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
                 disabled={isBusy}
                 activeOpacity={0.85}
               >
-                <Text style={styles.secondaryBtnText}>Trocar pulseira</Text>
+                <Text style={styles.secondaryBtnText}>
+                  {claimOwnership ? 'Trocar pulseira' : 'Escolher outra pulseira'}
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -668,12 +767,36 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
             </View>
           ) : null}
         </View>
+      ) : hideManualMeasures ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Monitoramento automático</Text>
+          <Text style={styles.sectionHint}>
+            Mantenha este app aberto (ou em segundo plano com Bluetooth ligado) perto da
+            pulseira. As leituras vão para o backend a cada 5 minutos para o grupo ver.
+          </Text>
+          <TouchableOpacity
+            style={styles.secondaryBtn}
+            onPress={ble.disconnect}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.secondaryBtnText}>Desconectar</Text>
+          </TouchableOpacity>
+          {claimOwnership ? (
+            <TouchableOpacity
+              style={styles.linkBtn}
+              onPress={handleChangeBracelet}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.linkBtnText}>Trocar pulseira</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       ) : (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Medir agora</Text>
           <Text style={styles.sectionHint}>
-            Mantenha a pulseira firme no pulso. SpO₂ e PA levam cerca de 60 segundos. Com a
-            conexão ativa, as leituras disponíveis são gravadas no grupo a cada 30 minutos.
+            Mantenha a pulseira firme no pulso. SpO₂ e PA levam cerca de 60 segundos. Os
+            dados do monitoramento contínuo vêm do celular do paciente (a cada 5 minutos).
           </Text>
 
           <TouchableOpacity
@@ -791,7 +914,9 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
             onPress={handleChangeBracelet}
             activeOpacity={0.7}
           >
-            <Text style={styles.linkBtnText}>Trocar pulseira</Text>
+            <Text style={styles.linkBtnText}>
+              {claimOwnership ? 'Trocar pulseira' : 'Escolher outra pulseira'}
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -878,10 +1003,10 @@ function PulseiraViewerPanel({
             </Text>
             <Text style={styles.statusSubtitle} numberOfLines={4}>
               {ownerName
-                ? `Conectada por ${ownerName}${braceletName ? ` · ${braceletName}` : ''}${
-                    modelLabel ? ` · ${modelLabel}` : ''
-                  }. Você só visualiza — sem reconectar.`
-                : 'Participante: só visualização. Reconectar/Trocar ficam com o admin ou quem vinculou a pulseira.'}
+                ? `Vinculada pelo paciente (${ownerName})${
+                    braceletName ? ` · ${braceletName}` : ''
+                  }${modelLabel ? ` · ${modelLabel}` : ''}. Dados enviados pelo celular dele.`
+                : 'Aguardando o paciente parear a pulseira no app (Configuração → Pulseira V5/V8).'}
             </Text>
           </View>
         </View>
@@ -892,8 +1017,9 @@ function PulseiraViewerPanel({
           </Text>
         ) : null}
         <Text style={styles.viewerHint}>
-          Quem conectou a pulseira no celular do cuidador envia os sinais para o grupo.
-          Puxe para atualizar.
+          O celular do paciente grava as leituras no grupo a cada 5 minutos. Para medir
+          agora, conecte-se à pulseira pelo Bluetooth (perto do paciente). Puxe para
+          atualizar.
         </Text>
       </View>
 
@@ -920,8 +1046,9 @@ function PulseiraViewerPanel({
 }
 
 /**
- * Painel da pulseira (V5 ou V8) no grupo: o membro que conecta controla o BLE;
- * os demais só veem os sinais gravados no backend.
+ * Painel da pulseira (V5 ou V8) no grupo.
+ * - Paciente (patientMode): pareia, auto-grava a cada 5 min, sem Medir agora.
+ * - Demais: veem dados do backend e podem medir sob demanda via BLE próximo.
  */
 function ModeDebugBanner({ mode, canConnectServer, email, pairingError }) {
   const ota = getOtaInfo();
@@ -938,11 +1065,19 @@ function ModeDebugBanner({ mode, canConnectServer, email, pairingError }) {
   );
 }
 
-export default function PulseiraVitalPanel({ groupId, onSaved, active = true, allowConnect = false }) {
+export default function PulseiraVitalPanel({
+  groupId,
+  onSaved,
+  active = true,
+  allowConnect = false,
+  /** Perfil paciente/acompanhado: pareamento + auto 5 min, sem medidas sob demanda. */
+  patientMode = false,
+}) {
   const { user } = useAuth();
   const myId = user?.id != null ? Number(user.id) : null;
   const [loading, setLoading] = useState(true);
   const [canConnect, setCanConnect] = useState(false);
+  const [canClaim, setCanClaim] = useState(false);
   const [canUnpair, setCanUnpair] = useState(false);
   const [pairing, setPairing] = useState(null);
   const [latest, setLatest] = useState(null);
@@ -993,10 +1128,16 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true, al
         }
       }
       const nextCanConnect =
+        patientMode ||
         pairingData?.canConnect === true ||
         allowConnect ||
         patientFallback ||
         (pairingData == null && adminFallback);
+
+      const nextCanClaim =
+        patientMode ||
+        pairingData?.canClaim === true ||
+        (pairingData == null && (patientFallback || allowConnect));
 
       const pairingHasData =
         officialPairing && pairingData?.latest && Object.values(pairingData.latest).some(Boolean);
@@ -1025,7 +1166,9 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true, al
         myId,
         linkedOwnerId,
         isLinkedOwner,
+        patientMode,
         serverCanConnect: pairingData?.canConnect,
+        nextCanClaim,
         adminFallback,
         nextCanConnect,
         pairingError,
@@ -1040,10 +1183,12 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true, al
       setPairing(pairingPayload);
       setLatest(latestReadings);
       setCanConnect(nextCanConnect);
+      setCanClaim(nextCanClaim);
       setCanUnpair(nextCanUnpair);
       setLoadError(null);
     } catch (e) {
       setCanConnect(false);
+      setCanClaim(false);
       setCanUnpair(false);
       setDebugMeta({ canConnectServer: null, pairingError: e?.message || 'fail' });
       setLoadError(e?.message || 'Falha ao carregar dados da pulseira');
@@ -1051,7 +1196,7 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true, al
       setLoading(false);
       setRefreshing(false);
     }
-  }, [groupId, myId, user?.email, allowConnect]);
+  }, [groupId, myId, user?.email, allowConnect, patientMode]);
 
   useEffect(() => {
     setLoading(true);
@@ -1059,17 +1204,18 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true, al
   }, [refresh]);
 
   useEffect(() => {
-    if (!groupId || canConnect) return undefined;
+    if (!groupId) return undefined;
+    // Viewer ou cuidador sem BLE: atualiza leituras do backend
     const id = setInterval(() => {
       void refresh({ silent: true });
     }, 30_000);
     return () => clearInterval(id);
-  }, [groupId, canConnect, refresh]);
+  }, [groupId, refresh]);
 
   const handleUnpair = useCallback(() => {
     Alert.alert(
       'Desvincular pulseira',
-      'Os membros deixarão de ver esta pulseira como vinculada. Quem conectou poderá parear de novo.',
+      'Os membros deixarão de ver esta pulseira como vinculada. O paciente poderá parear de novo no app dele.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -1102,7 +1248,7 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true, al
 
   const debugBanner = (
     <ModeDebugBanner
-      mode={canConnect ? 'owner-ble' : 'viewer'}
+      mode={canConnect ? (patientMode || canClaim ? 'patient-ble' : 'care-ble') : 'viewer'}
       canConnectServer={debugMeta.canConnectServer}
       email={user?.email}
       pairingError={debugMeta.pairingError}
@@ -1118,6 +1264,10 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true, al
           onSaved={onSaved}
           active={active}
           onPairingChanged={refresh}
+          claimOwnership={patientMode || canClaim}
+          enableAutoSave={patientMode || canClaim}
+          hideManualMeasures={patientMode || canClaim}
+          serverLatest={latest}
         />
       </View>
     );

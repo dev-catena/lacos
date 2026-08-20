@@ -670,7 +670,7 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Mantém a pulseira montada (BLE + auto-save 30min) ao trocar de aba nesta tela */}
+      {/* Mantém a pulseira montada (BLE + auto-save do paciente) ao trocar de aba nesta tela */}
       <PulseiraVitalPanel
         groupId={groupId}
         active={activeTab === 'pulseira'}

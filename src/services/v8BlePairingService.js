@@ -27,13 +27,15 @@ export async function getV8BlePairing(groupId) {
     if (!res?.success) {
       throw wrapPairingError(res, 'Não foi possível carregar o vínculo da pulseira.');
     }
-    return {
-      pairing: res.pairing || null,
-      isOwner: !!res.is_owner,
-      canConnect: !!res.can_connect,
-      canUnpair: !!res.can_unpair,
-      latest: res.latest || null,
-    };
+  return {
+    pairing: res.pairing || null,
+    isOwner: !!res.is_owner,
+    isPatient: !!res.is_patient,
+    canConnect: !!res.can_connect,
+    canClaim: res.can_claim !== undefined ? !!res.can_claim : !!res.is_patient,
+    canUnpair: !!res.can_unpair,
+    latest: res.latest || null,
+  };
   } catch (e) {
     throw wrapPairingError(e, 'Não foi possível carregar o vínculo da pulseira.');
   }

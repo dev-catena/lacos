@@ -36,7 +36,12 @@ class GroupV8BlePairingController extends Controller
         // Só o registro deste group_id conta. Não inferir dono por sinais vitais
         // (isso misturava a pulseira da Mamãe Sandra na Vovó Rosa).
         $hasLink = $pairing !== null;
-        $canConnect = $isOwner || $isAdmin || $isPatient;
+
+        // Paciente: pareia (claim) e envia leituras automáticas pelo celular próximo.
+        // Demais membros: veem dados no backend e podem conectar BLE perto da pulseira
+        // para medir sob demanda, sem roubar o vínculo (can_claim só paciente).
+        $canConnect = true;
+        $canClaim = $isPatient;
 
         $pairingPayload = $pairing ? $this->serializePairing($pairing) : null;
 
@@ -44,7 +49,9 @@ class GroupV8BlePairingController extends Controller
             'success' => true,
             'pairing' => $pairingPayload,
             'is_owner' => $isOwner,
+            'is_patient' => $isPatient,
             'can_connect' => $canConnect,
+            'can_claim' => $canClaim,
             'can_unpair' => $hasLink && ($isOwner || $isAdmin || $isPatient),
             'latest' => $hasLink ? $latest['readings'] : [
                 'heart_rate' => null,
@@ -72,6 +79,13 @@ class GroupV8BlePairingController extends Controller
         $group = $this->assertGroupMember($groupId);
         $userId = (int) Auth::id();
 
+        if (! $this->isGroupPatient($group, $userId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Só o paciente/acompanhado pode vincular a pulseira ao grupo. Use o celular que fica perto dele.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'bracelet_id' => 'required|string|max:80',
             'bracelet_name' => 'nullable|string|max:200',
@@ -84,17 +98,6 @@ class GroupV8BlePairingController extends Controller
         }
 
         $pairing = GroupV8BlePairing::where('group_id', $groupId)->first();
-        if (
-            $pairing
-            && (int) $pairing->paired_by !== $userId
-            && ! $this->isGroupAdmin($group, $userId)
-            && ! $this->isGroupPatient($group, $userId)
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' => 'A pulseira deste grupo já está vinculada por outro membro.',
-            ], 409);
-        }
 
         $alreadyElsewhere = GroupV8BlePairing::where('bracelet_id', $validated['bracelet_id'])
             ->where('group_id', '!=', $groupId)

@@ -16,9 +16,91 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import colors from '../../constants/colors';
 import { ArrowBackIcon } from '../../components/CustomIcons';
 import locationModuleService from '../../services/locationModuleService';
+import {
+  isBleScanAvailable,
+  looksLikeMac,
+  scanNearbyGateways,
+} from '../../ble/mokoGatewayScan';
+import { extractMacFromQrPayload } from '../../utils/macFromQr';
+
+function MacQrScannerModal({ visible, title, onClose, onMacFound }) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [locked, setLocked] = useState(false);
+
+  useEffect(() => {
+    if (visible) setLocked(false);
+  }, [visible]);
+
+  const onBarcodeScanned = useCallback(
+    ({ data }) => {
+      if (locked || !data) return;
+      const mac = extractMacFromQrPayload(data);
+      if (!mac) {
+        setLocked(true);
+        Alert.alert(
+          'QR sem MAC',
+          'Não encontrei um endereço MAC neste código. Tente outro QR ou digite manualmente.',
+          [{ text: 'OK', onPress: () => setLocked(false) }],
+        );
+        return;
+      }
+      setLocked(true);
+      onMacFound(mac, data);
+    },
+    [locked, onMacFound],
+  );
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.qrRoot}>
+        {!permission ? (
+          <View style={styles.qrCentered}>
+            <ActivityIndicator color={colors.textWhite} />
+          </View>
+        ) : !permission.granted ? (
+          <SafeAreaView style={styles.qrPermission} edges={['top', 'bottom']}>
+            <Text style={styles.qrPermissionTitle}>Permissão de câmera</Text>
+            <Text style={styles.qrPermissionText}>
+              Precisamos da câmera para ler o QR Code com o MAC do dispositivo.
+            </Text>
+            <TouchableOpacity style={styles.scanBtn} onPress={requestPermission}>
+              <Text style={styles.scanBtnText}>Permitir câmera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.qrCancel} onPress={onClose}>
+              <Text style={styles.qrCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
+        ) : (
+          <>
+            <CameraView
+              style={StyleSheet.absoluteFillObject}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={locked ? undefined : onBarcodeScanned}
+            />
+            <SafeAreaView style={styles.qrOverlay} edges={['top', 'bottom']}>
+              <View style={styles.qrHeader}>
+                <TouchableOpacity onPress={onClose} style={styles.qrCloseBtn}>
+                  <Ionicons name="close" size={26} color="#fff" />
+                </TouchableOpacity>
+                <Text style={styles.qrHeaderTitle}>{title || 'Ler QR Code'}</Text>
+                <View style={{ width: 40 }} />
+              </View>
+              <View style={styles.qrFrameWrap}>
+                <View style={styles.qrFrame} />
+                <Text style={styles.qrHint}>Aponte para o QR da pulseira ou da caixa</Text>
+              </View>
+            </SafeAreaView>
+          </>
+        )}
+      </View>
+    </Modal>
+  );
+}
 
 const MODES = {
   live: 'live',
@@ -63,6 +145,8 @@ function ModeTabs({ mode, onChange }) {
 }
 
 function LivePanel({ positions, gateways, windowMinutes, onRefresh, refreshing }) {
+  const gatewayOnlineMs = 2 * 60 * 1000;
+
   return (
     <ScrollView
       contentContainerStyle={styles.panelScroll}
@@ -93,7 +177,7 @@ function LivePanel({ positions, gateways, windowMinutes, onRefresh, refreshing }
               <View style={styles.liveCardTitleWrap}>
                 <Text style={styles.liveCardName}>{displayName(p)}</Text>
                 <Text style={styles.liveCardSub}>
-                  {p.bracelet_name ? p.bracelet_mac : ''}
+                  {p.bracelet_mac || ''}
                 </Text>
               </View>
               <View style={[styles.statusPill, p.is_online ? styles.statusOnline : styles.statusOffline]}>
@@ -115,15 +199,31 @@ function LivePanel({ positions, gateways, windowMinutes, onRefresh, refreshing }
       {gateways.length > 0 ? (
         <>
           <Text style={styles.sectionTitle}>Gateways na casa</Text>
-          {gateways.map((g) => (
-            <View key={g.id} style={styles.gatewayChip}>
-              <Ionicons name="wifi-outline" size={16} color={colors.gray600} />
-              <Text style={styles.gatewayChipText}>
-                {g.place_label}
-                {g.last_seen_at ? ` · ${formatTime(g.last_seen_at)}` : ''}
-              </Text>
-            </View>
-          ))}
+          {gateways.map((g) => {
+            const seenMs = g.last_seen_at ? moment(g.last_seen_at).valueOf() : 0;
+            const online = seenMs > 0 && Date.now() - seenMs < gatewayOnlineMs;
+            return (
+              <View key={g.id} style={styles.gatewayChip}>
+                <Ionicons
+                  name="wifi"
+                  size={18}
+                  color={online ? '#0d9488' : colors.gray400}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.gatewayChipTitle}>{g.place_label}</Text>
+                  <Text style={styles.gatewayChipText}>
+                    {g.gateway_mac}
+                    {g.last_seen_at
+                      ? ` · visto ${formatTime(g.last_seen_at)}`
+                      : ' · ainda sem dados do MQTT'}
+                  </Text>
+                </View>
+                <View style={[styles.statusPill, online ? styles.statusOnline : styles.statusOffline]}>
+                  <Text style={styles.statusPillText}>{online ? 'Ativo' : 'Inativo'}</Text>
+                </View>
+              </View>
+            );
+          })}
         </>
       ) : null}
     </ScrollView>
@@ -235,6 +335,11 @@ function ConfigPanel({ groupId, gateways, bracelets, members, onChanged }) {
   const [brName, setBrName] = useState('');
   const [brMemberId, setBrMemberId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanDevices, setScanDevices] = useState([]);
+  const [showAllBle, setShowAllBle] = useState(false);
+  const [scanHint, setScanHint] = useState('');
+  const [qrTarget, setQrTarget] = useState(null); // 'gateway' | 'bracelet' | null
 
   const openGw = (item = null) => {
     setEditingGw(item);
@@ -242,7 +347,73 @@ function ConfigPanel({ groupId, gateways, bracelets, members, onChanged }) {
     setGwName(item?.device_name || '');
     setGwPlace(item?.place_label || '');
     setGwDesc(item?.place_description || '');
+    setScanDevices([]);
+    setShowAllBle(false);
+    setScanHint('');
     setGwModal(true);
+  };
+
+  const closeGwModal = () => {
+    setGwModal(false);
+    setScanning(false);
+    setScanDevices([]);
+  };
+
+  const runGatewayScan = async () => {
+    if (!isBleScanAvailable()) {
+      Alert.alert(
+        'Bluetooth',
+        'Scan BLE indisponível neste build. Digite o MAC manualmente (Device Info no MKScannerPro).',
+      );
+      return;
+    }
+    setScanning(true);
+    setScanDevices([]);
+    setScanHint('Procurando gateways próximos…');
+    try {
+      const { devices } = await scanNearbyGateways({
+        durationMs: 8000,
+        onDevice: (d) => {
+          setScanDevices((prev) => {
+            const next = new Map(prev.map((x) => [x.id, x]));
+            next.set(d.id, d);
+            return [...next.values()].sort((a, b) => {
+              if (a.isMoko !== b.isMoko) return a.isMoko ? -1 : 1;
+              return (b.rssi ?? -999) - (a.rssi ?? -999);
+            });
+          });
+        },
+      });
+      setScanDevices(devices);
+      const mokoCount = devices.filter((d) => d.isMoko).length;
+      setScanHint(
+        mokoCount > 0
+          ? `${mokoCount} gateway(s) MOKO encontrado(s). Toque para selecionar.`
+          : devices.length
+            ? 'Nenhum Mini/MKGW óbvio. Mostrando BLE próximos — ou digite o MAC.'
+            : 'Nenhum dispositivo encontrado. Aproxime o celular do gateway e tente de novo.',
+      );
+      if (!mokoCount && devices.length) setShowAllBle(true);
+    } catch (e) {
+      setScanHint('');
+      Alert.alert('Scan BLE', e?.message || 'Falha ao escanear');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const selectScannedGateway = (device) => {
+    const mac = looksLikeMac(device.mac) ? device.mac : '';
+    setGwName(device.name || '');
+    if (mac) {
+      setGwMac(mac);
+    } else {
+      setGwMac('');
+      Alert.alert(
+        'MAC no iOS',
+        'Neste aparelho o Bluetooth não mostra o MAC real. Abra o MKScannerPro → Device Info e cole o MAC aqui. O nome já foi preenchido.',
+      );
+    }
   };
 
   const openBr = (item = null) => {
@@ -271,6 +442,7 @@ function ConfigPanel({ groupId, gateways, bracelets, members, onChanged }) {
         editingGw?.id,
       );
       setGwModal(false);
+      setScanDevices([]);
       onChanged();
     } catch (e) {
       Alert.alert('Gateway', e?.message || 'Erro');
@@ -345,95 +517,206 @@ function ConfigPanel({ groupId, gateways, bracelets, members, onChanged }) {
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.panelScroll}>
-      <Text style={styles.sectionTitle}>Gateways (cômodos)</Text>
-      <Text style={styles.hint}>
-        Descreva onde cada gateway MOKO está: sala, quarto, corredor…
-      </Text>
-      <TouchableOpacity style={styles.addBtn} onPress={() => openGw()}>
-        <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
-        <Text style={styles.addBtnText}>Adicionar gateway</Text>
-      </TouchableOpacity>
-      {gateways.map((g) => (
-        <View key={g.id} style={styles.configCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.configTitle}>{g.place_label}</Text>
-            <Text style={styles.configSub}>{g.gateway_mac}</Text>
-            {g.place_description ? (
-              <Text style={styles.configDesc}>{g.place_description}</Text>
-            ) : null}
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.panelScroll}>
+        <Text style={styles.sectionTitle}>Gateways (cômodos)</Text>
+        <Text style={styles.hint}>
+          Descreva onde cada gateway MOKO está: sala, quarto, corredor…
+        </Text>
+        <TouchableOpacity style={styles.addBtn} onPress={() => openGw()}>
+          <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
+          <Text style={styles.addBtnText}>Adicionar gateway</Text>
+        </TouchableOpacity>
+        {gateways.map((g) => (
+          <View key={g.id} style={styles.configCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.configTitle}>{g.place_label}</Text>
+              <Text style={styles.configSub}>{g.gateway_mac}</Text>
+              {g.place_description ? (
+                <Text style={styles.configDesc}>{g.place_description}</Text>
+              ) : null}
+            </View>
+            <TouchableOpacity onPress={() => openGw(g)} style={styles.iconBtn}>
+              <Ionicons name="create-outline" size={22} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => confirmDeleteGw(g)} style={styles.iconBtn}>
+              <Ionicons name="trash-outline" size={22} color={colors.error} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => openGw(g)} style={styles.iconBtn}>
-            <Ionicons name="create-outline" size={22} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => confirmDeleteGw(g)} style={styles.iconBtn}>
-            <Ionicons name="trash-outline" size={22} color={colors.error} />
-          </TouchableOpacity>
-        </View>
-      ))}
+        ))}
 
-      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Pulseiras</Text>
-      <Text style={styles.hint}>Associe cada pulseira MOKO a um acompanhado do grupo.</Text>
-      <TouchableOpacity style={styles.addBtn} onPress={() => openBr()}>
-        <Ionicons name="watch-outline" size={22} color={colors.primary} />
-        <Text style={styles.addBtnText}>Adicionar pulseira</Text>
-      </TouchableOpacity>
-      {bracelets.map((b) => (
-        <View key={b.id} style={styles.configCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.configTitle}>{displayName(b)}</Text>
-            <Text style={styles.configSub}>{b.bracelet_mac}</Text>
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Pulseiras</Text>
+        <Text style={styles.hint}>Associe cada pulseira MOKO a um acompanhado do grupo.</Text>
+        <TouchableOpacity style={styles.addBtn} onPress={() => openBr()}>
+          <Ionicons name="watch-outline" size={22} color={colors.primary} />
+          <Text style={styles.addBtnText}>Adicionar pulseira</Text>
+        </TouchableOpacity>
+        {bracelets.map((b) => (
+          <View key={b.id} style={styles.configCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.configTitle}>{displayName(b)}</Text>
+              <Text style={styles.configSub}>{b.bracelet_mac}</Text>
+            </View>
+            <TouchableOpacity onPress={() => openBr(b)} style={styles.iconBtn}>
+              <Ionicons name="create-outline" size={22} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => confirmDeleteBr(b)} style={styles.iconBtn}>
+              <Ionicons name="trash-outline" size={22} color={colors.error} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => openBr(b)} style={styles.iconBtn}>
-            <Ionicons name="create-outline" size={22} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => confirmDeleteBr(b)} style={styles.iconBtn}>
-            <Ionicons name="trash-outline" size={22} color={colors.error} />
-          </TouchableOpacity>
-        </View>
-      ))}
+        ))}
+      </ScrollView>
 
-      <Modal visible={gwModal} transparent animationType="slide">
-        <Pressable style={styles.modalBackdrop} onPress={() => setGwModal(false)}>
-          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+      <Modal
+        visible={gwModal}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={closeGwModal}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeGwModal} />
+          <View style={styles.modalSheet}>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>{editingGw ? 'Editar gateway' : 'Novo gateway'}</Text>
+
+            {!editingGw ? (
+              <View style={styles.scanBlock}>
+                <TouchableOpacity
+                  style={[styles.scanBtn, scanning && styles.scanBtnDisabled]}
+                  onPress={runGatewayScan}
+                  disabled={scanning}
+                >
+                  {scanning ? (
+                    <ActivityIndicator color={colors.textWhite} />
+                  ) : (
+                    <Ionicons name="bluetooth-outline" size={20} color={colors.textWhite} />
+                  )}
+                  <Text style={styles.scanBtnText}>
+                    {scanning ? 'Escaneando…' : 'Procurar gateway por Bluetooth'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.scanBtn, styles.scanBtnSecondary]}
+                  onPress={() => setQrTarget('gateway')}
+                >
+                  <Ionicons name="qr-code-outline" size={20} color={colors.textWhite} />
+                  <Text style={styles.scanBtnText}>Ler QR Code do gateway</Text>
+                </TouchableOpacity>
+                {scanHint ? <Text style={styles.scanHint}>{scanHint}</Text> : null}
+                {(showAllBle
+                  ? scanDevices
+                  : scanDevices.filter((d) => d.isMoko)
+                ).map((d) => (
+                  <TouchableOpacity
+                    key={d.id}
+                    style={styles.scanRow}
+                    onPress={() => selectScannedGateway(d)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.scanRowTitle}>{d.name}</Text>
+                      <Text style={styles.scanRowSub}>
+                        {looksLikeMac(d.mac) ? d.mac : d.id}
+                        {d.rssi != null ? ` · ${d.rssi} dBm` : ''}
+                        {d.isMoko ? ' · MOKO' : ''}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
+                  </TouchableOpacity>
+                ))}
+                {scanDevices.length > 0 && !showAllBle && scanDevices.some((d) => !d.isMoko) ? (
+                  <TouchableOpacity onPress={() => setShowAllBle(true)}>
+                    <Text style={styles.scanLink}>Ver todos os BLE próximos</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+
             <TextInput
               style={styles.input}
               placeholder="MAC do gateway"
+              placeholderTextColor={colors.placeholder}
               value={gwMac}
               onChangeText={setGwMac}
               editable={!editingGw}
               autoCapitalize="characters"
             />
-            <TextInput style={styles.input} placeholder="Nome do aparelho (opcional)" value={gwName} onChangeText={setGwName} />
-            <TextInput style={styles.input} placeholder="Onde fica? (ex.: Quarto da Rosa)" value={gwPlace} onChangeText={setGwPlace} />
+            <TextInput
+              style={styles.input}
+              placeholder="Nome do aparelho (opcional)"
+              placeholderTextColor={colors.placeholder}
+              value={gwName}
+              onChangeText={setGwName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Onde fica? (ex.: Quarto da Rosa)"
+              placeholderTextColor={colors.placeholder}
+              value={gwPlace}
+              onChangeText={setGwPlace}
+            />
             <TextInput
               style={[styles.input, styles.inputMultiline]}
               placeholder="Descrição (opcional)"
+              placeholderTextColor={colors.placeholder}
               value={gwDesc}
               onChangeText={setGwDesc}
               multiline
             />
             <TouchableOpacity style={styles.primaryBtn} onPress={saveGw} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Salvar</Text>}
+              {saving ? (
+                <ActivityIndicator color={colors.textWhite} />
+              ) : (
+                <Text style={styles.primaryBtnText}>Salvar</Text>
+              )}
             </TouchableOpacity>
-          </Pressable>
-        </Pressable>
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
-      <Modal visible={brModal} transparent animationType="slide">
-        <Pressable style={styles.modalBackdrop} onPress={() => setBrModal(false)}>
-          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+      <Modal
+        visible={brModal}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setBrModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setBrModal(false)} />
+          <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>{editingBr ? 'Editar pulseira' : 'Nova pulseira'}</Text>
+            {!editingBr ? (
+              <View style={styles.scanBlock}>
+                <TouchableOpacity
+                  style={styles.scanBtn}
+                  onPress={() => setQrTarget('bracelet')}
+                >
+                  <Ionicons name="qr-code-outline" size={20} color={colors.textWhite} />
+                  <Text style={styles.scanBtnText}>Ler QR Code da pulseira</Text>
+                </TouchableOpacity>
+                <Text style={styles.scanHint}>
+                  Aponte a câmera para o QR da pulseira ou da embalagem. O MAC é preenchido
+                  automaticamente.
+                </Text>
+              </View>
+            ) : null}
             <TextInput
               style={styles.input}
               placeholder="MAC da pulseira"
+              placeholderTextColor={colors.placeholder}
               value={brMac}
               onChangeText={setBrMac}
               editable={!editingBr}
               autoCapitalize="characters"
             />
-            <TextInput style={styles.input} placeholder="Apelido (opcional)" value={brName} onChangeText={setBrName} />
+            <TextInput
+              style={styles.input}
+              placeholder="Apelido (opcional)"
+              placeholderTextColor={colors.placeholder}
+              value={brName}
+              onChangeText={setBrName}
+            />
             <Text style={styles.fieldLabel}>Acompanhado</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <TouchableOpacity
@@ -448,19 +731,44 @@ function ConfigPanel({ groupId, gateways, bracelets, members, onChanged }) {
                   style={[styles.personChip, brMemberId === m.user_id && styles.personChipActive]}
                   onPress={() => setBrMemberId(m.user_id)}
                 >
-                  <Text style={[styles.personChipText, brMemberId === m.user_id && styles.personChipTextActive]}>
+                  <Text
+                    style={[
+                      styles.personChipText,
+                      brMemberId === m.user_id && styles.personChipTextActive,
+                    ]}
+                  >
                     {m.name}
                   </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
             <TouchableOpacity style={styles.primaryBtn} onPress={saveBr} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Salvar</Text>}
+              {saving ? (
+                <ActivityIndicator color={colors.textWhite} />
+              ) : (
+                <Text style={styles.primaryBtnText}>Salvar</Text>
+              )}
             </TouchableOpacity>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
-    </ScrollView>
+
+      <MacQrScannerModal
+        visible={qrTarget != null}
+        title={
+          qrTarget === 'gateway' ? 'QR do gateway' : 'QR da pulseira'
+        }
+        onClose={() => setQrTarget(null)}
+        onMacFound={(mac) => {
+          if (qrTarget === 'gateway') {
+            setGwMac(mac);
+          } else if (qrTarget === 'bracelet') {
+            setBrMac(mac);
+          }
+          setQrTarget(null);
+        }}
+      />
+    </View>
   );
 }
 
@@ -644,12 +952,13 @@ const styles = StyleSheet.create({
   gatewayChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
+    gap: 10,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  gatewayChipText: { fontSize: 13, color: colors.textLight, flex: 1 },
+  gatewayChipTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  gatewayChipText: { fontSize: 12, color: colors.textLight, marginTop: 2 },
   chipScroll: { marginBottom: 12 },
   personChip: {
     paddingHorizontal: 14,
@@ -697,17 +1006,110 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 6 },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: colors.white,
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 20,
     paddingBottom: 32,
+    opacity: 1,
+    elevation: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    maxHeight: '88%',
   },
   modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16, color: colors.text },
+  scanBlock: { marginBottom: 14 },
+  scanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0d9488',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  scanBtnSecondary: {
+    backgroundColor: colors.primary,
+    marginTop: 8,
+  },
+  scanBtnDisabled: { opacity: 0.7 },
+  scanBtnText: { color: colors.textWhite, fontWeight: '700', fontSize: 14 },
+  scanHint: { fontSize: 12, color: colors.textLight, marginTop: 8, lineHeight: 17 },
+  qrRoot: { flex: 1, backgroundColor: '#000' },
+  qrCentered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  qrPermission: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    padding: 24,
+    justifyContent: 'center',
+  },
+  qrPermissionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  qrPermissionText: { fontSize: 14, color: '#cbd5e1', marginBottom: 20, lineHeight: 20 },
+  qrCancel: { marginTop: 16, alignItems: 'center' },
+  qrCancelText: { color: '#94a3b8', fontWeight: '600' },
+  qrOverlay: { flex: 1, justifyContent: 'space-between' },
+  qrHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+  },
+  qrCloseBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qrHeaderTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  qrFrameWrap: { alignItems: 'center', marginBottom: 80 },
+  qrFrame: {
+    width: 240,
+    height: 240,
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+  },
+  qrHint: {
+    marginTop: 16,
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+  scanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  scanRowTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  scanRowSub: { fontSize: 12, color: colors.textLight, marginTop: 2 },
+  scanLink: {
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -717,6 +1119,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 15,
     color: colors.text,
+    backgroundColor: '#ffffff',
   },
   inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
   fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.textLight, marginBottom: 8 },
@@ -727,5 +1130,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  primaryBtnText: { color: colors.white, fontWeight: '700', fontSize: 16 },
+  primaryBtnText: { color: colors.textWhite, fontWeight: '700', fontSize: 16 },
 });

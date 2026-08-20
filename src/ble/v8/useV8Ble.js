@@ -622,7 +622,9 @@ export function useV8Ble(groupId, ownerUserId) {
         setLastBreadcrumb(null);
         updateUiState('connected');
         setError(null);
-        setStatusDetail('Conectada — use os botões de medição');
+        setStatusDetail(
+          'Conectada — monitoramento ativo (envia ao grupo a cada 5 min no app do paciente)',
+        );
         v8Log('connect:done', 'sucesso', { id: shortId, totalMs: elapsedMs(t0) });
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);

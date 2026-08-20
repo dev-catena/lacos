@@ -46,6 +46,8 @@ import alertService from '../../services/alertService';
 import websocketService from '../../services/websocketService';
 import API_CONFIG from '../../config/api';
 import { isAccompaniedPersonGroupRole } from '../../utils/groupRoles';
+import { loadPairedDevice } from '../../ble/v8/pairedStorage';
+import { Ionicons } from '@expo/vector-icons';
 
 const PATIENT_SESSION_KEY = '@lacos_patient_session';
 const GROUPS_STORAGE_KEY = '@lacos_groups';
@@ -56,6 +58,7 @@ const PatientHomeScreen = ({ navigation }) => {
   const [patientSession, setPatientSession] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [groupId, setGroupId] = useState(null);
+  const [hasPairedBracelet, setHasPairedBracelet] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [media, setMedia] = useState([]);
@@ -233,6 +236,15 @@ const PatientHomeScreen = ({ navigation }) => {
         
         console.log('📋 PatientHomeScreen - Grupo encontrado:', patientGroup.name);
         setGroupId(currentGroupId);
+
+        try {
+          const paired = await loadPairedDevice(currentGroupId, {
+            currentUserId: user?.id,
+          });
+          setHasPairedBracelet(!!paired?.id);
+        } catch {
+          setHasPairedBracelet(false);
+        }
         
         // 2. Carregar eventos (appointments + medications)
         await loadUpcomingEvents(currentGroupId);
@@ -256,6 +268,7 @@ const PatientHomeScreen = ({ navigation }) => {
         console.warn('⚠️ PatientHomeScreen - Nenhum grupo encontrado para o paciente');
         // Limpar dados do grupo anterior se existir
         setGroupId(null);
+        setHasPairedBracelet(false);
         setContacts([]);
         setEvents([]);
         setMedia([]);
@@ -1008,6 +1021,31 @@ const PatientHomeScreen = ({ navigation }) => {
           </View>
         )}
 
+        {groupId ? (
+          <TouchableOpacity
+            style={styles.braceletBanner}
+            onPress={() => navigation.navigate('PatientSettings')}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="watch-outline"
+              size={22}
+              color={colors.primary}
+            />
+            <View style={styles.braceletBannerText}>
+              <Text style={styles.braceletBannerTitle}>
+                {hasPairedBracelet ? 'Pulseira V5/V8' : 'Conectar pulseira'}
+              </Text>
+              <Text style={styles.braceletBannerSub}>
+                {hasPairedBracelet
+                  ? 'Toque para reconectar e manter o envio a cada 5 minutos'
+                  : 'Pareie a V5 ou V8 em Configuração (celular perto do paciente)'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.gray400} />
+          </TouchableOpacity>
+        ) : null}
+
         {/* Contact Cards */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contatos</Text>
@@ -1329,6 +1367,32 @@ const styles = StyleSheet.create({
   },
   alertsSection: {
     marginTop: 16,
+  },
+  braceletBanner: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  braceletBannerText: {
+    flex: 1,
+  },
+  braceletBannerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  braceletBannerSub: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginTop: 2,
+    lineHeight: 16,
   },
   section: {
     paddingHorizontal: 20,

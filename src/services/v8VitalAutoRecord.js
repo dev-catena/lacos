@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import vitalSignService from './vitalSignService';
 
-/** Intervalo de gravação automática da pulseira V8 (30 minutos). */
-export const V8_AUTO_RECORD_INTERVAL_MS = 30 * 60 * 1000;
+/** Intervalo de gravação automática da pulseira no celular do paciente (5 minutos). */
+export const V8_AUTO_RECORD_INTERVAL_MS = 5 * 60 * 1000;
 
 function lastSaveKey(groupId) {
   return `@lacos/v8/last-auto-save/${groupId}`;
@@ -87,7 +87,7 @@ export async function persistBraceletVitalSigns({
   const modelTag = String(braceletModel || '').toLowerCase() === 'v5' ? 'V5' : 'V8';
   const namePart = deviceName ? ` (${deviceName})` : '';
   const notes = auto
-    ? `wearable: ${modelTag}${namePart} | auto:30min`
+    ? `wearable: ${modelTag}${namePart} | auto:5min`
     : `wearable: ${modelTag}${namePart}`;
 
   const results = [];
@@ -165,7 +165,7 @@ export async function persistBraceletVitalSigns({
   if (hasSleep) {
     const fingerprint = `${sleepSession.startIso || ''}|${sleepSession.totalMinutes || 0}`;
     const lastFp = await getLastSavedSleepFingerprint(groupId);
-    // Evita gravar a mesma sessão de sono a cada 30 min
+    // Evita gravar a mesma sessão de sono a cada 5 min
     if (!auto || fingerprint !== lastFp) {
       const sleepNotes = [
         notes,

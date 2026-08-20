@@ -26,15 +26,35 @@ function normalizeMac(value) {
   return String(value).toUpperCase().replace(/[^A-F0-9]/g, '');
 }
 
+/** Converte timestamp MOKO (ms/s/string) em ISO 8601. */
+function toIsoDate(value) {
+  if (value == null || value === '') return new Date().toISOString();
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const ms = value > 1e12 ? value : value * 1000;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  }
+  const asNum = Number(value);
+  if (Number.isFinite(asNum) && String(value).trim() !== '') {
+    const ms = asNum > 1e12 ? asNum : asNum * 1000;
+    const d = new Date(ms);
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  const d = new Date(value);
+  if (!Number.isNaN(d.getTime())) return d.toISOString();
+  return new Date().toISOString();
+}
+
 /** Extrai MAC do gateway a partir do tópico ou payload MOKO. */
 function resolveGatewayMac(topic, payload) {
   const fromPayload =
     payload.gateway_mac ||
     payload.gatewayMac ||
     payload.gateway ||
+    payload.device_info?.mac ||
+    payload.deviceInfo?.mac ||
     payload.device_id ||
-    payload.deviceId ||
-    payload.mac;
+    payload.deviceId;
   if (fromPayload) return normalizeMac(fromPayload);
 
   const parts = String(topic || '').split('/').filter(Boolean);
@@ -51,11 +71,11 @@ function extractReadings(payload) {
 
   const push = (braceletMac, rssi, recordedAt) => {
     const mac = normalizeMac(braceletMac);
-    if (mac.length < 6) return;
+    if (mac.length !== 12) return;
     readings.push({
       bracelet_mac: mac,
       rssi: typeof rssi === 'number' ? rssi : parseInt(rssi, 10) || null,
-      recorded_at: recordedAt || new Date().toISOString(),
+      recorded_at: toIsoDate(recordedAt),
     });
   };
 
@@ -69,7 +89,7 @@ function extractReadings(payload) {
       push(row.mac || row.ble_mac, row.rssi, row.timestamp);
     }
   }
-  if (payload.mac && payload.rssi != null) {
+  if (payload.mac && payload.rssi != null && !payload.device_info) {
     push(payload.mac, payload.rssi, payload.timestamp || payload.time);
   }
   if (payload.ble_mac) {
@@ -126,11 +146,14 @@ client.on('connect', () => {
 });
 
 client.on('message', async (topic, buf) => {
+  // Só mensagens de upload do gateway (send), não eco de receive
+  if (/\/receive$/i.test(topic)) return;
+
   const payload = parsePayload(buf);
   if (!payload) return;
 
   const gatewayMac = resolveGatewayMac(topic, payload);
-  if (!gatewayMac) {
+  if (!gatewayMac || gatewayMac.length !== 12) {
     console.warn('[location-bridge] ignorado (sem gateway MAC):', topic);
     return;
   }
