@@ -1,20 +1,42 @@
 import apiService from './apiService';
 
+function wrapPairingError(e, fallbackMessage) {
+  const err = e instanceof Error ? e : new Error(e?.message || fallbackMessage);
+  err.status = e?.status || err.status;
+  return err;
+}
+
+/** Gateway antigo: rota ainda não existe (404 Laravel) ou tabela ausente (503). */
+export function isV8BlePairingUnavailable(error) {
+  const status = error?.status;
+  const msg = String(error?.message || '');
+  return (
+    status === 404 ||
+    status === 503 ||
+    /could not be found/i.test(msg) ||
+    /v8-ble-pairing/i.test(msg)
+  );
+}
+
 /**
  * Vínculo da pulseira BLE (V5 ou V8) ao grupo (um dono; demais membros só visualizam).
  */
 export async function getV8BlePairing(groupId) {
-  const res = await apiService.get(`/groups/${groupId}/v8-ble-pairing`);
-  if (!res?.success) {
-    throw new Error(res?.message || 'Não foi possível carregar o vínculo da pulseira.');
+  try {
+    const res = await apiService.get(`/groups/${groupId}/v8-ble-pairing`);
+    if (!res?.success) {
+      throw wrapPairingError(res, 'Não foi possível carregar o vínculo da pulseira.');
+    }
+    return {
+      pairing: res.pairing || null,
+      isOwner: !!res.is_owner,
+      canConnect: !!res.can_connect,
+      canUnpair: !!res.can_unpair,
+      latest: res.latest || null,
+    };
+  } catch (e) {
+    throw wrapPairingError(e, 'Não foi possível carregar o vínculo da pulseira.');
   }
-  return {
-    pairing: res.pairing || null,
-    isOwner: !!res.is_owner,
-    canConnect: !!res.can_connect,
-    canUnpair: !!res.can_unpair,
-    latest: res.latest || null,
-  };
 }
 
 export async function claimV8BlePairing(groupId, braceletId, braceletName, braceletModel) {
@@ -49,4 +71,5 @@ export default {
   getV8BlePairing,
   claimV8BlePairing,
   unpairV8BlePairing,
+  isV8BlePairingUnavailable,
 };

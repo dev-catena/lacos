@@ -34,9 +34,50 @@ import {
 import {
   claimV8BlePairing,
   getV8BlePairing,
+  isV8BlePairingUnavailable,
   unpairV8BlePairing,
 } from '../../../services/v8BlePairingService';
+import groupService from '../../../services/groupService';
 import { describeCurrentOta, getOtaInfo } from '../../../services/otaUpdateService';
+
+function unwrapGroupPayload(result) {
+  const raw = result?.data;
+  if (!raw || typeof raw !== 'object') return null;
+  if (raw.id && (raw.is_admin !== undefined || raw.created_by !== undefined || raw.group_members)) {
+    return raw;
+  }
+  if (raw.data?.id) return raw.data;
+  if (raw.group?.id) return raw.group;
+  return raw;
+}
+
+function userIsGroupAdmin(group, userId) {
+  if (!group || userId == null) return false;
+  const uid = String(userId);
+  if (group.is_admin === true || group.is_creator === true) return true;
+  if (String(group.created_by || '') === uid) return true;
+  if (String(group.admin_user_id || '') === uid) return true;
+  const me = (group.group_members || []).find((m) => String(m.user_id || m.id || '') === uid);
+  return me?.role === 'admin' || me?.is_admin === true;
+}
+
+function userIsGroupPatient(group, userId) {
+  if (!group || userId == null) return false;
+  const uid = String(userId);
+  const me = (group.group_members || []).find((m) => String(m.user_id || m.id || '') === uid);
+  const role = String(me?.role || group.my_role || '').toLowerCase();
+  return role === 'patient' || role === 'priority_contact' || role === 'accompanied';
+}
+
+async function resolveGroupAdmin(groupId, userId) {
+  try {
+    const result = await groupService.getGroup(groupId);
+    if (!result?.success) return false;
+    return userIsGroupAdmin(unwrapGroupPayload(result), userId);
+  } catch {
+    return false;
+  }
+}
 
 function ModelPicker({ selected, onSelect, disabled }) {
   const options = [
@@ -232,6 +273,7 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
   const [lastAutoSaveAt, setLastAutoSaveAtState] = useState(null);
   const [nowTick, setNowTick] = useState(Date.now());
   const savingRef = useRef(false);
+  const pairingRouteMissingToastRef = useRef(false);
   const bleRef = useRef(ble);
   bleRef.current = ble;
 
@@ -287,6 +329,7 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
           ble.pairedDevice.model || ble.braceletModel,
         );
       } catch (e) {
+        if (cancelled) return;
         if (e?.status === 409) {
           Toast.show({
             type: 'info',
@@ -294,6 +337,13 @@ function PulseiraOwnerPanel({ groupId, onSaved, active = true, onPairingChanged 
             text2: e.message || 'Outro membro já conectou a pulseira deste grupo.',
           });
           onPairingChanged?.();
+        } else if (isV8BlePairingUnavailable(e) && !pairingRouteMissingToastRef.current) {
+          pairingRouteMissingToastRef.current = true;
+          Toast.show({
+            type: 'error',
+            text1: 'Gateway sem a rota da pulseira',
+            text2: 'A conexão local funciona, mas o vínculo não foi gravado. Atualize o servidor.',
+          });
         }
       }
     })();
@@ -888,7 +938,7 @@ function ModeDebugBanner({ mode, canConnectServer, email, pairingError }) {
   );
 }
 
-export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) {
+export default function PulseiraVitalPanel({ groupId, onSaved, active = true, allowConnect = false }) {
   const { user } = useAuth();
   const myId = user?.id != null ? Number(user.id) : null;
   const [loading, setLoading] = useState(true);
@@ -910,7 +960,8 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
       const vitalsRes = await vitalSignService.getVitalSigns(groupId);
       const fromVitals = latestFromVitalRows(vitalsRes?.data);
 
-      // Fonte única: API can_connect. Se falhar → viewer (nunca dono).
+      // Fonte: API can_connect. Se a rota ainda não existir no gateway (404),
+      // admin/criador não fica preso em viewer — o vínculo local segue só neste grupo.
       let pairingData = null;
       let pairingError = null;
       try {
@@ -927,8 +978,25 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
       const isLinkedOwner =
         myId != null && linkedOwnerId != null && Number(linkedOwnerId) === myId;
 
-      // Só o servidor decide (dono da pulseira ou admin). Sem resposta → false.
-      const nextCanConnect = pairingData?.canConnect === true;
+      let adminFallback = false;
+      let patientFallback = false;
+      if (pairingData?.canConnect !== true) {
+        try {
+          const result = await groupService.getGroup(groupId);
+          if (result?.success) {
+            const group = unwrapGroupPayload(result);
+            adminFallback = userIsGroupAdmin(group, myId);
+            patientFallback = userIsGroupPatient(group, myId);
+          }
+        } catch {
+          adminFallback = pairingData == null ? await resolveGroupAdmin(groupId, myId) : false;
+        }
+      }
+      const nextCanConnect =
+        pairingData?.canConnect === true ||
+        allowConnect ||
+        patientFallback ||
+        (pairingData == null && adminFallback);
 
       const pairingHasData =
         officialPairing && pairingData?.latest && Object.values(pairingData.latest).some(Boolean);
@@ -958,6 +1026,7 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
         linkedOwnerId,
         isLinkedOwner,
         serverCanConnect: pairingData?.canConnect,
+        adminFallback,
         nextCanConnect,
         pairingError,
         email: user?.email,
@@ -965,7 +1034,7 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
       });
 
       setDebugMeta({
-        canConnectServer: pairingData ? !!pairingData.canConnect : null,
+        canConnectServer: pairingData != null ? !!pairingData.canConnect : adminFallback,
         pairingError,
       });
       setPairing(pairingPayload);
@@ -982,7 +1051,7 @@ export default function PulseiraVitalPanel({ groupId, onSaved, active = true }) 
       setLoading(false);
       setRefreshing(false);
     }
-  }, [groupId, myId, user?.email]);
+  }, [groupId, myId, user?.email, allowConnect]);
 
   useEffect(() => {
     setLoading(true);

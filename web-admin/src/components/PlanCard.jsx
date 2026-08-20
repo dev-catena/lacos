@@ -3,31 +3,59 @@ import SafeIcon from './SafeIcon';
 import plansService from '../services/plansService';
 import './PlanCard.css';
 
+function normalizeFeatures(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === 'object') return { ...raw };
+  return {};
+}
+
 const PlanCard = ({ plan, isEditing, onEdit, onSave, onCancel }) => {
   const [localPlan, setLocalPlan] = useState(plan);
-  const [features, setFeatures] = useState([]);
+  const [features, setFeatures] = useState(() => plansService.getAllFeatures());
 
   useEffect(() => {
-    setLocalPlan(plan);
+    setLocalPlan({
+      ...plan,
+      features: normalizeFeatures(plan?.features),
+    });
     setFeatures(plansService.getAllFeatures());
   }, [plan]);
 
   const handleFeatureToggle = (featureKey) => {
-    setLocalPlan((prev) => ({
-      ...prev,
-      features: {
-        ...prev.features,
-        [featureKey]: !prev.features[featureKey],
-      },
-    }));
+    setLocalPlan((prev) => {
+      const current = normalizeFeatures(prev.features);
+      return {
+        ...prev,
+        features: {
+          ...current,
+          [featureKey]: !current[featureKey],
+        },
+      };
+    });
   };
 
   const handleSave = () => {
-    onSave(localPlan);
+    const current = normalizeFeatures(localPlan.features);
+    const merged = {};
+    features.forEach((f) => {
+      merged[f.key] = !!current[f.key];
+    });
+    onSave({ ...localPlan, features: merged });
   };
 
   const handleCancel = () => {
-    setLocalPlan(plan);
+    setLocalPlan({
+      ...plan,
+      features: normalizeFeatures(plan?.features),
+    });
     onCancel();
   };
 
@@ -78,7 +106,7 @@ const PlanCard = ({ plan, isEditing, onEdit, onSave, onCancel }) => {
                   <label key={feature.key} className="feature-checkbox">
                     <input
                       type="checkbox"
-                      checked={localPlan.features[feature.key] || false}
+                      checked={!!normalizeFeatures(localPlan.features)[feature.key]}
                       onChange={() => handleFeatureToggle(feature.key)}
                     />
                     <div className="feature-info">
@@ -105,13 +133,13 @@ const PlanCard = ({ plan, isEditing, onEdit, onSave, onCancel }) => {
               <h3>Funcionalidades Ativas</h3>
               <div className="active-features">
                 {features
-                  .filter((f) => localPlan.features[f.key])
+                  .filter((f) => !!normalizeFeatures(localPlan.features)[f.key])
                   .map((feature) => (
                     <span key={feature.key} className="active-feature-badge">
                       {feature.label}
                     </span>
                   ))}
-                {features.filter((f) => localPlan.features[f.key]).length === 0 && (
+                {features.filter((f) => !!normalizeFeatures(localPlan.features)[f.key]).length === 0 && (
                   <span className="no-features">Nenhuma funcionalidade ativa</span>
                 )}
               </div>

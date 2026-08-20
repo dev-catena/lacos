@@ -15,12 +15,14 @@ import RecordingScreen from '../screens/Patient/RecordingScreen';
 import PatientProfileScreen from '../screens/Patient/PatientProfileScreen';
 import PatientHowToUseScreen from '../screens/Patient/PatientHowToUseScreen';
 import PatientEmergencyContactsScreen from '../screens/Patient/PatientEmergencyContactsScreen';
+import PatientSettingsScreen from '../screens/Patient/PatientSettingsScreen';
 import PatientMessagesScreen from '../screens/Patient/PatientMessagesScreen';
 import PatientJoinGroupScreen from '../screens/Patient/PatientJoinGroupScreen';
 import PatientVideoCallScreen from '../screens/Patient/PatientVideoCallScreen';
 import GroupDetailScreen from '../screens/Groups/GroupDetailScreen';
 import WatchAudiosScreen from '../screens/Groups/WatchAudiosScreen';
 import SmartwatchLocationScreen from '../screens/Groups/SmartwatchLocationScreen';
+import GatewayLocationScreen from '../screens/Groups/GatewayLocationScreen';
 import CamerasListScreen from '../screens/Cameras/CamerasListScreen';
 import CameraPlayerScreen from '../screens/Cameras/CameraPlayerScreen';
 import ScanCameraQrScreen from '../screens/Cameras/ScanCameraQrScreen';
@@ -318,6 +320,13 @@ const PatientNavigator = () => {
         }}
       />
       <Stack.Screen 
+        name="GatewayLocation" 
+        component={GatewayLocationScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
         name="Cameras" 
         component={CamerasListScreen}
         options={{ 
@@ -390,6 +399,11 @@ const PatientNavigator = () => {
       <Stack.Screen 
         name="PatientHowToUse" 
         component={PatientHowToUseScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="PatientSettings" 
+        component={PatientSettingsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen 

@@ -25,6 +25,10 @@ import AddVitalSignModal from './AddVitalSignModal';
 import PulseiraVitalPanel from './components/PulseiraVitalPanel';
 import { buildWatchVitalData, getWatchVitalsSnapshot } from '../../utils/thalamusHealthAdapter';
 import Toast from 'react-native-toast-message';
+import { useAuth } from '../../contexts/AuthContext';
+import { loadPairedDevice } from '../../ble/v8/pairedStorage';
+import { getV8BlePairing } from '../../services/v8BlePairingService';
+import { latestFromVitalRows } from '../../ble/v8/v8LatestFromVitals';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -104,8 +108,26 @@ function safeBuildWatchVitalData(health) {
   }
 }
 
+async function groupHasConnectedBracelet(groupId, userId, vitalsRows) {
+  if (!groupId) return false;
+  try {
+    const local = await loadPairedDevice(groupId, { currentUserId: userId });
+    if (local?.id) return true;
+  } catch {
+    // storage indisponível
+  }
+  try {
+    const pairingData = await getV8BlePairing(groupId);
+    if (pairingData?.pairing) return true;
+  } catch {
+    // rota ausente ou grupo sem vínculo no servidor
+  }
+  return latestFromVitalRows(vitalsRows).hasWearable === true;
+}
+
 const VitalSignsDetailScreen = ({ route, navigation }) => {
   const { groupId, groupName } = route.params || {};
+  const { user } = useAuth();
   
   const [loading, setLoading] = useState(true);
   const [vitalSignsData, setVitalSignsData] = useState({});
@@ -316,7 +338,6 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
           setWatchError('Não foi possível interpretar os dados do relógio.');
         }
         setWatchDataUpdatedAt(new Date());
-        setActiveTab('watch');
         setWatchError(null);
       }
       return true;
@@ -342,7 +363,17 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
           console.error('❌ Erro ao processar sinais manuais:', applyError);
         }
 
-        if (!hasWatch) {
+        const hasBracelet = await groupHasConnectedBracelet(
+          groupId,
+          user?.id,
+          vitRes?.data,
+        );
+        if (cancelled) return;
+        if (hasBracelet) {
+          setActiveTab('pulseira');
+        } else if (hasWatch) {
+          setActiveTab('watch');
+        } else {
           setActiveTab('manual');
         }
 
@@ -373,7 +404,7 @@ const VitalSignsDetailScreen = ({ route, navigation }) => {
     return () => {
       cancelled = true;
     };
-  }, [groupId, applyVitalSignsResult]);
+  }, [groupId, applyVitalSignsResult, user?.id]);
 
   const onRefreshManual = useCallback(async () => {
     setRefreshingManual(true);

@@ -30,12 +30,13 @@ class GroupV8BlePairingController extends Controller
         $latest = $this->latestV8Readings($groupId);
 
         $isAdmin = $this->isGroupAdmin($group, $userId);
+        $isPatient = $this->isGroupPatient($group, $userId);
         $isOwner = $pairing !== null && (int) $pairing->paired_by === $userId;
 
         // Só o registro deste group_id conta. Não inferir dono por sinais vitais
         // (isso misturava a pulseira da Mamãe Sandra na Vovó Rosa).
         $hasLink = $pairing !== null;
-        $canConnect = $isOwner || $isAdmin;
+        $canConnect = $isOwner || $isAdmin || $isPatient;
 
         $pairingPayload = $pairing ? $this->serializePairing($pairing) : null;
 
@@ -44,7 +45,7 @@ class GroupV8BlePairingController extends Controller
             'pairing' => $pairingPayload,
             'is_owner' => $isOwner,
             'can_connect' => $canConnect,
-            'can_unpair' => $hasLink && ($isOwner || $isAdmin),
+            'can_unpair' => $hasLink && ($isOwner || $isAdmin || $isPatient),
             'latest' => $hasLink ? $latest['readings'] : [
                 'heart_rate' => null,
                 'oxygen_saturation' => null,
@@ -83,7 +84,12 @@ class GroupV8BlePairingController extends Controller
         }
 
         $pairing = GroupV8BlePairing::where('group_id', $groupId)->first();
-        if ($pairing && (int) $pairing->paired_by !== $userId && ! $this->isGroupAdmin($group, $userId)) {
+        if (
+            $pairing
+            && (int) $pairing->paired_by !== $userId
+            && ! $this->isGroupAdmin($group, $userId)
+            && ! $this->isGroupPatient($group, $userId)
+        ) {
             return response()->json([
                 'success' => false,
                 'message' => 'A pulseira deste grupo já está vinculada por outro membro.',
@@ -151,10 +157,10 @@ class GroupV8BlePairingController extends Controller
         }
 
         $isOwner = (int) $pairing->paired_by === $userId;
-        if (! $isOwner && ! $this->isGroupAdmin($group, $userId)) {
+        if (! $isOwner && ! $this->isGroupAdmin($group, $userId) && ! $this->isGroupPatient($group, $userId)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Só quem conectou (ou um admin) pode desvincular a pulseira.',
+                'message' => 'Só quem conectou, o paciente ou um admin pode desvincular a pulseira.',
             ], 403);
         }
 
@@ -309,5 +315,14 @@ class GroupV8BlePairingController extends Controller
         $isCreator = isset($group->created_by) && (int) $group->created_by === $userId;
 
         return $isAdmin || $isCreator;
+    }
+
+    private function isGroupPatient(Group $group, int $userId): bool
+    {
+        return GroupMember::where('group_id', $group->id)
+            ->where('user_id', $userId)
+            ->where('is_active', true)
+            ->whereIn('role', GroupMember::accompaniedPersonRoles())
+            ->exists();
     }
 }

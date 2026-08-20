@@ -33,6 +33,7 @@ import PairV8GatewayScreen from '../screens/Groups/PairV8GatewayScreen';
 import SmartwatchScreen from '../screens/Groups/SmartwatchScreen';
 import WatchAudiosScreen from '../screens/Groups/WatchAudiosScreen';
 import SmartwatchLocationScreen from '../screens/Groups/SmartwatchLocationScreen';
+import GatewayLocationScreen from '../screens/Groups/GatewayLocationScreen';
 import CamerasListScreen from '../screens/Cameras/CamerasListScreen';
 import CameraPlayerScreen from '../screens/Cameras/CameraPlayerScreen';
 import ScanCameraQrScreen from '../screens/Cameras/ScanCameraQrScreen';
@@ -236,6 +237,13 @@ const HomeStack = () => {
       <Stack.Screen 
         name="SmartwatchLocation" 
         component={SmartwatchLocationScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="GatewayLocation" 
+        component={GatewayLocationScreen}
         options={{ 
           headerShown: false 
         }}
@@ -630,6 +638,13 @@ const GroupsStack = () => {
       <Stack.Screen 
         name="SmartwatchLocation" 
         component={SmartwatchLocationScreen}
+        options={{ 
+          headerShown: false 
+        }}
+      />
+      <Stack.Screen 
+        name="GatewayLocation" 
+        component={GatewayLocationScreen}
         options={{ 
           headerShown: false 
         }}

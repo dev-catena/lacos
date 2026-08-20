@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\UserStreamAgentController;
 use App\Http\Controllers\Api\StreamAgentController;
 use App\Http\Controllers\Api\V8GatewayController;
 use App\Http\Controllers\Api\GroupV8BlePairingController;
+use App\Http\Controllers\Api\LocationModuleController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MediaController;
@@ -76,6 +77,9 @@ Route::post('/v8-gateways/pairing/start', [V8GatewayController::class, 'pairingS
 Route::get('/v8-gateways/pairing/{pairing_id}/status', [V8GatewayController::class, 'pairingStatus']);
 Route::post('/v8-gateways/ingest', [V8GatewayController::class, 'ingest']);
 Route::post('/v8-gateways/heartbeat', [V8GatewayController::class, 'heartbeat']);
+
+// ─── Localização indoor (gateway BLE MOKO → ingest) ───────────────────────────
+Route::post('/location/ingest', [LocationModuleController::class, 'ingest']);
 
 // Player de câmera (URL assinada — HTTPS para iOS ATS)
 Route::get('/groups/{groupId}/cameras/{cameraId}/player', [GroupCameraController::class, 'player'])
@@ -404,6 +408,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'show']);
     Route::put('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'upsert']);
     Route::delete('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'destroy']);
+
+    // Localização indoor (gateways + pulseiras + histórico)
+    Route::get('/groups/{groupId}/location/realtime', [LocationModuleController::class, 'realtime']);
+    Route::get('/groups/{groupId}/location/history', [LocationModuleController::class, 'history']);
+    Route::get('/groups/{groupId}/location/assignable-members', [LocationModuleController::class, 'assignableMembers']);
+    Route::get('/groups/{groupId}/location/gateways', [LocationModuleController::class, 'indexGateways']);
+    Route::post('/groups/{groupId}/location/gateways', [LocationModuleController::class, 'storeGateway']);
+    Route::put('/groups/{groupId}/location/gateways/{gatewayId}', [LocationModuleController::class, 'updateGateway']);
+    Route::delete('/groups/{groupId}/location/gateways/{gatewayId}', [LocationModuleController::class, 'destroyGateway']);
+    Route::get('/groups/{groupId}/location/bracelets', [LocationModuleController::class, 'indexBracelets']);
+    Route::post('/groups/{groupId}/location/bracelets', [LocationModuleController::class, 'storeBracelet']);
+    Route::put('/groups/{groupId}/location/bracelets/{braceletId}', [LocationModuleController::class, 'updateBracelet']);
+    Route::delete('/groups/{groupId}/location/bracelets/{braceletId}', [LocationModuleController::class, 'destroyBracelet']);
     
     // Botão de Pânico - Emergência
     Route::post('/panic/trigger', [PanicController::class, 'trigger']);

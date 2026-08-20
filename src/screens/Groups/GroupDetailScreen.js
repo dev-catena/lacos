@@ -71,6 +71,7 @@ const KIDS_FEATURES_FALLBACK = {
   cameras: false,
   audiosRelogio: false,
   localizacaoRelogio: false,
+  localizacaoGateway: false,
   gatewayV8: false,
 };
 
@@ -156,6 +157,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
             'vitalsigns': () => navigation.navigate('VitalSignsDetail', { groupId, groupName }),
             'watchAudios': () => navigation.navigate('WatchAudios', { groupId, groupName }),
             'watchLocation': () => navigation.navigate('SmartwatchLocation', { groupId, groupName }),
+            'gatewayLocation': () => navigation.navigate('GatewayLocation', { groupId, groupName }),
           };
 
           const navigateToCard = cardNavigationMap[currentOpenCard];
@@ -512,9 +514,22 @@ const GroupDetailScreen = ({ route, navigation }) => {
       onPress: () => navigation.navigate('WatchAudios', { groupId, groupName }),
     },
     {
+      id: 'gatewayLocation',
+      featureKey: 'localizacaoGateway',
+      title: 'Localização indoor',
+      subtitle: 'Onde está o acompanhado (gateways BLE)',
+      icon: 'navigate',
+      IconComponent: ({ size = 32, color: c = '#7c3aed' }) => (
+        <Ionicons name="navigate-outline" size={size} color={c} />
+      ),
+      color: '#7c3aed',
+      backgroundColor: '#7c3aed20',
+      onPress: () => navigation.navigate('GatewayLocation', { groupId, groupName }),
+    },
+    {
       id: 'watchLocation',
       featureKey: 'localizacaoRelogio',
-      title: 'Localização',
+      title: 'Localização (relógio)',
       subtitle: 'Mapa do relógio e últimos pontos',
       icon: 'location',
       IconComponent: ({ size = 32, color: c = '#0d9488' }) => (

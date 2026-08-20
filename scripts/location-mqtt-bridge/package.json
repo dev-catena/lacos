@@ -1,0 +1,13 @@
+{
+  "name": "lacos-location-mqtt-bridge",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Ponte MQTT (gateway MOKO) → POST /api/location/ingest do Laços",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "mqtt": "^5.10.0"
+  }
+}
