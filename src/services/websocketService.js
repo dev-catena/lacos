@@ -11,11 +11,13 @@ class WebSocketService {
   constructor() {
     this.echo = null;
     this.isConnected = false;
-    this.listeners = new Map(); // Armazenar listeners por grupo
+    this.listeners = new Map(); // Armazenar canais por grupo
     /** @type {Map<string, Set<Function>>} */
     this.braceletMeasureHandlers = new Map();
     /** @type {Map<string, Set<Function>>} */
     this.braceletMeasureFinishedHandlers = new Map();
+    /** @type {Map<string, boolean>} */
+    this.braceletChannelBound = new Map();
   }
 
   /**
@@ -28,26 +30,19 @@ class WebSocketService {
         return;
       }
 
-      // Obter token de autenticação
       const token = await AsyncStorage.getItem('@lacos:token');
-      
+
       if (!token) {
         console.warn('⚠️ WebSocket - Token não encontrado, não é possível conectar');
         return;
       }
 
-      // Extrair base URL (remover /api)
       const baseUrl = API_CONFIG.BASE_URL.replace('/api', '');
-
-      // Configurar Pusher
-      // Nota: Para usar Laravel Reverb, você precisaria configurar socket.io
-      // Por enquanto, vamos usar Pusher como padrão
       const pusherKey = getPusherKey();
       const pusherCluster = getPusherCluster();
-      
+
       console.log('🔌 WebSocket - Configurando Pusher:', { key: pusherKey, cluster: pusherCluster });
-      
-      // Configurar Echo - o Pusher já está disponível globalmente
+
       this.echo = new Echo({
         broadcaster: 'pusher',
         key: pusherKey,
@@ -64,7 +59,6 @@ class WebSocketService {
         enabledTransports: ['ws', 'wss'],
       });
 
-      // Eventos de conexão
       this.echo.connector.pusher.connection.bind('connected', () => {
         console.log('✅ WebSocket - Conectado');
         this.isConnected = true;
@@ -86,8 +80,48 @@ class WebSocketService {
     }
   }
 
+  hasBraceletHandlers(groupId) {
+    const key = String(groupId);
+    return (
+      (this.braceletMeasureHandlers.get(key)?.size || 0) > 0 ||
+      (this.braceletMeasureFinishedHandlers.get(key)?.size || 0) > 0
+    );
+  }
+
+  bindBraceletChannelListeners(channel, groupId) {
+    const key = String(groupId);
+    if (this.braceletChannelBound.get(key)) {
+      return;
+    }
+
+    channel.listen('.bracelet.measure', (data) => {
+      console.log('📡 WebSocket - bracelet.measure:', data);
+      this.braceletMeasureHandlers.get(key)?.forEach((fn) => {
+        try {
+          fn(data || {});
+        } catch (e) {
+          console.warn('bracelet.measure handler', e);
+        }
+      });
+    });
+
+    channel.listen('.bracelet.measure.finished', (data) => {
+      console.log('📡 WebSocket - bracelet.measure.finished:', data);
+      this.braceletMeasureFinishedHandlers.get(key)?.forEach((fn) => {
+        try {
+          fn(data || {});
+        } catch (e) {
+          console.warn('bracelet.measure.finished handler', e);
+        }
+      });
+    });
+
+    this.braceletChannelBound.set(key, true);
+  }
+
   /**
-   * Escutar eventos de um grupo
+   * Escutar eventos de mídia de um grupo.
+   * NÃO derruba o canal se houver handlers da pulseira (Medir agora).
    */
   async listenToGroup(groupId, callbacks) {
     try {
@@ -101,69 +135,33 @@ class WebSocketService {
       }
 
       const channelName = `group.${groupId}`;
-      
-      // Remover listener anterior se existir
-      if (this.listeners.has(channelName)) {
-        this.stopListeningToGroup(groupId);
-      }
-
       console.log(`🔌 WebSocket - Escutando canal: ${channelName}`);
 
-      const channel = this.echo.private(channelName);
+      let channel = this.listeners.get(channelName);
+      if (channel) {
+        // Só troca listeners de mídia; mantém bracelet.*
+        channel.stopListening('.media.deleted');
+        channel.stopListening('.media.created');
+      } else {
+        channel = this.echo.private(channelName);
+        this.listeners.set(channelName, channel);
+      }
 
-      // Escutar evento de mídia deletada
+      this.bindBraceletChannelListeners(channel, groupId);
+
       if (callbacks.onMediaDeleted) {
         channel.listen('.media.deleted', (data) => {
           console.log('📡 WebSocket - Evento .media.deleted recebido:', data);
-          console.log('📡 WebSocket - Tipo de dados:', typeof data);
-          console.log('📡 WebSocket - Estrutura completa:', JSON.stringify(data, null, 2));
-          
-          // Garantir que os dados estão no formato esperado
-          const eventData = data || {};
-          callbacks.onMediaDeleted(eventData);
+          callbacks.onMediaDeleted(data || {});
         });
       }
 
-      // Escutar evento de mídia criada
       if (callbacks.onMediaCreated) {
         channel.listen('.media.created', (data) => {
           console.log('📡 WebSocket - Nova mídia criada:', data);
           callbacks.onMediaCreated(data);
         });
       }
-
-      channel.listen('.bracelet.measure', (data) => {
-        console.log('📡 WebSocket - bracelet.measure:', data);
-        const key = String(groupId);
-        this.braceletMeasureHandlers.get(key)?.forEach((fn) => {
-          try {
-            fn(data || {});
-          } catch (e) {
-            console.warn('bracelet.measure handler', e);
-          }
-        });
-        if (callbacks.onBraceletMeasure) {
-          callbacks.onBraceletMeasure(data || {});
-        }
-      });
-
-      channel.listen('.bracelet.measure.finished', (data) => {
-        console.log('📡 WebSocket - bracelet.measure.finished:', data);
-        const key = String(groupId);
-        this.braceletMeasureFinishedHandlers.get(key)?.forEach((fn) => {
-          try {
-            fn(data || {});
-          } catch (e) {
-            console.warn('bracelet.measure.finished handler', e);
-          }
-        });
-        if (callbacks.onBraceletMeasureFinished) {
-          callbacks.onBraceletMeasureFinished(data || {});
-        }
-      });
-
-      // Armazenar referência do canal
-      this.listeners.set(channelName, channel);
 
       console.log(`✅ WebSocket - Escutando eventos do grupo ${groupId}`);
     } catch (error) {
@@ -173,7 +171,6 @@ class WebSocketService {
 
   /**
    * Handler permanente para pedido de medição (app do paciente).
-   * Não substitui os listeners de mídia do Home.
    */
   onBraceletMeasure(groupId, fn) {
     const key = String(groupId);
@@ -181,7 +178,6 @@ class WebSocketService {
       this.braceletMeasureHandlers.set(key, new Set());
     }
     this.braceletMeasureHandlers.get(key).add(fn);
-    // Garante canal inscrito
     void this.ensureGroupChannel(groupId);
     return () => {
       this.braceletMeasureHandlers.get(key)?.delete(fn);
@@ -205,74 +201,60 @@ class WebSocketService {
       if (!this.echo) await this.initialize();
       if (!this.echo) return;
       const channelName = `group.${groupId}`;
-      if (this.listeners.has(channelName)) return;
-
-      const channel = this.echo.private(channelName);
-      const key = String(groupId);
-
-      channel.listen('.bracelet.measure', (data) => {
-        console.log('📡 WebSocket - bracelet.measure:', data);
-        this.braceletMeasureHandlers.get(key)?.forEach((fn) => {
-          try {
-            fn(data || {});
-          } catch (e) {
-            console.warn('bracelet.measure handler', e);
-          }
-        });
-      });
-
-      channel.listen('.bracelet.measure.finished', (data) => {
-        console.log('📡 WebSocket - bracelet.measure.finished:', data);
-        this.braceletMeasureFinishedHandlers.get(key)?.forEach((fn) => {
-          try {
-            fn(data || {});
-          } catch (e) {
-            console.warn('bracelet.measure.finished handler', e);
-          }
-        });
-      });
-
-      this.listeners.set(channelName, channel);
+      let channel = this.listeners.get(channelName);
+      if (!channel) {
+        channel = this.echo.private(channelName);
+        this.listeners.set(channelName, channel);
+      }
+      this.bindBraceletChannelListeners(channel, groupId);
     } catch (e) {
       console.warn('ensureGroupChannel', e?.message || e);
     }
   }
 
   /**
-   * Parar de escutar eventos de um grupo
+   * Parar listeners de mídia. Mantém o canal se a pulseira ainda precisa dele.
    */
   stopListeningToGroup(groupId) {
     try {
       const channelName = `group.${groupId}`;
       const channel = this.listeners.get(channelName);
+      const key = String(groupId);
 
-      if (channel) {
-        channel.stopListening('.media.deleted');
-        channel.stopListening('.media.created');
-        channel.stopListening('.bracelet.measure');
-        channel.stopListening('.bracelet.measure.finished');
-        this.echo?.leave(channelName);
-        this.listeners.delete(channelName);
-        console.log(`🔌 WebSocket - Parou de escutar grupo ${groupId}`);
+      if (!channel) {
+        return;
       }
+
+      channel.stopListening('.media.deleted');
+      channel.stopListening('.media.created');
+
+      if (this.hasBraceletHandlers(groupId)) {
+        console.log(
+          `🔌 WebSocket - Mídia removida; canal ${channelName} mantido (pulseira)`,
+        );
+        return;
+      }
+
+      channel.stopListening('.bracelet.measure');
+      channel.stopListening('.bracelet.measure.finished');
+      this.braceletChannelBound.delete(key);
+      this.echo?.leave(channelName);
+      this.listeners.delete(channelName);
+      console.log(`🔌 WebSocket - Parou de escutar grupo ${groupId}`);
     } catch (error) {
       console.error('❌ WebSocket - Erro ao parar de escutar:', error);
     }
   }
 
-  /**
-   * Desconectar
-   */
   disconnect() {
     try {
-      // Parar de escutar todos os canais
       this.listeners.forEach((channel, channelName) => {
         channel.stopListening();
         this.echo?.leave(channelName);
       });
       this.listeners.clear();
+      this.braceletChannelBound.clear();
 
-      // Desconectar Echo
       if (this.echo) {
         this.echo.disconnect();
         this.echo = null;
@@ -285,9 +267,6 @@ class WebSocketService {
     }
   }
 
-  /**
-   * Reconectar
-   */
   async reconnect() {
     this.disconnect();
     await this.initialize();
@@ -295,4 +274,3 @@ class WebSocketService {
 }
 
 export default new WebSocketService();
-

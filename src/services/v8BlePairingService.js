@@ -92,6 +92,30 @@ export async function requestBraceletMeasure(groupId, type = 'all') {
   }
 }
 
+/** Paciente: consulta pedido pendente (fallback se WebSocket falhar). */
+export async function getPendingBraceletMeasure(groupId) {
+  try {
+    const res = await apiService.get(`/groups/${groupId}/v8-ble-pairing/pending-measure`);
+    return res?.pending || null;
+  } catch (e) {
+    console.warn('[v8BlePairing] pendingMeasure', e?.message || e);
+    return null;
+  }
+}
+
+/** Paciente: marca pedido como em andamento. */
+export async function claimPendingBraceletMeasure(groupId, requestId) {
+  try {
+    const res = await apiService.post(`/groups/${groupId}/v8-ble-pairing/claim-pending-measure`, {
+      request_id: requestId || null,
+    });
+    return res;
+  } catch (e) {
+    console.warn('[v8BlePairing] claimPending', e?.message || e);
+    return null;
+  }
+}
+
 /** Paciente: informa o grupo que a medição remota terminou. */
 export async function finishBraceletMeasure(groupId, { type, requestId, success, message }) {
   try {
@@ -113,6 +137,8 @@ export default {
   claimV8BlePairing,
   unpairV8BlePairing,
   requestBraceletMeasure,
+  getPendingBraceletMeasure,
+  claimPendingBraceletMeasure,
   finishBraceletMeasure,
   isV8BlePairingUnavailable,
 };

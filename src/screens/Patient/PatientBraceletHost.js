@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, View, Text, StyleSheet } from 'react-native';
 import { useNavigationState } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import colors from '../../constants/colors';
 import groupService from '../../services/groupService';
 import websocketService from '../../services/websocketService';
 import { dispatchBraceletRemoteMeasure } from '../../services/braceletRemoteMeasure';
+import { getPendingBraceletMeasure } from '../../services/v8BlePairingService';
 import PulseiraVitalPanel from '../VitalSigns/components/PulseiraVitalPanel';
 
 function routeNamesInState(state, acc = []) {
@@ -25,6 +26,7 @@ function routeNamesInState(state, acc = []) {
 export default function PatientBraceletHost() {
   const insets = useSafeAreaInsets();
   const [groupId, setGroupId] = useState(null);
+  const lastPolledRequestIdRef = useRef(null);
   const onSettingsScreen = useNavigationState((state) =>
     routeNamesInState(state).includes('PatientSettings'),
   );
@@ -61,6 +63,51 @@ export default function PatientBraceletHost() {
     })();
     return () => {
       unsub();
+    };
+  }, [groupId]);
+
+  // Reinscreve o canal ao voltar do background (Pusher pode ter caído).
+  useEffect(() => {
+    if (!groupId) return undefined;
+    const onChange = (state) => {
+      if (state === 'active') {
+        void websocketService.ensureGroupChannel(groupId);
+      }
+    };
+    const sub = AppState.addEventListener('change', onChange);
+    return () => sub.remove();
+  }, [groupId]);
+
+  // Fallback HTTP: se o WebSocket não entregar o pedido, o paciente ainda mede.
+  useEffect(() => {
+    if (!groupId) return undefined;
+    let cancelled = false;
+
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const pending = await getPendingBraceletMeasure(groupId);
+        const reqId = pending?.request_id;
+        if (!reqId || String(reqId) === String(lastPolledRequestIdRef.current)) {
+          return;
+        }
+        lastPolledRequestIdRef.current = reqId;
+        void dispatchBraceletRemoteMeasure({
+          type: pending.type || 'all',
+          request_id: reqId,
+          requested_by: pending.requested_by,
+          group_id: groupId,
+        });
+      } catch (e) {
+        console.warn('[PatientBraceletHost] pending poll', e?.message || e);
+      }
+    };
+
+    void poll();
+    const id = setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
     };
   }, [groupId]);
 

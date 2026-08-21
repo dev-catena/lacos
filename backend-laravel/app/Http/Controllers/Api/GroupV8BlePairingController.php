@@ -180,6 +180,20 @@ class GroupV8BlePairingController extends Controller
 
         $requestId = (string) \Illuminate\Support\Str::uuid();
 
+        $pending = [
+            'request_id' => $requestId,
+            'type' => $validated['type'],
+            'requested_by' => $userId,
+            'group_id' => $groupId,
+            'created_at' => now()->toIso8601String(),
+        ];
+        // Fallback HTTP: paciente consulta mesmo se o WebSocket cair ao trocar de aba.
+        \Illuminate\Support\Facades\Cache::put(
+            $this->pendingMeasureCacheKey($groupId),
+            $pending,
+            now()->addMinutes(3)
+        );
+
         try {
             event(new \App\Events\BraceletMeasureRequested(
                 $groupId,
@@ -189,11 +203,7 @@ class GroupV8BlePairingController extends Controller
             ));
         } catch (\Throwable $e) {
             \Log::warning('bracelet.measure broadcast failed: '.$e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Não foi possível avisar o celular do paciente. Verifique a conexão em tempo real.',
-            ], 502);
+            // Continua: paciente ainda pode pegar via GET pending-measure
         }
 
         return response()->json([
@@ -201,6 +211,30 @@ class GroupV8BlePairingController extends Controller
             'message' => 'Pedido enviado ao celular do paciente.',
             'request_id' => $requestId,
             'type' => $validated['type'],
+        ]);
+    }
+
+    /**
+     * GET /api/groups/{groupId}/v8-ble-pairing/pending-measure
+     * Paciente busca pedido pendente (fallback sem WebSocket).
+     */
+    public function pendingMeasure(int $groupId)
+    {
+        $group = $this->assertGroupMember($groupId);
+        $userId = (int) Auth::id();
+
+        if (! $this->isGroupPatient($group, $userId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Só o paciente consulta pedidos pendentes.',
+            ], 403);
+        }
+
+        $pending = \Illuminate\Support\Facades\Cache::get($this->pendingMeasureCacheKey($groupId));
+
+        return response()->json([
+            'success' => true,
+            'pending' => $pending ?: null,
         ]);
     }
 
@@ -227,6 +261,8 @@ class GroupV8BlePairingController extends Controller
             'message' => 'nullable|string|max:500',
         ]);
 
+        \Illuminate\Support\Facades\Cache::forget($this->pendingMeasureCacheKey($groupId));
+
         try {
             event(new \App\Events\BraceletMeasureFinished(
                 $groupId,
@@ -241,6 +277,54 @@ class GroupV8BlePairingController extends Controller
 
         return response()->json([
             'success' => true,
+        ]);
+    }
+
+    /**
+     * POST /api/groups/{groupId}/v8-ble-pairing/claim-pending-measure
+     * Paciente marca o pedido como em andamento (evita WS + poll duplicados).
+     */
+    public function claimPendingMeasure(Request $request, int $groupId)
+    {
+        $group = $this->assertGroupMember($groupId);
+        $userId = (int) Auth::id();
+
+        if (! $this->isGroupPatient($group, $userId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Só o paciente pode reivindicar a medição.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'request_id' => 'nullable|string|max:80',
+        ]);
+
+        $key = $this->pendingMeasureCacheKey($groupId);
+        $pending = \Illuminate\Support\Facades\Cache::get($key);
+        if (! $pending) {
+            return response()->json([
+                'success' => true,
+                'claimed' => false,
+                'pending' => null,
+            ]);
+        }
+
+        if (! empty($validated['request_id'])
+            && ($pending['request_id'] ?? null) !== $validated['request_id']) {
+            return response()->json([
+                'success' => true,
+                'claimed' => false,
+                'pending' => null,
+            ]);
+        }
+
+        \Illuminate\Support\Facades\Cache::forget($key);
+
+        return response()->json([
+            'success' => true,
+            'claimed' => true,
+            'pending' => $pending,
         ]);
     }
 
@@ -392,6 +476,11 @@ class GroupV8BlePairingController extends Controller
         }
 
         return $out;
+    }
+
+    private function pendingMeasureCacheKey(int $groupId): string
+    {
+        return 'bracelet_measure_pending:'.$groupId;
     }
 
     private function assertGroupMember(int $groupId): Group

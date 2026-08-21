@@ -408,6 +408,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'show']);
     Route::put('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'upsert']);
     Route::post('/groups/{groupId}/v8-ble-pairing/measure', [GroupV8BlePairingController::class, 'requestMeasure']);
+    Route::get('/groups/{groupId}/v8-ble-pairing/pending-measure', [GroupV8BlePairingController::class, 'pendingMeasure']);
+    Route::post('/groups/{groupId}/v8-ble-pairing/claim-pending-measure', [GroupV8BlePairingController::class, 'claimPendingMeasure']);
     Route::post('/groups/{groupId}/v8-ble-pairing/measure-finished', [GroupV8BlePairingController::class, 'finishMeasure']);
     Route::delete('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'destroy']);
 

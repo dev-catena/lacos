@@ -28,3 +28,13 @@ Schedule::command('notifications:check-appointments')
 Schedule::command('panic:sync-watch-sos')
     ->everyMinute()
     ->withoutOverlapping(2);
+
+// Basal diária: média de até 8 amostras (janelas de 3h) do dia anterior
+Schedule::command('vitals:compute-daily-basals')
+    ->dailyAt('00:15')
+    ->withoutOverlapping(30);
+
+// Backup: desvio ≥50% da basal → notificação aos membros do grupo
+Schedule::command('notifications:check-vital-signs')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping(10);

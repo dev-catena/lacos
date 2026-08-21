@@ -33,6 +33,7 @@ import {
 } from '../../../services/v8VitalAutoRecord';
 import {
   claimV8BlePairing,
+  claimPendingBraceletMeasure,
   finishBraceletMeasure,
   getV8BlePairing,
   isV8BlePairingUnavailable,
@@ -43,6 +44,9 @@ import groupService from '../../../services/groupService';
 import { describeCurrentOta, getOtaInfo } from '../../../services/otaUpdateService';
 import { registerBraceletRemoteMeasureHandler } from '../../../services/braceletRemoteMeasure';
 import websocketService from '../../../services/websocketService';
+
+/** Evita medição remota duplicada (WS + poll HTTP). */
+let remoteMeasureInFlightId = null;
 
 function unwrapGroupPayload(result) {
   const raw = result?.data;
@@ -445,6 +449,15 @@ function PulseiraOwnerPanel({
     const runRemote = async (payload) => {
       const type = payload?.type === 'ecg' ? 'ecg' : 'all';
       const requestId = payload?.request_id || payload?.requestId || `local-${Date.now()}`;
+      if (remoteMeasureInFlightId) {
+        if (String(remoteMeasureInFlightId) === String(requestId)) {
+          return { success: false, error: 'Já em andamento' };
+        }
+        return { success: false, error: 'Outra medição remota em andamento' };
+      }
+      remoteMeasureInFlightId = requestId;
+      void claimPendingBraceletMeasure(groupId, requestId);
+
       Toast.show({
         type: 'info',
         text1: type === 'ecg' ? 'ECG solicitado' : 'Medição solicitada',
@@ -495,60 +508,117 @@ function PulseiraOwnerPanel({
             throw new Error(result.error || 'Falha ao salvar ECG.');
           }
         } else {
-          await bleRef.current.startMeasurement();
-          await waitUntil(() => (bleRef.current.heartRate || 0) > 0, { timeoutMs: 25_000 });
-          await bleRef.current.stopMeasurement();
-          await sleepMs(400);
+          let notifiedDone = false;
+          const notifyDoneOnce = async () => {
+            if (notifiedDone) return;
+            notifiedDone = true;
+            await finishBraceletMeasure(groupId, {
+              type,
+              requestId,
+              success: true,
+              message: 'Medição concluída',
+            });
+          };
 
+          const deviceName = () =>
+            bleRef.current.connectedName || bleRef.current.pairedDevice?.name;
+          const braceletModel = () =>
+            bleRef.current.pairedDevice?.model || bleRef.current.braceletModel;
+
+          // 1) FC primeiro — grava e libera o spinner do cuidador cedo
+          await bleRef.current.startMeasurement();
+          await waitUntil(() => (bleRef.current.heartRate || 0) > 0, { timeoutMs: 20_000 });
+          await bleRef.current.stopMeasurement();
+          await sleepMs(300);
+          if ((bleRef.current.heartRate || 0) > 0) {
+            await persistBraceletVitalSigns({
+              groupId,
+              heartRate: bleRef.current.heartRate,
+              deviceName: deviceName(),
+              braceletModel: braceletModel(),
+              auto: false,
+            });
+            await notifyDoneOnce();
+          }
+
+          // 2) SpO2
           await bleRef.current.startSpo2Measurement();
           await waitUntil(
             () =>
               (bleRef.current.spo2 || 0) > 0 || bleRef.current.uiState === 'connected',
-            { timeoutMs: 70_000 },
+            { timeoutMs: 45_000 },
           );
           if (bleRef.current.uiState === 'measuringSpo2') {
             await bleRef.current.stopSpo2Measurement();
           }
-          await sleepMs(400);
+          await sleepMs(300);
+          if ((bleRef.current.spo2 || 0) > 0) {
+            await persistBraceletVitalSigns({
+              groupId,
+              spo2: bleRef.current.spo2,
+              deviceName: deviceName(),
+              braceletModel: braceletModel(),
+              auto: false,
+            });
+            await notifyDoneOnce();
+          }
 
+          // 3) PA
           await bleRef.current.startBpMeasurement();
           await waitUntil(
             () =>
               !!bleRef.current.bloodPressure || bleRef.current.uiState === 'connected',
-            { timeoutMs: 70_000 },
+            { timeoutMs: 45_000 },
           );
           if (bleRef.current.uiState === 'measuringBP') {
             await bleRef.current.stopBpMeasurement();
           }
-          await sleepMs(400);
+          await sleepMs(300);
+          if (bleRef.current.bloodPressure) {
+            await persistBraceletVitalSigns({
+              groupId,
+              bloodPressure: bleRef.current.bloodPressure,
+              deviceName: deviceName(),
+              braceletModel: braceletModel(),
+              auto: false,
+            });
+            await notifyDoneOnce();
+          }
 
           await bleRef.current.refreshTemperature();
           await bleRef.current.refreshSleep();
-          await sleepMs(2000);
-
+          await sleepMs(1500);
           const snap = bleRef.current;
-          const result = await persistBraceletVitalSigns({
+          await persistBraceletVitalSigns({
             groupId,
-            heartRate: snap.heartRate,
-            spo2: snap.spo2,
-            bloodPressure: snap.bloodPressure,
             temperatureC: snap.temperatureC,
             sleepSession: snap.sleepSession,
-            deviceName: snap.connectedName || snap.pairedDevice?.name,
-            braceletModel: snap.pairedDevice?.model || snap.braceletModel,
+            deviceName: deviceName(),
+            braceletModel: braceletModel(),
             auto: false,
           });
-          if (!result.success) {
-            throw new Error(result.error || 'Falha ao salvar leituras.');
+
+          if (!notifiedDone) {
+            const hasAny =
+              (snap.heartRate || 0) > 0 ||
+              (snap.spo2 || 0) > 0 ||
+              !!snap.bloodPressure ||
+              snap.temperatureC != null;
+            if (!hasAny) {
+              throw new Error('Sem leituras da pulseira. Mantenha contato firme e tente de novo.');
+            }
+            await notifyDoneOnce();
           }
         }
 
-        await finishBraceletMeasure(groupId, {
-          type,
-          requestId,
-          success: true,
-          message: 'Medição concluída',
-        });
+        if (type === 'ecg') {
+          await finishBraceletMeasure(groupId, {
+            type,
+            requestId,
+            success: true,
+            message: 'Medição concluída',
+          });
+        }
         onSaved?.();
         Toast.show({
           type: 'success',
@@ -570,6 +640,10 @@ function PulseiraOwnerPanel({
           text2: message,
         });
         return { success: false, error: message };
+      } finally {
+        if (String(remoteMeasureInFlightId) === String(requestId)) {
+          remoteMeasureInFlightId = null;
+        }
       }
     };
 
@@ -1163,6 +1237,7 @@ function PulseiraViewerPanel({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null);
   const pendingRequestIdRef = useRef(null);
+  const busyGenRef = useRef(0);
 
   const ownerName = pairing?.paired_by_name;
   const braceletName = pairing?.bracelet_name;
@@ -1206,18 +1281,31 @@ function PulseiraViewerPanel({
 
   const canMeasure = !!pairing?.bracelet_id && !busy;
 
+  const clearBusy = useCallback(() => {
+    pendingRequestIdRef.current = null;
+    setBusy(false);
+    setProgress(null);
+  }, []);
+
+  const cancelRemote = useCallback(() => {
+    busyGenRef.current += 1;
+    clearBusy();
+    Toast.show({
+      type: 'info',
+      text1: 'Medição cancelada',
+      text2: 'Você pode tentar de novo quando quiser.',
+    });
+  }, [clearBusy]);
+
   useEffect(() => {
     if (!groupId) return undefined;
     return websocketService.onBraceletMeasureFinished(groupId, async (data) => {
       if (!pendingRequestIdRef.current) return;
       const reqId = data?.request_id || data?.requestId;
-      // Aceita finished do pedido atual; se request_id vier vazio, também encerra.
       if (reqId && String(reqId) !== String(pendingRequestIdRef.current)) {
         return;
       }
-      pendingRequestIdRef.current = null;
-      setBusy(false);
-      setProgress(null);
+      clearBusy();
       if (data?.success !== false) {
         Toast.show({
           type: 'success',
@@ -1236,11 +1324,12 @@ function PulseiraViewerPanel({
         });
       }
     });
-  }, [groupId, onRefresh, onSaved]);
+  }, [clearBusy, groupId, onRefresh, onSaved]);
 
   const requestRemote = useCallback(
     async (type) => {
       if (busy) return;
+      const gen = ++busyGenRef.current;
       setBusy(true);
       setProgress(
         type === 'ecg'
@@ -1251,8 +1340,10 @@ function PulseiraViewerPanel({
         const at = latestMeasuredAt(latest);
         return at ? new Date(at).getTime() : 0;
       })();
+      const startedAt = Date.now();
       try {
         const res = await requestBraceletMeasure(groupId, type);
+        if (gen !== busyGenRef.current) return;
         pendingRequestIdRef.current = res.requestId;
         setProgress(
           type === 'ecg'
@@ -1260,26 +1351,47 @@ function PulseiraViewerPanel({
             : 'Aguardando medição no celular do paciente…',
         );
 
-        const timeoutMs = type === 'ecg' ? 120_000 : 200_000;
-        const pollEvery = 2500;
+        // Paciente mede FC+SpO2+PA em sequência — precisa de margem folgada.
+        const timeoutMs = type === 'ecg' ? 120_000 : 210_000;
+        const pollEvery = 2000;
         const deadline = Date.now() + timeoutMs;
 
         while (Date.now() < deadline && pendingRequestIdRef.current) {
+          if (gen !== busyGenRef.current) return;
           await sleepMs(pollEvery);
-          if (!pendingRequestIdRef.current) {
-            setBusy(false);
-            setProgress(null);
+          if (gen !== busyGenRef.current || !pendingRequestIdRef.current) {
             return;
           }
           try {
-            // Detecta sucesso pelos dados novos no backend (mesmo se o WS finished falhar).
             const pairingData = await getV8BlePairing(groupId);
             const nextAt = latestMeasuredAt(pairingData?.latest);
             const nextMs = nextAt ? new Date(nextAt).getTime() : 0;
-            if (nextMs > baselineMs) {
-              pendingRequestIdRef.current = null;
-              setBusy(false);
-              setProgress(null);
+            if (nextMs > baselineMs && nextMs >= startedAt - 5000) {
+              clearBusy();
+              Toast.show({
+                type: 'success',
+                text1: 'Medição atualizada',
+                text2: 'Leituras novas recebidas do paciente.',
+              });
+              onSaved?.();
+              onRefresh?.({ silent: true });
+              return;
+            }
+            // Fallback: qualquer vital wearable criado após o clique
+            const vitalsRes = await vitalSignService.getVitalSigns(groupId);
+            const rows = Array.isArray(vitalsRes?.data)
+              ? vitalsRes.data
+              : Array.isArray(vitalsRes)
+                ? vitalsRes
+                : [];
+            const fresh = rows.some((row) => {
+              const notes = String(row?.notes || '');
+              if (!/wearable|V8|V5|v8|v5/i.test(notes)) return false;
+              const t = new Date(row.measured_at || row.created_at || 0).getTime();
+              return Number.isFinite(t) && t >= startedAt - 5000;
+            });
+            if (fresh) {
+              clearBusy();
               Toast.show({
                 type: 'success',
                 text1: 'Medição atualizada',
@@ -1295,26 +1407,28 @@ function PulseiraViewerPanel({
           }
         }
 
+        if (gen !== busyGenRef.current) return;
         if (pendingRequestIdRef.current) {
-          pendingRequestIdRef.current = null;
+          clearBusy();
           throw new Error(
             'Tempo esgotado. Confira se o app do paciente está aberto e a pulseira conectada.',
           );
         }
-        setBusy(false);
-        setProgress(null);
       } catch (e) {
-        pendingRequestIdRef.current = null;
+        if (gen !== busyGenRef.current) return;
+        clearBusy();
         Toast.show({
           type: 'error',
           text1: 'Falha na medição',
           text2: e?.message || 'Não foi possível solicitar a medição.',
         });
-        setBusy(false);
-        setProgress(null);
+      } finally {
+        if (gen === busyGenRef.current && pendingRequestIdRef.current) {
+          clearBusy();
+        }
       }
     },
-    [busy, groupId, latest, onRefresh, onSaved],
+    [busy, clearBusy, groupId, latest, onRefresh, onSaved],
   );
 
   return (
@@ -1363,6 +1477,15 @@ function PulseiraViewerPanel({
         </View>
         {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
         {progress ? <Text style={styles.updatedAt}>{progress}</Text> : null}
+        {busy ? (
+          <TouchableOpacity
+            style={styles.cancelRemoteBtn}
+            onPress={cancelRemote}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.cancelRemoteBtnText}>Cancelar espera</Text>
+          </TouchableOpacity>
+        ) : null}
         {measuredAt && !busy ? (
           <Text style={styles.updatedAt}>
             Último registro {moment(measuredAt).format('DD/MM HH:mm:ss')}
@@ -1750,6 +1873,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textLight,
     lineHeight: 17,
+  },
+  cancelRemoteBtn: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: colors.gray200,
+  },
+  cancelRemoteBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
   },
   statusCard: {
     backgroundColor: colors.backgroundLight,
