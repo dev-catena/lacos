@@ -14,6 +14,7 @@ class GroupV8BlePairing extends Model
         'bracelet_id',
         'bracelet_name',
         'bracelet_model',
+        'battery_percent',
         'paired_at',
         'last_seen_at',
     ];

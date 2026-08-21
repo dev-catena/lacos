@@ -12,8 +12,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import groupService from '../../services/groupService';
-import PulseiraVitalPanel from '../VitalSigns/components/PulseiraVitalPanel';
 
+/**
+ * Cabeçalho da configuração do paciente.
+ * O painel BLE fica no PatientBraceletHost (instância única, sempre montada).
+ */
 const PatientSettingsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [groupId, setGroupId] = useState(null);
@@ -80,18 +83,7 @@ const PatientSettingsScreen = ({ navigation }) => {
           <Text style={styles.emptyText}>{error || 'Entre em um grupo para conectar a pulseira.'}</Text>
         </View>
       ) : (
-        <View style={styles.content}>
-          <View style={styles.introCard}>
-            <Ionicons name="watch-outline" size={22} color={colors.primary} />
-            <Text style={styles.introText}>
-              Pareie a pulseira V5 ou V8 neste celular (perto do paciente). As leituras vão
-              automaticamente para o grupo a cada 5 minutos enquanto o app estiver aberto.
-              Medidas sob demanda ficam com os cuidadores. No Android, use Reconectar se a
-              conexão cair.
-            </Text>
-          </View>
-          <PulseiraVitalPanel groupId={groupId} active allowConnect patientMode />
-        </View>
+        <View style={styles.content} />
       )}
     </SafeAreaView>
   );
@@ -109,6 +101,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    zIndex: 40,
+    backgroundColor: colors.background,
   },
   backButton: {
     width: 40,
@@ -135,25 +129,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  introCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: colors.backgroundLight,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-  },
-  introText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.textLight,
   },
   loadingContainer: {
     flex: 1,

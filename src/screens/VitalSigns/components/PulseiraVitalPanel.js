@@ -259,6 +259,8 @@ function PulseiraOwnerPanel({
   hideManualMeasures = false,
   /** Últimas leituras do backend (exibidas quando o BLE não está conectado). */
   serverLatest = null,
+  /** Última bateria conhecida no backend. */
+  serverBattery = null,
 }) {
   const { user } = useAuth();
   const ble = useV8Ble(groupId, user?.id);
@@ -321,6 +323,7 @@ function PulseiraOwnerPanel({
           ble.pairedDevice.id,
           ble.pairedDevice.name,
           ble.pairedDevice.model || ble.braceletModel,
+          ble.battery,
         );
       } catch (e) {
         if (cancelled) return;
@@ -417,6 +420,7 @@ function PulseiraOwnerPanel({
               paired.id,
               paired.name,
               paired.model || current.braceletModel,
+              current.battery,
             ).catch(() => {});
           }
           onSaved?.();
@@ -584,6 +588,9 @@ function PulseiraOwnerPanel({
         }
       : null;
 
+  const displayBattery =
+    ble.battery != null ? ble.battery : serverBattery != null ? Number(serverBattery) : null;
+
   return (
     <ScrollView
       style={[styles.scroll, !active && styles.hidden]}
@@ -607,8 +614,11 @@ function PulseiraOwnerPanel({
                   : 'Escolha V5 ou V8 e conecte a pulseira do paciente')}
             </Text>
           </View>
-          {ble.battery != null ? (
-            <Text style={styles.battery}>{ble.battery}%</Text>
+          {displayBattery != null && Number.isFinite(displayBattery) ? (
+            <View style={styles.batteryWrap}>
+              <SafeIcon name="battery-half" size={16} color={colors.primary} />
+              <Text style={styles.battery}>{displayBattery}%</Text>
+            </View>
           ) : null}
         </View>
         {ble.error ? <Text style={styles.errorText}>{ble.error}</Text> : null}
@@ -1253,6 +1263,14 @@ function PulseiraViewerPanel({
                 : 'Aguardando o paciente parear a pulseira (Configuração → Pulseira V5/V8).'}
             </Text>
           </View>
+          {(ble.battery != null || pairing?.battery_percent != null) ? (
+            <View style={styles.batteryWrap}>
+              <SafeIcon name="battery-half" size={16} color={colors.primary} />
+              <Text style={styles.battery}>
+                {ble.battery != null ? ble.battery : pairing.battery_percent}%
+              </Text>
+            </View>
+          ) : null}
         </View>
         {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
         {ble.error && busy ? <Text style={styles.errorText}>{ble.error}</Text> : null}
@@ -1340,16 +1358,31 @@ function PulseiraViewerPanel({
  * - Demais: visualizam o backend + Medir agora (todos) e Medir eletro sob demanda.
  */
 function ModeDebugBanner({ mode, canConnectServer, email, pairingError }) {
+  const [open, setOpen] = useState(false);
   const ota = getOtaInfo();
   const shortOta = ota.updateId ? String(ota.updateId).slice(0, 13) : 'embedded';
   return (
-    <View style={styles.modeDebug}>
-      <Text style={styles.modeDebugText}>
-        modo={mode} · can_connect={canConnectServer == null ? '?' : canConnectServer ? '1' : '0'} ·{' '}
-        ota={shortOta} · {email || '?—'}
-        {pairingError ? ` · api:${pairingError}` : ''}
-      </Text>
-      <Text style={styles.modeDebugSub}>{describeCurrentOta()}</Text>
+    <View style={styles.modeDebugWrap}>
+      <TouchableOpacity
+        style={styles.modeDebugToggle}
+        onPress={() => setOpen((v) => !v)}
+        hitSlop={8}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.modeDebugToggleText}>
+          {open ? 'Ocultar diagnóstico' : 'Diagnóstico'}
+        </Text>
+      </TouchableOpacity>
+      {open ? (
+        <View style={styles.modeDebug}>
+          <Text style={styles.modeDebugText}>
+            modo={mode} · can_connect={canConnectServer == null ? '?' : canConnectServer ? '1' : '0'} ·{' '}
+            ota={shortOta} · {email || '?—'}
+            {pairingError ? ` · api:${pairingError}` : ''}
+          </Text>
+          <Text style={styles.modeDebugSub}>{describeCurrentOta()}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1551,6 +1584,7 @@ export default function PulseiraVitalPanel({
           enableAutoSave
           hideManualMeasures
           serverLatest={latest}
+          serverBattery={pairing?.battery_percent}
         />
       </View>
     );
@@ -1579,10 +1613,24 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   hidden: { display: 'none' },
   loadingBox: { alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
-  modeDebug: {
+  modeDebugWrap: {
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 4,
+  },
+  modeDebugToggle: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  modeDebugToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.gray400,
+    textDecorationLine: 'underline',
+  },
+  modeDebug: {
+    marginTop: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 8,
@@ -1600,6 +1648,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#7A6500',
   },
+  batteryWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  battery: { fontSize: 14, fontWeight: '600', color: colors.primary },
   content: { padding: 16, paddingBottom: 40 },
   viewerHint: {
     marginTop: 10,
@@ -1619,7 +1673,6 @@ const styles = StyleSheet.create({
   statusTextWrap: { flex: 1 },
   statusTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
   statusSubtitle: { fontSize: 13, color: colors.textLight, marginTop: 2 },
-  battery: { fontSize: 14, fontWeight: '600', color: colors.primary },
   errorText: { marginTop: 8, fontSize: 13, color: colors.error },
   breadcrumbBox: {
     marginTop: 10,

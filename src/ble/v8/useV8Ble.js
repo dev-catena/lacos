@@ -698,14 +698,9 @@ export function useV8Ble(groupId, ownerUserId, options = {}) {
       setError('Permissão de Bluetooth/localização negada.');
       return;
     }
-    // Android: auto-connect no GATT derruba o app (crash em connect:gatt).
-    // Quem vinculou reconecta com o botão, depois de um scan.
-    if (Platform.OS === 'android') {
-      v8Log('auto:skip', 'android-manual');
-      setStatusDetail('Toque em Reconectar para ligar a pulseira');
-      return;
-    }
+    // Android: connect() já faz scan+GATT (não usar autoConnect nativo).
     v8Log('auto:start', paired.name || paired.id);
+    setStatusDetail('Reconectando pulseira…');
     await connect(paired.id, paired.name, { persist: true });
   }, [connect]);
 
@@ -783,7 +778,6 @@ export function useV8Ble(groupId, ownerUserId, options = {}) {
 
   useEffect(() => {
     if (!enableAutoConnect) return undefined;
-    if (Platform.OS === 'android') return;
     if (!pairReady || !pairedDevice) return;
     if (autoConnectAttemptedRef.current) return;
     if (uiStateRef.current === 'unavailable') return;
@@ -791,6 +785,11 @@ export function useV8Ble(groupId, ownerUserId, options = {}) {
     (async () => {
       const manager = managerRef.current;
       if (!manager || !State) return;
+      // Android: pequena espera para o BleManager estabilizar após o mount
+      if (Platform.OS === 'android') {
+        await sleep(600);
+        if (cancelled) return;
+      }
       for (let i = 0; i < 20 && !cancelled; i++) {
         try {
           const state = await manager.state();
@@ -814,7 +813,6 @@ export function useV8Ble(groupId, ownerUserId, options = {}) {
   useEffect(() => {
     if (!enableAutoConnect) return undefined;
     const sub = AppState.addEventListener('change', (next) => {
-      if (Platform.OS === 'android') return;
       if (next !== 'active' || !pairedRef.current) return;
       if (
         uiStateRef.current === 'connected' ||
@@ -876,9 +874,24 @@ export function useV8Ble(groupId, ownerUserId, options = {}) {
   }, [applyBraceletModel, disconnect, groupId, updateUiState]);
 
   const reconnectPaired = useCallback(async () => {
+    const paired = pairedRef.current;
+    if (!paired?.id) {
+      setError('Nenhuma pulseira pareada neste grupo.');
+      setStatusDetail('Escolha o modelo e procure a pulseira.');
+      return;
+    }
     autoConnectAttemptedRef.current = true;
-    await tryAutoConnect();
-  }, [tryAutoConnect]);
+    setError(null);
+    setStatusDetail('Reconectando pulseira…');
+    updateUiState('connecting');
+    try {
+      await connect(paired.id, paired.name, { persist: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      updateUiState('idle');
+      setStatusDetail('Falha ao reconectar. Aproxime a pulseira e tente de novo.');
+    }
+  }, [connect, updateUiState]);
 
   const startScan = useCallback(async () => {
     const manager = managerRef.current;

@@ -89,6 +89,7 @@ class GroupV8BlePairingController extends Controller
             'bracelet_id' => 'required|string|max:80',
             'bracelet_name' => 'nullable|string|max:200',
             'bracelet_model' => 'nullable|string|in:v5,v8',
+            'battery_percent' => 'nullable|integer|min:0|max:100',
         ]);
 
         $model = strtolower((string) ($validated['bracelet_model'] ?? 'v8'));
@@ -117,6 +118,13 @@ class GroupV8BlePairingController extends Controller
         ];
         if (Schema::hasColumn('group_v8_ble_pairings', 'bracelet_model')) {
             $payload['bracelet_model'] = $model;
+        }
+        if (
+            Schema::hasColumn('group_v8_ble_pairings', 'battery_percent')
+            && array_key_exists('battery_percent', $validated)
+            && $validated['battery_percent'] !== null
+        ) {
+            $payload['battery_percent'] = (int) $validated['battery_percent'];
         }
 
         $pairing = GroupV8BlePairing::updateOrCreate(
@@ -190,6 +198,9 @@ class GroupV8BlePairingController extends Controller
             'bracelet_id' => $pairing->bracelet_id,
             'bracelet_name' => $pairing->bracelet_name,
             'bracelet_model' => $model,
+            'battery_percent' => Schema::hasColumn('group_v8_ble_pairings', 'battery_percent')
+                ? ($pairing->battery_percent !== null ? (int) $pairing->battery_percent : null)
+                : null,
             'paired_by' => (int) $pairing->paired_by,
             'paired_by_name' => $user?->name,
             'paired_at' => optional($pairing->paired_at)->toIso8601String(),

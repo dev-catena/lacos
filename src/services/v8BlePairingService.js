@@ -41,13 +41,17 @@ export async function getV8BlePairing(groupId) {
   }
 }
 
-export async function claimV8BlePairing(groupId, braceletId, braceletName, braceletModel) {
+export async function claimV8BlePairing(groupId, braceletId, braceletName, braceletModel, batteryPercent) {
   try {
-    const res = await apiService.put(`/groups/${groupId}/v8-ble-pairing`, {
+    const body = {
       bracelet_id: braceletId,
       bracelet_name: braceletName || (braceletModel === 'v5' ? 'Pulseira V5' : 'Pulseira V8'),
       bracelet_model: braceletModel === 'v5' ? 'v5' : 'v8',
-    });
+    };
+    if (batteryPercent != null && Number.isFinite(Number(batteryPercent))) {
+      body.battery_percent = Math.max(0, Math.min(100, Math.round(Number(batteryPercent))));
+    }
+    const res = await apiService.put(`/groups/${groupId}/v8-ble-pairing`, body);
     if (!res?.success) {
       const err = new Error(res?.message || 'Não foi possível vincular a pulseira ao grupo.');
       err.status = res?.status;

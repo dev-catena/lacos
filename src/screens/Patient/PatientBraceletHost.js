@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useNavigationState } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import colors from '../../constants/colors';
 import groupService from '../../services/groupService';
 import PulseiraVitalPanel from '../VitalSigns/components/PulseiraVitalPanel';
 
@@ -13,11 +16,12 @@ function routeNamesInState(state, acc = []) {
 }
 
 /**
- * Mantém BLE + auto-gravação (5 min) enquanto o paciente usa o app.
- * Desliga quando a tela Configuração está aberta (lá já há o painel visível),
- * para não haver dois BleManagers ao mesmo tempo.
+ * Uma única instância BLE do paciente: permanece montada o tempo todo
+ * (não desconecta ao sair/entrar em Configuração). Na tela Configuração
+ * o painel fica visível; nas demais abas fica oculto mas conectado.
  */
 export default function PatientBraceletHost() {
+  const insets = useSafeAreaInsets();
   const [groupId, setGroupId] = useState(null);
   const onSettingsScreen = useNavigationState((state) =>
     routeNamesInState(state).includes('PatientSettings'),
@@ -40,13 +44,35 @@ export default function PatientBraceletHost() {
     void loadGroup();
   }, [loadGroup]);
 
-  if (!groupId || onSettingsScreen) {
+  if (!groupId) {
     return null;
   }
 
   return (
-    <View style={styles.host} pointerEvents="none">
-      <PulseiraVitalPanel groupId={groupId} active={false} allowConnect patientMode />
+    <View
+      style={
+        onSettingsScreen
+          ? [styles.settingsPanel, { top: insets.top + 56 }]
+          : styles.host
+      }
+      pointerEvents={onSettingsScreen ? 'auto' : 'none'}
+    >
+      {onSettingsScreen ? (
+        <View style={styles.introCard}>
+          <Ionicons name="watch-outline" size={22} color={colors.primary} />
+          <Text style={styles.introText}>
+            Pareie a pulseira V5 ou V8 neste celular (perto do paciente). As leituras vão
+            automaticamente para o grupo a cada 5 minutos enquanto o app estiver aberto.
+            A conexão permanece ativa; só desconecta ao trocar de pulseira.
+          </Text>
+        </View>
+      ) : null}
+      <PulseiraVitalPanel
+        groupId={groupId}
+        active
+        allowConnect
+        patientMode
+      />
     </View>
   );
 }
@@ -58,5 +84,32 @@ const styles = StyleSheet.create({
     height: 1,
     opacity: 0,
     overflow: 'hidden',
+  },
+  settingsPanel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.background,
+    zIndex: 30,
+  },
+  introCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  introText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textLight,
   },
 });
