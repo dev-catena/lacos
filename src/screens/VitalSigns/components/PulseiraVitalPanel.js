@@ -488,7 +488,7 @@ function PulseiraOwnerPanel({
     }
   }, [groupId, runPersist]);
 
-  // Auto-gravação a cada 5 minutos no celular do paciente enquanto conectada
+  // Auto-gravação: envia assim que houver leitura (se vencido) e a cada 5 min
   useEffect(() => {
     if (!enableAutoSave || !groupId || !isConnected) return undefined;
 
@@ -523,7 +523,7 @@ function PulseiraOwnerPanel({
       await runPersist({ auto: true });
     };
 
-    // Checa ao conectar / ter leituras; depois a cada 60s (o gate de 5 min evita duplicar)
+    // Logo ao conectar: tenta gravar se o intervalo já venceu (ex.: dias sem envio)
     void tryAutoSave();
     const id = setInterval(() => {
       void tryAutoSave();
@@ -543,6 +543,31 @@ function PulseiraOwnerPanel({
     ble.bloodPressure,
     ble.temperatureC,
     ble.sleepSession,
+  ]);
+
+  // Bootstrap: com FC/SpO₂ ao vivo, força 1º envio em até ~20s se ainda não gravou nesta sessão
+  useEffect(() => {
+    if (!enableAutoSave || !groupId || !isConnected) return undefined;
+    if (!(ble.heartRate > 0 || ble.spo2 > 0 || ble.bloodPressure)) return undefined;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      if (cancelled) return;
+      const due = await isV8AutoSaveDue(groupId, V8_AUTO_RECORD_INTERVAL_MS);
+      if (!due) return;
+      await runPersist({ auto: true });
+    }, 20_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [
+    enableAutoSave,
+    groupId,
+    isConnected,
+    ble.heartRate,
+    ble.spo2,
+    ble.bloodPressure,
+    runPersist,
   ]);
 
   const nextInMs = msUntilNextV8AutoSave(lastAutoSaveAt, V8_AUTO_RECORD_INTERVAL_MS);
@@ -658,10 +683,11 @@ function PulseiraOwnerPanel({
           </View>
         ) : null}
         {hideManualMeasures && isConnected ? (
-          <Text style={styles.viewerHint}>
-            Medidas sob demanda ficam com os cuidadores. Neste celular a pulseira envia
-            automaticamente para o grupo a cada 5 minutos.
-          </Text>
+        <Text style={styles.viewerHint}>
+          Medidas sob demanda ficam com os cuidadores. Neste celular a pulseira envia
+          automaticamente para o grupo a cada 5 minutos. Os números acima são ao vivo no
+          Bluetooth; o cuidador vê o que já foi gravado no servidor.
+        </Text>
         ) : null}
       </View>
 
@@ -911,11 +937,46 @@ function PulseiraOwnerPanel({
         </View>
       )}
 
-      {ble.steps != null ? (
+      {ble.steps != null && !hideManualMeasures ? (
         <Text style={styles.stepsHint}>Passos (realtime): {ble.steps}</Text>
       ) : null}
     </ScrollView>
   );
+}
+
+function pickFresherReading(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  const ta = new Date(a.measured_at || 0).getTime();
+  const tb = new Date(b.measured_at || 0).getTime();
+  return tb > ta ? b : a;
+}
+
+function mergeLatestReadings(a, b) {
+  const keys = [
+    'heart_rate',
+    'oxygen_saturation',
+    'blood_pressure',
+    'temperature',
+    'sleep',
+    'ecg',
+  ];
+  const out = {};
+  for (const k of keys) {
+    out[k] = pickFresherReading(a?.[k], b?.[k]);
+  }
+  return out;
+}
+
+function latestMeasuredAt(latest) {
+  if (!latest) return null;
+  const times = Object.values(latest)
+    .map((r) => r?.measured_at)
+    .filter(Boolean)
+    .map((t) => new Date(t).getTime())
+    .filter((n) => Number.isFinite(n));
+  if (!times.length) return null;
+  return new Date(Math.max(...times)).toISOString();
 }
 
 function sleepMs(ms) {
@@ -972,12 +1033,7 @@ function PulseiraViewerPanel({
     ? braceletModelLabel(pairing.bracelet_model)
     : null;
   const measuredAt =
-    latest?.heart_rate?.measured_at ||
-    latest?.oxygen_saturation?.measured_at ||
-    latest?.blood_pressure?.measured_at ||
-    latest?.temperature?.measured_at ||
-    latest?.sleep?.measured_at ||
-    latest?.ecg?.measured_at ||
+    latestMeasuredAt(latest) ||
     pairing?.last_seen_at;
 
   const serverBp =
@@ -1036,16 +1092,27 @@ function PulseiraViewerPanel({
     }
     current.selectBraceletModel(pairing.bracelet_model || 'v8');
     setProgress('Conectando à pulseira…');
-    await current.connect(pairing.bracelet_id, pairing.bracelet_name || 'Pulseira', {
-      persist: false,
-    });
+    try {
+      await current.connect(pairing.bracelet_id, pairing.bracelet_name || 'Pulseira', {
+        persist: false,
+        nameHint: pairing.bracelet_name,
+      });
+    } catch (e) {
+      const msg = e?.message || String(e);
+      if (/invalid uuid|não encontrada|desconectar/i.test(msg)) {
+        throw new Error(
+          'Não conectou à pulseira. Fique a poucos metros dela. Se o celular do paciente estiver conectado, peça para tocar em Desconectar lá e tente de novo.',
+        );
+      }
+      throw e instanceof Error ? e : new Error(msg);
+    }
     const ok = await waitUntil(() => isBleLive(bleRef.current.uiState), {
       timeoutMs: 20_000,
     });
     if (!ok) {
       throw new Error(
         bleRef.current.error ||
-          'Não foi possível conectar. Aproxime o celular da pulseira e tente de novo.',
+          'Não foi possível conectar. Aproxime o celular da pulseira. Se o paciente estiver conectado, desconecte nele primeiro.',
       );
     }
   }, [pairing?.bracelet_id, pairing?.bracelet_model, pairing?.bracelet_name]);
@@ -1281,8 +1348,9 @@ function PulseiraViewerPanel({
           </Text>
         ) : null}
         <Text style={styles.viewerHint}>
-          Monitoramento contínuo vem do celular do paciente (a cada 5 min). Use os botões
-          abaixo para medir agora, com o celular perto da pulseira.
+          Os números abaixo são os últimos gravados no servidor. O celular do paciente
+          envia a cada 5 min. Para medir agora, fique perto da pulseira — se o app do
+          paciente estiver conectado, peça para tocar em Desconectar lá antes.
         </Text>
       </View>
 
@@ -1467,12 +1535,11 @@ export default function PulseiraVitalPanel({
         sleep: null,
         ecg: null,
       };
-      // Cuidador: sempre preferir o que veio do backend (pairing ou vital_signs).
-      const latestReadings = pairingHasData
-        ? pairingData.latest
-        : fromVitals.hasWearable
-          ? fromVitals.latest
-          : emptyLatest;
+      // Usa o mais recente entre pairing API e lista de vital_signs (evita FC antiga com sono novo).
+      const latestReadings = mergeLatestReadings(
+        pairingHasData ? pairingData.latest : emptyLatest,
+        fromVitals.hasWearable ? fromVitals.latest : emptyLatest,
+      );
 
       const pairingPayload = officialPairing;
 

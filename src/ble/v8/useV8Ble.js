@@ -94,23 +94,60 @@ function sleep(ms) {
  * No Android, connectToDevice(id) sem o periférico no cache GATT derruba o processo.
  * Localiza o device por scan/connectedDevices antes do connect.
  */
-async function locateBleDevice(manager, deviceId, timeoutMs = 10000) {
+function normalizeAndroidMac(id) {
+  const hex = String(id || '')
+    .toUpperCase()
+    .replace(/[^A-F0-9]/g, '');
+  if (hex.length === 12) {
+    return hex.match(/.{1,2}/g).join(':');
+  }
+  return String(id || '').trim();
+}
+
+function bleIdsMatch(a, b) {
+  if (!a || !b) return false;
+  if (String(a) === String(b)) return true;
+  const na = String(a).toUpperCase().replace(/[^A-F0-9]/g, '');
+  const nb = String(b).toUpperCase().replace(/[^A-F0-9]/g, '');
+  return na.length >= 12 && na === nb;
+}
+
+function isProbablyBleDeviceId(id) {
+  const s = String(id || '').trim();
+  if (!s) return false;
+  // UUID iOS
+  if (/^[0-9a-fA-F-]{36}$/.test(s)) return true;
+  // MAC Android com ou sem separadores
+  const hex = s.toUpperCase().replace(/[^A-F0-9]/g, '');
+  return hex.length === 12;
+}
+
+async function locateBleDevice(manager, deviceId, { nameHint } = {}, timeoutMs = 12000) {
+  const targetId = normalizeAndroidMac(deviceId);
+  const nameNeedle = String(nameHint || '')
+    .trim()
+    .toLowerCase();
+
   try {
     const connected = await manager.connectedDevices([V8_UUID.service]);
-    const already = connected?.find((d) => d.id === deviceId);
+    const already = connected?.find((d) => bleIdsMatch(d.id, targetId));
     if (already) return already;
   } catch {
     // ignore
   }
-  try {
-    const known = await manager.devices([deviceId]);
-    if (known?.[0]) return known[0];
-  } catch {
-    // ignore
+
+  if (isProbablyBleDeviceId(targetId)) {
+    try {
+      const known = await manager.devices([targetId]);
+      if (known?.[0]) return known[0];
+    } catch {
+      // ID inválido para a API nativa — segue para scan
+    }
   }
 
   return new Promise((resolve) => {
     let settled = false;
+    let bestByName = null;
     const finish = (device) => {
       if (settled) return;
       settled = true;
@@ -122,14 +159,27 @@ async function locateBleDevice(manager, deviceId, timeoutMs = 10000) {
       }
       resolve(device);
     };
-    const timer = setTimeout(() => finish(null), timeoutMs);
+    const timer = setTimeout(() => finish(bestByName), timeoutMs);
     try {
       manager.startDeviceScan(null, { allowDuplicates: false }, (err, device) => {
-        if (err) {
-          finish(null);
+        if (err || !device) {
+          if (err) finish(bestByName);
           return;
         }
-        if (device?.id === deviceId) finish(device);
+        if (bleIdsMatch(device.id, targetId)) {
+          finish(device);
+          return;
+        }
+        if (nameNeedle) {
+          const n = String(device.name || device.localName || '').toLowerCase();
+          if (
+            n &&
+            (n.includes(nameNeedle) || nameNeedle.includes(n)) &&
+            (!bestByName || (device.rssi ?? -999) > (bestByName.rssi ?? -999))
+          ) {
+            bestByName = device;
+          }
+        }
       });
     } catch {
       finish(null);
@@ -483,20 +533,27 @@ export function useV8Ble(groupId, ownerUserId, options = {}) {
         }
 
         let device;
+        const resolvedId =
+          Platform.OS === 'android' ? normalizeAndroidMac(deviceId) : deviceId;
         if (Platform.OS === 'android') {
           await mark('connect:scan');
-          const located = await locateBleDevice(manager, deviceId);
+          const located = await locateBleDevice(manager, resolvedId, {
+            nameHint: displayName || options?.nameHint,
+          });
           if (!located) {
             throw new Error(
-              'Pulseira não encontrada no Bluetooth. Aproxime o aparelho e toque em Reconectar.',
+              'Pulseira não encontrada no Bluetooth. Aproxime o aparelho. Se o celular do paciente estiver conectado, peça para tocar em Desconectar lá primeiro.',
             );
           }
-          v8Log('connect:scan', 'encontrada', { id: shortId, ms: elapsedMs(t0) });
+          v8Log('connect:scan', 'encontrada', {
+            id: (located.id || '').slice(-8),
+            ms: elapsedMs(t0),
+          });
           await mark('connect:gatt');
           device = await located.connect({ autoConnect: false, timeout: 15000 });
         } else {
           await mark('connect:gatt');
-          device = await manager.connectToDevice(deviceId, {
+          device = await manager.connectToDevice(resolvedId, {
             autoConnect: false,
             timeout: 15000,
           });
@@ -637,10 +694,17 @@ export function useV8Ble(groupId, ownerUserId, options = {}) {
         }).then((crumb) => {
           if (crumb) setLastBreadcrumb(crumb);
         });
+        let friendly = message;
+        if (/invalid uuid/i.test(message)) {
+          friendly =
+            'Não foi possível abrir a conexão BLE (UUID inválido). Aproxime a pulseira. Se o app do paciente estiver conectado, toque em Desconectar nele primeiro e tente de novo.';
+        } else if (/already connected|status 133|gatt/i.test(message)) {
+          friendly = `${message} Se o celular do paciente estiver conectado à pulseira, desconecte lá antes.`;
+        }
         setError(
           pairedRef.current
-            ? `Falha ao reconectar (${step}): ${message}`
-            : `Falha ao conectar (${step}): ${message}`,
+            ? `Falha ao reconectar (${step}): ${friendly}`
+            : `Falha ao conectar (${step}): ${friendly}`,
         );
         if (Platform.OS !== 'android') {
           try {
@@ -651,6 +715,7 @@ export function useV8Ble(groupId, ownerUserId, options = {}) {
         }
         cleanupConnection();
         updateUiState(pairedRef.current ? 'idle' : 'error');
+        throw e instanceof Error ? e : new Error(friendly || message);
       } finally {
         connectingRef.current = false;
         v8Log('connect:finally', step, { ms: elapsedMs(t0) });
