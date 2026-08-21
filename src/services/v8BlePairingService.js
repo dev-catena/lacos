@@ -73,9 +73,46 @@ export async function unpairV8BlePairing(groupId) {
   return res;
 }
 
+/** Cuidador: pede medição no celular do paciente (sem BLE local). */
+export async function requestBraceletMeasure(groupId, type = 'all') {
+  try {
+    const res = await apiService.post(`/groups/${groupId}/v8-ble-pairing/measure`, {
+      type: type === 'ecg' ? 'ecg' : 'all',
+    });
+    if (!res?.success) {
+      throw wrapPairingError(res, 'Não foi possível solicitar a medição.');
+    }
+    return {
+      requestId: res.request_id,
+      type: res.type || type,
+      message: res.message,
+    };
+  } catch (e) {
+    throw wrapPairingError(e, 'Não foi possível solicitar a medição.');
+  }
+}
+
+/** Paciente: informa o grupo que a medição remota terminou. */
+export async function finishBraceletMeasure(groupId, { type, requestId, success, message }) {
+  try {
+    const res = await apiService.post(`/groups/${groupId}/v8-ble-pairing/measure-finished`, {
+      type: type === 'ecg' ? 'ecg' : 'all',
+      request_id: requestId,
+      success: !!success,
+      message: message || null,
+    });
+    return res;
+  } catch (e) {
+    console.warn('[v8BlePairing] finishMeasure', e?.message || e);
+    return null;
+  }
+}
+
 export default {
   getV8BlePairing,
   claimV8BlePairing,
   unpairV8BlePairing,
+  requestBraceletMeasure,
+  finishBraceletMeasure,
   isV8BlePairingUnavailable,
 };

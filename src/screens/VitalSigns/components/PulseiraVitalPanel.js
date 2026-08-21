@@ -33,12 +33,16 @@ import {
 } from '../../../services/v8VitalAutoRecord';
 import {
   claimV8BlePairing,
+  finishBraceletMeasure,
   getV8BlePairing,
   isV8BlePairingUnavailable,
+  requestBraceletMeasure,
   unpairV8BlePairing,
 } from '../../../services/v8BlePairingService';
 import groupService from '../../../services/groupService';
 import { describeCurrentOta, getOtaInfo } from '../../../services/otaUpdateService';
+import { registerBraceletRemoteMeasureHandler } from '../../../services/braceletRemoteMeasure';
+import websocketService from '../../../services/websocketService';
 
 function unwrapGroupPayload(result) {
   const raw = result?.data;
@@ -433,6 +437,144 @@ function PulseiraOwnerPanel({
     },
     [claimOwnership, groupId, onSaved],
   );
+
+  // Pedidos remotos do cuidador (WebSocket → medir neste celular)
+  useEffect(() => {
+    if (!claimOwnership || !groupId) return undefined;
+
+    const runRemote = async (payload) => {
+      const type = payload?.type === 'ecg' ? 'ecg' : 'all';
+      const requestId = payload?.request_id || payload?.requestId || `local-${Date.now()}`;
+      Toast.show({
+        type: 'info',
+        text1: type === 'ecg' ? 'ECG solicitado' : 'Medição solicitada',
+        text2: 'Um cuidador pediu atualização pela pulseira.',
+        visibilityTime: 2500,
+      });
+
+      try {
+        const current = bleRef.current;
+        if (!isBleLive(current.uiState)) {
+          const paired = current.pairedDevice;
+          if (!paired?.id) {
+            throw new Error('Pulseira não pareada neste celular. Abra Configuração e reconecte.');
+          }
+          await current.connect(paired.id, paired.name, { persist: true });
+          const ok = await waitUntil(() => isBleLive(bleRef.current.uiState), {
+            timeoutMs: 25_000,
+          });
+          if (!ok) {
+            throw new Error(bleRef.current.error || 'Não foi possível conectar à pulseira.');
+          }
+        }
+
+        if (type === 'ecg') {
+          await bleRef.current.startEcgMeasurement();
+          await waitUntil(
+            () =>
+              bleRef.current.uiState === 'connected' || !!bleRef.current.ecgResult,
+            { timeoutMs: 70_000 },
+          );
+          if (bleRef.current.uiState === 'measuringEcg') {
+            await bleRef.current.stopEcgMeasurement();
+          }
+          await sleepMs(500);
+          const snap = bleRef.current;
+          if (!snap.ecgResult) {
+            throw new Error('ECG sem amostras. Mantenha contato firme.');
+          }
+          const result = await persistBraceletVitalSigns({
+            groupId,
+            ecgResult: snap.ecgResult,
+            heartRate: snap.ecgResult.heartRate || snap.heartRate,
+            deviceName: snap.connectedName || snap.pairedDevice?.name,
+            braceletModel: snap.pairedDevice?.model || snap.braceletModel,
+            auto: false,
+          });
+          if (!result.success) {
+            throw new Error(result.error || 'Falha ao salvar ECG.');
+          }
+        } else {
+          await bleRef.current.startMeasurement();
+          await waitUntil(() => (bleRef.current.heartRate || 0) > 0, { timeoutMs: 25_000 });
+          await bleRef.current.stopMeasurement();
+          await sleepMs(400);
+
+          await bleRef.current.startSpo2Measurement();
+          await waitUntil(
+            () =>
+              (bleRef.current.spo2 || 0) > 0 || bleRef.current.uiState === 'connected',
+            { timeoutMs: 70_000 },
+          );
+          if (bleRef.current.uiState === 'measuringSpo2') {
+            await bleRef.current.stopSpo2Measurement();
+          }
+          await sleepMs(400);
+
+          await bleRef.current.startBpMeasurement();
+          await waitUntil(
+            () =>
+              !!bleRef.current.bloodPressure || bleRef.current.uiState === 'connected',
+            { timeoutMs: 70_000 },
+          );
+          if (bleRef.current.uiState === 'measuringBP') {
+            await bleRef.current.stopBpMeasurement();
+          }
+          await sleepMs(400);
+
+          await bleRef.current.refreshTemperature();
+          await bleRef.current.refreshSleep();
+          await sleepMs(2000);
+
+          const snap = bleRef.current;
+          const result = await persistBraceletVitalSigns({
+            groupId,
+            heartRate: snap.heartRate,
+            spo2: snap.spo2,
+            bloodPressure: snap.bloodPressure,
+            temperatureC: snap.temperatureC,
+            sleepSession: snap.sleepSession,
+            deviceName: snap.connectedName || snap.pairedDevice?.name,
+            braceletModel: snap.pairedDevice?.model || snap.braceletModel,
+            auto: false,
+          });
+          if (!result.success) {
+            throw new Error(result.error || 'Falha ao salvar leituras.');
+          }
+        }
+
+        await finishBraceletMeasure(groupId, {
+          type,
+          requestId,
+          success: true,
+          message: 'Medição concluída',
+        });
+        onSaved?.();
+        Toast.show({
+          type: 'success',
+          text1: 'Medição enviada',
+          text2: 'Leituras gravadas para o grupo.',
+        });
+        return { success: true };
+      } catch (e) {
+        const message = e?.message || 'Falha na medição remota';
+        await finishBraceletMeasure(groupId, {
+          type,
+          requestId,
+          success: false,
+          message,
+        });
+        Toast.show({
+          type: 'error',
+          text1: 'Falha na medição remota',
+          text2: message,
+        });
+        return { success: false, error: message };
+      }
+    };
+
+    return registerBraceletRemoteMeasureHandler(runRemote);
+  }, [claimOwnership, groupId, onSaved]);
 
   const handleSave = useCallback(async () => {
     if (!groupId) {
@@ -1003,8 +1145,8 @@ function isBleLive(uiState) {
 }
 
 /**
- * Cuidador/admin/etc.: lê backend + Medir agora (todos) e Eletro sob demanda via BLE.
- * Não pareia e desconecta ao terminar para liberar a pulseira ao celular do paciente.
+ * Cuidador/admin/etc.: lê backend. Medir agora / ECG pedem ao app do paciente
+ * (WebSocket) — este perfil NÃO conecta no Bluetooth.
  */
 function PulseiraViewerPanel({
   groupId,
@@ -1018,23 +1160,16 @@ function PulseiraViewerPanel({
   loadError,
   onSaved,
 }) {
-  const { user } = useAuth();
-  const ble = useV8Ble(groupId, user?.id, { enableAutoConnect: false });
-  const bleRef = useRef(ble);
-  bleRef.current = ble;
-
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null);
-  const cancelledRef = useRef(false);
+  const pendingRequestIdRef = useRef(null);
 
   const ownerName = pairing?.paired_by_name;
   const braceletName = pairing?.bracelet_name;
   const modelLabel = pairing?.bracelet_model
     ? braceletModelLabel(pairing.bracelet_model)
     : null;
-  const measuredAt =
-    latestMeasuredAt(latest) ||
-    pairing?.last_seen_at;
+  const measuredAt = latestMeasuredAt(latest) || pairing?.last_seen_at;
 
   const serverBp =
     latest?.blood_pressure?.systolic != null
@@ -1045,10 +1180,10 @@ function PulseiraViewerPanel({
       : null;
 
   const sleepHours = readingNumber(latest?.sleep);
-  const serverHr = readingNumber(latest?.heart_rate);
-  const serverSpo2 = readingNumber(latest?.oxygen_saturation);
-  const serverTemp = readingNumber(latest?.temperature);
-  const serverEcg = latest?.ecg
+  const displayHr = readingNumber(latest?.heart_rate);
+  const displaySpo2 = readingNumber(latest?.oxygen_saturation);
+  const displayTemp = readingNumber(latest?.temperature);
+  const displayEcg = latest?.ecg
     ? {
         heartRate: latest.ecg.heart_rate ?? readingNumber(latest.ecg),
         hrv: latest.ecg.hrv ?? null,
@@ -1056,242 +1191,103 @@ function PulseiraViewerPanel({
         samples: latest.ecg.samples ?? null,
       }
     : null;
-
-  const showingLive = busy || isBleLive(ble.uiState);
-  const displayHr = showingLive && ble.heartRate != null ? ble.heartRate : serverHr;
-  const displaySpo2 = showingLive && ble.spo2 != null ? ble.spo2 : serverSpo2;
-  const displayBp = showingLive && ble.bloodPressure ? ble.bloodPressure : serverBp;
-  const displayTemp =
-    showingLive && ble.temperatureC != null ? ble.temperatureC : serverTemp;
   const displaySleep =
-    showingLive && ble.sleepSession
-      ? ble.sleepSession
-      : sleepHours != null
-        ? { totalHours: sleepHours, startAt: latest?.sleep?.measured_at }
-        : null;
-  const displayEcg =
-    showingLive && ble.ecgResult
-      ? ble.ecgResult
-      : serverEcg;
+    sleepHours != null
+      ? { totalHours: sleepHours, startAt: latest?.sleep?.measured_at }
+      : null;
 
   const hasAny =
     displayHr != null ||
     displaySpo2 != null ||
-    displayBp ||
+    serverBp ||
     displayTemp != null ||
     displaySleep != null ||
     displayEcg;
 
   const canMeasure = !!pairing?.bracelet_id && !busy;
 
-  const ensureConnected = useCallback(async () => {
-    const current = bleRef.current;
-    if (isBleLive(current.uiState)) return;
-    if (!pairing?.bracelet_id) {
-      throw new Error('O paciente ainda não vinculou a pulseira neste grupo.');
-    }
-    current.selectBraceletModel(pairing.bracelet_model || 'v8');
-    setProgress('Conectando à pulseira…');
-    try {
-      await current.connect(pairing.bracelet_id, pairing.bracelet_name || 'Pulseira', {
-        persist: false,
-        nameHint: pairing.bracelet_name,
-      });
-    } catch (e) {
-      const msg = e?.message || String(e);
-      if (/invalid uuid|não encontrada|desconectar/i.test(msg)) {
-        throw new Error(
-          'Não conectou à pulseira. Fique a poucos metros dela. Se o celular do paciente estiver conectado, peça para tocar em Desconectar lá e tente de novo.',
-        );
+  useEffect(() => {
+    if (!groupId) return undefined;
+    return websocketService.onBraceletMeasureFinished(groupId, async (data) => {
+      const reqId = data?.request_id || data?.requestId;
+      if (!pendingRequestIdRef.current || String(reqId) !== String(pendingRequestIdRef.current)) {
+        return;
       }
-      throw e instanceof Error ? e : new Error(msg);
-    }
-    const ok = await waitUntil(() => isBleLive(bleRef.current.uiState), {
-      timeoutMs: 20_000,
+      pendingRequestIdRef.current = null;
+      setBusy(false);
+      setProgress(null);
+      if (data?.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Medição atualizada',
+          text2: 'O celular do paciente enviou as leituras.',
+        });
+        onSaved?.();
+        onRefresh?.({ silent: true });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Falha na medição',
+          text2:
+            data?.message ||
+            'O app do paciente não conseguiu medir. Confira se a pulseira está conectada lá.',
+        });
+      }
     });
-    if (!ok) {
-      throw new Error(
-        bleRef.current.error ||
-          'Não foi possível conectar. Aproxime o celular da pulseira. Se o paciente estiver conectado, desconecte nele primeiro.',
+  }, [groupId, onRefresh, onSaved]);
+
+  const requestRemote = useCallback(
+    async (type) => {
+      if (busy) return;
+      setBusy(true);
+      setProgress(
+        type === 'ecg'
+          ? 'Pedindo ECG no celular do paciente…'
+          : 'Pedindo medição no celular do paciente…',
       );
-    }
-  }, [pairing?.bracelet_id, pairing?.bracelet_model, pairing?.bracelet_name]);
+      try {
+        const res = await requestBraceletMeasure(groupId, type);
+        pendingRequestIdRef.current = res.requestId;
+        setProgress(
+          type === 'ecg'
+            ? 'Aguardando ECG no celular do paciente…'
+            : 'Aguardando medição no celular do paciente…',
+        );
 
-  const safeDisconnect = useCallback(async () => {
-    try {
-      await bleRef.current.disconnect();
-    } catch {
-      // ignore
-    }
-  }, []);
+        const startedAt = latestMeasuredAt(latest);
+        const timeoutMs = type === 'ecg' ? 120_000 : 200_000;
+        const pollEvery = 3000;
+        const deadline = Date.now() + timeoutMs;
 
-  const handleMeasureAll = useCallback(async () => {
-    if (busy) return;
-    cancelledRef.current = false;
-    setBusy(true);
-    setProgress(null);
-    try {
-      await ensureConnected();
-      if (cancelledRef.current) return;
-      const current = bleRef.current;
+        while (Date.now() < deadline && pendingRequestIdRef.current) {
+          await sleepMs(pollEvery);
+          if (!pendingRequestIdRef.current) return;
+          try {
+            await onRefresh?.({ silent: true });
+          } catch {
+            // ignore
+          }
+        }
 
-      setProgress('Medindo frequência cardíaca…');
-      await current.startMeasurement();
-      await waitUntil(() => (bleRef.current.heartRate || 0) > 0, { timeoutMs: 25_000 });
-      await current.stopMeasurement();
-      await sleepMs(400);
-
-      if (cancelledRef.current) return;
-      setProgress('Medindo oxigenação (SpO₂)…');
-      await current.startSpo2Measurement();
-      await waitUntil(
-        () =>
-          (bleRef.current.spo2 || 0) > 0 ||
-          bleRef.current.uiState === 'connected',
-        { timeoutMs: 70_000 },
-      );
-      if (bleRef.current.uiState === 'measuringSpo2') {
-        await current.stopSpo2Measurement();
+        if (pendingRequestIdRef.current) {
+          pendingRequestIdRef.current = null;
+          throw new Error(
+            'Tempo esgotado. Confira se o app do paciente está aberto e a pulseira conectada.',
+          );
+        }
+      } catch (e) {
+        pendingRequestIdRef.current = null;
+        Toast.show({
+          type: 'error',
+          text1: 'Falha na medição',
+          text2: e?.message || 'Não foi possível solicitar a medição.',
+        });
+        setBusy(false);
+        setProgress(null);
       }
-      await sleepMs(400);
-
-      if (cancelledRef.current) return;
-      setProgress('Medindo pressão arterial…');
-      await current.startBpMeasurement();
-      await waitUntil(
-        () =>
-          !!bleRef.current.bloodPressure ||
-          bleRef.current.uiState === 'connected',
-        { timeoutMs: 70_000 },
-      );
-      if (bleRef.current.uiState === 'measuringBP') {
-        await current.stopBpMeasurement();
-      }
-      await sleepMs(400);
-
-      if (cancelledRef.current) return;
-      setProgress('Atualizando temperatura e sono…');
-      await current.refreshTemperature();
-      await current.refreshSleep();
-      await sleepMs(2000);
-
-      if (cancelledRef.current) return;
-      setProgress('Salvando no grupo…');
-      const snap = bleRef.current;
-      const result = await persistBraceletVitalSigns({
-        groupId,
-        heartRate: snap.heartRate,
-        spo2: snap.spo2,
-        bloodPressure: snap.bloodPressure,
-        temperatureC: snap.temperatureC,
-        sleepSession: snap.sleepSession,
-        deviceName: pairing?.bracelet_name || snap.connectedName,
-        braceletModel: pairing?.bracelet_model || snap.braceletModel,
-        auto: false,
-      });
-
-      if (!result.success) {
-        throw new Error(result.error || 'Nenhuma leitura válida para salvar.');
-      }
-
-      Toast.show({
-        type: 'success',
-        text1: 'Medição concluída',
-        text2: `${result.saved} sinal(is) gravados no grupo.`,
-      });
-      onSaved?.();
-      onRefresh?.({ silent: true });
-    } catch (e) {
-      Toast.show({
-        type: 'error',
-        text1: 'Falha na medição',
-        text2: e?.message || 'Tente novamente perto da pulseira.',
-      });
-    } finally {
-      setProgress(null);
-      setBusy(false);
-      await safeDisconnect();
-    }
-  }, [
-    busy,
-    ensureConnected,
-    groupId,
-    onRefresh,
-    onSaved,
-    pairing?.bracelet_model,
-    pairing?.bracelet_name,
-    safeDisconnect,
-  ]);
-
-  const handleMeasureEcg = useCallback(async () => {
-    if (busy) return;
-    cancelledRef.current = false;
-    setBusy(true);
-    setProgress(null);
-    try {
-      await ensureConnected();
-      if (cancelledRef.current) return;
-
-      setProgress('Medindo eletrocardiograma (~50s)…');
-      await bleRef.current.startEcgMeasurement();
-      await waitUntil(
-        () =>
-          bleRef.current.uiState === 'connected' ||
-          !!bleRef.current.ecgResult,
-        { timeoutMs: 60_000 },
-      );
-      if (bleRef.current.uiState === 'measuringEcg') {
-        await bleRef.current.stopEcgMeasurement();
-      }
-      await sleepMs(500);
-
-      const snap = bleRef.current;
-      if (!snap.ecgResult) {
-        throw new Error('ECG sem amostras. Mantenha contato firme e tente de novo.');
-      }
-
-      setProgress('Salvando ECG no grupo…');
-      const result = await persistBraceletVitalSigns({
-        groupId,
-        ecgResult: snap.ecgResult,
-        heartRate: snap.ecgResult.heartRate || snap.heartRate,
-        deviceName: pairing?.bracelet_name || snap.connectedName,
-        braceletModel: pairing?.bracelet_model || snap.braceletModel,
-        auto: false,
-      });
-
-      if (!result.success) {
-        throw new Error(result.error || 'Não foi possível salvar o ECG.');
-      }
-
-      Toast.show({
-        type: 'success',
-        text1: 'ECG salvo',
-        text2: 'Eletrocardiograma gravado no grupo.',
-      });
-      onSaved?.();
-      onRefresh?.({ silent: true });
-    } catch (e) {
-      Toast.show({
-        type: 'error',
-        text1: 'Falha no ECG',
-        text2: e?.message || 'Tente novamente perto da pulseira.',
-      });
-    } finally {
-      setProgress(null);
-      setBusy(false);
-      await safeDisconnect();
-    }
-  }, [
-    busy,
-    ensureConnected,
-    groupId,
-    onRefresh,
-    onSaved,
-    pairing?.bracelet_model,
-    pairing?.bracelet_name,
-    safeDisconnect,
-  ]);
+    },
+    [busy, groupId, latest, onRefresh],
+  );
 
   return (
     <ScrollView
@@ -1317,7 +1313,7 @@ function PulseiraViewerPanel({
           <View style={styles.statusTextWrap}>
             <Text style={styles.statusTitle}>
               {busy
-                ? 'Medindo sob demanda…'
+                ? 'Aguardando o celular do paciente…'
                 : hasAny
                   ? 'Dados da pulseira do grupo'
                   : 'Aguardando leituras'}
@@ -1330,17 +1326,14 @@ function PulseiraViewerPanel({
                 : 'Aguardando o paciente parear a pulseira (Configuração → Pulseira V5/V8).'}
             </Text>
           </View>
-          {(ble.battery != null || pairing?.battery_percent != null) ? (
+          {pairing?.battery_percent != null ? (
             <View style={styles.batteryWrap}>
               <SafeIcon name="battery-half" size={16} color={colors.primary} />
-              <Text style={styles.battery}>
-                {ble.battery != null ? ble.battery : pairing.battery_percent}%
-              </Text>
+              <Text style={styles.battery}>{pairing.battery_percent}%</Text>
             </View>
           ) : null}
         </View>
         {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
-        {ble.error && busy ? <Text style={styles.errorText}>{ble.error}</Text> : null}
         {progress ? <Text style={styles.updatedAt}>{progress}</Text> : null}
         {measuredAt && !busy ? (
           <Text style={styles.updatedAt}>
@@ -1348,31 +1341,29 @@ function PulseiraViewerPanel({
           </Text>
         ) : null}
         <Text style={styles.viewerHint}>
-          Os números abaixo são os últimos gravados no servidor. O celular do paciente
-          envia a cada 5 min. Para medir agora, fique perto da pulseira — se o app do
-          paciente estiver conectado, peça para tocar em Desconectar lá antes.
+          Medir agora e ECG enviam um pedido ao celular do paciente (já conectado à
+          pulseira). Este perfil não usa Bluetooth.
         </Text>
       </View>
 
       <ReadingsGrid
         heartRate={displayHr}
         spo2={displaySpo2}
-        bloodPressure={displayBp}
+        bloodPressure={serverBp}
         temperatureC={displayTemp}
         sleepSession={displaySleep}
         ecgResult={displayEcg}
-        ecgSampleCount={showingLive ? ble.ecgSampleCount : displayEcg?.samples}
-        measuringEcg={ble.uiState === 'measuringEcg'}
+        ecgSampleCount={displayEcg?.samples}
       />
 
       <View style={styles.section}>
         <TouchableOpacity
           style={[styles.primaryBtn, (!canMeasure || busy) && styles.btnDisabled]}
-          onPress={handleMeasureAll}
+          onPress={() => requestRemote('all')}
           disabled={!canMeasure || busy}
           activeOpacity={0.85}
         >
-          {busy && progress && !String(progress).includes('ECG') && !String(progress).includes('eletro') ? (
+          {busy && progress && !String(progress).toLowerCase().includes('ecg') ? (
             <ActivityIndicator color={colors.textWhite} />
           ) : (
             <SafeIcon name="heart" size={20} color={colors.textWhite} />
@@ -1381,12 +1372,16 @@ function PulseiraViewerPanel({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.measureBtn, styles.measureBtnEcg, (!canMeasure || busy) && styles.btnDisabled]}
-          onPress={handleMeasureEcg}
+          style={[
+            styles.measureBtn,
+            styles.measureBtnEcg,
+            (!canMeasure || busy) && styles.btnDisabled,
+          ]}
+          onPress={() => requestRemote('ecg')}
           disabled={!canMeasure || busy}
           activeOpacity={0.85}
         >
-          {busy && (String(progress || '').includes('ECG') || String(progress || '').includes('eletro')) ? (
+          {busy && String(progress || '').toLowerCase().includes('ecg') ? (
             <ActivityIndicator color={colors.textWhite} />
           ) : (
             <SafeIcon name="pulse" size={20} color={colors.textWhite} />
@@ -1400,8 +1395,8 @@ function PulseiraViewerPanel({
           </Text>
         ) : (
           <Text style={styles.sectionHint}>
-            Medir agora coleta FC, SpO₂, PA, temperatura e sono de uma vez. Fique perto da
-            pulseira durante a medição.
+            O app do paciente precisa estar aberto (ou em segundo plano) com a pulseira
+            conectada para atender o pedido.
           </Text>
         )}
       </View>
@@ -1423,7 +1418,7 @@ function PulseiraViewerPanel({
 /**
  * Painel da pulseira (V5 ou V8) no grupo.
  * - Paciente (patientMode): pareia, auto-grava a cada 5 min, sem Medir agora.
- * - Demais: visualizam o backend + Medir agora (todos) e Medir eletro sob demanda.
+ * - Demais: visualizam o backend; Medir agora/ECG pedem ao app do paciente via WebSocket.
  */
 function ModeDebugBanner({ mode, canConnectServer, email, pairingError }) {
   const [open, setOpen] = useState(false);

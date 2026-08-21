@@ -144,6 +144,107 @@ class GroupV8BlePairingController extends Controller
     }
 
     /**
+     * POST /api/groups/{groupId}/v8-ble-pairing/measure
+     * Cuidador solicita medição no celular do paciente (sem BLE no cuidador).
+     */
+    public function requestMeasure(Request $request, int $groupId)
+    {
+        $group = $this->assertGroupMember($groupId);
+        $userId = (int) Auth::id();
+
+        if ($this->isGroupPatient($group, $userId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'O paciente já monitora a pulseira neste celular. Use a gravação automática.',
+            ], 422);
+        }
+
+        if (! Schema::hasTable('group_v8_ble_pairings')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pulseira ainda não configurada.',
+            ], 503);
+        }
+
+        $pairing = GroupV8BlePairing::where('group_id', $groupId)->first();
+        if (! $pairing) {
+            return response()->json([
+                'success' => false,
+                'message' => 'O paciente ainda não vinculou a pulseira.',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'type' => 'required|string|in:all,ecg',
+        ]);
+
+        $requestId = (string) \Illuminate\Support\Str::uuid();
+
+        try {
+            event(new \App\Events\BraceletMeasureRequested(
+                $groupId,
+                $validated['type'],
+                $userId,
+                $requestId
+            ));
+        } catch (\Throwable $e) {
+            \Log::warning('bracelet.measure broadcast failed: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Não foi possível avisar o celular do paciente. Verifique a conexão em tempo real.',
+            ], 502);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pedido enviado ao celular do paciente.',
+            'request_id' => $requestId,
+            'type' => $validated['type'],
+        ]);
+    }
+
+    /**
+     * POST /api/groups/{groupId}/v8-ble-pairing/measure-finished
+     * App do paciente reporta fim da medição remota.
+     */
+    public function finishMeasure(Request $request, int $groupId)
+    {
+        $group = $this->assertGroupMember($groupId);
+        $userId = (int) Auth::id();
+
+        if (! $this->isGroupPatient($group, $userId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Só o paciente reporta o fim da medição.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'type' => 'required|string|in:all,ecg',
+            'request_id' => 'required|string|max:80',
+            'success' => 'required|boolean',
+            'message' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            event(new \App\Events\BraceletMeasureFinished(
+                $groupId,
+                $validated['type'],
+                $validated['request_id'],
+                (bool) $validated['success'],
+                $validated['message'] ?? null
+            ));
+        } catch (\Throwable $e) {
+            \Log::warning('bracelet.measure.finished broadcast failed: '.$e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+        ]);
+    }
+
+    /**
      * DELETE /api/groups/{groupId}/v8-ble-pairing
      */
     public function destroy(int $groupId)

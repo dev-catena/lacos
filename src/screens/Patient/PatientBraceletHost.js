@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import groupService from '../../services/groupService';
+import websocketService from '../../services/websocketService';
+import { dispatchBraceletRemoteMeasure } from '../../services/braceletRemoteMeasure';
 import PulseiraVitalPanel from '../VitalSigns/components/PulseiraVitalPanel';
 
 function routeNamesInState(state, acc = []) {
@@ -43,6 +45,24 @@ export default function PatientBraceletHost() {
   useEffect(() => {
     void loadGroup();
   }, [loadGroup]);
+
+  useEffect(() => {
+    if (!groupId) return undefined;
+    let unsub = () => {};
+    (async () => {
+      try {
+        await websocketService.initialize();
+        unsub = websocketService.onBraceletMeasure(groupId, (data) => {
+          void dispatchBraceletRemoteMeasure(data);
+        });
+      } catch (e) {
+        console.warn('[PatientBraceletHost] ws measure', e?.message || e);
+      }
+    })();
+    return () => {
+      unsub();
+    };
+  }, [groupId]);
 
   if (!groupId) {
     return null;

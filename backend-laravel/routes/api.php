@@ -407,6 +407,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Pulseira V8 BLE no celular — um vínculo por grupo (dono conecta, demais só veem)
     Route::get('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'show']);
     Route::put('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'upsert']);
+    Route::post('/groups/{groupId}/v8-ble-pairing/measure', [GroupV8BlePairingController::class, 'requestMeasure']);
+    Route::post('/groups/{groupId}/v8-ble-pairing/measure-finished', [GroupV8BlePairingController::class, 'finishMeasure']);
     Route::delete('/groups/{groupId}/v8-ble-pairing', [GroupV8BlePairingController::class, 'destroy']);
 
     // Localização indoor (gateways + pulseiras + histórico)

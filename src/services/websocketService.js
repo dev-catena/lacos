@@ -12,6 +12,10 @@ class WebSocketService {
     this.echo = null;
     this.isConnected = false;
     this.listeners = new Map(); // Armazenar listeners por grupo
+    /** @type {Map<string, Set<Function>>} */
+    this.braceletMeasureHandlers = new Map();
+    /** @type {Map<string, Set<Function>>} */
+    this.braceletMeasureFinishedHandlers = new Map();
   }
 
   /**
@@ -128,12 +132,109 @@ class WebSocketService {
         });
       }
 
+      channel.listen('.bracelet.measure', (data) => {
+        console.log('📡 WebSocket - bracelet.measure:', data);
+        const key = String(groupId);
+        this.braceletMeasureHandlers.get(key)?.forEach((fn) => {
+          try {
+            fn(data || {});
+          } catch (e) {
+            console.warn('bracelet.measure handler', e);
+          }
+        });
+        if (callbacks.onBraceletMeasure) {
+          callbacks.onBraceletMeasure(data || {});
+        }
+      });
+
+      channel.listen('.bracelet.measure.finished', (data) => {
+        console.log('📡 WebSocket - bracelet.measure.finished:', data);
+        const key = String(groupId);
+        this.braceletMeasureFinishedHandlers.get(key)?.forEach((fn) => {
+          try {
+            fn(data || {});
+          } catch (e) {
+            console.warn('bracelet.measure.finished handler', e);
+          }
+        });
+        if (callbacks.onBraceletMeasureFinished) {
+          callbacks.onBraceletMeasureFinished(data || {});
+        }
+      });
+
       // Armazenar referência do canal
       this.listeners.set(channelName, channel);
 
       console.log(`✅ WebSocket - Escutando eventos do grupo ${groupId}`);
     } catch (error) {
       console.error('❌ WebSocket - Erro ao escutar grupo:', error);
+    }
+  }
+
+  /**
+   * Handler permanente para pedido de medição (app do paciente).
+   * Não substitui os listeners de mídia do Home.
+   */
+  onBraceletMeasure(groupId, fn) {
+    const key = String(groupId);
+    if (!this.braceletMeasureHandlers.has(key)) {
+      this.braceletMeasureHandlers.set(key, new Set());
+    }
+    this.braceletMeasureHandlers.get(key).add(fn);
+    // Garante canal inscrito
+    void this.ensureGroupChannel(groupId);
+    return () => {
+      this.braceletMeasureHandlers.get(key)?.delete(fn);
+    };
+  }
+
+  onBraceletMeasureFinished(groupId, fn) {
+    const key = String(groupId);
+    if (!this.braceletMeasureFinishedHandlers.has(key)) {
+      this.braceletMeasureFinishedHandlers.set(key, new Set());
+    }
+    this.braceletMeasureFinishedHandlers.get(key).add(fn);
+    void this.ensureGroupChannel(groupId);
+    return () => {
+      this.braceletMeasureFinishedHandlers.get(key)?.delete(fn);
+    };
+  }
+
+  async ensureGroupChannel(groupId) {
+    try {
+      if (!this.echo) await this.initialize();
+      if (!this.echo) return;
+      const channelName = `group.${groupId}`;
+      if (this.listeners.has(channelName)) return;
+
+      const channel = this.echo.private(channelName);
+      const key = String(groupId);
+
+      channel.listen('.bracelet.measure', (data) => {
+        console.log('📡 WebSocket - bracelet.measure:', data);
+        this.braceletMeasureHandlers.get(key)?.forEach((fn) => {
+          try {
+            fn(data || {});
+          } catch (e) {
+            console.warn('bracelet.measure handler', e);
+          }
+        });
+      });
+
+      channel.listen('.bracelet.measure.finished', (data) => {
+        console.log('📡 WebSocket - bracelet.measure.finished:', data);
+        this.braceletMeasureFinishedHandlers.get(key)?.forEach((fn) => {
+          try {
+            fn(data || {});
+          } catch (e) {
+            console.warn('bracelet.measure.finished handler', e);
+          }
+        });
+      });
+
+      this.listeners.set(channelName, channel);
+    } catch (e) {
+      console.warn('ensureGroupChannel', e?.message || e);
     }
   }
 
@@ -148,6 +249,8 @@ class WebSocketService {
       if (channel) {
         channel.stopListening('.media.deleted');
         channel.stopListening('.media.created');
+        channel.stopListening('.bracelet.measure');
+        channel.stopListening('.bracelet.measure.finished');
         this.echo?.leave(channelName);
         this.listeners.delete(channelName);
         console.log(`🔌 WebSocket - Parou de escutar grupo ${groupId}`);
