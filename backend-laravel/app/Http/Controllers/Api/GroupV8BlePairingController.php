@@ -37,10 +37,9 @@ class GroupV8BlePairingController extends Controller
         // (isso misturava a pulseira da Mamãe Sandra na Vovó Rosa).
         $hasLink = $pairing !== null;
 
-        // Paciente: pareia (claim) e envia leituras automáticas pelo celular próximo.
-        // Demais membros: veem dados no backend e podem conectar BLE perto da pulseira
-        // para medir sob demanda, sem roubar o vínculo (can_claim só paciente).
-        $canConnect = true;
+        // Só o paciente/acompanhado pareia e usa BLE neste celular.
+        // Demais membros só leem as leituras gravadas no backend.
+        $canConnect = $isPatient;
         $canClaim = $isPatient;
 
         $pairingPayload = $pairing ? $this->serializePairing($pairing) : null;

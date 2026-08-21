@@ -51,32 +51,12 @@ function unwrapGroupPayload(result) {
   return raw;
 }
 
-function userIsGroupAdmin(group, userId) {
-  if (!group || userId == null) return false;
-  const uid = String(userId);
-  if (group.is_admin === true || group.is_creator === true) return true;
-  if (String(group.created_by || '') === uid) return true;
-  if (String(group.admin_user_id || '') === uid) return true;
-  const me = (group.group_members || []).find((m) => String(m.user_id || m.id || '') === uid);
-  return me?.role === 'admin' || me?.is_admin === true;
-}
-
 function userIsGroupPatient(group, userId) {
   if (!group || userId == null) return false;
   const uid = String(userId);
   const me = (group.group_members || []).find((m) => String(m.user_id || m.id || '') === uid);
   const role = String(me?.role || group.my_role || '').toLowerCase();
   return role === 'patient' || role === 'priority_contact' || role === 'accompanied';
-}
-
-async function resolveGroupAdmin(groupId, userId) {
-  try {
-    const result = await groupService.getGroup(groupId);
-    if (!result?.success) return false;
-    return userIsGroupAdmin(unwrapGroupPayload(result), userId);
-  } catch {
-    return false;
-  }
 }
 
 function ModelPicker({ selected, onSelect, disabled }) {
@@ -1017,9 +997,8 @@ function PulseiraViewerPanel({
           </Text>
         ) : null}
         <Text style={styles.viewerHint}>
-          O celular do paciente grava as leituras no grupo a cada 5 minutos. Para medir
-          agora, conecte-se à pulseira pelo Bluetooth (perto do paciente). Puxe para
-          atualizar.
+          O celular do paciente envia as leituras para o grupo a cada 5 minutos. Puxe para
+          atualizar. Pareamento e Bluetooth ficam só no app do paciente.
         </Text>
       </View>
 
@@ -1048,7 +1027,7 @@ function PulseiraViewerPanel({
 /**
  * Painel da pulseira (V5 ou V8) no grupo.
  * - Paciente (patientMode): pareia, auto-grava a cada 5 min, sem Medir agora.
- * - Demais: veem dados do backend e podem medir sob demanda via BLE próximo.
+ * - Demais: só visualizam leituras do backend (sem Bluetooth).
  */
 function ModeDebugBanner({ mode, canConnectServer, email, pairingError }) {
   const ota = getOtaInfo();
@@ -1113,31 +1092,27 @@ export default function PulseiraVitalPanel({
       const isLinkedOwner =
         myId != null && linkedOwnerId != null && Number(linkedOwnerId) === myId;
 
-      let adminFallback = false;
       let patientFallback = false;
-      if (pairingData?.canConnect !== true) {
+      // BLE só para paciente. Nunca liberar reconnect/scan para cuidador/admin.
+      if (patientMode || allowConnect || pairingData?.canConnect !== true) {
         try {
           const result = await groupService.getGroup(groupId);
           if (result?.success) {
-            const group = unwrapGroupPayload(result);
-            adminFallback = userIsGroupAdmin(group, myId);
-            patientFallback = userIsGroupPatient(group, myId);
+            patientFallback = userIsGroupPatient(unwrapGroupPayload(result), myId);
           }
         } catch {
-          adminFallback = pairingData == null ? await resolveGroupAdmin(groupId, myId) : false;
+          patientFallback = false;
         }
       }
-      const nextCanConnect =
-        patientMode ||
-        pairingData?.canConnect === true ||
-        allowConnect ||
-        patientFallback ||
-        (pairingData == null && adminFallback);
 
       const nextCanClaim =
         patientMode ||
         pairingData?.canClaim === true ||
-        (pairingData == null && (patientFallback || allowConnect));
+        (allowConnect && patientFallback) ||
+        (pairingData == null && patientFallback);
+
+      // Conectar BLE / Reconectar / Escolher pulseira: somente perfil paciente.
+      const nextCanConnect = nextCanClaim;
 
       const pairingHasData =
         officialPairing && pairingData?.latest && Object.values(pairingData.latest).some(Boolean);
@@ -1149,13 +1124,12 @@ export default function PulseiraVitalPanel({
         sleep: null,
         ecg: null,
       };
-      const latestReadings = officialPairing
-        ? pairingHasData
-          ? pairingData.latest
-          : fromVitals.hasWearable
-            ? fromVitals.latest
-            : emptyLatest
-        : emptyLatest;
+      // Cuidador: sempre preferir o que veio do backend (pairing ou vital_signs).
+      const latestReadings = pairingHasData
+        ? pairingData.latest
+        : fromVitals.hasWearable
+          ? fromVitals.latest
+          : emptyLatest;
 
       const pairingPayload = officialPairing;
 
@@ -1169,7 +1143,6 @@ export default function PulseiraVitalPanel({
         patientMode,
         serverCanConnect: pairingData?.canConnect,
         nextCanClaim,
-        adminFallback,
         nextCanConnect,
         pairingError,
         email: user?.email,
@@ -1177,7 +1150,7 @@ export default function PulseiraVitalPanel({
       });
 
       setDebugMeta({
-        canConnectServer: pairingData != null ? !!pairingData.canConnect : adminFallback,
+        canConnectServer: pairingData != null ? !!pairingData.canConnect : null,
         pairingError,
       });
       setPairing(pairingPayload);
@@ -1248,7 +1221,7 @@ export default function PulseiraVitalPanel({
 
   const debugBanner = (
     <ModeDebugBanner
-      mode={canConnect ? (patientMode || canClaim ? 'patient-ble' : 'care-ble') : 'viewer'}
+      mode={canConnect ? 'patient-ble' : 'viewer'}
       canConnectServer={debugMeta.canConnectServer}
       email={user?.email}
       pairingError={debugMeta.pairingError}
@@ -1264,9 +1237,9 @@ export default function PulseiraVitalPanel({
           onSaved={onSaved}
           active={active}
           onPairingChanged={refresh}
-          claimOwnership={patientMode || canClaim}
-          enableAutoSave={patientMode || canClaim}
-          hideManualMeasures={patientMode || canClaim}
+          claimOwnership
+          enableAutoSave
+          hideManualMeasures
           serverLatest={latest}
         />
       </View>
