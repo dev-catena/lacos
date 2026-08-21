@@ -1209,14 +1209,16 @@ function PulseiraViewerPanel({
   useEffect(() => {
     if (!groupId) return undefined;
     return websocketService.onBraceletMeasureFinished(groupId, async (data) => {
+      if (!pendingRequestIdRef.current) return;
       const reqId = data?.request_id || data?.requestId;
-      if (!pendingRequestIdRef.current || String(reqId) !== String(pendingRequestIdRef.current)) {
+      // Aceita finished do pedido atual; se request_id vier vazio, também encerra.
+      if (reqId && String(reqId) !== String(pendingRequestIdRef.current)) {
         return;
       }
       pendingRequestIdRef.current = null;
       setBusy(false);
       setProgress(null);
-      if (data?.success) {
+      if (data?.success !== false) {
         Toast.show({
           type: 'success',
           text1: 'Medição atualizada',
@@ -1245,6 +1247,10 @@ function PulseiraViewerPanel({
           ? 'Pedindo ECG no celular do paciente…'
           : 'Pedindo medição no celular do paciente…',
       );
+      const baselineMs = (() => {
+        const at = latestMeasuredAt(latest);
+        return at ? new Date(at).getTime() : 0;
+      })();
       try {
         const res = await requestBraceletMeasure(groupId, type);
         pendingRequestIdRef.current = res.requestId;
@@ -1254,18 +1260,38 @@ function PulseiraViewerPanel({
             : 'Aguardando medição no celular do paciente…',
         );
 
-        const startedAt = latestMeasuredAt(latest);
         const timeoutMs = type === 'ecg' ? 120_000 : 200_000;
-        const pollEvery = 3000;
+        const pollEvery = 2500;
         const deadline = Date.now() + timeoutMs;
 
         while (Date.now() < deadline && pendingRequestIdRef.current) {
           await sleepMs(pollEvery);
-          if (!pendingRequestIdRef.current) return;
+          if (!pendingRequestIdRef.current) {
+            setBusy(false);
+            setProgress(null);
+            return;
+          }
           try {
+            // Detecta sucesso pelos dados novos no backend (mesmo se o WS finished falhar).
+            const pairingData = await getV8BlePairing(groupId);
+            const nextAt = latestMeasuredAt(pairingData?.latest);
+            const nextMs = nextAt ? new Date(nextAt).getTime() : 0;
+            if (nextMs > baselineMs) {
+              pendingRequestIdRef.current = null;
+              setBusy(false);
+              setProgress(null);
+              Toast.show({
+                type: 'success',
+                text1: 'Medição atualizada',
+                text2: 'Leituras novas recebidas do paciente.',
+              });
+              onSaved?.();
+              onRefresh?.({ silent: true });
+              return;
+            }
             await onRefresh?.({ silent: true });
           } catch {
-            // ignore
+            // ignore poll errors
           }
         }
 
@@ -1275,6 +1301,8 @@ function PulseiraViewerPanel({
             'Tempo esgotado. Confira se o app do paciente está aberto e a pulseira conectada.',
           );
         }
+        setBusy(false);
+        setProgress(null);
       } catch (e) {
         pendingRequestIdRef.current = null;
         Toast.show({
@@ -1286,7 +1314,7 @@ function PulseiraViewerPanel({
         setProgress(null);
       }
     },
-    [busy, groupId, latest, onRefresh],
+    [busy, groupId, latest, onRefresh, onSaved],
   );
 
   return (
