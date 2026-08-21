@@ -144,7 +144,8 @@ function createBleManagerSafe() {
   return new BleManager();
 }
 
-export function useV8Ble(groupId, ownerUserId) {
+export function useV8Ble(groupId, ownerUserId, options = {}) {
+  const enableAutoConnect = options.enableAutoConnect !== false;
   const managerRef = useRef(null);
   const notifySubRef = useRef(null);
   const disconnectSubRef = useRef(null);
@@ -781,6 +782,7 @@ export function useV8Ble(groupId, ownerUserId) {
   }, [clearMeasureTimers, updateUiState]);
 
   useEffect(() => {
+    if (!enableAutoConnect) return undefined;
     if (Platform.OS === 'android') return;
     if (!pairReady || !pairedDevice) return;
     if (autoConnectAttemptedRef.current) return;
@@ -807,9 +809,10 @@ export function useV8Ble(groupId, ownerUserId) {
     return () => {
       cancelled = true;
     };
-  }, [pairReady, pairedDevice, tryAutoConnect]);
+  }, [enableAutoConnect, pairReady, pairedDevice, tryAutoConnect]);
 
   useEffect(() => {
+    if (!enableAutoConnect) return undefined;
     const sub = AppState.addEventListener('change', (next) => {
       if (Platform.OS === 'android') return;
       if (next !== 'active' || !pairedRef.current) return;
@@ -827,7 +830,7 @@ export function useV8Ble(groupId, ownerUserId) {
       void tryAutoConnect();
     });
     return () => sub.remove();
-  }, [tryAutoConnect]);
+  }, [enableAutoConnect, tryAutoConnect]);
 
   const disconnect = useCallback(async () => {
     stopScan();
